@@ -127,8 +127,6 @@ export class CombatModal {
     );
   }
 
-  // ... (Mantenha handleZoom, createBackdrop, show, close, createHexagons IGUAIS) ...
-
   handleZoom(deltaY, mouseX, mouseY) {
     const zoomFactor = 0.1;
     const direction = deltaY > 0 ? -1 : 1;
@@ -160,16 +158,15 @@ export class CombatModal {
   show(territoryData) {
     this.backdrop.setVisible(true);
     this.container.setVisible(true);
-    this.titleText.setVisible(true);
     this.container.setPosition(0, 0);
     this.container.setScale(1);
 
     const terrainColor = territoryData?.terrain?.color || 0x445566;
     if (territoryData) {
-      this.titleText.setText(
-        `COMBATE EM: ${territoryData.terrain.name.toUpperCase()}`
-      );
-      this.titleText.setBackgroundColor(this.hexColorToString(terrainColor));
+      const uiScene = this.scene.scene.get("UIScene");
+      if (uiScene) {
+        uiScene.setCombatMode(true, territoryData);
+      }
     }
 
     const cols = 30;
@@ -217,10 +214,14 @@ export class CombatModal {
   close() {
     this.backdrop.setVisible(false);
     this.container.setVisible(false);
-    this.titleText.setVisible(false);
     this.hexagons.forEach((hex) => hex.destroy());
     this.hexagons = [];
     this.selectedHexId = -1;
+    const uiScene = this.scene.scene.get("UIScene");
+    if (uiScene) {
+      uiScene.setCombatMode(false);
+    }
+
     if (this.scene.onCombatClose) this.scene.onCombatClose();
   }
 

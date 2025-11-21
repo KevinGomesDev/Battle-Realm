@@ -45,9 +45,6 @@ export class InteractiveHexagon {
     });
 
     this.graphics.on("pointerdown", (pointer, localX, localY, event) => {
-      // --- CORREÇÃO: REMOVIDO stopPropagation ---
-      // Isso permite que o evento suba para a Scene e ative o Drag do CombatModal
-
       if (this.onSelect) this.onSelect(this.id);
     });
   }

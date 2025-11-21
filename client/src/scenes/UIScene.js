@@ -7,26 +7,23 @@ export class UIScene extends Phaser.Scene {
   }
 
   create() {
-    // Instancia a barra unificada
     this.topBar = new TopBar(this);
   }
 
-  // Método chamado pela GameScene quando o jogador clica/seleciona algo
   updateInfo(data) {
     if (this.topBar) {
       this.topBar.updateTerritoryInfo(data);
     }
   }
 
-  // (Opcional) Se você tiver lógica de atualizar recursos no futuro
-  updateResources(resourceData) {
+  // --- NOVO MÉTODO ---
+  setCombatMode(isActive, data) {
     if (this.topBar) {
-      // Exemplo: resourceData = { gold: 1050, wood: 400 }
-      Object.keys(resourceData).forEach((key) => {
-        this.topBar.updateResource(key, resourceData[key]);
-      });
+      if (isActive && data) {
+        this.topBar.setCombatState(true, data.terrain.name, data.terrain.color);
+      } else {
+        this.topBar.setCombatState(false);
+      }
     }
   }
-
-  // Removemos setModalState pois não há mais botão de fechar para esconder
 }
