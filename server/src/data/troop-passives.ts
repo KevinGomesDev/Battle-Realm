@@ -30,18 +30,18 @@ export const TROOP_PASSIVES: TroopPassiveDef[] = [
     description:
       "Caso ataque uma unidade que ainda não agiu neste turno, causa +3 de dano.",
   },
-  //   {
-  //     id: "FURTIVIDADE",
-  //     name: "Furtividade",
-  //     description:
-  //       "Não pode ser alvo de ataques à distância enquanto estiver adjacente a outra unidade aliada.",
-  //   },
-  //   {
-  //     id: "TIRO_RAPIDO",
-  //     name: "Tiro Rápido",
-  //     description:
-  //       "Pode realizar dois ataques à distância por turno, mas cada ataque causa -1 de dano.",
-  //   },
+  {
+    id: "FURTIVIDADE",
+    name: "Furtividade",
+    description:
+      "Não pode ser alvo de ataques à distância enquanto estiver adjacente a outra unidade aliada.",
+  },
+  {
+    id: "TIRO_RAPIDO",
+    name: "Tiro Rápido",
+    description:
+      "Pode realizar dois ataques à distância por turno, mas cada ataque causa -1 de dano.",
+  },
   //   {
   //     id: "PRECISAO_MORTAL",
   //     name: "Precisão Mortal",
