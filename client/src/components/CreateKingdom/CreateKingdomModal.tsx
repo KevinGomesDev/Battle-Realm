@@ -193,8 +193,6 @@ export const CreateKingdomModal: React.FC<CreateKingdomModalProps> = ({
         race: selectedRace,
         alignment: selectedAlignment,
         raceMetadata,
-        crestUrl: "",
-        capitalImageUrl: "",
       });
 
       if (!kingdomResult || !("id" in kingdomResult)) {

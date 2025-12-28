@@ -54,8 +54,6 @@ interface KingdomData {
   alignment: string;
   race: string;
   raceMetadata: any;
-  crestUrl: string;
-  capitalImageUrl: string;
 }
 
 interface RegentData {

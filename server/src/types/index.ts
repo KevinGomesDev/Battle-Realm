@@ -18,8 +18,6 @@ export interface CreateKingdomData {
   alignment: Alignment;
   race: Race;
   raceMetadata?: string;
-  crestUrl?: string;
-  capitalImageUrl?: string;
 }
 
 // Tipos de Crise

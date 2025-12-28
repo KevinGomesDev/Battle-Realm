@@ -22,8 +22,6 @@ model Kingdom {
   id             String    @id @default(uuid())
   name           String
   capitalName    String
-  crestUrl       String?
-  capitalImageUrl String?
   alignment      Alignment
   race           Race
   raceMetadata   String?

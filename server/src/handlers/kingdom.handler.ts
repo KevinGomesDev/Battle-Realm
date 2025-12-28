@@ -21,8 +21,6 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
         alignment,
         race,
         raceMetadata,
-        crestUrl,
-        capitalImageUrl,
         troopTemplates, // Nova propriedade: array de 5 templates de tropas
       } = data;
 
@@ -69,8 +67,6 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
           alignment,
           race,
           raceMetadata,
-          crestUrl,
-          capitalImageUrl,
           locationIndex: randomLocation,
           ownerId: userId,
         },
