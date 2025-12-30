@@ -22,6 +22,7 @@ model Kingdom {
   id             String    @id @default(uuid())
   name           String
   capitalName    String
+  description    String?   // História ou descrição do reino (opcional)
   alignment      Alignment
   race           Race
   raceMetadata   String?
@@ -43,6 +44,7 @@ model TroopTemplate {
   kingdom        Kingdom   @relation(fields: [kingdomId], references: [id], onDelete: Cascade)
   slotIndex      Int       // 0-4 (5 tropas por reino)
   name           String    // Nome personalizado da tropa
+  description    String?   // História ou descrição da tropa (opcional)
   passiveId      String    // ID da passiva escolhida
   resourceType   String    // minerio, suprimentos, arcana, experiencia
   // Atributos base (10 pontos distribuídos)
@@ -154,6 +156,7 @@ model Unit {
   ownerId        String?
   owner          MatchPlayer? @relation(fields: [ownerId], references: [id])
   name           String?
+  description    String?     // História ou descrição do herói/regente (opcional)
   equipment      String      @default("[]") // Itens equipados (máx 3) (JSON)
   // Relacionamentos de unidades
   summonerId     String?
@@ -162,19 +165,25 @@ model Unit {
   battleUnits    BattleUnit[]
   // Dados da Unidade
   category       UnitCategory
-  type           String
+  troopSlot      Int?         // Para TROOP: índice do template de tropa (0-4)
   level          Int          @default(1)
-  heroClass      String?
-  classFeatures  String       @default("[]")
+  // Classe do Herói/Regente (referência à table HeroClass)
+  classId        String?
+  heroClass      HeroClass?   @relation(fields: [classId], references: [id])
+  classFeatures  String       @default("[]") // IDs das skills aprendidas
   combat         Int
   acuity         Int
   focus          Int
   armor          Int
   vitality       Int
+  damageReduction Int         @default(0) // Redução de dano fixa (armadura pesada, raça, etc.)
   currentHp      Int
   movesLeft      Int
   actionsLeft    Int
+  isAlive        Boolean      @default(true) // Morte permanente em partidas
   locationIndex  Int?
+  // Ações disponíveis para esta unidade (JSON array de strings)
+  actions        String       @default("[\"attack\",\"move\",\"dash\",\"dodge\"]")
 }
 
 model Structure {
@@ -197,13 +206,84 @@ model Structure {
   locationIndex  Int?
 }
 
+// =====================
+// Hero Classes & Skills
+// =====================
+
+model HeroClass {
+  id             String    @id @default(uuid())
+  code           String    @unique  // Ex: BARBARIAN, WARRIOR, CLERIC
+  name           String              // Nome de exibição
+  description    String?             // Descrição da classe
+  archetype      Archetype           // PHYSICAL, SPIRITUAL, ARCANE
+  resourceUsed   String              // Recurso gasto para usar skills (FOOD, DEVOTION, ARCANA)
+  
+  // Relacionamentos
+  skills         Skill[]             // Skills desta classe
+  units          Unit[]              // Unidades com esta classe
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Skill {
+  id             String    @id @default(uuid())
+  code           String    @unique  // Ex: BARBARIAN_WILD_FURY
+  name           String              // Nome de exibição
+  description    String              // O que a skill faz
+  
+  // Tipo e custo
+  category       SkillCategory       // PASSIVE, ACTIVE, REACTIVE
+  costTier       CostTier?           // LOW, MEDIUM, HIGH, EXTREME (null para passivas)
+  range          SkillRange?         // SELF, ADJACENT, RANGED, AREA
+  
+  // Vínculo à classe
+  classId        String
+  heroClass      HeroClass @relation(fields: [classId], references: [id])
+  
+  // Função que será executada (nome do handler)
+  functionName   String?             // Ex: "executeWildFury", "executeActionSurge"
+  
+  // Metadata adicional (JSON para parâmetros extras)
+  metadata       String    @default("{}")
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+enum Archetype {
+  PHYSICAL    // Física - usa Comida
+  SPIRITUAL   // Espiritual - usa Devoção  
+  ARCANE      // Arcana - usa Arcana
+}
+
+enum SkillCategory {
+  PASSIVE     // Sempre ativa
+  ACTIVE      // Requer ação para usar
+  REACTIVE    // Pode ser usada como reação
+}
+
+enum CostTier {
+  LOW         // Custo baixo
+  MEDIUM      // Custo médio
+  HIGH        // Custo alto
+  EXTREME     // Custo extremo
+}
+
+enum SkillRange {
+  SELF        // Afeta apenas o usuário
+  ADJACENT    // Afeta adjacentes
+  RANGED      // Afeta à distância
+  AREA        // Afeta área
+}
+
 enum UnitCategory {
-  TROPA
-  HEROI
-  REGENTE
-  PRISIONEIRO
-  INVOCACAO
-  MONSTRO
+  TROOP
+  HERO
+  REGENT
+  PRISONER
+  SUMMON
+  MONSTER
 }
 
 enum TerritorySize {
@@ -227,16 +307,23 @@ enum TurnType {
 
 model Battle {
   id               String   @id @default(uuid())
-  matchId          String
-  match            Match    @relation(fields: [matchId], references: [id])
+  matchId          String?  // Null para batalhas de Arena
+  match            Match?   @relation(fields: [matchId], references: [id])
+  isArena          Boolean  @default(false)    // True se é batalha de Arena
+  lobbyId          String?  // ID do lobby de Arena (se aplicável)
+  hostUserId       String?  // ID do host da Arena
+  guestUserId      String?  // ID do guest da Arena
+  hostKingdomId    String?  // ID do reino do host
+  guestKingdomId   String?  // ID do reino do guest
   status           String   @default("ACTIVE") // ACTIVE | ENDED
   gridWidth        Int      @default(20)
   gridHeight       Int      @default(20)
   round            Int      @default(1)
   currentTurnIndex Int      @default(0)        // índice na ordem de iniciativa
   initiativeOrder  String   @default("[]")      // JSON: [battleUnitId...]
-  actionOrder      String   @default("[]")      // JSON: [matchPlayerId...], ordem de jogadores
-  supplyBids       String   @default("{}")      // JSON: {matchPlayerId: bid}
+  actionOrder      String   @default("[]")      // JSON: [userId...], ordem de jogadores por iniciativa
+  winnerId         String?  // ID do vencedor (userId ou matchPlayerId)
+  winReason        String?  // Motivo da vitória
   ransomPrice      Int?
   ransomResource   String?
   createdAt        DateTime @default(now())
@@ -248,23 +335,43 @@ model Battle {
 model BattleUnit {
   id          String      @id @default(uuid())
   battleId    String
-  battle      Battle      @relation(fields: [battleId], references: [id])
-  unitId      String
-  unit        Unit        @relation(fields: [unitId], references: [id])
-  ownerId     String
-  owner       MatchPlayer @relation(fields: [ownerId], references: [id])
+  battle      Battle      @relation(fields: [battleId], references: [id], onDelete: Cascade)
+  unitId      String?     // Reference to original Unit (null for Arena where units are temporary)
+  unit        Unit?       @relation(fields: [unitId], references: [id])
+  ownerId     String?     // MatchPlayer ID (for matches)
+  owner       MatchPlayer? @relation(fields: [ownerId], references: [id])
+  // Data copied from Unit for battle
+  userId      String?     // Owner User ID (for Arena)
+  kingdomId   String?     // Owner Kingdom ID
+  name        String      @default("Unit")
+  category    String      @default("TROOP")
+  troopSlot   Int?        // Para TROOP: índice do template (0-4)
+  level       Int         @default(1)  // Nível da unidade
+  classId     String?     // ID da classe do herói/regente
+  classFeatures String    @default("[]") // Skills aprendidas (JSON)
+  equipment   String      @default("[]") // Itens equipados (JSON)
+  combat      Int         @default(1)
+  acuity      Int         @default(1)
+  focus       Int         @default(1)
+  armor       Int         @default(1)
+  vitality    Int         @default(5)
+  damageReduction Int     @default(0) // Fixed DR, most units have 0
+  currentHp   Int         @default(10)  // vitality * 2
+  // Battle state
   posX        Int         @default(0)
   posY        Int         @default(0)
   initiative  Int         @default(0)
   movesLeft   Int         @default(3)
   actionsLeft Int         @default(1)
   isAlive     Boolean     @default(true)
-  actionMarks Int         @default(0)          // Marcas de Ação acumuladas
-  protection  Int         @default(0)          // Proteção atual (2x Armadura ao iniciar)
-  protectionBroken Boolean @default(false)     // Não pode ser recuperada se quebrar
-  conditions  String      @default("[]")        // JSON: ["CONGELADA", ...]
+  actionMarks Int         @default(0)          // Accumulated Action Marks
+  protection  Int         @default(0)          // Current protection (2x Armor at start)
+  protectionBroken Boolean @default(false)     // Cannot be recovered if broken
+  conditions  String      @default("[]")        // JSON: ["FROZEN", ...]
   grabbedByBattleUnitId String?
-  corpseRemoved Boolean   @default(false)      // Se verdadeiro, cadáver não bloqueia mais
+  corpseRemoved Boolean   @default(false)      // If true, corpse no longer blocks
+  hasStartedAction Boolean @default(false)     // If unit already started action this turn
+  actions     String      @default("[\"attack\",\"move\",\"dash\",\"dodge\"]") // Available actions (copied from Unit)
 }
 
 model BattleLog {

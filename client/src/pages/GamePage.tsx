@@ -132,9 +132,9 @@ const GamePage: React.FC<GamePageProps> = ({
                 <MapCanvas
                   territories={matchMapData.territories}
                   players={completeMatchState.players}
-                  onTerritoryClick={(territory) =>
-                    console.log("Território clicado:", territory)
-                  }
+                  onTerritoryClick={(_territory) => {
+                    // Clique em território no modo de jogo
+                  }}
                 />
               ) : (
                 <div className="text-center text-slate-400 py-8">

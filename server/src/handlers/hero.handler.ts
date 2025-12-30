@@ -106,7 +106,6 @@ export const registerHeroHandlers = (io: Server, socket: Socket) => {
         }
 
         const result = await recruitHero(matchId, playerId, {
-          type: "hero",
           name,
           heroClass,
           attributeDistribution,
@@ -154,7 +153,7 @@ export const registerHeroHandlers = (io: Server, socket: Socket) => {
         return;
       }
 
-      if (unit.category !== "HEROI") {
+      if (unit.category !== "HERO") {
         socket.emit("error", { message: "Esta não é uma unidade Herói" });
         return;
       }
@@ -180,7 +179,7 @@ export const registerHeroHandlers = (io: Server, socket: Socket) => {
         where: {
           matchId,
           ownerId: playerId,
-          category: "HEROI",
+          category: "HERO",
         },
       });
 

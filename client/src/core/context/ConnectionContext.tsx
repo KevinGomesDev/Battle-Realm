@@ -61,8 +61,8 @@ export function ConnectionProvider({
       dispatch({ type: "SET_ERROR", payload: null });
 
       // Setup global socket listeners
-      socketService.on("socket:connected", (data: { socketId: string }) => {
-        console.log("[Connection] Connected to server:", data.socketId);
+      socketService.on("socket:connected", (_data: { socketId: string }) => {
+        // Conexão estabelecida
       });
 
       socketService.on(
@@ -87,7 +87,6 @@ export function ConnectionProvider({
   // Listen for socket.io native events
   useEffect(() => {
     const handleConnect = () => {
-      console.log("🟢 Conectado ao servidor");
       dispatch({ type: "SET_CONNECTED", payload: true });
       dispatch({ type: "SET_ERROR", payload: null });
     };
@@ -102,15 +101,13 @@ export function ConnectionProvider({
       }
     };
 
-    const handleReconnect = (attemptNumber: number) => {
-      console.log("🔄 Reconectado após tentativa", attemptNumber);
+    const handleReconnect = (_attemptNumber: number) => {
       dispatch({ type: "SET_CONNECTED", payload: true });
       dispatch({ type: "SET_RECONNECTING", payload: false });
       dispatch({ type: "SET_RECONNECT_ATTEMPT", payload: 0 });
     };
 
     const handleReconnectAttempt = (attemptNumber: number) => {
-      console.log("🔄 Tentativa de reconexão", attemptNumber);
       dispatch({ type: "SET_RECONNECT_ATTEMPT", payload: attemptNumber });
     };
 

@@ -10,13 +10,33 @@ import { registerTurnHandlers } from "./handlers/turn.handler";
 import { registerRegentHandlers } from "./handlers/regent.handler";
 import { registerHeroHandlers } from "./handlers/hero.handler";
 import { registerTroopHandlers } from "./handlers/troop.handler";
-import { registerBattleHandlers } from "./handlers/battle.handler";
+import {
+  registerBattleHandlers,
+  arenaLobbies,
+  arenaBattles,
+  userToLobby,
+  disconnectedPlayers,
+  socketToUser,
+} from "./handlers/battle.handler";
 import { registerItemsHandlers } from "./handlers/items.handler";
 import { registerSummonHandlers } from "./handlers/summon.handler";
 import { registerMovementHandlers } from "./handlers/movement.handler";
 import { registerCrisisHandlers } from "./handlers/crisis.handler";
 import { registerSkillsHandlers } from "./handlers/skills.handler";
 import { registerActionHandlers } from "./handlers/action.handler";
+import {
+  registerSessionHandlers,
+  injectArenaRefs,
+} from "./handlers/session.handler";
+
+// Injetar referências da arena no session handler
+injectArenaRefs(
+  arenaLobbies,
+  arenaBattles,
+  userToLobby,
+  disconnectedPlayers,
+  socketToUser
+);
 
 const app = express();
 const server = http.createServer(app);
@@ -36,7 +56,13 @@ io.on("connection", (socket: Socket) => {
     `[SOCKET] Nova conexão (${connectionCount} ativos): ${socket.id}`
   );
 
+  // Handler de ping/pong para manter conexão ativa
+  socket.on("ping", () => {
+    socket.emit("pong");
+  });
+
   registerAuthHandlers(io, socket);
+  registerSessionHandlers(io, socket); // Deve vir logo após auth
   registerKingdomHandlers(io, socket);
   registerMatchHandlers(io, socket);
   registerWorldMapHandlers(io, socket);

@@ -150,8 +150,8 @@ export const registerTroopHandlers = (io: Server, socket: Socket) => {
           where: {
             matchId,
             ownerId: playerId,
-            type: String(slotIndex),
-            category: "TROPA",
+            troopSlot: slotIndex,
+            category: "TROOP",
           },
         });
 
@@ -210,17 +210,18 @@ export const registerTroopHandlers = (io: Server, socket: Socket) => {
         where: {
           matchId,
           ownerId: playerId,
-          category: { in: ["TROPA", "INVOCACAO"] },
+          category: { in: ["TROOP", "INVOCACAO"] },
         },
       } as any);
 
-      // Agrupar por slotIndex (armazenado em type)
+      // Agrupar por slotIndex (armazenado em troopSlot)
       const groupedBySlot: { [key: string]: typeof units } = {};
       for (const unit of units) {
-        if (!groupedBySlot[unit.type]) {
-          groupedBySlot[unit.type] = [];
+        const slotKey = String(unit.troopSlot ?? "other");
+        if (!groupedBySlot[slotKey]) {
+          groupedBySlot[slotKey] = [];
         }
-        groupedBySlot[unit.type].push(unit);
+        groupedBySlot[slotKey].push(unit);
       }
 
       socket.emit("army:all_troops", { groupedBySlot, units });

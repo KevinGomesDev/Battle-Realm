@@ -14,6 +14,7 @@ import {
   getTerritoryConstructionInfo,
   buildStructureFree,
 } from "../utils/construction.utils";
+import { canJoinNewSession } from "../utils/session.utils";
 
 const MAP_SIZE = 25; // Grid 5x5 de terra
 
@@ -169,6 +170,12 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
   // ============================================================
   socket.on("match:create", async ({ userId, kingdomId }) => {
     try {
+      // Verificar se usuário já está em uma sessão ativa
+      const blockReason = await canJoinNewSession(userId);
+      if (blockReason) {
+        return socket.emit("error", { message: blockReason });
+      }
+
       console.log(
         `[MATCH] Host ${userId} criando partida com Reino ${kingdomId}`
       );
@@ -256,6 +263,12 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
   // ============================================================
   socket.on("match:join", async ({ matchId, userId, kingdomId }) => {
     try {
+      // Verificar se usuário já está em uma sessão ativa
+      const blockReason = await canJoinNewSession(userId);
+      if (blockReason) {
+        return socket.emit("error", { message: blockReason });
+      }
+
       console.log(`[MATCH] Guest ${userId} entrando na partida ${matchId}`);
 
       const match = await prisma.match.findUnique({
@@ -728,6 +741,102 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
     } catch (error) {
       console.error("[MATCH] Erro ao marcar pronto:", error);
       socket.emit("error", { message: "Erro ao marcar como pronto." });
+    }
+  });
+
+  // ============================================================
+  // SAIR DA PARTIDA (ABANDONAR)
+  // ============================================================
+  socket.on("match:leave", async ({ matchId, userId }) => {
+    try {
+      console.log(`[MATCH] Usuário ${userId} saindo da partida ${matchId}`);
+
+      const match = await prisma.match.findUnique({
+        where: { id: matchId },
+        include: { players: true },
+      });
+
+      if (!match) {
+        return socket.emit("error", { message: "Partida não encontrada." });
+      }
+
+      const player = match.players.find((p) => p.userId === userId);
+      if (!player) {
+        return socket.emit("error", {
+          message: "Você não está nesta partida.",
+        });
+      }
+
+      // Se a partida está em WAITING, apenas remove o jogador
+      if (match.status === "WAITING") {
+        await prisma.matchPlayer.delete({ where: { id: player.id } });
+
+        // Se era o único jogador (host), cancela a partida
+        if (match.players.length === 1) {
+          await prisma.territory.deleteMany({ where: { matchId } });
+          await prisma.match.delete({ where: { id: matchId } });
+
+          socket.leave(matchId);
+          socket.emit("match:left", {
+            message: "Partida cancelada (você era o único jogador).",
+          });
+          console.log(`[MATCH] Partida ${matchId} cancelada pelo host`);
+          return;
+        }
+
+        // Notifica os outros jogadores
+        socket.leave(matchId);
+        io.to(matchId).emit("match:player_left", {
+          userId,
+          message: "Um jogador saiu da sala.",
+        });
+        socket.emit("match:left", { message: "Você saiu da partida." });
+        await broadcastMatchState(io, matchId);
+        return;
+      }
+
+      // Se a partida está ACTIVE ou PREPARATION, o jogador abandona (perde por W.O.)
+      if (match.status === "ACTIVE" || match.status === "PREPARATION") {
+        // Marcar partida como finalizada e o outro jogador como vencedor
+        const otherPlayer = match.players.find((p) => p.userId !== userId);
+
+        await prisma.match.update({
+          where: { id: matchId },
+          data: {
+            status: "FINISHED",
+          },
+        });
+
+        // Liberar territórios do jogador que abandonou
+        await prisma.territory.updateMany({
+          where: { matchId, ownerId: player.id },
+          data: { ownerId: null, isCapital: false },
+        });
+
+        socket.leave(matchId);
+        io.to(matchId).emit("match:player_abandoned", {
+          abandonedUserId: userId,
+          winnerUserId: otherPlayer?.userId,
+          message: `Jogador abandonou a partida. ${
+            otherPlayer ? "Vitória por W.O.!" : ""
+          }`,
+        });
+
+        socket.emit("match:left", {
+          message: "Você abandonou a partida. Derrota por W.O.",
+        });
+
+        console.log(
+          `[MATCH] Usuário ${userId} abandonou partida ${matchId}. Vencedor: ${otherPlayer?.userId}`
+        );
+        return;
+      }
+
+      // Partida já finalizada
+      socket.emit("error", { message: "Esta partida já foi finalizada." });
+    } catch (error) {
+      console.error("[MATCH] Erro ao sair da partida:", error);
+      socket.emit("error", { message: "Erro ao sair da partida." });
     }
   });
 };

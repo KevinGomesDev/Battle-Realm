@@ -170,4 +170,30 @@ export const registerAuthHandlers = (io: Server, socket: Socket) => {
       });
     }
   });
+
+  // --- LOGOUT ---
+  socket.on("auth:logout", async () => {
+    try {
+      const userId = socket.data.userId;
+
+      if (userId) {
+        console.log(`[AUTH] Logout: ${userId}`);
+      }
+
+      // Limpa dados do socket
+      socket.data.userId = undefined;
+
+      // Emite confirmação
+      socket.emit("auth:logged_out", {
+        success: true,
+        message: "Logout realizado com sucesso",
+      });
+    } catch (error) {
+      console.error("[AUTH] Erro ao fazer logout:", error);
+      socket.emit("error", {
+        message: "Erro ao fazer logout",
+        code: "LOGOUT_ERROR",
+      });
+    }
+  });
 };

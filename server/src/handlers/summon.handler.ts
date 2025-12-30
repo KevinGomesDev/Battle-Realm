@@ -44,7 +44,7 @@ export const registerSummonHandlers = (io: Server, socket: Socket) => {
       if (!summonerUnitId)
         return socket.emit("error", { message: "summonerUnitId requerido" });
       const summons = await prisma.unit.findMany({
-        where: { summonerId: summonerUnitId, category: "INVOCACAO" },
+        where: { summonerId: summonerUnitId, category: "SUMMON" },
       });
       socket.emit("summon:summons", { summonerUnitId, summons });
     } catch (err: any) {

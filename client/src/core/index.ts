@@ -13,3 +13,14 @@ export type {
   ConnectionContextType,
   ConnectionAction,
 } from "./types/connection.types";
+
+// Session Management
+export { SessionProvider, SessionContext } from "./context/SessionContext";
+export { useSession } from "./hooks/useSession";
+export type {
+  SessionState,
+  SessionContextType,
+  SessionAction,
+  SessionType,
+  ActiveSession,
+} from "./types/session.types";

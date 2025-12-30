@@ -57,7 +57,7 @@ export const registerItemsHandlers = (io: Server, socket: Socket) => {
       const unit = await prisma.unit.findUnique({ where: { id: unitId } });
       if (!kingdom || !unit)
         return socket.emit("error", { message: "Dados inválidos" });
-      if (unit.category !== "HEROI" && unit.category !== "REGENTE") {
+      if (unit.category !== "HERO" && unit.category !== "REGENT") {
         return socket.emit("error", {
           message: "Apenas Heróis e Regentes podem equipar itens",
         });

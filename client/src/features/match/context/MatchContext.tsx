@@ -522,8 +522,6 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
   // Listener para o novo sistema de broadcast
   React.useEffect(() => {
     const handleMatchStateUpdated = (completeState: CompleteMatchState) => {
-      console.log("📡 Estado da partida atualizado:", completeState);
-
       // Atualizar estado completo
       dispatch({ type: "SET_COMPLETE_MATCH_STATE", payload: completeState });
 
@@ -563,7 +561,6 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
         sessionStorage.getItem("currentMatchId");
 
       if (matchId) {
-        console.log("🔄 Reconectado! Sincronizando partida...");
         requestMatchState(matchId);
         requestMapData(matchId);
       }

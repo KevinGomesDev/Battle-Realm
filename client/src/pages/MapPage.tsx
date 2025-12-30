@@ -1,6 +1,11 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useMatch } from "../features/match";
-import { MapCanvas, TopHUD, RightSidebar, TerritoryModal } from "../features/map";
+import {
+  MapCanvas,
+  TopHUD,
+  RightSidebar,
+  TerritoryModal,
+} from "../features/map";
 import type { Territory } from "../features/map";
 
 /**
@@ -20,9 +25,10 @@ const MapPage: React.FC = () => {
   } = useMatch();
   const [isLoadingMap, setIsLoadingMap] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  
+
   // Estado do modal de território - este é o único jeito de construir
-  const [openTerritoryModal, setOpenTerritoryModal] = useState<Territory | null>(null);
+  const [openTerritoryModal, setOpenTerritoryModal] =
+    useState<Territory | null>(null);
 
   const matchId = completeMatchState?.matchId || currentMatch?.id || "";
   const inPreparation =
@@ -50,19 +56,17 @@ const MapPage: React.FC = () => {
   }, [requestMapData]);
 
   // Clique em território - abre modal se for do jogador e puder construir
-  const handleTerritoryClick = useCallback((territory: Territory) => {
-    console.log("Território clicado:", territory);
-    
-    // Verifica se é um território do jogador atual
-    const isOwnTerritory = territory.ownerId === myPlayerId;
-    
-    if (isOwnTerritory && canBuild) {
-      setOpenTerritoryModal(territory);
-    } else if (!isOwnTerritory) {
-      // Pode exibir informações do território inimigo futuramente
-      console.log("Território não pertence ao jogador.");
-    }
-  }, [myPlayerId, canBuild]);
+  const handleTerritoryClick = useCallback(
+    (territory: Territory) => {
+      // Verifica se é um território do jogador atual
+      const isOwnTerritory = territory.ownerId === myPlayerId;
+
+      if (isOwnTerritory && canBuild) {
+        setOpenTerritoryModal(territory);
+      }
+    },
+    [myPlayerId, canBuild]
+  );
 
   // Fecha modal de território
   const handleCloseTerritory = useCallback(() => {
@@ -91,7 +95,7 @@ const MapPage: React.FC = () => {
       <TopHUD />
 
       {/* RightSidebar - Sidebar Direita com suporte a território selecionado */}
-      <RightSidebar 
+      <RightSidebar
         selectedTerritory={openTerritoryModal}
         onCloseTerritory={handleCloseTerritory}
       />
@@ -141,11 +145,11 @@ const MapPage: React.FC = () => {
       {canBuild && !openTerritoryModal && (
         <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none">
           <div className="bg-citadel-carved/90 border-2 border-metal-iron rounded-lg px-6 py-3 shadow-stone-raised">
-            <p 
+            <p
               className="text-parchment-aged text-sm text-center"
               style={{ fontFamily: "'Cinzel', serif" }}
             >
-              {inPreparation 
+              {inPreparation
                 ? "Clique em um de seus territórios para construir estruturas gratuitas."
                 : "Clique em um de seus territórios para administrar construções."}
             </p>

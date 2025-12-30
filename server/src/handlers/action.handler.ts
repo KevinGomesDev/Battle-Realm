@@ -81,8 +81,8 @@ export const registerActionHandlers = (io: Server, socket: Socket) => {
         const unitCount = unitsInTerritory.length;
         const hasHeroOrRegent = unitsInTerritory.some(
           (u) =>
-            u.category === UnitCategory.HEROI ||
-            u.category === UnitCategory.REGENTE
+            u.category === UnitCategory.HERO ||
+            u.category === UnitCategory.REGENT
         );
 
         // 6. Calcular custo (quantidade de territórios já dominados)
@@ -139,8 +139,8 @@ export const registerActionHandlers = (io: Server, socket: Socket) => {
         // 10. Encontrar líder (Herói ou Regente) para os testes
         const leader = unitsInTerritory.find(
           (u) =>
-            u.category === UnitCategory.HEROI ||
-            u.category === UnitCategory.REGENTE
+            u.category === UnitCategory.HERO ||
+            u.category === UnitCategory.REGENT
         );
 
         // Pegar atributos do líder para os testes
@@ -187,7 +187,7 @@ export const registerActionHandlers = (io: Server, socket: Socket) => {
             cost,
             unitCount,
             leaderId: leader?.id,
-            leaderName: leader?.name ?? `${leader?.category} ${leader?.type}`,
+            leaderName: leader?.name ?? `${leader?.category}`,
           },
           event: conquestResult.eventTriggered
             ? {
@@ -277,8 +277,8 @@ export const registerActionHandlers = (io: Server, socket: Socket) => {
             const unitCount = unitsInTerritory.length;
             const hasLeader = unitsInTerritory.some(
               (u) =>
-                u.category === UnitCategory.HEROI ||
-                u.category === UnitCategory.REGENTE
+                u.category === UnitCategory.HERO ||
+                u.category === UnitCategory.REGENT
             );
 
             return {

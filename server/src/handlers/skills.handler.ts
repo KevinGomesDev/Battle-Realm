@@ -11,7 +11,7 @@ export const registerSkillsHandlers = (io: Server, socket: Socket) => {
   // --- LISTAR TODAS AS CLASSES ---
   socket.on("skills:list_classes", async () => {
     try {
-      const classes = listAllClasses();
+      const classes = await listAllClasses();
 
       socket.emit("skills:classes_list", {
         classes,
@@ -26,7 +26,7 @@ export const registerSkillsHandlers = (io: Server, socket: Socket) => {
   // --- OBTER DETALHES DE UMA CLASSE ---
   socket.on("skills:get_class", async ({ classId }) => {
     try {
-      const classInfo = getClassInfo(classId);
+      const classInfo = await getClassInfo(classId);
 
       if (!classInfo) {
         socket.emit("error", { message: "Classe não encontrada" });

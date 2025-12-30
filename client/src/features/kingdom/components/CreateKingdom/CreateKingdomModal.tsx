@@ -4,6 +4,7 @@ import { socketService } from "../../../../services/socket.service";
 import { Step1Kingdom } from "./Step1Kingdom";
 import { Step2Regent } from "./Step2Regent";
 import { Step3Troops } from "./Step3Troops";
+import { TemplateSelection } from "./TemplateSelection";
 import type {
   Race,
   Alignment,
@@ -17,6 +18,7 @@ interface CreateKingdomModalProps {
   onSuccess: () => void;
 }
 
+type ModalView = "templates" | "custom";
 type Step = "kingdom" | "regent" | "troops";
 
 const createEmptyTemplate = (
@@ -44,6 +46,9 @@ export const CreateKingdomModal: React.FC<CreateKingdomModalProps> = ({
     createKingdom,
     state: { isLoading: isCreatingKingdom, error: kingdomError },
   } = useKingdom();
+
+  // View mode: templates (default) or custom creation
+  const [currentView, setCurrentView] = useState<ModalView>("templates");
   const [currentStep, setCurrentStep] = useState<Step>("kingdom");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -325,103 +330,207 @@ export const CreateKingdomModal: React.FC<CreateKingdomModalProps> = ({
     }
   };
 
+  // Handle template creation success
+  const handleTemplateSuccess = () => {
+    onSuccess();
+  };
+
+  // Switch to custom creation mode
+  const handleCustomCreate = () => {
+    setCurrentView("custom");
+  };
+
+  // Go back to template selection
+  const handleBackToTemplates = () => {
+    setCurrentView("templates");
+    setCurrentStep("kingdom");
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose}></div>
+      {/* Backdrop escuro com efeito */}
+      <div
+        className="absolute inset-0 bg-gradient-to-b from-citadel-obsidian/90 via-black/80 to-citadel-obsidian/90 backdrop-blur-sm"
+        onClick={onClose}
+      />
 
-      <div className="relative bg-slate-800 border border-slate-600 p-6 sm:p-8 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white"
+      {/* Container do Modal */}
+      <div
+        className="relative bg-gradient-to-b from-citadel-granite via-citadel-carved to-citadel-obsidian 
+                      border-2 border-metal-iron shadow-2xl rounded-2xl
+                      w-full max-w-4xl max-h-[90vh] overflow-hidden"
+      >
+        {/* Header decorativo */}
+        <div
+          className="relative bg-gradient-to-r from-citadel-obsidian via-citadel-slate to-citadel-obsidian 
+                        border-b border-metal-iron/50 px-6 py-4"
         >
-          ✕
-        </button>
+          {/* Decoração de cantos */}
+          <div className="absolute top-0 left-0 w-8 h-8 border-l-2 border-t-2 border-metal-gold/50 rounded-tl-lg" />
+          <div className="absolute top-0 right-0 w-8 h-8 border-r-2 border-t-2 border-metal-gold/50 rounded-tr-lg" />
 
-        <div className="flex gap-2 mb-6">
-          <div
-            className={`flex-1 h-1 ${
-              currentStep === "kingdom" ? "bg-blue-500" : "bg-green-500"
-            }`}
-          ></div>
-          <div
-            className={`flex-1 h-1 ${
-              currentStep === "regent"
-                ? "bg-blue-500"
-                : currentStep === "troops"
-                ? "bg-green-500"
-                : "bg-slate-600"
-            }`}
-          ></div>
-          <div
-            className={`flex-1 h-1 ${
-              currentStep === "troops" ? "bg-blue-500" : "bg-slate-600"
-            }`}
-          ></div>
+          {/* Título */}
+          <h1
+            className="text-center text-2xl font-bold text-parchment-light tracking-wider"
+            style={{ fontFamily: "'Cinzel', serif" }}
+          >
+            {currentView === "templates"
+              ? "⚔️ Fundar Novo Reino ⚔️"
+              : getStepTitle()}
+          </h1>
+
+          {/* Subtítulo / Breadcrumb */}
+          {currentView === "custom" && (
+            <div className="flex items-center justify-center gap-2 mt-2">
+              {["Reino", "Regente", "Tropas"].map((label, idx) => {
+                const stepName = ["kingdom", "regent", "troops"][idx] as Step;
+                const isActive = currentStep === stepName;
+                const isPassed =
+                  stepName === "kingdom" ||
+                  (stepName === "regent" && currentStep !== "kingdom") ||
+                  (stepName === "troops" && currentStep === "troops");
+
+                return (
+                  <React.Fragment key={stepName}>
+                    <span
+                      className={`text-xs ${
+                        isActive
+                          ? "text-metal-gold font-bold"
+                          : isPassed
+                          ? "text-parchment-aged"
+                          : "text-parchment-dark"
+                      }`}
+                    >
+                      {label}
+                    </span>
+                    {idx < 2 && <span className="text-metal-iron">→</span>}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Botão Fechar */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center
+                       text-parchment-dark hover:text-war-ember transition-colors
+                       border border-metal-iron/50 rounded-lg hover:border-war-ember/50"
+          >
+            ✕
+          </button>
         </div>
 
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-white">{getStepTitle()}</h2>
-          <p className="text-slate-400 mt-1 text-sm">
-            Passo {getStepNumber()} de 3
-          </p>
-        </div>
-
-        {isLoadingData ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <div className="animate-spin w-10 h-10 border-3 border-blue-500 border-t-transparent rounded-full mb-4"></div>
-            <p className="text-slate-400">Carregando dados...</p>
+        {/* Progress Bar para criação customizada */}
+        {currentView === "custom" && (
+          <div className="flex gap-1 px-6 pt-4">
+            <div
+              className={`flex-1 h-1 rounded ${
+                currentStep === "kingdom" ? "bg-metal-gold" : "bg-green-500"
+              }`}
+            />
+            <div
+              className={`flex-1 h-1 rounded ${
+                currentStep === "regent"
+                  ? "bg-metal-gold"
+                  : currentStep === "troops"
+                  ? "bg-green-500"
+                  : "bg-citadel-slate"
+              }`}
+            />
+            <div
+              className={`flex-1 h-1 rounded ${
+                currentStep === "troops" ? "bg-metal-gold" : "bg-citadel-slate"
+              }`}
+            />
           </div>
-        ) : (
-          <>
-            {currentStep === "kingdom" && (
-              <Step1Kingdom
-                kingdomName={kingdomName}
-                setKingdomName={setKingdomName}
-                capitalName={capitalName}
-                setCapitalName={setCapitalName}
-                selectedRace={selectedRace}
-                setSelectedRace={setSelectedRace}
-                selectedAlignment={selectedAlignment}
-                setSelectedAlignment={setSelectedAlignment}
-                races={races}
-                alignments={alignments}
-                error={currentError}
-                isLoading={isLoading}
-                onNext={handleNextToRegent}
-                onCancel={onClose}
-              />
-            )}
-
-            {currentStep === "regent" && (
-              <Step2Regent
-                regentName={regentName}
-                setRegentName={setRegentName}
-                selectedClass={selectedClass}
-                setSelectedClass={setSelectedClass}
-                attributes={regentAttributes}
-                updateAttribute={updateRegentAttribute}
-                classes={classes}
-                error={currentError}
-                isLoading={isLoading}
-                totalPoints={regentTotalPoints}
-                onSubmit={handleNextToTroops}
-                onBack={() => setCurrentStep("kingdom")}
-              />
-            )}
-
-            {currentStep === "troops" && (
-              <Step3Troops
-                templates={troopTemplates}
-                setTemplates={setTroopTemplates}
-                passives={troopPassives}
-                error={currentError}
-                isLoading={isLoading}
-                onSubmit={handleFinalSubmit}
-                onBack={() => setCurrentStep("regent")}
-              />
-            )}
-          </>
         )}
+
+        {/* Conteúdo com scroll */}
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
+          {/* Vista de Templates (Padrão) */}
+          {currentView === "templates" && (
+            <TemplateSelection
+              onSelectTemplate={handleTemplateSuccess}
+              onCustomCreate={handleCustomCreate}
+            />
+          )}
+
+          {/* Vista de Criação Customizada */}
+          {currentView === "custom" && (
+            <>
+              {isLoadingData ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="relative w-12 h-12">
+                    <div className="absolute inset-0 border-3 border-metal-bronze rounded-full animate-spin border-t-transparent" />
+                    <div
+                      className="absolute inset-2 border-2 border-metal-gold rounded-full animate-spin border-b-transparent"
+                      style={{ animationDirection: "reverse" }}
+                    />
+                  </div>
+                  <p className="text-parchment-dark mt-4">
+                    Carregando dados...
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {currentStep === "kingdom" && (
+                    <>
+                      <Step1Kingdom
+                        kingdomName={kingdomName}
+                        setKingdomName={setKingdomName}
+                        capitalName={capitalName}
+                        setCapitalName={setCapitalName}
+                        selectedRace={selectedRace}
+                        setSelectedRace={setSelectedRace}
+                        selectedAlignment={selectedAlignment}
+                        setSelectedAlignment={setSelectedAlignment}
+                        races={races}
+                        alignments={alignments}
+                        error={currentError}
+                        isLoading={isLoading}
+                        onNext={handleNextToRegent}
+                        onCancel={handleBackToTemplates}
+                      />
+                    </>
+                  )}
+
+                  {currentStep === "regent" && (
+                    <Step2Regent
+                      regentName={regentName}
+                      setRegentName={setRegentName}
+                      selectedClass={selectedClass}
+                      setSelectedClass={setSelectedClass}
+                      attributes={regentAttributes}
+                      updateAttribute={updateRegentAttribute}
+                      classes={classes}
+                      error={currentError}
+                      isLoading={isLoading}
+                      totalPoints={regentTotalPoints}
+                      onSubmit={handleNextToTroops}
+                      onBack={() => setCurrentStep("kingdom")}
+                    />
+                  )}
+
+                  {currentStep === "troops" && (
+                    <Step3Troops
+                      templates={troopTemplates}
+                      setTemplates={setTroopTemplates}
+                      passives={troopPassives}
+                      error={currentError}
+                      isLoading={isLoading}
+                      onSubmit={handleFinalSubmit}
+                      onBack={() => setCurrentStep("regent")}
+                    />
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer decorativo */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-metal-iron/30 to-transparent" />
       </div>
     </div>
   );

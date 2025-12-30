@@ -122,6 +122,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       dispatch({ type: "SET_USER", payload: user });
       dispatch({ type: "SET_LOADING", payload: false });
+
+      // Nota: A verificação de sessão será feita no DashboardPage após login
+
+      return user;
     } catch (error: any) {
       dispatch({
         type: "SET_ERROR",

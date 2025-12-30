@@ -197,7 +197,7 @@ export const registerRegentHandlers = (io: Server, socket: Socket) => {
         return;
       }
 
-      if (unit.category !== "REGENTE") {
+      if (unit.category !== "REGENT") {
         socket.emit("error", { message: "Esta não é uma unidade Regente" });
         return;
       }
@@ -223,7 +223,7 @@ export const registerRegentHandlers = (io: Server, socket: Socket) => {
         where: {
           matchId,
           ownerId: playerId,
-          category: "REGENTE",
+          category: "REGENT",
         },
       });
 

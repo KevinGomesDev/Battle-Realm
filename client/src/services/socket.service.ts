@@ -33,15 +33,9 @@ class SocketService {
   connect(url: string = "http://localhost:3000"): Promise<void> {
     return new Promise((resolve, reject) => {
       if (this.socket?.connected) {
-        console.log(
-          "[Socket] ⚠️ Já está conectado, reutilizando socket:",
-          this.socket.id
-        );
         resolve();
         return;
       }
-
-      console.log("[Socket] 🔌 Iniciando conexão com:", url);
 
       this.socket = io(url, {
         reconnection: true,
@@ -53,12 +47,6 @@ class SocketService {
       });
 
       this.socket.on("connect", () => {
-        console.log(
-          "%c[Socket] ✅ CONECTADO",
-          "color: #22c55e; font-weight: bold; font-size: 14px;",
-          "\n🆔 Socket ID:",
-          this.socket?.id
-        );
         this.reconnectAttempts = 0;
         this.lastPongTime = Date.now();
         this.startHeartbeat();
@@ -66,28 +54,20 @@ class SocketService {
         resolve();
       });
 
-      this.socket.on("disconnect", (reason) => {
-        console.log(
-          "%c[Socket] ❌ DESCONECTADO",
-          "color: #ef4444; font-weight: bold;",
-          "\n📝 Motivo:",
-          reason
-        );
+      this.socket.on("disconnect", (_reason) => {
         this.stopHeartbeat();
         this.stopPing();
       });
 
       this.socket.on("error", (error) => {
-        console.error("[Socket] 💥 Erro:", error);
         reject(error);
       });
 
       this.socket.on("connect_error", (error) => {
         this.reconnectAttempts++;
-        console.warn(
-          `[Socket] ⚠️ Erro de conexão (${this.reconnectAttempts}/${this.maxReconnectAttempts}):`,
-          error.message
-        );
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+          reject(error);
+        }
       });
     });
   }
@@ -117,15 +97,8 @@ class SocketService {
    */
   emit(event: string, data?: any): void {
     if (!this.socket?.connected) {
-      console.warn(`[Socket] Tentativa de emitir '${event}' sem conexão`);
       return;
     }
-    console.log(
-      `%c[Socket] ⬆️ EMIT: ${event}`,
-      "color: #22c55e; font-weight: bold;",
-      "\n📦 Payload:",
-      data
-    );
     this.socket.emit(event, data);
   }
 
@@ -139,29 +112,10 @@ class SocketService {
         return;
       }
 
-      console.log(
-        `%c[Socket] ⬆️ EMIT (async): ${event}`,
-        "color: #22c55e; font-weight: bold;",
-        "\n📦 Payload:",
-        data
-      );
-
       this.socket.emit(event, data, (response: any) => {
         if (response?.error) {
-          console.log(
-            `%c[Socket] ❌ RESPONSE ERROR: ${event}`,
-            "color: #ef4444; font-weight: bold;",
-            "\n📦 Error:",
-            response.error
-          );
           reject(new Error(response.error));
         } else {
-          console.log(
-            `%c[Socket] ✅ RESPONSE: ${event}`,
-            "color: #3b82f6; font-weight: bold;",
-            "\n📦 Data:",
-            response
-          );
           resolve(response);
         }
       });
@@ -178,12 +132,6 @@ class SocketService {
       // Registra o listener no socket
       if (this.socket) {
         this.socket.on(event, (data: any) => {
-          console.log(
-            `%c[Socket] ⬇️ RECEIVE: ${event}`,
-            "color: #a855f7; font-weight: bold;",
-            "\n📦 Data:",
-            data
-          );
           const callbacks = this.listeners.get(event);
           if (callbacks) {
             callbacks.forEach((cb) => cb(data));
@@ -258,12 +206,19 @@ class SocketService {
   private startPing(): void {
     this.stopPing();
 
+    // Reset lastPongTime when starting ping to avoid stale values
+    this.lastPongTime = Date.now();
+
     // Listener para pong do servidor
     if (this.socket) {
       this.socket.on("pong", () => {
         this.lastPongTime = Date.now();
-        console.log("[Socket] 🏓 Pong recebido");
       });
+    }
+
+    // Envia primeiro ping imediatamente
+    if (this.socket?.connected) {
+      this.socket.emit("ping");
     }
 
     // Envia ping periodicamente
@@ -271,17 +226,15 @@ class SocketService {
       const timeSinceLastPong = Date.now() - this.lastPongTime;
 
       if (timeSinceLastPong > this.PING_TIMEOUT) {
-        console.warn(
-          `[Socket] ⚠️ Sem resposta há ${Math.round(
-            timeSinceLastPong / 1000
-          )}s. Forçando reconexão...`
-        );
+        console.warn("[Socket] Ping timeout detectado, forçando reconexão...", {
+          timeSinceLastPong,
+          timeout: this.PING_TIMEOUT,
+        });
         this.forceReconnect();
         return;
       }
 
       if (this.socket?.connected) {
-        console.log("[Socket] 🏓 Enviando ping...");
         this.socket.emit("ping");
       }
     }, this.PING_INTERVAL);
@@ -304,7 +257,6 @@ class SocketService {
    * Força uma reconexão manual
    */
   private forceReconnect(): void {
-    console.log("[Socket] 🔄 Forçando reconexão...");
     this.stopHeartbeat();
     this.stopPing();
 

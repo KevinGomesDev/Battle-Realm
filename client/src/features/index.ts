@@ -4,3 +4,4 @@ export * from "./kingdom";
 export * from "./match";
 export * from "./map";
 export * from "./game";
+export * from "./arena";

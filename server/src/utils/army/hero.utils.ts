@@ -29,7 +29,7 @@ export async function calculateHeroRecruitmentCost(
   const heroCount = await prisma.unit.count({
     where: {
       ownerId: playerId,
-      category: "HEROI",
+      category: "HERO",
     },
   });
 
@@ -55,7 +55,7 @@ export async function canHeroLevelUp(
     return { canLevel: false, reason: "Você não é dono desta unidade" };
   }
 
-  if (unit.category !== "HEROI") {
+  if (unit.category !== "HERO") {
     return { canLevel: false, reason: "Esta não é uma unidade Herói" };
   }
 
@@ -195,9 +195,8 @@ export async function recruitHero(
   matchId: string,
   playerId: string,
   heroData: {
-    type: string;
-    name?: string; // <--- ADICIONADO: Campo opcional name
-    heroClass: string;
+    name?: string;
+    heroClass: string; // Código da classe (ex: "CLERIC", "WIZARD")
     attributeDistribution: {
       combat: number;
       acuity: number;
@@ -225,7 +224,7 @@ export async function recruitHero(
   const heroCount = await prisma.unit.count({
     where: {
       kingdomId,
-      category: "HEROI",
+      category: "HERO",
     },
   });
 
@@ -277,17 +276,28 @@ export async function recruitHero(
     return { success: false, message: "Território da capital não encontrado" };
   }
 
+  // Busca a classe no banco pelo código
+  const heroClass = await prisma.heroClass.findUnique({
+    where: { code: heroData.heroClass },
+  });
+
+  if (!heroClass) {
+    return {
+      success: false,
+      message: `Classe ${heroData.heroClass} não encontrada`,
+    };
+  }
+
   // Cria o herói
   const hero = await prisma.unit.create({
     data: {
       kingdomId, // Vinculado ao Reino (proprietário permanente)
       matchId,
       ownerId: playerId,
-      category: "HEROI",
-      type: heroData.type,
-      name: heroData.name || heroData.type, // <--- ADICIONADO: Usa o nome ou o tipo como fallback
+      category: "HERO",
+      name: heroData.name || heroClass.name, // Usa o nome ou o nome da classe como fallback
       level: 1,
-      heroClass: heroData.heroClass,
+      classId: heroClass.id, // Referência ao ID da classe no banco
       classFeatures: "[]",
       combat,
       acuity,
@@ -331,7 +341,7 @@ export async function addHeroClassFeature(
     return { success: false, message: "Unidade não encontrada" };
   }
 
-  if (unit.category !== "HEROI") {
+  if (unit.category !== "HERO") {
     return { success: false, message: "Esta não é uma unidade Herói" };
   }
 

@@ -14,6 +14,7 @@ import {
 export interface TroopTemplateData {
   slotIndex: number; // 0-4
   name: string;
+  description?: string; // História/descrição opcional da tropa
   passiveId: string;
   resourceType: keyof PlayerResources;
   combat: number;
@@ -137,6 +138,7 @@ export async function createTroopTemplatesForKingdom(
         kingdomId,
         slotIndex: t.slotIndex,
         name: t.name.trim(),
+        description: t.description || null,
         passiveId: t.passiveId,
         resourceType: t.resourceType,
         combat: t.combat,
@@ -175,9 +177,8 @@ export async function calculateTroopRecruitmentCost(
     where: {
       matchId,
       ownerId,
-      category: "TROPA",
-      // troopSlotIndex is stored in "type" field as string
-      type: String(troopSlotIndex),
+      category: "TROOP",
+      troopSlot: troopSlotIndex,
     },
   });
 
@@ -282,11 +283,10 @@ export async function recruitTroop(
         matchId,
         ownerId: playerId,
         kingdomId: player.kingdomId,
-        category: "TROPA",
-        type: String(troopSlotIndex), // Armazena qual slot de tropa
+        category: "TROOP",
+        troopSlot: troopSlotIndex, // Armazena qual slot de tropa
         level,
         name: customName || template.name,
-        heroClass: null,
         classFeatures: JSON.stringify([template.passiveId]),
         combat: template.combat + bonusPerAttr + (remainder > 0 ? 1 : 0),
         acuity: template.acuity + bonusPerAttr + (remainder > 1 ? 1 : 0),
@@ -364,8 +364,8 @@ export async function getTroopCategoryInfo(
   const troopCount = await prisma.unit.count({
     where: {
       ownerId: playerId,
-      category: "TROPA",
-      type: String(troopSlotIndex),
+      category: "TROOP",
+      troopSlot: troopSlotIndex,
     },
   });
 
@@ -463,8 +463,8 @@ export async function upgradeTroopCategory(
       where: {
         matchId,
         ownerId: playerId,
-        category: "TROPA",
-        type: String(troopSlotIndex),
+        category: "TROOP",
+        troopSlot: troopSlotIndex,
       },
       data: {
         level: currentLevel + 1,

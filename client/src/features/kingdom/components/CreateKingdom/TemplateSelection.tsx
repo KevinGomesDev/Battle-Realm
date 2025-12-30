@@ -1,0 +1,597 @@
+import React, { useEffect, useState } from "react";
+import { socketService } from "../../../../services/socket.service";
+import type {
+  KingdomTemplateSummary,
+  KingdomTemplateDetails,
+} from "./template.types";
+
+interface TemplateCardProps {
+  template: KingdomTemplateSummary;
+  isSelected: boolean;
+  isExpanded: boolean;
+  onSelect: () => void;
+}
+
+const DIFFICULTY_CONFIG = {
+  BEGINNER: {
+    color: "text-green-400",
+    bg: "bg-green-900/30",
+    border: "border-green-600/50",
+    label: "Iniciante",
+  },
+  INTERMEDIATE: {
+    color: "text-yellow-400",
+    bg: "bg-yellow-900/30",
+    border: "border-yellow-600/50",
+    label: "Intermediário",
+  },
+  ADVANCED: {
+    color: "text-red-400",
+    bg: "bg-red-900/30",
+    border: "border-red-600/50",
+    label: "Avançado",
+  },
+};
+
+/**
+ * Card de Template - Preto e branco quando não selecionado, colorido quando selecionado/hover
+ */
+const TemplateCard: React.FC<TemplateCardProps> = ({
+  template,
+  isSelected,
+  isExpanded,
+  onSelect,
+}) => {
+  const diffConfig =
+    DIFFICULTY_CONFIG[template.difficulty] || DIFFICULTY_CONFIG.BEGINNER;
+
+  return (
+    <div
+      onClick={onSelect}
+      className={`
+        relative cursor-pointer transition-all duration-300 overflow-hidden rounded-xl
+        ${
+          isSelected
+            ? "ring-2 ring-metal-gold shadow-[0_0_30px_rgba(255,215,0,0.3)]"
+            : "hover:ring-1 hover:ring-metal-bronze/50"
+        }
+        ${!isSelected && !isExpanded ? "grayscale" : ""}
+      `}
+    >
+      {/* Background com gradiente */}
+      <div
+        className={`
+        absolute inset-0 transition-all duration-300
+        ${
+          isSelected
+            ? "bg-gradient-to-b from-citadel-granite via-citadel-carved to-citadel-obsidian"
+            : "bg-gradient-to-b from-citadel-slate to-citadel-obsidian"
+        }
+      `}
+      />
+
+      {/* Conteúdo do Card */}
+      <div className="relative p-4 flex flex-col items-center text-center min-h-[280px]">
+        {/* Ícone grande */}
+        <div
+          className={`
+          text-5xl mb-3 transition-all duration-300
+          ${isSelected ? "scale-110" : "opacity-70"}
+        `}
+        >
+          {template.icon}
+        </div>
+
+        {/* Nome do Template */}
+        <h3
+          className={`
+            text-lg font-bold mb-2 transition-colors duration-300
+            ${isSelected ? "text-parchment-light" : "text-parchment-dark"}
+          `}
+          style={{ fontFamily: "'Cinzel', serif" }}
+        >
+          {template.name}
+        </h3>
+
+        {/* Descrição curta */}
+        <p
+          className={`
+          text-xs leading-relaxed mb-3 flex-1 transition-colors duration-300
+          ${isSelected ? "text-parchment-aged" : "text-parchment-dark/70"}
+        `}
+        >
+          {template.description}
+        </p>
+
+        {/* Tags de info */}
+        <div className="space-y-2 w-full">
+          <div className="flex items-center justify-center gap-2 text-xs">
+            <span
+              className={`px-2 py-0.5 rounded ${
+                isSelected
+                  ? "bg-citadel-slate/50 text-parchment-aged"
+                  : "bg-citadel-obsidian/50 text-parchment-dark"
+              }`}
+            >
+              {template.raceName}
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded ${
+                isSelected
+                  ? "bg-citadel-slate/50 text-parchment-aged"
+                  : "bg-citadel-obsidian/50 text-parchment-dark"
+              }`}
+            >
+              {template.alignmentName}
+            </span>
+          </div>
+
+          <div
+            className={`text-xs px-2 py-1 rounded ${diffConfig.bg} ${diffConfig.border} border ${diffConfig.color}`}
+          >
+            {diffConfig.label}
+          </div>
+        </div>
+
+        {/* Indicador de seleção */}
+        {isSelected && (
+          <div className="absolute top-2 right-2 w-6 h-6 bg-metal-gold rounded-full flex items-center justify-center">
+            <span className="text-citadel-obsidian text-sm">✓</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+interface TemplateDetailsViewProps {
+  template: KingdomTemplateDetails;
+  isLoading: boolean;
+  onCreateFromTemplate: () => void;
+}
+
+// Mapeamento de códigos para nomes legíveis
+const RACE_NAMES: Record<string, string> = {
+  HUMANOIDE: "Humanóide",
+  ELFICO: "Élfico",
+  DRACONICO: "Dracônico",
+  MORTO_VIVO: "Morto-Vivo",
+  DEMONIACO: "Demoníaco",
+};
+
+const ALIGNMENT_NAMES: Record<string, string> = {
+  BOM: "Bom",
+  MAL: "Mal",
+  NEUTRO: "Neutro",
+  CAOS: "Caos",
+  ORDEM: "Ordem",
+};
+
+const CLASS_NAMES: Record<string, string> = {
+  WARRIOR: "Guerreiro",
+  CLERIC: "Clérigo",
+  MAGE: "Mago",
+  ROGUE: "Ladino",
+  RANGER: "Patrulheiro",
+  PALADIN: "Paladino",
+  NECROMANCER: "Necromante",
+  BERSERKER: "Berserker",
+};
+
+const RESOURCE_NAMES: Record<string, string> = {
+  minerio: "Minério",
+  suprimentos: "Suprimentos",
+  devocao: "Devoção",
+  arcano: "Arcano",
+  experiencia: "Experiência",
+};
+
+const PASSIVE_NAMES: Record<string, string> = {
+  charge: "Investida",
+  shield_wall: "Muro de Escudos",
+  first_strike: "Primeiro Golpe",
+  expendable: "Descartável",
+  healer: "Curador",
+  stealth: "Furtividade",
+  berserker: "Fúria",
+  undying: "Imortal",
+};
+
+/**
+ * Vista expandida dos detalhes do template
+ */
+const TemplateDetailsView: React.FC<TemplateDetailsViewProps> = ({
+  template,
+  isLoading,
+  onCreateFromTemplate,
+}) => {
+  if (!template) return null;
+
+  const regent = template.regent;
+  const troops = template.troopTemplates || [];
+
+  return (
+    <div className="bg-citadel-slate/30 rounded-xl border border-metal-iron/30 p-6 mt-4 animate-fadeIn">
+      {/* Header */}
+      <div className="flex items-start gap-4 mb-6 pb-4 border-b border-metal-iron/30">
+        <div className="text-4xl">🏰</div>
+        <div className="flex-1">
+          <h3
+            className="text-2xl font-bold text-parchment-light mb-1"
+            style={{ fontFamily: "'Cinzel', serif" }}
+          >
+            {template.name}
+          </h3>
+          <p className="text-parchment-aged text-xs italic">
+            Capital: {template.capitalName}
+          </p>
+        </div>
+      </div>
+
+      {/* Descrição/Lore */}
+      <div className="mb-6 p-4 bg-citadel-obsidian/30 rounded-lg border-l-4 border-metal-gold/50">
+        <p className="text-parchment-aged text-sm leading-relaxed whitespace-pre-line">
+          {template.description}
+        </p>
+      </div>
+
+      {/* Grid de informações */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {/* Reino */}
+        <div className="bg-citadel-obsidian/50 rounded-lg p-4">
+          <h4 className="text-parchment-light font-semibold mb-3 flex items-center gap-2">
+            <span>🏰</span> Reino
+          </h4>
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-parchment-dark">Raça:</span>
+              <span className="text-parchment-aged font-medium">
+                {RACE_NAMES[template.race] || template.race}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-parchment-dark">Alinhamento:</span>
+              <span className="text-parchment-aged font-medium">
+                {ALIGNMENT_NAMES[template.alignment] || template.alignment}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Regente */}
+        <div className="bg-citadel-obsidian/50 rounded-lg p-4">
+          <h4 className="text-parchment-light font-semibold mb-3 flex items-center gap-2">
+            <span>👑</span> Regente
+          </h4>
+          {regent ? (
+            <>
+              <div className="space-y-2 text-sm mb-3">
+                <div>
+                  <span className="text-parchment-dark">Nome:</span>
+                  <span className="text-parchment-aged ml-2 font-medium">
+                    {regent.name}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-parchment-dark">Classe:</span>
+                  <span className="text-parchment-aged ml-2 font-medium">
+                    {CLASS_NAMES[regent.classCode] || regent.classCode}
+                  </span>
+                </div>
+              </div>
+
+              {/* Atributos do Regente */}
+              <div className="pt-3 border-t border-metal-iron/20">
+                <p className="text-parchment-dark text-xs mb-2">Atributos:</p>
+                <div className="grid grid-cols-5 gap-1 text-center text-xs">
+                  <div className="bg-citadel-slate/30 rounded p-1">
+                    <div className="text-war-ember">⚔️</div>
+                    <div className="text-parchment-light font-bold">
+                      {regent.combat ?? 0}
+                    </div>
+                  </div>
+                  <div className="bg-citadel-slate/30 rounded p-1">
+                    <div className="text-blue-400">👁️</div>
+                    <div className="text-parchment-light font-bold">
+                      {regent.acuity ?? 0}
+                    </div>
+                  </div>
+                  <div className="bg-citadel-slate/30 rounded p-1">
+                    <div className="text-purple-400">🎯</div>
+                    <div className="text-parchment-light font-bold">
+                      {regent.focus ?? 0}
+                    </div>
+                  </div>
+                  <div className="bg-citadel-slate/30 rounded p-1">
+                    <div className="text-metal-steel">🛡️</div>
+                    <div className="text-parchment-light font-bold">
+                      {regent.armor ?? 0}
+                    </div>
+                  </div>
+                  <div className="bg-citadel-slate/30 rounded p-1">
+                    <div className="text-green-400">❤️</div>
+                    <div className="text-parchment-light font-bold">
+                      {regent.vitality ?? 0}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-parchment-dark text-sm">Regente não definido</p>
+          )}
+        </div>
+
+        {/* Tropas */}
+        <div className="bg-citadel-obsidian/50 rounded-lg p-4">
+          <h4 className="text-parchment-light font-semibold mb-3 flex items-center gap-2">
+            <span>⚔️</span> Exército
+          </h4>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {troops.length > 0 ? (
+              troops.map((troop, index) => (
+                <div
+                  key={index}
+                  className="bg-citadel-slate/20 rounded p-2 text-xs"
+                >
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-parchment-light font-semibold">
+                      {troop.name}
+                    </span>
+                    <span className="text-parchment-dark text-[10px]">
+                      {RESOURCE_NAMES[troop.resourceType] || troop.resourceType}
+                    </span>
+                  </div>
+                  <div className="text-metal-gold text-[10px]">
+                    🔸 {PASSIVE_NAMES[troop.passiveId] || troop.passiveId}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-parchment-dark text-sm">
+                Nenhuma tropa definida
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Descrição do Regente */}
+      {regent?.description && (
+        <div className="mb-6 p-4 bg-citadel-obsidian/30 rounded-lg">
+          <h4 className="text-parchment-light font-semibold mb-2 text-sm flex items-center gap-2">
+            <span>📜</span> Sobre o Regente
+          </h4>
+          <p className="text-parchment-dark text-xs leading-relaxed whitespace-pre-line">
+            {regent.description}
+          </p>
+        </div>
+      )}
+
+      {/* Botão de Criar */}
+      <button
+        onClick={onCreateFromTemplate}
+        disabled={isLoading}
+        className="w-full py-4 bg-gradient-to-b from-metal-gold to-metal-bronze border-2 border-metal-gold/50 rounded-lg
+                   text-citadel-obsidian font-bold text-lg tracking-wide
+                   hover:from-yellow-400 hover:to-metal-gold
+                   disabled:from-citadel-granite disabled:to-citadel-carved disabled:text-parchment-dark disabled:cursor-not-allowed
+                   transition-all duration-200 shadow-lg"
+        style={{ fontFamily: "'Cinzel', serif" }}
+      >
+        {isLoading ? (
+          <span className="flex items-center justify-center gap-2">
+            <div className="animate-spin w-5 h-5 border-2 border-citadel-obsidian border-t-transparent rounded-full"></div>
+            Criando Reino...
+          </span>
+        ) : (
+          <span>⚔️ FUNDAR ESTE REINO ⚔️</span>
+        )}
+      </button>
+    </div>
+  );
+};
+
+interface TemplateSelectionProps {
+  onSelectTemplate: (templateId: string) => void;
+  onCustomCreate: () => void;
+}
+
+/**
+ * Componente de seleção de templates
+ */
+export const TemplateSelection: React.FC<TemplateSelectionProps> = ({
+  onSelectTemplate,
+  onCustomCreate,
+}) => {
+  const [templates, setTemplates] = useState<KingdomTemplateSummary[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
+    null
+  );
+  const [templateDetails, setTemplateDetails] =
+    useState<KingdomTemplateDetails | null>(null);
+  const [isLoadingList, setIsLoadingList] = useState(true);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Carregar lista de templates
+  useEffect(() => {
+    const handleTemplatesList = (data: {
+      templates: KingdomTemplateSummary[];
+    }) => {
+      setTemplates(data.templates);
+      setIsLoadingList(false);
+    };
+
+    const handleError = (data: { message: string }) => {
+      setError(data.message);
+      setIsLoadingList(false);
+    };
+
+    socketService.on("kingdom:templates_list", handleTemplatesList);
+    socketService.on("error", handleError);
+
+    socketService.emit("kingdom:list_templates");
+
+    return () => {
+      socketService.off("kingdom:templates_list", handleTemplatesList);
+      socketService.off("error", handleError);
+    };
+  }, []);
+
+  // Carregar detalhes do template selecionado
+  useEffect(() => {
+    if (!selectedTemplateId) {
+      setTemplateDetails(null);
+      return;
+    }
+
+    setIsLoadingDetails(true);
+
+    const handleDetails = (data: { template: KingdomTemplateDetails }) => {
+      setTemplateDetails(data.template);
+      setIsLoadingDetails(false);
+    };
+
+    socketService.on("kingdom:template_details", handleDetails);
+    socketService.emit("kingdom:get_template", {
+      templateId: selectedTemplateId,
+    });
+
+    return () => {
+      socketService.off("kingdom:template_details", handleDetails);
+    };
+  }, [selectedTemplateId]);
+
+  const handleCreateFromTemplate = () => {
+    if (!selectedTemplateId) return;
+
+    setIsCreating(true);
+
+    const handleSuccess = (data: { kingdom: any; message: string }) => {
+      setIsCreating(false);
+      onSelectTemplate(data.kingdom.id);
+    };
+
+    const handleError = (data: { message: string }) => {
+      setError(data.message);
+      setIsCreating(false);
+    };
+
+    socketService.on("kingdom:created_from_template", handleSuccess);
+    socketService.on("error", handleError);
+
+    socketService.emit("kingdom:create_from_template", {
+      templateId: selectedTemplateId,
+    });
+
+    // Cleanup após timeout
+    setTimeout(() => {
+      socketService.off("kingdom:created_from_template", handleSuccess);
+      socketService.off("error", handleError);
+    }, 15000);
+  };
+
+  if (isLoadingList) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <div className="relative w-12 h-12">
+          <div className="absolute inset-0 border-3 border-metal-bronze rounded-full animate-spin border-t-transparent"></div>
+          <div
+            className="absolute inset-2 border-2 border-metal-gold rounded-full animate-spin border-b-transparent"
+            style={{ animationDirection: "reverse" }}
+          ></div>
+        </div>
+        <p className="text-parchment-dark mt-4">Carregando reinos...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Erro */}
+      {error && (
+        <div className="p-3 bg-war-blood/20 border border-war-crimson rounded-lg">
+          <p className="text-war-ember text-sm flex items-center gap-2">
+            <span>⚠️</span> {error}
+          </p>
+        </div>
+      )}
+
+      {/* Título */}
+      <div className="text-center">
+        <h2
+          className="text-2xl font-bold text-parchment-light mb-2"
+          style={{ fontFamily: "'Cinzel', serif" }}
+        >
+          Escolha seu Destino
+        </h2>
+        <p className="text-parchment-dark text-sm">
+          Selecione um reino pré-configurado ou crie o seu próprio
+        </p>
+      </div>
+
+      {/* Grid de Templates */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {templates.map((template) => (
+          <TemplateCard
+            key={template.id}
+            template={template}
+            isSelected={selectedTemplateId === template.id}
+            isExpanded={
+              selectedTemplateId === template.id && templateDetails !== null
+            }
+            onSelect={() =>
+              setSelectedTemplateId(
+                selectedTemplateId === template.id ? null : template.id
+              )
+            }
+          />
+        ))}
+      </div>
+
+      {/* Detalhes do Template Selecionado */}
+      {selectedTemplateId &&
+        (isLoadingDetails ? (
+          <div className="bg-citadel-slate/30 rounded-xl border border-metal-iron/30 p-8 mt-4 flex items-center justify-center">
+            <div className="animate-spin w-8 h-8 border-2 border-metal-gold border-t-transparent rounded-full"></div>
+            <span className="text-parchment-dark ml-3">
+              Carregando detalhes...
+            </span>
+          </div>
+        ) : templateDetails ? (
+          <TemplateDetailsView
+            template={templateDetails}
+            isLoading={isCreating}
+            onCreateFromTemplate={handleCreateFromTemplate}
+          />
+        ) : null)}
+
+      {/* Divisor */}
+      <div className="flex items-center gap-4 py-4">
+        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-metal-iron to-transparent"></div>
+        <span className="text-parchment-dark text-xs tracking-widest uppercase">
+          ou
+        </span>
+        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-metal-iron to-transparent"></div>
+      </div>
+
+      {/* Botão de Criação Personalizada */}
+      <button
+        onClick={onCustomCreate}
+        className="w-full py-4 bg-gradient-to-b from-citadel-granite to-citadel-carved border-2 border-metal-iron rounded-lg
+                   text-parchment-aged font-semibold tracking-wide
+                   hover:from-citadel-weathered hover:to-citadel-granite hover:text-parchment-light
+                   transition-all duration-200"
+        style={{ fontFamily: "'Cinzel', serif" }}
+      >
+        <span className="flex items-center justify-center gap-2">
+          <span>📜</span>
+          <span>Criar seu Próprio Reino</span>
+          <span className="text-parchment-dark text-xs">(Personalizado)</span>
+        </span>
+      </button>
+    </div>
+  );
+};

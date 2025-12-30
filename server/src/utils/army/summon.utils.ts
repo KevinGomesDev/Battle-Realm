@@ -1,6 +1,5 @@
 // src/utils/army/summon.utils.ts
 import { prisma } from "../../lib/prisma";
-import { CLASS_DEFINITIONS } from "../../data/classes";
 import { TROOP_PASSIVES } from "../../data/troop-passives";
 import { rollExplodingD6Once } from "../dice";
 
@@ -36,7 +35,7 @@ export async function createSummonedCreature(params: {
     let summonerUnitId = params.summonerUnitId || null;
     if (!summonerUnitId && kingdomId) {
       const regent = await prisma.unit.findFirst({
-        where: { matchId, kingdomId, category: "REGENTE" },
+        where: { matchId, kingdomId, category: "REGENT" },
         orderBy: { createdAt: "asc" },
       } as any);
       if (regent) summonerUnitId = regent.id;
@@ -45,11 +44,14 @@ export async function createSummonedCreature(params: {
     // Random passive from troop passives (since creatures don't belong to a kingdom's template)
     const randomPassive = pickRandom(TROOP_PASSIVES);
 
-    // Random class feature
-    const classKeys = Object.keys(CLASS_DEFINITIONS);
-    const randomClass = pickRandom(classKeys);
-    const classDef = CLASS_DEFINITIONS[randomClass];
-    const randomSkill = pickRandom(classDef.skills);
+    // Random class feature a partir do banco
+    const totalClasses = await prisma.heroClass.count();
+    const randomIndex = Math.max(0, Math.floor(Math.random() * totalClasses));
+    const randomClass = await prisma.heroClass.findFirst({
+      skip: randomIndex,
+      include: { skills: true },
+    });
+    const randomSkill = randomClass ? pickRandom(randomClass.skills) : null;
 
     const stats = generateCreatureStats(level);
 
@@ -58,12 +60,15 @@ export async function createSummonedCreature(params: {
         matchId,
         ownerId: ownerId || null,
         kingdomId: kingdomId || null,
-        category: "INVOCACAO",
-        type: "CRIATURA", // Tipo genérico para invocações
+        category: "SUMMON",
         level,
         name: params.name || null,
         heroClass: null,
-        classFeatures: JSON.stringify([randomPassive.id, randomSkill.id]),
+        classFeatures: JSON.stringify(
+          [randomPassive.id, randomSkill ? randomSkill.code : null].filter(
+            Boolean
+          )
+        ),
         combat: stats.combat,
         acuity: stats.acuity,
         focus: stats.focus,

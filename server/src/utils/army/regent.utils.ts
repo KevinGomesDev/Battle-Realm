@@ -35,7 +35,7 @@ export async function canRegentLevelUp(
     return { canLevel: false, reason: "Você não é dono desta unidade" };
   }
 
-  if (unit.category !== "REGENTE") {
+  if (unit.category !== "REGENT") {
     return { canLevel: false, reason: "Esta não é uma unidade Regente" };
   }
 
@@ -226,7 +226,7 @@ export async function recruitRegent(
   const existingRegent = await prisma.unit.findFirst({
     where: {
       kingdomId,
-      category: "REGENTE",
+      category: "REGENT",
     },
   });
 
@@ -281,8 +281,7 @@ export async function recruitRegent(
       kingdomId, // ➡️ Vinculado ao Reino (proprietário permanente)
       matchId: matchId || null, // Vinculado à partida (opcional, temporário enquanto reino está jogando)
       ownerId: matchId ? finalPlayerId : null, // Só tem ownerId se estiver em uma partida
-      category: "REGENTE",
-      type: "REGENT",
+      category: "REGENT",
       level: 1,
       combat: attributeDistribution.combat,
       acuity: attributeDistribution.acuity,
@@ -293,7 +292,7 @@ export async function recruitRegent(
       movesLeft: matchId ? 3 : 0, // Só tem moves se estiver em uma partida
       actionsLeft: matchId ? 1 : 0, // Só tem ações se estiver em uma partida
       locationIndex: spawnIndex,
-      name: name || "Regente", // <--- ADICIONE esta linha
+      name: name || "REGENT", // <--- ADICIONE esta linha
 
       classFeatures: JSON.stringify([]), // Regente escolhe característica no nível 1
     },

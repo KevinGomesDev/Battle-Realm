@@ -105,12 +105,12 @@ export interface StartMatchData {
 }
 
 export enum UnitCategory {
-  TROPA = "TROPA",
-  HEROI = "HEROI",
-  REGENTE = "REGENTE",
-  PRISIONEIRO = "PRISIONEIRO",
-  INVOCACAO = "INVOCACAO",
-  MONSTRO = "MONSTRO",
+  TROOP = "TROOP",
+  HERO = "HERO",
+  REGENT = "REGENT",
+  PRISONER = "PRISONER",
+  SUMMON = "SUMMON",
+  MONSTER = "MONSTER",
 }
 
 export interface UnitStats {

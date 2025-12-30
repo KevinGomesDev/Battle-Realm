@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useMatch } from "../hooks/useMatch";
 import { useKingdom } from "../../kingdom";
+import { useSession } from "../../../core";
+import { useAuth } from "../../auth";
 import type { OpenMatch } from "../types/match.types";
 
 interface MatchListProps {
@@ -23,6 +25,9 @@ export const MatchList: React.FC<MatchListProps> = ({
     createMatch,
     joinMatch,
   } = useMatch();
+
+  const { canJoinSession, state: sessionState } = useSession();
+  const { state: authState } = useAuth();
 
   const [selectedKingdom, setSelectedKingdom] = useState<string>("");
   const [isCreating, setIsCreating] = useState(false);
@@ -56,6 +61,17 @@ export const MatchList: React.FC<MatchListProps> = ({
       return;
     }
 
+    // Verificar se pode entrar em nova sessão
+    if (authState.user?.id) {
+      const canJoin = await canJoinSession(authState.user.id);
+      if (!canJoin) {
+        setLocalError(
+          sessionState.canJoinReason || "Você já está em uma sessão ativa"
+        );
+        return;
+      }
+    }
+
     setIsCreating(true);
     setLocalError(null);
 
@@ -73,6 +89,17 @@ export const MatchList: React.FC<MatchListProps> = ({
     if (!selectedKingdom) {
       setLocalError("Selecione um reino primeiro");
       return;
+    }
+
+    // Verificar se pode entrar em nova sessão
+    if (authState.user?.id) {
+      const canJoin = await canJoinSession(authState.user.id);
+      if (!canJoin) {
+        setLocalError(
+          sessionState.canJoinReason || "Você já está em uma sessão ativa"
+        );
+        return;
+      }
     }
 
     setIsJoining(matchId);

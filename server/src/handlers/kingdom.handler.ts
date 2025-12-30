@@ -9,6 +9,10 @@ import {
   createTroopTemplatesForKingdom,
   TroopTemplateData,
 } from "../utils/army/troop.utils";
+import {
+  getKingdomTemplateById,
+  getKingdomTemplatesSummary,
+} from "../data/kingdom-templates";
 
 const MAP_SIZE = 100;
 
@@ -171,7 +175,7 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
             orderBy: { slotIndex: "asc" },
           },
           units: {
-            where: { category: "REGENTE" },
+            where: { category: "REGENT" },
           },
         },
       });
@@ -235,4 +239,216 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
       socket.emit("error", { message: "Erro ao definir tropas do reino." });
     }
   });
+
+  // ============================================
+  // KINGDOM TEMPLATES (Reinos Pré-definidos)
+  // ============================================
+
+  // Listar todos os templates de reino (versão resumida)
+  socket.on("kingdom:list_templates", async () => {
+    try {
+      const templates = getKingdomTemplatesSummary();
+      socket.emit("kingdom:templates_list", { templates });
+    } catch (error) {
+      console.error("[KINGDOM] Erro ao listar templates:", error);
+      socket.emit("error", { message: "Erro ao listar templates de reino." });
+    }
+  });
+
+  // Obter um template de reino completo por ID
+  socket.on("kingdom:get_template", async ({ templateId }) => {
+    try {
+      const template = getKingdomTemplateById(templateId);
+      if (!template) {
+        return socket.emit("error", { message: "Template não encontrado." });
+      }
+      socket.emit("kingdom:template_details", { template });
+    } catch (error) {
+      console.error("[KINGDOM] Erro ao buscar template:", error);
+      socket.emit("error", { message: "Erro ao buscar template de reino." });
+    }
+  });
+
+  // Criar reino a partir de um template pré-definido
+  socket.on("kingdom:create_from_template", async ({ templateId }) => {
+    try {
+      const userId = socket.data.userId;
+      if (!userId) {
+        return socket.emit("error", {
+          message: "Sessão inválida. Faça login novamente.",
+        });
+      }
+
+      const template = getKingdomTemplateById(templateId);
+      if (!template) {
+        return socket.emit("error", { message: "Template não encontrado." });
+      }
+
+      const randomLocation = Math.floor(Math.random() * MAP_SIZE) + 1;
+
+      // Criar o reino
+      const newKingdom = await prisma.kingdom.create({
+        data: {
+          name: template.name,
+          capitalName: template.capitalName,
+          description: template.description,
+          alignment: template.alignment,
+          race: template.race,
+          raceMetadata: template.raceMetadata,
+          locationIndex: randomLocation,
+          ownerId: userId,
+        },
+      });
+
+      // Criar o Regente
+      // Primeiro, buscar a classe pelo código
+      let heroClass = await prisma.heroClass.findUnique({
+        where: { code: template.regent.classCode },
+      });
+
+      await prisma.unit.create({
+        data: {
+          kingdomId: newKingdom.id,
+          name: template.regent.name,
+          description: template.regent.description,
+          category: "REGENT",
+          classId: heroClass?.id || null,
+          combat: template.regent.combat,
+          acuity: template.regent.acuity,
+          focus: template.regent.focus,
+          armor: template.regent.armor,
+          vitality: template.regent.vitality,
+          currentHp: template.regent.vitality,
+          movesLeft: template.regent.acuity,
+          actionsLeft: 3, // Regentes têm 3 ações
+        },
+      });
+
+      // Criar templates de tropas
+      const troopTemplatesData = template.troopTemplates.map((t) => ({
+        kingdomId: newKingdom.id,
+        slotIndex: t.slotIndex,
+        name: t.name,
+        description: t.description,
+        passiveId: t.passiveId,
+        resourceType: t.resourceType,
+        combat: t.combat,
+        acuity: t.acuity,
+        focus: t.focus,
+        armor: t.armor,
+        vitality: t.vitality,
+      }));
+
+      await prisma.troopTemplate.createMany({ data: troopTemplatesData });
+
+      // Buscar reino completo
+      const kingdomWithData = await prisma.kingdom.findUnique({
+        where: { id: newKingdom.id },
+        include: {
+          units: true,
+          troopTemplates: { orderBy: { slotIndex: "asc" } },
+        },
+      });
+
+      socket.emit("kingdom:created_from_template", {
+        kingdom: kingdomWithData,
+        message: `Reino "${template.name}" criado com sucesso!`,
+      });
+
+      console.log(
+        `[KINGDOM] Reino criado de template: ${template.name} por userId=${userId}`
+      );
+    } catch (error) {
+      console.error("[KINGDOM] Erro ao criar de template:", error);
+      socket.emit("error", { message: "Erro ao criar reino do template." });
+    }
+  });
+
+  // Atualizar descrição de um reino
+  socket.on(
+    "kingdom:update_description",
+    async ({ kingdomId, description }) => {
+      try {
+        const userId = socket.data.userId;
+        const kingdom = await prisma.kingdom.findUnique({
+          where: { id: kingdomId },
+        });
+
+        if (!kingdom || kingdom.ownerId !== userId) {
+          return socket.emit("error", {
+            message: "Acesso negado a este reino.",
+          });
+        }
+
+        const updated = await prisma.kingdom.update({
+          where: { id: kingdomId },
+          data: { description },
+        });
+
+        socket.emit("kingdom:description_updated", { kingdom: updated });
+      } catch (error) {
+        console.error("[KINGDOM] Erro ao atualizar descrição:", error);
+        socket.emit("error", { message: "Erro ao atualizar descrição." });
+      }
+    }
+  );
+
+  // Atualizar descrição de uma unidade (herói/regente)
+  socket.on("unit:update_description", async ({ unitId, description }) => {
+    try {
+      const userId = socket.data.userId;
+      const unit = await prisma.unit.findUnique({
+        where: { id: unitId },
+        include: { kingdom: true },
+      });
+
+      if (!unit || !unit.kingdom || unit.kingdom.ownerId !== userId) {
+        return socket.emit("error", {
+          message: "Acesso negado a esta unidade.",
+        });
+      }
+
+      const updated = await prisma.unit.update({
+        where: { id: unitId },
+        data: { description },
+      });
+
+      socket.emit("unit:description_updated", { unit: updated });
+    } catch (error) {
+      console.error("[UNIT] Erro ao atualizar descrição:", error);
+      socket.emit("error", { message: "Erro ao atualizar descrição." });
+    }
+  });
+
+  // Atualizar descrição de um template de tropa
+  socket.on(
+    "troop_template:update_description",
+    async ({ templateId, description }) => {
+      try {
+        const userId = socket.data.userId;
+        const template = await prisma.troopTemplate.findUnique({
+          where: { id: templateId },
+          include: { kingdom: true },
+        });
+
+        if (!template || template.kingdom.ownerId !== userId) {
+          return socket.emit("error", {
+            message: "Acesso negado a este template.",
+          });
+        }
+
+        const updated = await prisma.troopTemplate.update({
+          where: { id: templateId },
+          data: { description },
+        });
+
+        socket.emit("troop_template:description_updated", {
+          template: updated,
+        });
+      } catch (error) {
+        console.error("[TROOP_TEMPLATE] Erro ao atualizar descrição:", error);
+        socket.emit("error", { message: "Erro ao atualizar descrição." });
+      }
+    }
+  );
 };

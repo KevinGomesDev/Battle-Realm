@@ -50,11 +50,11 @@ export function validateGridMove(
 // Retorna marcas máximas por categoria
 export function getMaxMarksByCategory(category: string): number {
   switch (category) {
-    case "TROPA":
+    case "TROOP":
       return 1;
-    case "HEROI":
+    case "HERO":
       return 2;
-    case "REGENTE":
+    case "REGENT":
       return 3;
     default:
       return 1;
