@@ -1,280 +1,152 @@
-# Battle Realm - Development Guidelines
+# Battle Realm - Instruções de Desenvolvimento
 
-## 🎮 Game Overview
-
-Battle Realm é um **jogo de turnos baseado em browser** com sistema de batalha PvP em arena grid-based. O backend é sempre a **fonte de verdade** para toda lógica de jogo.
-
-## 📁 Project Structure
-
-```
-├── client/          # React + Vite + TypeScript (Frontend)
-├── server/          # Node.js + Express + Socket.IO + Prisma (Backend)
-└── shared/          # Tipos e constantes compartilhados (CRÍTICO!)
-    └── types/       # Tipos TypeScript usados por ambos
-```
-
-### Stack
+## Stack
 
 - **Client:** React 18 + Vite + TypeScript + TailwindCSS
 - **Server:** Node.js + Express + Socket.IO + Prisma + PostgreSQL
-- **Communication:** Socket.IO (WebSocket) - Tempo real, bidirecional
+- **Shared:** Tipos TypeScript compartilhados
+
+## Estrutura
+
+```
+client/src/features/{feature}/   # Componentes, context, hooks por feature
+server/src/handlers/             # Socket event handlers
+server/src/logic/                # Lógica de jogo pura
+server/src/services/             # Business logic com I/O
+server/src/data/                 # Dados estáticos (classes, skills)
+shared/types/                    # Tipos compartilhados (CRÍTICO!)
+```
 
 ---
 
-## 🚨 REGRAS CRÍTICAS
+## Regras Críticas
 
-### 1. Shared Types - SEMPRE usar `shared/types/`
+### 1. Shared Types
 
-Tipos e constantes usados por **client E server** DEVEM estar em `shared/types/`:
+Tipos usados por client E server → `shared/types/`
 
 ```typescript
-// ✅ CORRETO - Definir no shared
-// shared/types/arena.types.ts
-export interface ArenaUnit { ... }
-
-// Client: importar do shared
-import type { ArenaUnit } from "../../../../../shared/types";
-
-// Server: importar do shared
 import type { ArenaUnit } from "../../../shared/types";
-```
-
-```typescript
-// ❌ ERRADO - Duplicar tipos em cada lado
-// client/src/types/arena.types.ts
-export interface ArenaUnit { ... }
-// server/src/types/arena.types.ts
-export interface ArenaUnit { ... } // DUPLICAÇÃO!
 ```
 
 ### 2. Backend = Fonte de Verdade
 
-O **servidor** é a autoridade para:
+Server calcula tudo (dano, movimento, validações). Client apenas exibe.
 
-- Lógica de batalha e combate
-- Cálculos de dano/iniciativa/movimento
-- Validação de ações do jogador
-- Estado atual do jogo
+### 3. Socket Events
 
-```typescript
-// ✅ CORRETO - Server calcula e envia resultado
-// server/handlers/battle.handler.ts
-const damage = calculateDamage(attacker, defender);
-io.to(battleRoom).emit("battle:attack-result", { damage, ... });
+Verificar que nome e payload são idênticos em ambos os lados.
 
-// client recebe e exibe
-socket.on("battle:attack-result", (data) => {
-  dispatch({ type: "ATTACK_RESULT", payload: data });
-});
 ```
-
-```typescript
-// ❌ ERRADO - Client calculando lógica de jogo
-const damage = attacker.combat - defender.armor; // NÃO!
-```
-
-### 3. Socket Events - Verificar Emitter ↔ Listener
-
-Sempre garantir que o **evento emitido** corresponde ao **listener esperado**:
-
-```typescript
-// SERVER - Emitindo evento
-socket.emit("arena:lobby-updated", lobbyData);
-
-// CLIENT - Listener DEVE corresponder exatamente
-socketService.on("arena:lobby-updated", (data) => { ... });
-//              ^^^^^^^^^^^^^^^^^^^^^^ MESMO NOME!
-```
-
-**Checklist para Socket Events:**
-
-1. Nome do evento é idêntico em ambos os lados?
-2. Payload tem os mesmos campos?
-3. Tipos estão sincronizados via `shared/types`?
-
-### 4. Condições de Batalha - Uma Fonte de Verdade
-
-Todas as condições (buffs/debuffs) são definidas em `server/src/logic/conditions.ts`:
-
-```typescript
-// Tipos em shared/types/conditions.types.ts
-export interface ConditionDefinition { ... }
-
-// Definições no server (FONTE DE VERDADE)
-// server/src/logic/conditions.ts
-export const CONDITIONS: Record<string, ConditionDefinition> = { ... }
-
-// Dados visuais no shared (para frontend usar)
-// shared/types/conditions.data.ts
-export const CONDITIONS_INFO = { ... }
+Padrão: {domain}:{action}
+Exemplos: arena:lobby-updated, battle:action-executed
 ```
 
 ---
 
-## 🏗️ Architecture Patterns
+## Sistema de Eventos (Log de Batalha)
 
-### Frontend (client/)
-
-```
-src/
-├── features/           # Módulos por feature (arena/, auth/, kingdom/)
-│   └── arena/
-│       ├── components/ # Componentes React da feature
-│       ├── context/    # ArenaContext + arenaReducer
-│       ├── hooks/      # useArena, useBattleKeyboard
-│       ├── constants/  # Constantes específicas da feature
-│       ├── types/      # Tipos client-only (re-export shared)
-│       └── utils/      # Helpers e loggers
-├── services/           # socket.service.ts (singleton)
-├── components/         # Componentes globais reutilizáveis
-├── pages/              # Páginas/rotas
-└── providers/          # Context providers
-```
-
-**Padrão Feature-based:**
+### Backend - Emitir eventos
 
 ```typescript
-// Cada feature exporta sua API pública via index.ts
-// client/src/features/arena/index.ts
-export { ArenaProvider, useArena } from "./context";
-export { ArenaBattleView, ArenaList } from "./components";
-export type { ArenaState, ArenaUnit } from "./types";
+// server/src/logic/combat-events.ts
+import { emitAttackHitEvent, emitAttackDodgedEvent } from "./combat-events";
+
+// Após ação de combate
+if (result.missed) {
+  await emitAttackDodgedEvent(battleId, attacker, target);
+} else {
+  await emitAttackHitEvent(battleId, attacker, target, result);
+}
 ```
 
-### Backend (server/)
+### Frontend - Exibir eventos
 
-```
-src/
-├── handlers/           # Socket event handlers (1 por domínio)
-│   ├── battle.handler.ts
-│   ├── kingdom.handler.ts
-│   └── turn.handler.ts
-├── logic/              # Lógica de jogo pura (sem I/O)
-│   ├── conditions.ts   # FONTE DE VERDADE para condições
-│   ├── combat-actions.ts
-│   └── unit-actions.ts
-├── services/           # Business logic com I/O
-├── utils/              # Helpers puros
-├── data/               # Configurações e constantes
-└── lib/                # Integrações (prisma, auth)
+```tsx
+import { EventProvider, EventLog } from "@/features/events";
+
+// Provider no App
+<EventProvider><App /></EventProvider>
+
+// Componente em qualquer lugar
+<EventLog context="BATTLE" contextId={battleId} />
 ```
 
-**Padrão Handler:**
+### Arquivos do Sistema
+
+| Arquivo                                | Descrição                    |
+| -------------------------------------- | ---------------------------- |
+| `shared/types/events.types.ts`         | Tipos e constantes           |
+| `server/src/services/event.service.ts` | Criar e emitir eventos       |
+| `server/src/logic/combat-events.ts`    | Funções prontas para combate |
+| `client/src/features/events/`          | Context, hook e componente   |
+
+---
+
+## Sistema de Skills
+
+### Dados Estáticos (não banco)
 
 ```typescript
-// server/src/handlers/example.handler.ts
-export function registerExampleHandlers(io: Server, socket: Socket) {
-  socket.on("example:action", async (data, callback) => {
-    try {
-      // 1. Validar input
-      // 2. Processar lógica
-      // 3. Persistir se necessário
-      // 4. Emitir resultado
-      callback?.({ success: true, data: result });
-    } catch (error) {
-      callback?.({ success: false, error: error.message });
-    }
+// Tipos: shared/types/skills.types.ts
+// Classes: server/src/data/classes.data.ts
+// Skills: server/src/data/skills.data.ts
+
+import { HERO_CLASSES, getClassByCode } from "../data/classes.data";
+import {
+  getSkillEffectiveRange,
+  isAdjacent,
+} from "../../../shared/types/skills.types";
+```
+
+### Ranges
+
+- `SELF` = 0 (apenas usuário)
+- `ADJACENT` = 1 (1 bloco Manhattan)
+- `RANGED` = customizável (padrão 4)
+- `AREA` = raio (padrão 2)
+
+---
+
+## Padrões de Código
+
+### Feature (Client)
+
+```typescript
+// client/src/features/{feature}/index.ts
+export { FeatureProvider, useFeature } from "./context";
+export { FeatureComponent } from "./components";
+```
+
+### Handler (Server)
+
+```typescript
+export function registerFeatureHandlers(io: Server, socket: Socket) {
+  socket.on("feature:action", async (data, callback) => {
+    // 1. Validar → 2. Processar → 3. Persistir → 4. Emitir
+    callback?.({ success: true, data: result });
   });
 }
 ```
 
 ---
 
-## 📝 Code Conventions
+## Quick Reference
 
-### Imports
-
-```typescript
-// Path alias no client
-import { useAuth } from "@/hooks/useAuth";
-import { AsyncButton } from "@/components/AsyncButton";
-
-// Shared types
-import type { ArenaUnit, ArenaBattle } from "shared/types";
-```
-
-### Socket Event Naming
-
-```
-{domain}:{action}[-{qualifier}]
-
-Exemplos:
-- arena:create-lobby
-- arena:lobby-updated
-- battle:action-executed
-- kingdom:resources-updated
-```
-
-### State Management (Frontend)
-
-```typescript
-// Context + Reducer pattern
-const [state, dispatch] = useReducer(arenaReducer, initialState);
-
-// Actions tipadas
-type ArenaAction =
-  | { type: "SET_LOBBIES"; payload: ArenaLobby[] }
-  | { type: "JOIN_LOBBY"; payload: ArenaLobby }
-  | { type: "BATTLE_UPDATE"; payload: ArenaBattle };
-```
+| Ação                       | Onde                                                  |
+| -------------------------- | ----------------------------------------------------- |
+| Novo tipo compartilhado    | `shared/types/`                                       |
+| Nova condição de batalha   | `server/src/logic/conditions.ts`                      |
+| Nova skill/classe          | `server/src/data/skills.data.ts` ou `classes.data.ts` |
+| Novo evento de combate     | `server/src/logic/combat-events.ts`                   |
+| Lógica de combate          | `server/src/logic/combat-actions.ts`                  |
+| Novo componente de feature | `client/src/features/{feature}/components/`           |
 
 ---
 
-## ⚔️ Battle System (Turn-Based)
+## NÃO FAZER
 
-### Flow de Turno
-
-1. **Server** determina ordem de iniciativa
-2. **Server** emite `battle:turn-start` com unidade ativa
-3. **Client** exibe UI para ação
-4. **Client** envia `battle:execute-action` com ação escolhida
-5. **Server** valida, processa, e emite `battle:action-result`
-6. **Server** avança para próxima unidade ou rodada
-
-### Estrutura de Batalha
-
-```typescript
-interface Battle {
-  id: string;
-  gridWidth: number;
-  gridHeight: number;
-  round: number;
-  currentTurnIndex: number;
-  initiativeOrder: string[]; // IDs das unidades
-  units: BattleUnit[];
-  status: "ACTIVE" | "ENDED";
-}
-```
-
----
-
-## 🚫 DO NOT
-
-- ❌ Criar arquivos .md de documentação (exceto este)
-- ❌ Executar `npm run build` ou `npm run dev` (assumir que estão rodando)
-- ❌ Duplicar tipos entre client e server
+- ❌ Duplicar tipos entre client/server
 - ❌ Calcular lógica de jogo no frontend
-- ❌ Criar eventos socket sem verificar o listener correspondente
-- ❌ Adicionar console.log desnecessários (usar logger da feature)
-
-## ✅ DO
-
-- ✅ Usar `shared/types/` para tipos compartilhados
-- ✅ Validar ações no backend antes de processar
-- ✅ Usar TypeScript estrito com tipos explícitos
-- ✅ Seguir padrões existentes (Context/Reducer, Handlers)
-- ✅ Manter código conciso e focado
-- ✅ Usar callbacks em socket.emit para confirmação
-
----
-
-## 🔧 Quick Reference
-
-| Ação                       | Onde                                        |
-| -------------------------- | ------------------------------------------- |
-| Novo tipo compartilhado    | `shared/types/`                             |
-| Nova condição de batalha   | `server/src/logic/conditions.ts`            |
-| Novo socket event          | Handler no server + Listener no client      |
-| Novo componente de feature | `client/src/features/{feature}/components/` |
-| Lógica de combate          | `server/src/logic/combat-actions.ts`        |
-| Persistência de dados      | `server/src/services/` via Prisma           |
+- ❌ Criar socket events sem verificar listener correspondente
+- ❌ Executar `npm run build/dev` (assumir que estão rodando)

@@ -25,6 +25,8 @@ import { registerCrisisHandlers } from "./handlers/crisis.handler";
 import { registerSkillsHandlers } from "./handlers/skills.handler";
 import { registerActionHandlers } from "./handlers/action.handler";
 import { registerRankingHandlers } from "./handlers/ranking.handler";
+import { registerEventHandlers } from "./handlers/event.handler";
+import { initEventService } from "./services/event.service";
 import {
   registerSessionHandlers,
   injectArenaRefs,
@@ -44,6 +46,9 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: "*" },
 });
+
+// Inicializar serviço de eventos com instância do Socket.IO
+initEventService(io);
 
 app.get("/", (req, res) => {
   res.send("Backend Battle Realm (Modular) Online!");
@@ -79,6 +84,7 @@ io.on("connection", (socket: Socket) => {
   registerSkillsHandlers(io, socket);
   registerActionHandlers(io, socket);
   registerRankingHandlers(io, socket);
+  registerEventHandlers(io, socket);
 
   socket.on("disconnect", () => {
     connectionCount--;

@@ -10,7 +10,7 @@ interface DBUnit {
   category: string;
   troopSlot: number | null;
   level: number;
-  classId: string | null;
+  classCode: string | null;
   classFeatures: string | null;
   equipment: string | null;
   combat: number;
@@ -31,7 +31,7 @@ export interface BattleUnit {
   category: string;
   troopSlot?: number;
   level: number;
-  classId?: string;
+  classCode?: string;
   classFeatures: string[];
   equipment: string[];
   combat: number;
@@ -104,7 +104,7 @@ export function createBattleUnit(
     category: dbUnit.category,
     troopSlot: dbUnit.troopSlot ?? undefined,
     level: dbUnit.level,
-    classId: dbUnit.classId ?? undefined,
+    classCode: dbUnit.classCode ?? undefined,
     classFeatures: JSON.parse(dbUnit.classFeatures || "[]"),
     equipment: JSON.parse(dbUnit.equipment || "[]"),
     combat: dbUnit.combat,

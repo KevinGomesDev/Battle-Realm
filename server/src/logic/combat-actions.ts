@@ -8,6 +8,11 @@ import {
   scanConditionsForAction,
   applyConditionScanResult,
 } from "./conditions";
+import {
+  getManhattanDistance,
+  isAdjacent,
+  getAdjacentPositions,
+} from "../../../shared/types/skills.types";
 
 export interface CombatUnit {
   id: string;
@@ -163,9 +168,12 @@ export function executeAttackAction(
     return { success: false, error: "No actions left this turn" };
   }
 
-  const manhattanDistance =
-    Math.abs(attacker.posX - target.posX) +
-    Math.abs(attacker.posY - target.posY);
+  const manhattanDistance = getManhattanDistance(
+    attacker.posX,
+    attacker.posY,
+    target.posX,
+    target.posY
+  );
 
   if (manhattanDistance !== 1) {
     return { success: false, error: "Target must be adjacent" };
@@ -429,9 +437,7 @@ export function executeHelpAction(
     return { success: false, error: "Não pode ajudar unidade morta" };
   }
 
-  const manhattan =
-    Math.abs(helper.posX - target.posX) + Math.abs(helper.posY - target.posY);
-  if (manhattan !== 1) {
+  if (!isAdjacent(helper.posX, helper.posY, target.posX, target.posY)) {
     return { success: false, error: "Alvo deve estar adjacente" };
   }
 
@@ -476,10 +482,7 @@ export function executeKnockdownAction(
     return { success: false, error: "Não pode derrubar unidade morta" };
   }
 
-  const manhattan =
-    Math.abs(attacker.posX - target.posX) +
-    Math.abs(attacker.posY - target.posY);
-  if (manhattan !== 1) {
+  if (!isAdjacent(attacker.posX, attacker.posY, target.posX, target.posY)) {
     return { success: false, error: "Alvo deve estar adjacente" };
   }
 
@@ -514,10 +517,7 @@ export function executeDisarmAction(
     return { success: false, error: "Não pode desarmar unidade morta" };
   }
 
-  const manhattan =
-    Math.abs(attacker.posX - target.posX) +
-    Math.abs(attacker.posY - target.posY);
-  if (manhattan !== 1) {
+  if (!isAdjacent(attacker.posX, attacker.posY, target.posX, target.posY)) {
     return { success: false, error: "Alvo deve estar adjacente" };
   }
 
@@ -552,10 +552,7 @@ export function executeGrabAction(
     return { success: false, error: "Não pode agarrar unidade morta" };
   }
 
-  const manhattan =
-    Math.abs(attacker.posX - target.posX) +
-    Math.abs(attacker.posY - target.posY);
-  if (manhattan !== 1) {
+  if (!isAdjacent(attacker.posX, attacker.posY, target.posX, target.posY)) {
     return { success: false, error: "Alvo deve estar adjacente" };
   }
 
@@ -601,10 +598,7 @@ export function executeThrowAction(
     return { success: false, error: "Não pode arremessar unidade morta" };
   }
 
-  const manhattan =
-    Math.abs(attacker.posX - target.posX) +
-    Math.abs(attacker.posY - target.posY);
-  if (manhattan !== 1) {
+  if (!isAdjacent(attacker.posX, attacker.posY, target.posX, target.posY)) {
     return { success: false, error: "Alvo deve estar adjacente" };
   }
 
@@ -773,9 +767,7 @@ export function executeAttackObstacle(
     return { success: false, error: "Sem ações restantes" };
   }
 
-  const manhattan =
-    Math.abs(attacker.posX - targetX) + Math.abs(attacker.posY - targetY);
-  if (manhattan !== 1) {
+  if (!isAdjacent(attacker.posX, attacker.posY, targetX, targetY)) {
     return { success: false, error: "Obstáculo deve estar adjacente" };
   }
 

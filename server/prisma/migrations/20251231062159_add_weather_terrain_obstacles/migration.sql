@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Battle" ADD COLUMN     "obstacles" TEXT NOT NULL DEFAULT '[]',
+ADD COLUMN     "terrainType" TEXT NOT NULL DEFAULT 'PLAINS',
+ADD COLUMN     "territorySize" TEXT NOT NULL DEFAULT 'MEDIUM',
+ADD COLUMN     "weather" TEXT NOT NULL DEFAULT 'SUNNY';

@@ -35,7 +35,7 @@ export interface ArenaUnit {
   category: string;
   troopSlot?: number;
   level: number;
-  classId?: string;
+  classCode?: string;
   classFeatures: string[];
   equipment: string[];
   // Stats
@@ -66,13 +66,33 @@ export interface ArenaUnit {
 // CONFIG TYPES
 // =============================================================================
 
+import type {
+  WeatherType,
+  BattleTerrainType,
+  TerritorySize,
+  BattleObstacle,
+} from "./battle.types";
+
 export interface ArenaGrid {
   width: number;
   height: number;
 }
 
+export interface ArenaMapConfig {
+  weather: WeatherType;
+  weatherEmoji: string;
+  weatherName: string;
+  weatherEffect: string;
+  weatherCssFilter: string;
+  terrainType: BattleTerrainType;
+  terrainName: string;
+  territorySize: TerritorySize;
+  obstacles: BattleObstacle[];
+}
+
 export interface ArenaConfig {
   grid: ArenaGrid;
+  map: ArenaMapConfig;
   colors: {
     gridBackground: string;
     gridLine: string;

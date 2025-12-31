@@ -115,7 +115,7 @@ export interface Unit {
   name: string;
   description?: string;
   category: UnitCategory;
-  classId?: string;
+  classCode?: string;
   combat: number;
   acuity: number;
   focus: number;

@@ -358,17 +358,13 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
             },
           });
 
-          const heroClass = await tx.heroClass.findUnique({
-            where: { code: template.regent.classCode },
-          });
-
           await tx.unit.create({
             data: {
               kingdomId: newKingdom.id,
               name: template.regent.name,
               description: template.regent.description,
               category: "REGENT",
-              classId: heroClass?.id || null,
+              classCode: template.regent.classCode, // Código da classe (dados estáticos)
               combat: template.regent.combat,
               acuity: template.regent.acuity,
               focus: template.regent.focus,

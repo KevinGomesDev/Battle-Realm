@@ -61,6 +61,7 @@ export interface ArenaBattleData {
   initiativeOrder: string[];
   actionOrder: string[];
   turnTimer: number;
+  config: any; // ArenaConfig com mapa, clima e obstáculos
   // Campos opcionais que podem existir na implementação completa
   isArena?: boolean;
   matchId?: string;

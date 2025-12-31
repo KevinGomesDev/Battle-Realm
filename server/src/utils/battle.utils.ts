@@ -4,7 +4,7 @@ export function calculateSkillCost(
   skill: SkillDefinition,
   timesUsedInBattle: number
 ): number {
-  if (skill.category === "PASSIVA" || !skill.costTier) {
+  if (skill.category === "PASSIVE" || !skill.costTier) {
     return 0;
   }
 

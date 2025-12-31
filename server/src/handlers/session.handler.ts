@@ -263,7 +263,7 @@ export const registerSessionHandlers = (io: Server, socket: Socket): void => {
         socket.emit("battle:battle_restored", {
           battleId: session.battleId,
           lobbyId: session.lobbyId,
-          config: ARENA_CONFIG, // Configuração visual completa
+          config: battle.config, // Configuração dinâmica da batalha (com mapa, clima, obstáculos)
           round: battle.round,
           status: battle.status,
           currentTurnIndex: battle.currentTurnIndex,

@@ -7,6 +7,7 @@ import React, {
   memo,
 } from "react";
 import type { ArenaUnit, ArenaBattle } from "../types/arena.types";
+import type { BattleObstacle } from "../../../../../shared/types/battle.types";
 
 interface ArenaBattleCanvasProps {
   battle: ArenaBattle;
@@ -50,6 +51,9 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
     const GRID_HEIGHT = config.grid.height;
     const GRID_COLORS = config.colors;
     const CONDITION_COLORS = config.conditionColors;
+    const MAP_CONFIG = config.map;
+    const OBSTACLES = MAP_CONFIG?.obstacles || [];
+    const WEATHER_CSS_FILTER = MAP_CONFIG?.weatherCssFilter || "";
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -87,6 +91,15 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
       return map;
     }, [units]);
 
+    // Map de obstáculos para lookup O(1)
+    const obstaclePositionMap = useMemo(() => {
+      const map = new Map<string, BattleObstacle>();
+      OBSTACLES.forEach((obs) => {
+        map.set(`${obs.posX},${obs.posY}`, obs);
+      });
+      return map;
+    }, [OBSTACLES]);
+
     // Células movíveis como Set para O(1) lookup
     const movableCells = useMemo((): Set<string> => {
       if (!selectedUnit || selectedUnit.movesLeft <= 0) return new Set();
@@ -101,7 +114,8 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
             const ny = selectedUnit.posY + dy;
             if (nx >= 0 && nx < GRID_WIDTH && ny >= 0 && ny < GRID_HEIGHT) {
               const key = `${nx},${ny}`;
-              if (!unitPositionMap.has(key)) {
+              // Verificar se não tem unidade NEM obstáculo
+              if (!unitPositionMap.has(key) && !obstaclePositionMap.has(key)) {
                 movable.add(key);
               }
             }
@@ -109,7 +123,7 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
         }
       }
       return movable;
-    }, [selectedUnit, unitPositionMap]);
+    }, [selectedUnit, unitPositionMap, obstaclePositionMap]);
 
     // Células atacáveis como Set
     const attackableCells = useMemo((): Set<string> => {
@@ -343,6 +357,23 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
       ctx.strokeStyle = GRID_COLORS.guestSecondary;
       ctx.strokeRect(8 * cellSize, 0, 4 * cellSize, 2 * cellSize);
 
+      // === DESENHAR OBSTÁCULOS ===
+      OBSTACLES.forEach((obstacle) => {
+        const cellX = obstacle.posX * cellSize;
+        const cellY = obstacle.posY * cellSize;
+
+        // Desenhar emoji do obstáculo
+        const fontSize = Math.max(12, cellSize * 0.6);
+        ctx.font = `${fontSize}px Arial`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(
+          obstacle.emoji,
+          cellX + cellSize / 2,
+          cellY + cellSize / 2
+        );
+      });
+
       // === DESENHAR UNIDADES ===
       units.forEach((unit) => {
         const cellX = unit.posX * cellSize;
@@ -415,6 +446,7 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
       GRID_HEIGHT,
       canvasWidth,
       canvasHeight,
+      OBSTACLES,
     ]);
 
     // === MARCAR PARA REDESENHO ===
@@ -553,6 +585,8 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
             height: canvasHeight,
             imageRendering: "pixelated",
             cursor: "pointer",
+            filter: WEATHER_CSS_FILTER || undefined,
+            transition: "filter 0.5s ease-in-out",
           }}
           className="border-4 border-metal-iron rounded-lg shadow-2xl"
           onMouseMove={handleMouseMove}

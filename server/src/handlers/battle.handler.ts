@@ -30,11 +30,12 @@ import {
   calculateBaseMovement,
 } from "../logic/combat-actions";
 import { determineUnitActions } from "../logic/unit-actions";
-import { ARENA_CONFIG } from "../data/arena-config";
+import { ARENA_CONFIG, generateArenaConfig } from "../data/arena-config";
 import type {
   ArenaLobbyData,
   ArenaBattleData,
 } from "../../../shared/types/session.types";
+import type { ArenaConfig } from "../../../shared/types/arena.types";
 
 // Usar tipos do shared para consistência
 type BattleLobby = ArenaLobbyData;
@@ -55,6 +56,7 @@ interface Battle {
   units: BattleUnit[];
   logs: BattleLog[];
   createdAt: Date;
+  config: ArenaConfig; // Configuração completa (inclui mapa, clima, obstáculos)
   // IDs para persistência
   hostUserId: string;
   guestUserId: string;
@@ -74,7 +76,7 @@ interface BattleUnit {
   category: string;
   troopSlot?: number; // Para TROOP: índice do template (0-4)
   level: number;
-  classId?: string; // ID da classe do herói/regente
+  classCode?: string; // Código da classe do herói/regente (ex: BARBARIAN)
   classFeatures: string[]; // Skills aprendidas
   equipment: string[]; // Itens equipados
   // Stats
@@ -421,7 +423,7 @@ async function saveBattleToDB(battle: Battle): Promise<void> {
           category: unit.category,
           troopSlot: unit.troopSlot,
           level: unit.level,
-          classId: unit.classId,
+          classCode: unit.classCode,
           classFeatures: JSON.stringify(unit.classFeatures),
           equipment: JSON.stringify(unit.equipment),
           combat: unit.combat,
@@ -649,7 +651,7 @@ async function loadBattlesFromDB(): Promise<void> {
         category: u.category,
         troopSlot: u.troopSlot ?? undefined,
         level: u.level,
-        classId: u.classId ?? undefined,
+        classCode: u.classCode ?? undefined,
         classFeatures: JSON.parse(u.classFeatures || "[]"),
         equipment: JSON.parse(u.equipment || "[]"),
         combat: u.combat,
@@ -688,6 +690,7 @@ async function loadBattlesFromDB(): Promise<void> {
         units,
         logs: [],
         createdAt: dbBattle.createdAt,
+        config: ARENA_CONFIG, // Usar config default ao recuperar do banco
         hostUserId: dbBattle.hostUserId || "",
         guestUserId: dbBattle.guestUserId || "",
         hostKingdomId: dbBattle.hostKingdomId || "",
@@ -1146,6 +1149,10 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
         lobby.guestUserId
       );
 
+      // Gerar configuração do mapa com clima, terreno e obstáculos
+      const unitPositions = orderedUnits.map((u) => ({ x: u.posX, y: u.posY }));
+      const arenaConfig = generateArenaConfig(unitPositions);
+
       const battle: Battle = {
         id: battleId,
         lobbyId,
@@ -1170,6 +1177,7 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
           },
         ],
         createdAt: new Date(),
+        config: arenaConfig,
         hostUserId: lobby.hostUserId,
         guestUserId: lobby.guestUserId as string,
         hostKingdomId: lobby.hostKingdomId,
@@ -1187,7 +1195,7 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
       io.to(lobbyId).emit("battle:battle_started", {
         battleId,
         lobbyId, // Incluir lobbyId para revanche
-        config: ARENA_CONFIG, // Configuração visual completa
+        config: arenaConfig, // Configuração visual completa com mapa dinâmico
         units: orderedUnits,
         initiativeOrder: orderedUnits.map((u) => u.id),
         actionOrder: battle.actionOrder,
@@ -1728,7 +1736,7 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
 
       socket.emit("battle:battle_state", {
         battleId,
-        config: ARENA_CONFIG, // Configuração visual completa
+        config: battle.config, // Configuração completa (inclui mapa dinâmico)
         round: battle.round,
         status: battle.status,
         currentTurnIndex: battle.currentTurnIndex,
@@ -2011,6 +2019,13 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
             lobby.guestUserId
           );
 
+          // Gerar configuração do mapa para a revanche
+          const unitPositions = orderedUnits.map((u) => ({
+            x: u.posX,
+            y: u.posY,
+          }));
+          const rematchConfig = generateArenaConfig(unitPositions);
+
           // Criar nova batalha
           const newBattle: Battle = {
             id: battleId,
@@ -2026,6 +2041,7 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
             units: orderedUnits,
             logs: [],
             createdAt: new Date(),
+            config: rematchConfig,
             hostUserId: lobby.hostUserId,
             guestUserId: lobby.guestUserId as string,
             hostKingdomId: hostKingdom.id,
@@ -2044,7 +2060,7 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
           io.to(lobbyId).emit("battle:rematch_started", {
             battleId,
             lobbyId,
-            config: ARENA_CONFIG,
+            config: rematchConfig,
             units: orderedUnits,
             initiativeOrder,
             actionOrder,

@@ -1,6 +1,7 @@
 // src/utils/army/summon.utils.ts
 import { prisma } from "../../lib/prisma";
 import { TROOP_PASSIVES } from "../../data/troop-passives";
+import { HERO_CLASSES, getSkillsForClass } from "../../data/classes.data";
 import { rollExplodingD6Once } from "../dice";
 
 function pickRandom<T>(arr: T[]): T {
@@ -44,14 +45,10 @@ export async function createSummonedCreature(params: {
     // Random passive from troop passives (since creatures don't belong to a kingdom's template)
     const randomPassive = pickRandom(TROOP_PASSIVES);
 
-    // Random class feature a partir do banco
-    const totalClasses = await prisma.heroClass.count();
-    const randomIndex = Math.max(0, Math.floor(Math.random() * totalClasses));
-    const randomClass = await prisma.heroClass.findFirst({
-      skip: randomIndex,
-      include: { skills: true },
-    });
-    const randomSkill = randomClass ? pickRandom(randomClass.skills) : null;
+    // Random class feature a partir dos dados estáticos
+    const randomClass = pickRandom(HERO_CLASSES);
+    const classSkills = getSkillsForClass(randomClass.code);
+    const randomSkill = classSkills.length > 0 ? pickRandom(classSkills) : null;
 
     const stats = generateCreatureStats(level);
 
@@ -63,7 +60,7 @@ export async function createSummonedCreature(params: {
         category: "SUMMON",
         level,
         name: params.name || null,
-        heroClass: null,
+        classCode: null, // Summons não têm classe
         classFeatures: JSON.stringify(
           [randomPassive.id, randomSkill ? randomSkill.code : null].filter(
             Boolean
@@ -79,7 +76,7 @@ export async function createSummonedCreature(params: {
         actionsLeft: 1,
         summonerId: summonerUnitId || null,
       },
-    } as any);
+    });
 
     return { success: true, unit: creature };
   } catch (err: any) {

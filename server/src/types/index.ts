@@ -35,11 +35,11 @@ import {
 import {
   SkillCategory,
   SkillCostTier,
-  RangeType,
+  SkillRange,
   COST_VALUES,
-  RANGE_VALUES,
+  DEFAULT_RANGE_VALUES,
   SkillDefinition,
-} from "../data/skills-system";
+} from "../../../shared/types/skills.types";
 import {
   ClassArchetype,
   TroopCategory,
@@ -232,11 +232,20 @@ export {
 export {
   SkillCategory,
   SkillCostTier,
-  RangeType,
+  SkillRange,
+  SkillTargetType,
   COST_VALUES,
-  RANGE_VALUES,
+  DEFAULT_RANGE_VALUES,
   SkillDefinition,
-} from "../data/skills-system";
+  // Range helpers
+  getManhattanDistance,
+  isInSkillRange,
+  isAdjacent,
+  getAdjacentPositions,
+  getPositionsInRadius,
+  getPositionsInRange,
+  getSkillEffectiveRange,
+} from "../../../shared/types/skills.types";
 export {
   ClassArchetype,
   TroopCategory,

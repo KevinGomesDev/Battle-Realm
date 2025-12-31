@@ -1,97 +1,100 @@
 // src/utils/skills.utils.ts
-import { CostTier, SkillCategory, SkillRange } from "@prisma/client";
+// Utilitários para o sistema de skills - usando dados estáticos
+
 import { prisma } from "../lib/prisma";
-import { ResourceType } from "../types";
 import { spendResources } from "./turn.utils";
+import {
+  HERO_CLASSES,
+  getClassByCode,
+  getSkillByCode,
+  getSkillsForClass,
+  getAllClassesSummary,
+} from "../data/classes.data";
+import {
+  SkillCategory,
+  SkillCostTier,
+  SkillRange,
+  SkillResourceType,
+  SkillDefinition,
+  HeroClassDefinition,
+  COST_VALUES,
+  DEFAULT_RANGE_VALUES,
+  getSkillCost,
+  getSkillEffectiveRange,
+} from "../../../shared/types/skills.types";
 
-// Valores de custo para as enums do banco
-const COST_VALUES: Record<CostTier, number> = {
-  LOW: 1,
-  MEDIUM: 2,
-  HIGH: 3,
-  EXTREME: 4,
-};
+// ================
+// Resource Helpers
+// ================
 
-// Alcances aproximados em quadrados para as enums do banco
-const RANGE_VALUES: Record<SkillRange, number> = {
-  SELF: 0,
-  ADJACENT: 1,
-  RANGED: 6,
-  AREA: 3,
-};
-
-const RESOURCE_KEY_MAP: Record<
-  string,
-  keyof ReturnType<typeof parseResources>
-> = {
-  ORE: "ore",
+// Mapeia nomes de recursos para chaves de ParsedResources
+const RESOURCE_KEY_MAP: Record<string, keyof ParsedResources> = {
   FOOD: "supplies",
   SUPPLIES: "supplies",
-  ARCANE: "arcane",
   ARCANA: "arcane",
+  ARCANE: "arcane",
   DEVOTION: "devotion",
-  EXPERIENCE: "experience",
 };
 
-const RESOURCE_LABEL: Record<
-  keyof ReturnType<typeof parseResources>,
-  ResourceType
-> = {
-  ore: "ORE",
+// Mapeia chaves de ParsedResources para SkillResourceType (usado em skills)
+const SKILL_RESOURCE_MAP: Record<string, SkillResourceType> = {
   supplies: "FOOD",
-  arcane: "ARCANE",
-  experience: "EXPERIENCE",
+  arcane: "ARCANA",
   devotion: "DEVOTION",
 };
 
-function parseResources(raw: string | null | undefined) {
+interface ParsedResources {
+  ore?: number;
+  supplies?: number;
+  arcane?: number;
+  experience?: number;
+  devotion?: number;
+}
+
+function parseResources(raw: string | null | undefined): ParsedResources {
   try {
-    return JSON.parse(raw || "{}") as {
-      ore?: number;
-      supplies?: number;
-      arcane?: number;
-      experience?: number;
-      devotion?: number;
-    };
+    return JSON.parse(raw || "{}") as ParsedResources;
   } catch {
     return { ore: 0, supplies: 0, arcane: 0, experience: 0, devotion: 0 };
   }
 }
 
-function mapResource(resourceUsed: string | null | undefined) {
+function mapResource(resourceUsed: SkillResourceType | null | undefined) {
   if (!resourceUsed) return null;
   const key = RESOURCE_KEY_MAP[resourceUsed.toUpperCase()];
   if (!key) return null;
+  const label = SKILL_RESOURCE_MAP[key];
+  if (!label) return null;
   return {
     resourceKey: key,
-    resourceLabel: RESOURCE_LABEL[key],
+    resourceLabel: label,
   } as const;
 }
+
+// ================
+// Skill Functions (usando dados estáticos)
+// ================
 
 /**
  * Obtém todas as habilidades de uma classe pelo code
  */
-export async function getClassSkills(classCode: string) {
-  const heroClass = await prisma.heroClass.findUnique({
-    where: { code: classCode },
-    include: { skills: true },
-  });
-
-  return heroClass?.skills ?? [];
+export function getClassSkills(classCode: string): SkillDefinition[] {
+  return getSkillsForClass(classCode);
 }
 
 /**
  * Obtém detalhes completos de uma habilidade
  */
-export async function getSkillDefinition(skillCode: string) {
-  return prisma.skill.findUnique({ where: { code: skillCode } });
+export function getSkillDefinition(skillCode: string): SkillDefinition | null {
+  const result = getSkillByCode(skillCode);
+  return result ? result.skill : null;
 }
 
 /**
  * Calcula o custo base de uma habilidade
  */
 export function calculateBaseCost(
-  costTier: CostTier | null | undefined
+  costTier: SkillCostTier | null | undefined
 ): number {
   if (!costTier) return 0;
   return COST_VALUES[costTier] || 0;
@@ -107,8 +110,7 @@ export function calculateEscaledCost(
   if (baseCost === 0) return 0;
   // Primeira vez: baseCost
   // Segunda vez: baseCost * 2
-  // Terceira vez: baseCost * 2 * 2 = baseCost * 4
-  // Etc.
+  // Terceira vez: baseCost * 4
   return baseCost * Math.pow(2, usageCount);
 }
 
@@ -119,7 +121,7 @@ export function getSkillRange(
   rangeType: SkillRange | null | undefined
 ): number {
   if (!rangeType) return 0;
-  return RANGE_VALUES[rangeType] || 0;
+  return DEFAULT_RANGE_VALUES[rangeType] || 0;
 }
 
 /**
@@ -134,12 +136,11 @@ export async function validateSkillUsage(
   valid: boolean;
   reason?: string;
   cost?: number;
-  resourceType?: ResourceType;
+  resourceType?: SkillResourceType;
 }> {
-  // Busca a unidade com heroClass incluído
+  // Busca a unidade
   const unit = await prisma.unit.findUnique({
     where: { id: unitId },
-    include: { heroClass: true },
   });
 
   if (!unit) {
@@ -150,47 +151,41 @@ export async function validateSkillUsage(
     return { valid: false, reason: "Você não é dono desta unidade" };
   }
 
-  // Busca a habilidade no banco
-  const skill = await prisma.skill.findUnique({ where: { code: skillCode } });
-  if (!skill) {
+  // Busca a habilidade nos dados estáticos
+  const skillResult = getSkillByCode(skillCode);
+  if (!skillResult) {
     return { valid: false, reason: "Habilidade não encontrada" };
   }
+  const skill = skillResult.skill;
 
   // Se é passiva, sempre pode ser usada (já está ativa)
-  if (skill.category === SkillCategory.PASSIVE) {
-    return {
-      valid: true,
-      cost: 0,
-    };
+  if (skill.category === "PASSIVE") {
+    return { valid: true, cost: 0 };
   }
 
   // Se é ativa ou reativa, verifica custo
   if (!skill.costTier) {
-    // Sem custo
-    return {
-      valid: true,
-      cost: 0,
-    };
+    return { valid: true, cost: 0 };
   }
 
   // Calcula custo escalado
-  const baseCost = calculateBaseCost(skill.costTier);
+  const baseCost = getSkillCost(skill);
   const escalatedCost = calculateEscaledCost(baseCost, usageCountThisBattle);
 
   // Obtém a classe da unidade para saber qual recurso é necessário
-  if (!unit.heroClass) {
-    return {
-      valid: false,
-      reason: "Unidade não possui classe definida",
-    };
+  const classCode = unit.classCode;
+  if (!classCode) {
+    return { valid: false, reason: "Unidade não possui classe definida" };
   }
 
-  const resourceInfo = mapResource(unit.heroClass.resourceUsed);
+  const heroClass = getClassByCode(classCode);
+  if (!heroClass) {
+    return { valid: false, reason: `Classe ${classCode} não encontrada` };
+  }
+
+  const resourceInfo = mapResource(heroClass.resourceUsed);
   if (!resourceInfo) {
-    return {
-      valid: false,
-      reason: "Recurso da classe não encontrado",
-    };
+    return { valid: false, reason: "Recurso da classe não encontrado" };
   }
 
   // Verifica se jogador tem recursos suficientes
@@ -199,10 +194,7 @@ export async function validateSkillUsage(
   });
 
   if (!player) {
-    return {
-      valid: false,
-      reason: "Jogador não encontrado",
-    };
+    return { valid: false, reason: "Jogador não encontrado" };
   }
 
   const playerResources = parseResources(player.resources);
@@ -236,7 +228,7 @@ export async function useSkill(
   success: boolean;
   message: string;
   cost?: number;
-  resourceType?: ResourceType;
+  resourceType?: SkillResourceType;
 }> {
   // Valida uso
   const validation = await validateSkillUsage(
@@ -253,20 +245,20 @@ export async function useSkill(
     };
   }
 
-  const skill = await prisma.skill.findUnique({ where: { code: skillCode } });
-  const unit = await prisma.unit.findUnique({
-    where: { id: unitId },
-    include: { heroClass: true },
-  });
+  const skillResult = getSkillByCode(skillCode);
+  const unit = await prisma.unit.findUnique({ where: { id: unitId } });
 
-  if (!unit || !unit.heroClass || !skill) {
+  if (!unit || !skillResult) {
     return {
       success: false,
       message: "Dados da unidade ou habilidade não encontrados",
     };
   }
 
-  const resourceInfo = mapResource(unit.heroClass.resourceUsed);
+  const skill = skillResult.skill;
+  const classCode = unit.classCode;
+  const heroClass = classCode ? getClassByCode(classCode) : null;
+  const resourceInfo = heroClass ? mapResource(heroClass.resourceUsed) : null;
 
   // Se tem custo, gasta o recurso
   if (validation.cost && validation.cost > 0 && resourceInfo) {
@@ -299,16 +291,16 @@ export async function getSkillInfo(
   playerId: string,
   usageCountThisBattle: number = 0
 ): Promise<{
-  skill: any;
+  skill: SkillDefinition | null;
   isAvailable: boolean;
   canUse: boolean;
   cost: number;
-  resourceType?: ResourceType;
+  resourceType?: SkillResourceType;
   reason?: string;
 }> {
-  const skill = await prisma.skill.findUnique({ where: { code: skillCode } });
+  const skillResult = getSkillByCode(skillCode);
 
-  if (!skill) {
+  if (!skillResult) {
     return {
       skill: null,
       isAvailable: false,
@@ -326,7 +318,7 @@ export async function getSkillInfo(
   );
 
   return {
-    skill,
+    skill: skillResult.skill,
     isAvailable: true,
     canUse: validation.valid,
     cost: validation.cost || 0,
@@ -338,13 +330,8 @@ export async function getSkillInfo(
 /**
  * Lista todas as classes disponíveis com suas habilidades
  */
-export async function listAllClasses() {
-  const classes = await prisma.heroClass.findMany({
-    include: { skills: true },
-    orderBy: { name: "asc" },
-  });
-
-  return classes.map((classDef) => ({
+export function listAllClasses() {
+  return HERO_CLASSES.map((classDef) => ({
     id: classDef.code,
     name: classDef.name,
     archetype: classDef.archetype,
@@ -357,9 +344,9 @@ export async function listAllClasses() {
       description: skill.description,
       category: skill.category,
       costTier: skill.costTier,
-      baseCost: skill.costTier ? COST_VALUES[skill.costTier] : 0,
+      baseCost: getSkillCost(skill),
       range: skill.range,
-      rangeSquares: skill.range ? RANGE_VALUES[skill.range] : 0,
+      rangeSquares: getSkillEffectiveRange(skill),
     })),
   }));
 }
@@ -367,11 +354,8 @@ export async function listAllClasses() {
 /**
  * Obtém detalhes de uma classe específica
  */
-export async function getClassInfo(classCode: string) {
-  const classDef = await prisma.heroClass.findUnique({
-    where: { code: classCode },
-    include: { skills: true },
-  });
+export function getClassInfo(classCode: string) {
+  const classDef = getClassByCode(classCode);
 
   if (!classDef) {
     return null;
@@ -389,9 +373,17 @@ export async function getClassInfo(classCode: string) {
       description: skill.description,
       category: skill.category,
       costTier: skill.costTier,
-      baseCost: skill.costTier ? COST_VALUES[skill.costTier] : 0,
+      baseCost: getSkillCost(skill),
       range: skill.range,
-      rangeSquares: skill.range ? RANGE_VALUES[skill.range] : 0,
+      rangeSquares: getSkillEffectiveRange(skill),
     })),
   };
 }
+
+// Re-exportar funções de dados para conveniência
+export {
+  getClassByCode,
+  getSkillByCode,
+  getSkillsForClass,
+  getAllClassesSummary,
+};

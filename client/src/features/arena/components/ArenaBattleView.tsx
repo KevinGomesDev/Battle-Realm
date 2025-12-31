@@ -419,6 +419,47 @@ const AttributeTooltip: React.FC<{
   );
 };
 
+// Componente de Indicador de Clima
+const WeatherIndicator: React.FC<{
+  emoji: string;
+  name: string;
+  effect: string;
+  terrainName: string;
+}> = ({ emoji, name, effect, terrainName }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <div className="bg-citadel-obsidian/60 px-3 py-1 rounded border border-metal-iron cursor-help hover:bg-citadel-slate/50 transition-colors">
+        <span className="text-xl">{emoji}</span>
+      </div>
+      {showTooltip && (
+        <div className="absolute z-[200] top-full left-1/2 -translate-x-1/2 mt-2 w-56 p-3 bg-citadel-obsidian border border-metal-iron rounded-lg shadow-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-2xl">{emoji}</span>
+            <div>
+              <span className="text-parchment-light font-bold text-sm block">
+                {name}
+              </span>
+              <span className="text-parchment-dark text-[10px]">
+                Terreno: {terrainName}
+              </span>
+            </div>
+          </div>
+          <p className="text-parchment-aged text-xs leading-relaxed border-t border-metal-iron/30 pt-2">
+            {effect}
+          </p>
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45 w-2 h-2 bg-citadel-obsidian border-l border-t border-metal-iron"></div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 /**
  * ArenaBattleView - Tela completa de batalha da Arena
  * Inclui o grid canvas, painel de unidade, controles e logs
@@ -828,6 +869,16 @@ export const ArenaBattleView: React.FC = () => {
 
         {/* Centro - Round e Turno */}
         <div className="text-center flex items-center gap-4">
+          {/* Clima */}
+          {battle.config.map && (
+            <WeatherIndicator
+              emoji={battle.config.map.weatherEmoji}
+              name={battle.config.map.weatherName}
+              effect={battle.config.map.weatherEffect}
+              terrainName={battle.config.map.terrainName}
+            />
+          )}
+
           {/* Round */}
           <div className="bg-citadel-obsidian/60 px-3 py-1 rounded border border-metal-iron">
             <span className="text-parchment-aged text-xs">Round</span>
@@ -876,7 +927,6 @@ export const ArenaBattleView: React.FC = () => {
             </span>
           </div>
         </div>
-
         {/* Reino Oponente */}
         <div className="flex items-center gap-3">
           <div className="text-right">

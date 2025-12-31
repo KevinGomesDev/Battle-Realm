@@ -9,6 +9,7 @@ import {
   HERO_ATTRIBUTE_POINTS_PER_LEVEL,
 } from "../../types";
 import { spendResources } from "../turn.utils";
+import { getClassByCode } from "../../data/classes.data";
 
 // ... (calculateHeroLevelUpCost, calculateHeroRecruitmentCost, canHeroLevelUp e levelUpHero permanecem iguais) ...
 
@@ -276,10 +277,8 @@ export async function recruitHero(
     return { success: false, message: "Território da capital não encontrado" };
   }
 
-  // Busca a classe no banco pelo código
-  const heroClass = await prisma.heroClass.findUnique({
-    where: { code: heroData.heroClass },
-  });
+  // Busca a classe nos dados estáticos pelo código
+  const heroClass = getClassByCode(heroData.heroClass);
 
   if (!heroClass) {
     return {
@@ -297,7 +296,7 @@ export async function recruitHero(
       category: "HERO",
       name: heroData.name || heroClass.name, // Usa o nome ou o nome da classe como fallback
       level: 1,
-      classId: heroClass.id, // Referência ao ID da classe no banco
+      classCode: heroClass.code, // Código da classe (dados em data/classes.data.ts)
       classFeatures: "[]",
       combat,
       acuity,
