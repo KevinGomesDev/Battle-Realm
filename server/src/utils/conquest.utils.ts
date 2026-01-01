@@ -2,16 +2,14 @@
 
 import { EVENTS, EventDef } from "../data/events";
 import { rollD6Test, AdvantageMod } from "../logic/dice-system";
+import {
+  ALL_ATTRIBUTE_KEYS,
+  AttributeKey,
+} from "../../../shared/config/global.config";
 
-// Attributes usable for conquest tests
-export const CONQUEST_ATTRIBUTES = [
-  "combat",
-  "acuity",
-  "focus",
-  "armor",
-  "vitality",
-] as const;
-export type ConquestAttribute = (typeof CONQUEST_ATTRIBUTES)[number];
+// Attributes usable for conquest tests (usa config global)
+export const CONQUEST_ATTRIBUTES = ALL_ATTRIBUTE_KEYS;
+export type ConquestAttribute = AttributeKey;
 
 // Check if event triggers (sucesso = 4+ em 1D6)
 export function rollEventTrigger(): { roll: number; triggered: boolean } {

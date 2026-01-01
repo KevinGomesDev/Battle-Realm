@@ -61,7 +61,7 @@ A capital Solenheim é conhecida como "A Cidade das Mil Torres", onde a Grande C
 Dizem que ela foi tocada pelo próprio Sol Eterno quando criança, e que seu olho esquerdo brilha com luz dourada quando usa seus poderes divinos. Empunha a lendária Lança do Amanhecer, forjada com fragmentos de uma estrela caída.
 
 Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, mesmo que isso custe sua própria vida.`,
-    avatar: "[1].png",
+    avatar: "1",
     initialSkillId: "divine_smite", // Skill de Cleric
     combat: 6,
     acuity: 4,
@@ -75,6 +75,7 @@ Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, m
       name: "Cavaleiros do Amanhecer",
       description:
         "A elite montada de Valdoria. Cada cavaleiro passa por 10 anos de treinamento e deve completar uma peregrinação ao Pico Solar antes de receber sua armadura dourada. São implacáveis contra as forças das trevas.",
+      avatar: "2",
       passiveId: "charge",
       resourceType: "minerio",
       combat: 4,
@@ -88,6 +89,7 @@ Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, m
       name: "Templários Solares",
       description:
         "Guerreiros-sacerdotes que canalizam o poder do Sol Eterno. Seus escudos são abençoados para repelir magia negra, e suas espadas queimam com fogo sagrado.",
+      avatar: "3",
       passiveId: "shield_wall",
       resourceType: "devocao",
       combat: 2,
@@ -101,6 +103,7 @@ Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, m
       name: "Arqueiros de Solenheim",
       description:
         "Treinados desde a infância nas torres da capital, estes arqueiros são capazes de acertar um alvo a 300 metros. Suas flechas são abençoadas por clérigos antes de cada batalha.",
+      avatar: "4",
       passiveId: "first_strike",
       resourceType: "suprimentos",
       combat: 3,
@@ -114,6 +117,7 @@ Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, m
       name: "Milícia Imperial",
       description:
         "Cidadãos comuns que servem o Império em tempos de guerra. O que lhes falta em habilidade, compensam em números e devoção fervorosa à Imperatriz.",
+      avatar: "5",
       passiveId: "expendable",
       resourceType: "suprimentos",
       combat: 2,
@@ -127,6 +131,7 @@ Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, m
       name: "Clérigos de Batalha",
       description:
         "Sacerdotes que abandonaram os templos para curar feridos no campo de batalha. Carregam relíquias sagradas que podem fechar feridas e banir espíritos malignos.",
+      avatar: "6",
       passiveId: "healer",
       resourceType: "devocao",
       combat: 1,
@@ -159,7 +164,7 @@ A capital Véu Negro é uma cidade esculpida no interior de uma montanha, ilumin
 Seu corpo é uma carcaça ressecada envolta em mantos de escuridão pura. Onde seus olhos deveriam estar, apenas chamas verdes e frias queimam com conhecimento acumulado de eras. Ele carrega o Grimório Vazio, um livro que consome as almas de seus inimigos.
 
 Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento absoluto, e está disposto a destruir mundos para obtê-lo.`,
-    avatar: "[9].png",
+    avatar: "9",
     initialSkillId: "arcane_blast", // Skill de Wizard
     combat: 2,
     acuity: 5,
@@ -173,6 +178,7 @@ Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento ab
       name: "Lâminas Silenciosas",
       description:
         "Assassinos de elite que treinam desde crianças nas artes da morte invisível. Dizem que suas sombras se movem independentemente, e que podem matar um homem antes que ele perceba que está morto.",
+      avatar: "10",
       passiveId: "assassin",
       resourceType: "suprimentos",
       combat: 4,
@@ -186,6 +192,7 @@ Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento ab
       name: "Esqueletos Blindados",
       description:
         "Os ossos de guerreiros caídos, reanimados e vestidos com armaduras forjadas em forjas alimentadas por almas. Não sentem dor, não sentem medo, e nunca param até que seus ossos virem pó.",
+      avatar: "11",
       passiveId: "undying",
       resourceType: "arcana",
       combat: 2,
@@ -199,6 +206,7 @@ Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento ab
       name: "Espectros de Guerra",
       description:
         "Fantasmas de generais e campeões mortos, amarrados ao serviço eterno de Nyxrath. Podem atravessar paredes e drenar a vida dos vivos com seu toque gelado.",
+      avatar: "12",
       passiveId: "ethereal",
       resourceType: "arcana",
       combat: 3,
@@ -212,6 +220,7 @@ Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento ab
       name: "Cultistas do Véu",
       description:
         "Fanáticos que veneram Malachar como um deus. Praticam rituais de sangue para canalizar magia negra, e muitos voluntariamente se transformam em mortos-vivos.",
+      avatar: "13",
       passiveId: "blood_magic",
       resourceType: "devocao",
       combat: 1,
@@ -225,6 +234,7 @@ Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento ab
       name: "Abominações de Carne",
       description:
         "Construtos grotescos feitos de partes de centenas de corpos. Cada um é único em sua monstruosidade, costurado e animado por magia profana. São usados como tanques de guerra vivos.",
+      avatar: "14",
       passiveId: "regeneration",
       resourceType: "arcana",
       combat: 3,
@@ -257,7 +267,7 @@ O Ninho das Eras é uma cidade impossível — construída nas encostas de vulc�
 Com escamas que brilham como metal derretido e olhos que são brasas de pura energia, Ignatharax é tanto uma força da natureza quanto um ser senciente. Sua voz é o rugido de vulcões, e seu sopro pode derreter montanhas.
 
 Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância ou raiva. Ele vê o mundo com a perspectiva de eras, e protege Ashenvale porque sabe que o equilíbrio é a única coisa que impede a extinção de todas as coisas.`,
-    avatar: "[1].png",
+    avatar: "7",
     initialSkillId: "reckless_attack", // Skill de Barbarian
     combat: 8,
     acuity: 4,
@@ -271,6 +281,7 @@ Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância 
       name: "Dragonetes de Fogo",
       description:
         "Jovens dragões que ainda não atingiram maturidade plena, mas são ferozes em batalha. Seu fogo é temperamental e explosivo, perfeito para causar caos nas linhas inimigas.",
+      avatar: "8",
       passiveId: "fire_breath",
       resourceType: "arcana",
       combat: 4,
@@ -284,6 +295,7 @@ Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância 
       name: "Kobolds Juramentados",
       description:
         "Pequenas criaturas reptilianas que servem os dragões com devoção fanática. São excelentes mineradores e trapaceiros, preparando emboscadas e armadilhas para os inimigos de seus mestres.",
+      avatar: "15",
       passiveId: "ambush",
       resourceType: "minerio",
       combat: 2,
@@ -297,6 +309,7 @@ Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância 
       name: "Draconatos de Guerra",
       description:
         "Humanos transformados pelo sangue dracônico em guerreiros híbridos. Com escamas, garras e um sopro elemental menor, são a infantaria pesada da Confederação.",
+      avatar: "1",
       passiveId: "elemental_resistance",
       resourceType: "experiencia",
       combat: 3,
@@ -310,6 +323,7 @@ Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância 
       name: "Xamãs da Chama Viva",
       description:
         "Místicos que canalizam o poder dos vulcões de Ashenvale. Podem invocar espíritos elementais e curar aliados com o calor regenerativo do magma.",
+      avatar: "5",
       passiveId: "summon_elemental",
       resourceType: "devocao",
       combat: 1,
@@ -323,6 +337,7 @@ Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância 
       name: "Wyrms Subterrâneos",
       description:
         "Dragões serpentinos que vivem nas profundezas. Podem atravessar rocha sólida e emergir sob os pés dos inimigos. Seu ácido derrete armaduras como manteiga.",
+      avatar: "9",
       passiveId: "burrow",
       resourceType: "minerio",
       combat: 3,

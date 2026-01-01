@@ -2,6 +2,173 @@
 // Configuração global centralizada do jogo
 // Altere valores aqui para ajustar o balanceamento globalmente
 
+// =============================================================================
+// NOMES DOS ATRIBUTOS
+// =============================================================================
+// Altere aqui para mudar o nome dos atributos em toda a aplicação
+
+export type AttributeKey = "combat" | "acuity" | "focus" | "armor" | "vitality";
+
+export interface AttributeDefinition {
+  key: AttributeKey;
+  name: string;
+  shortName: string;
+  icon: string;
+  description: string;
+  color: string;
+}
+
+export const ATTRIBUTE_NAMES: Record<AttributeKey, AttributeDefinition> = {
+  combat: {
+    key: "combat",
+    name: "Combate",
+    shortName: "COM",
+    icon: "⚔️",
+    description: "Determina dados de ataque e dano. Dano = Sucessos × Combate.",
+    color: "text-red-400",
+  },
+  acuity: {
+    key: "acuity",
+    name: "Acuidade",
+    shortName: "ACU",
+    icon: "👁️",
+    description:
+      "Dados de defesa e movimento. Defesa = Sucessos × (Acuidade ÷ 2).",
+    color: "text-blue-400",
+  },
+  focus: {
+    key: "focus",
+    name: "Foco",
+    shortName: "FOC",
+    icon: "🎯",
+    description: "Poder mágico. Proteção Mágica = Foco × 4. Usado para magias.",
+    color: "text-purple-400",
+  },
+  armor: {
+    key: "armor",
+    name: "Armadura",
+    shortName: "ARM",
+    icon: "🛡️",
+    description:
+      "Redução de dano físico. Proteção Física = Armadura × 4. Absorve dano antes do HP.",
+    color: "text-amber-400",
+  },
+  vitality: {
+    key: "vitality",
+    name: "Vitalidade",
+    shortName: "VIT",
+    icon: "❤️",
+    description: "Pontos de vida. HP Máximo = Vitalidade × 2.",
+    color: "text-green-400",
+  },
+};
+
+/** Helper para obter o nome de um atributo */
+export function getAttributeName(key: AttributeKey): string {
+  return ATTRIBUTE_NAMES[key].name;
+}
+
+/** Helper para obter definição completa de um atributo */
+export function getAttributeDefinition(key: AttributeKey): AttributeDefinition {
+  return ATTRIBUTE_NAMES[key];
+}
+
+/** Lista de todas as chaves de atributos */
+export const ALL_ATTRIBUTE_KEYS: AttributeKey[] = [
+  "combat",
+  "acuity",
+  "focus",
+  "armor",
+  "vitality",
+];
+
+// =============================================================================
+// NOMES DOS RECURSOS
+// =============================================================================
+// Altere aqui para mudar o nome dos recursos em toda a aplicação
+
+export type ResourceKey =
+  | "ore"
+  | "supplies"
+  | "arcane"
+  | "experience"
+  | "devotion";
+
+export interface ResourceDefinition {
+  key: ResourceKey;
+  name: string;
+  shortName: string;
+  icon: string;
+  description: string;
+  color: string;
+}
+
+export const RESOURCE_NAMES: Record<ResourceKey, ResourceDefinition> = {
+  ore: {
+    key: "ore",
+    name: "Minério",
+    shortName: "MIN",
+    icon: "⛏️",
+    description: "Recurso básico para construção e equipamentos.",
+    color: "text-amber-400",
+  },
+  supplies: {
+    key: "supplies",
+    name: "Suprimentos",
+    shortName: "SUP",
+    icon: "📦",
+    description: "Mantimentos e provisões para as tropas.",
+    color: "text-green-400",
+  },
+  arcane: {
+    key: "arcane",
+    name: "Arcano",
+    shortName: "ARC",
+    icon: "✨",
+    description: "Energia mágica para habilidades e feitiços.",
+    color: "text-purple-400",
+  },
+  experience: {
+    key: "experience",
+    name: "Experiência",
+    shortName: "EXP",
+    icon: "⭐",
+    description: "Pontos de experiência para evolução.",
+    color: "text-blue-400",
+  },
+  devotion: {
+    key: "devotion",
+    name: "Devoção",
+    shortName: "DEV",
+    icon: "🙏",
+    description: "Fé e poder divino para habilidades sagradas.",
+    color: "text-yellow-400",
+  },
+};
+
+/** Helper para obter o nome de um recurso */
+export function getResourceName(key: ResourceKey): string {
+  return RESOURCE_NAMES[key].name;
+}
+
+/** Helper para obter definição completa de um recurso */
+export function getResourceDefinition(key: ResourceKey): ResourceDefinition {
+  return RESOURCE_NAMES[key];
+}
+
+/** Lista de todas as chaves de recursos */
+export const ALL_RESOURCE_KEYS: ResourceKey[] = [
+  "ore",
+  "supplies",
+  "arcane",
+  "experience",
+  "devotion",
+];
+
+// =============================================================================
+// TIPOS BÁSICOS
+// =============================================================================
+
 // Tipos básicos definidos localmente para evitar dependência circular
 export type TerritorySize = "SMALL" | "MEDIUM" | "LARGE";
 export type WeatherType =
@@ -272,7 +439,7 @@ export const PHYSICAL_PROTECTION_CONFIG = {
    * Fórmula: Atributo * multiplier
    * Ex: Armor * 4
    */
-  multiplier: 4,
+  multiplier: 2,
 
   /**
    * Tipos de dano que usam proteção física primeiro
@@ -295,7 +462,7 @@ export const MAGICAL_PROTECTION_CONFIG = {
    * Fórmula: Atributo * multiplier
    * Ex: Focus * 4
    */
-  multiplier: 4,
+  multiplier: 2,
 
   /**
    * Tipos de dano que usam proteção mágica primeiro
@@ -318,7 +485,7 @@ export const HP_CONFIG = {
    * Fórmula: Atributo * multiplier
    * Ex: Vitality * 2
    */
-  multiplier: 2,
+  multiplier: 1,
 } as const;
 
 // =============================================================================

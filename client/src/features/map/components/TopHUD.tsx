@@ -1,6 +1,7 @@
 import React from "react";
 import { useMatch } from "../../match";
 import { useAuth } from "../../auth";
+import { RESOURCE_NAMES } from "../../../../../shared/config/global.config";
 
 /**
  * TopHUD - Barra Superior do Mapa
@@ -65,43 +66,64 @@ export const TopHUD: React.FC = () => {
               </div>
             </div>
 
-            {/* CENTRO: Recursos */}
+            {/* CENTRO: Recursos (usa config global) */}
             <div className="flex items-center gap-2">
               {/* Ore */}
-              <div className="bg-citadel-carved border-2 border-metal-iron rounded px-3 py-1.5 shadow-stone-inset flex items-center gap-2">
-                <span className="text-base">⛏️</span>
+              <div
+                className="bg-citadel-carved border-2 border-metal-iron rounded px-3 py-1.5 shadow-stone-inset flex items-center gap-2"
+                title={RESOURCE_NAMES.ore.name}
+              >
+                <span className="text-base">{RESOURCE_NAMES.ore.icon}</span>
                 <span className="text-metal-gold font-bold text-sm">
                   {resources.ore}
                 </span>
               </div>
 
               {/* Supplies */}
-              <div className="bg-citadel-carved border-2 border-metal-iron rounded px-3 py-1.5 shadow-stone-inset flex items-center gap-2">
-                <span className="text-base">🌾</span>
+              <div
+                className="bg-citadel-carved border-2 border-metal-iron rounded px-3 py-1.5 shadow-stone-inset flex items-center gap-2"
+                title={RESOURCE_NAMES.supplies.name}
+              >
+                <span className="text-base">
+                  {RESOURCE_NAMES.supplies.icon}
+                </span>
                 <span className="text-parchment-light font-bold text-sm">
                   {resources.supplies}
                 </span>
               </div>
 
               {/* Arcane */}
-              <div className="bg-citadel-carved border-2 border-metal-iron rounded px-3 py-1.5 shadow-stone-inset flex items-center gap-2">
-                <span className="text-base">✨</span>
+              <div
+                className="bg-citadel-carved border-2 border-metal-iron rounded px-3 py-1.5 shadow-stone-inset flex items-center gap-2"
+                title={RESOURCE_NAMES.arcane.name}
+              >
+                <span className="text-base">{RESOURCE_NAMES.arcane.icon}</span>
                 <span className="text-purple-400 font-bold text-sm">
                   {resources.arcane}
                 </span>
               </div>
 
               {/* Experience */}
-              <div className="bg-citadel-carved border-2 border-metal-iron rounded px-3 py-1.5 shadow-stone-inset flex items-center gap-2">
-                <span className="text-base">⚔️</span>
+              <div
+                className="bg-citadel-carved border-2 border-metal-iron rounded px-3 py-1.5 shadow-stone-inset flex items-center gap-2"
+                title={RESOURCE_NAMES.experience.name}
+              >
+                <span className="text-base">
+                  {RESOURCE_NAMES.experience.icon}
+                </span>
                 <span className="text-blue-400 font-bold text-sm">
                   {resources.experience}
                 </span>
               </div>
 
               {/* Devotion */}
-              <div className="bg-citadel-carved border-2 border-metal-iron rounded px-3 py-1.5 shadow-stone-inset flex items-center gap-2">
-                <span className="text-base">🙏</span>
+              <div
+                className="bg-citadel-carved border-2 border-metal-iron rounded px-3 py-1.5 shadow-stone-inset flex items-center gap-2"
+                title={RESOURCE_NAMES.devotion.name}
+              >
+                <span className="text-base">
+                  {RESOURCE_NAMES.devotion.icon}
+                </span>
                 <span className="text-yellow-400 font-bold text-sm">
                   {resources.devotion}
                 </span>

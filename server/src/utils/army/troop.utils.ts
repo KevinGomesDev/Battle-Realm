@@ -10,6 +10,7 @@ import {
   MAX_TROOP_LEVEL,
   PlayerResources,
 } from "../../types";
+import { getResourceName } from "../../../../shared/config/global.config";
 
 // Tipo para transação Prisma
 type PrismaTransaction = Omit<
@@ -250,7 +251,9 @@ export async function recruitTroop(
     if ((resources[resourceKey] || 0) < cost) {
       return {
         success: false,
-        message: `${resourceKey} insuficiente. Custo: ${cost}, disponível: ${
+        message: `${getResourceName(
+          resourceKey as any
+        )} insuficiente. Custo: ${cost}, disponível: ${
           resources[resourceKey] || 0
         }`,
       };
@@ -450,7 +453,9 @@ export async function upgradeTroopCategory(
     if (resources.experience < cost) {
       return {
         success: false,
-        message: `Experiência insuficiente. Custo: ${cost}, disponível: ${resources.experience}`,
+        message: `${getResourceName(
+          "experience"
+        )} insuficiente. Custo: ${cost}, disponível: ${resources.experience}`,
       };
     }
 

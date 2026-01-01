@@ -399,13 +399,16 @@ export function getArchetypeLabel(archetype: Archetype): string {
 }
 
 /**
- * Traduz recurso para português
+ * Traduz recurso de skill para português
+ * Mapeia SkillResourceType para ResourceKey e usa getResourceName do config global
  */
 export function getResourceLabel(resource: SkillResourceType): string {
-  const labels: Record<SkillResourceType, string> = {
-    FOOD: "Suprimentos",
-    DEVOTION: "Devoção",
-    ARCANA: "Arcana",
+  // Importação inline para evitar dependência circular
+  // Mapeia SkillResourceType para ResourceKey
+  const skillToResourceMap: Record<SkillResourceType, string> = {
+    FOOD: "Suprimentos", // supplies
+    DEVOTION: "Devoção", // devotion
+    ARCANA: "Arcano", // arcane
   };
-  return labels[resource];
+  return skillToResourceMap[resource];
 }

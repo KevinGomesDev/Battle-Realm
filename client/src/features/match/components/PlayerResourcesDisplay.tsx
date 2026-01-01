@@ -1,6 +1,7 @@
 import React from "react";
 import { useMatch } from "../hooks/useMatch";
 import { useAuth } from "../../auth";
+import { RESOURCE_NAMES } from "../../../../../shared/config/global.config";
 
 /**
  * Componente que exibe os recursos do jogador atual
@@ -22,17 +23,33 @@ export const PlayerResourcesDisplay: React.FC = () => {
 
   const { resources } = myPlayer;
 
-  // Icons and colors for each resource
+  // Usa config global para ícones, nomes e cores
   const resourceConfig = {
-    ore: { icon: "⛏️", label: "Ore", color: "text-gray-400" },
-    supplies: { icon: "🌾", label: "Supplies", color: "text-amber-400" },
-    arcane: { icon: "✨", label: "Arcane", color: "text-medieval-red-400" },
-    experience: {
-      icon: "⚔️",
-      label: "Experience",
-      color: "text-medieval-red-500",
+    ore: {
+      icon: RESOURCE_NAMES.ore.icon,
+      label: RESOURCE_NAMES.ore.name,
+      color: RESOURCE_NAMES.ore.color,
     },
-    devotion: { icon: "🙏", label: "Devotion", color: "text-medieval-red-300" },
+    supplies: {
+      icon: RESOURCE_NAMES.supplies.icon,
+      label: RESOURCE_NAMES.supplies.name,
+      color: RESOURCE_NAMES.supplies.color,
+    },
+    arcane: {
+      icon: RESOURCE_NAMES.arcane.icon,
+      label: RESOURCE_NAMES.arcane.name,
+      color: RESOURCE_NAMES.arcane.color,
+    },
+    experience: {
+      icon: RESOURCE_NAMES.experience.icon,
+      label: RESOURCE_NAMES.experience.name,
+      color: RESOURCE_NAMES.experience.color,
+    },
+    devotion: {
+      icon: RESOURCE_NAMES.devotion.icon,
+      label: RESOURCE_NAMES.devotion.name,
+      color: RESOURCE_NAMES.devotion.color,
+    },
   };
 
   return (

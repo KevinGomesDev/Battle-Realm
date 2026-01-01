@@ -6,7 +6,6 @@ import {
   PHYSICAL_PROTECTION_CONFIG,
   MAGICAL_PROTECTION_CONFIG,
   HP_CONFIG,
-  GRID_CONFIG,
   getRandomArenaSize,
   getGridDimensions,
 } from "../../../shared/config/global.config";

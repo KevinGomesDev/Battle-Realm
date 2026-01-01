@@ -22,6 +22,10 @@ import {
   getSkillCost,
   getSkillEffectiveRange,
 } from "../../../shared/types/skills.types";
+import {
+  getResourceName,
+  ResourceKey,
+} from "../../../shared/config/global.config";
 
 // ================
 // Resource Helpers
@@ -34,13 +38,6 @@ const RESOURCE_KEY_MAP: Record<string, keyof ParsedResources> = {
   ARCANA: "arcane",
   ARCANE: "arcane",
   DEVOTION: "devotion",
-};
-
-// Mapeia chaves de ParsedResources para SkillResourceType (usado em skills)
-const SKILL_RESOURCE_MAP: Record<string, SkillResourceType> = {
-  supplies: "FOOD",
-  arcane: "ARCANA",
-  devotion: "DEVOTION",
 };
 
 interface ParsedResources {
@@ -63,11 +60,12 @@ function mapResource(resourceUsed: SkillResourceType | null | undefined) {
   if (!resourceUsed) return null;
   const key = RESOURCE_KEY_MAP[resourceUsed.toUpperCase()];
   if (!key) return null;
-  const label = SKILL_RESOURCE_MAP[key];
-  if (!label) return null;
+  // Usa getResourceName para obter o nome localizado
+  const resourceKey = key as ResourceKey;
   return {
     resourceKey: key,
-    resourceLabel: label,
+    resourceLabel: getResourceName(resourceKey),
+    skillResourceType: resourceUsed, // Mantém o tipo original para tipagem
   } as const;
 }
 
@@ -205,14 +203,14 @@ export async function validateSkillUsage(
       valid: false,
       reason: `Recursos insuficientes. Disponível: ${availableAmount} ${resourceInfo.resourceLabel}, Necessário: ${escalatedCost}`,
       cost: escalatedCost,
-      resourceType: resourceInfo.resourceLabel,
+      resourceType: resourceInfo.skillResourceType,
     };
   }
 
   return {
     valid: true,
     cost: escalatedCost,
-    resourceType: resourceInfo.resourceLabel,
+    resourceType: resourceInfo.skillResourceType,
   };
 }
 

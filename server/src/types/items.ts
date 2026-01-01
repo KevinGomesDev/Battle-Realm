@@ -1,5 +1,7 @@
 // src/types/items.ts
-export type AttributeKey = "combat" | "acuity" | "focus" | "armor" | "vitality";
+import { AttributeKey } from "../../../shared/config/global.config";
+
+export type { AttributeKey };
 
 export type ItemRarity = "COMMON" | "UNCOMMON" | "RARE" | "EPIC" | "LEGENDARY";
 

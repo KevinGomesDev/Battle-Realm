@@ -194,11 +194,20 @@ export function isValidHeroId(id: number): boolean {
 
 /**
  * Mapeamento de classCode para heroId preferido
+ * Inclui fallbacks usados pelo canvas para unidades sem avatar
  */
 export const CLASS_CODE_TO_HERO_ID: Record<string, number> = {
+  // Classes principais
   WARRIOR: 1,
   CLERIC: 5,
   WIZARD: 10,
+  // Fallbacks do canvas (para unidades sem avatar/classCode)
+  swordman: 1, // Unidade aliada default
+  mage: 10, // Unidade inimiga default
+  // Variações lowercase
+  warrior: 1,
+  cleric: 5,
+  wizard: 10,
 };
 
 /**

@@ -7,6 +7,7 @@ import {
 } from "../types";
 import { STRUCTURE_DEFINITIONS } from "../data/structures";
 import { spendResources } from "./turn.utils";
+import { getResourceName } from "../../../shared/config/global.config";
 
 /**
  * Verifica se um jogador pode construir em um território
@@ -92,7 +93,7 @@ export async function buildStructure(
   } catch (error) {
     return {
       success: false,
-      message: `Minério insuficiente. Custo: ${cost}`,
+      message: `${getResourceName("ore")} insuficiente. Custo: ${cost}`,
     };
   }
 
@@ -142,7 +143,9 @@ export async function buildStructure(
 
   return {
     success: true,
-    message: `${structureDef.name} construída com sucesso! Custo: ${cost} Minério`,
+    message: `${
+      structureDef.name
+    } construída com sucesso! Custo: ${cost} ${getResourceName("ore")}`,
     structure,
   };
 }

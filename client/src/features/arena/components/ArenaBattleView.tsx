@@ -50,6 +50,13 @@ export const ArenaBattleView: React.FC = () => {
   const [isPauseMenuOpen, setIsPauseMenuOpen] = useState(false);
   const autoEndTriggeredRef = useRef<boolean>(false); // Evita múltiplos auto-ends
   const isMovingRef = useRef<boolean>(false); // Lock para evitar cliques rápidos
+  const autoEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Timer para debounce do auto-end
+  const unitsRef = useRef(units); // Ref para acessar units atualizado dentro do setTimeout
+
+  // Manter ref sincronizada
+  useEffect(() => {
+    unitsRef.current = units;
+  }, [units]);
 
   // Handler para abrir menu de pausa (ESC)
   useEffect(() => {
@@ -95,7 +102,14 @@ export const ArenaBattleView: React.FC = () => {
   }, [battle?.currentPlayerId, battle?.round, user?.id, units, beginAction]);
 
   // Auto-encerrar turno quando movimentos E ações acabarem
+  // Usa debounce para evitar finalização prematura após skills que restauram movimento (ex: Disparada)
   useEffect(() => {
+    // Limpar timer anterior se houver
+    if (autoEndTimerRef.current) {
+      clearTimeout(autoEndTimerRef.current);
+      autoEndTimerRef.current = null;
+    }
+
     if (!battle || !user || autoEndTriggeredRef.current) return;
 
     const isMyTurnNow = battle.currentPlayerId === user.id;
@@ -110,16 +124,36 @@ export const ArenaBattleView: React.FC = () => {
       myUnit.movesLeft === 0 &&
       myUnit.actionsLeft === 0
     ) {
-      console.log(
-        "%c[ArenaBattleView] ✅ Movimentos e ações esgotados - Auto-encerrar turno",
-        "color: #22c55e; font-weight: bold;"
-      );
-      autoEndTriggeredRef.current = true;
-      // Pequeno delay para feedback visual
-      setTimeout(() => {
-        endAction(myUnit.id);
-      }, 500);
+      // Usar debounce para dar tempo de respostas do servidor (ex: Disparada restaura movimento)
+      autoEndTimerRef.current = setTimeout(() => {
+        // Verificar novamente após o delay usando ref para estado atualizado
+        const currentUnits = unitsRef.current;
+        const currentUnit = currentUnits.find(
+          (u) => u.ownerId === user.id && u.isAlive
+        );
+        if (
+          currentUnit &&
+          currentUnit.hasStartedAction &&
+          currentUnit.movesLeft === 0 &&
+          currentUnit.actionsLeft === 0
+        ) {
+          console.log(
+            "%c[ArenaBattleView] ✅ Movimentos e ações esgotados - Auto-encerrar turno",
+            "color: #22c55e; font-weight: bold;"
+          );
+          autoEndTriggeredRef.current = true;
+          endAction(currentUnit.id);
+        }
+      }, 600); // 600ms de debounce para dar tempo do servidor responder
     }
+
+    // Cleanup
+    return () => {
+      if (autoEndTimerRef.current) {
+        clearTimeout(autoEndTimerRef.current);
+        autoEndTimerRef.current = null;
+      }
+    };
   }, [battle?.currentPlayerId, user?.id, units, endAction]);
 
   // Resetar lock de movimento quando unidade termina de mover

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { socketService } from "../../../../services/socket.service";
 import type { KingdomTemplateSummary, KingdomTemplateDetails } from "./types";
+import { RESOURCE_NAMES as GLOBAL_RESOURCE_NAMES } from "../../../../../../shared/config/global.config";
 
 interface TemplateCardProps {
   template: KingdomTemplateSummary;
@@ -175,12 +176,18 @@ const CLASS_NAMES: Record<string, string> = {
   BERSERKER: "Berserker",
 };
 
+// Usa nomes do config global com mapeamento para chaves legadas
 const RESOURCE_NAMES: Record<string, string> = {
-  minerio: "Minério",
-  suprimentos: "Suprimentos",
-  devocao: "Devoção",
-  arcano: "Arcano",
-  experiencia: "Experiência",
+  minerio: GLOBAL_RESOURCE_NAMES.ore.name,
+  ore: GLOBAL_RESOURCE_NAMES.ore.name,
+  suprimentos: GLOBAL_RESOURCE_NAMES.supplies.name,
+  supplies: GLOBAL_RESOURCE_NAMES.supplies.name,
+  devocao: GLOBAL_RESOURCE_NAMES.devotion.name,
+  devotion: GLOBAL_RESOURCE_NAMES.devotion.name,
+  arcano: GLOBAL_RESOURCE_NAMES.arcane.name,
+  arcane: GLOBAL_RESOURCE_NAMES.arcane.name,
+  experiencia: GLOBAL_RESOURCE_NAMES.experience.name,
+  experience: GLOBAL_RESOURCE_NAMES.experience.name,
 };
 
 const PASSIVE_NAMES: Record<string, string> = {

@@ -132,12 +132,9 @@ export interface UnitDefinition {
 }
 
 // --- RECURSOS ---
-export type ResourceType =
-  | "ORE"
-  | "ARCANE"
-  | "FOOD"
-  | "EXPERIENCE"
-  | "DEVOTION";
+// Re-exporta ResourceKey do config global como ResourceType para compatibilidade
+import { ResourceKey } from "../../../shared/config/global.config";
+export type ResourceType = ResourceKey;
 
 // Interface para os recursos de um jogador
 export interface PlayerResources {

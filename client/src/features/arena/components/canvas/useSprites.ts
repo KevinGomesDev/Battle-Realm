@@ -39,6 +39,16 @@ interface UseSpritesReturn {
   ) => HTMLImageElement | null;
   /** Obtém heroId baseado em avatar ou classCode */
   getHeroId: (avatar?: string, classCode?: string) => number;
+  /** Obtém sprite pronto para desenho (com image e config) */
+  getSprite: (spriteType: string) => {
+    image: HTMLImageElement;
+    config: {
+      frameWidth: number;
+      frameHeight: number;
+      idleFrames: number;
+      idleRow: number;
+    };
+  } | null;
   /** Frame index global para animações idle (ref para evitar re-renders) */
   frameIndexRef: React.MutableRefObject<number>;
   /** Timestamp da última mudança de frame */
@@ -160,10 +170,52 @@ export function useSprites(): UseSpritesReturn {
     []
   );
 
+  /**
+   * Obtém sprite pronto para desenho no canvas
+   * @param spriteType - avatar string ou classCode
+   * @returns Objeto com imagem e configuração ou null se não carregado
+   */
+  const getSprite = useCallback(
+    (
+      spriteType: string
+    ): {
+      image: HTMLImageElement;
+      config: {
+        frameWidth: number;
+        frameHeight: number;
+        idleFrames: number;
+        idleRow: number;
+      };
+    } | null => {
+      // Converter spriteType para heroId
+      const heroId = getHeroIdForUnit(spriteType, spriteType);
+
+      // Obter imagem de Idle
+      const image = getImage(heroId, "Idle");
+
+      if (!image) {
+        return null;
+      }
+
+      // Configuração para Idle (todos os sprites usam 32x32 frames, row 0)
+      return {
+        image,
+        config: {
+          frameWidth: FRAME_SIZE,
+          frameHeight: FRAME_SIZE,
+          idleFrames: ANIMATION_CONFIGS.Idle.frameCount,
+          idleRow: 0,
+        },
+      };
+    },
+    [getImage]
+  );
+
   return {
     allLoaded,
     getImage,
     getHeroId,
+    getSprite,
     frameIndexRef,
     lastFrameChangeRef,
   };

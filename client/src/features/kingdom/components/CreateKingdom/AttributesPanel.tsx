@@ -1,7 +1,8 @@
 import React from "react";
-import type { BaseAttributes } from "./types";
-
-type AttributeKey = keyof BaseAttributes;
+import {
+  ATTRIBUTE_NAMES,
+  type AttributeKey,
+} from "../../../../../../shared/config/global.config";
 
 type AttributeInfo = {
   name: string;
@@ -9,31 +10,32 @@ type AttributeInfo = {
   icon: string;
 };
 
+// Usa as definições do global.config para garantir consistência
 export const ATTRIBUTE_INFO: Record<AttributeKey, AttributeInfo> = {
   combat: {
-    name: "Combate",
-    description: "Determina sua eficiência em ataques corpo a corpo",
-    icon: "⚔️",
+    name: ATTRIBUTE_NAMES.combat.name,
+    description: ATTRIBUTE_NAMES.combat.description,
+    icon: ATTRIBUTE_NAMES.combat.icon,
   },
   acuity: {
-    name: "Acuidade",
-    description: "Precisão em ataques à distância e percepção",
-    icon: "🎯",
+    name: ATTRIBUTE_NAMES.acuity.name,
+    description: ATTRIBUTE_NAMES.acuity.description,
+    icon: ATTRIBUTE_NAMES.acuity.icon,
   },
   focus: {
-    name: "Foco",
-    description: "Poder mágico e resistência mental",
-    icon: "✨",
+    name: ATTRIBUTE_NAMES.focus.name,
+    description: ATTRIBUTE_NAMES.focus.description,
+    icon: ATTRIBUTE_NAMES.focus.icon,
   },
   armor: {
-    name: "Armadura",
-    description: "Redução de dano recebido",
-    icon: "🛡️",
+    name: ATTRIBUTE_NAMES.armor.name,
+    description: ATTRIBUTE_NAMES.armor.description,
+    icon: ATTRIBUTE_NAMES.armor.icon,
   },
   vitality: {
-    name: "Vitalidade",
-    description: "Pontos de vida máximos",
-    icon: "❤️",
+    name: ATTRIBUTE_NAMES.vitality.name,
+    description: ATTRIBUTE_NAMES.vitality.description,
+    icon: ATTRIBUTE_NAMES.vitality.icon,
   },
 };
 

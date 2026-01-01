@@ -8,6 +8,10 @@ import {
   CRISIS_METER_MAX,
 } from "../types";
 import { restorePlayerResources } from "./turn.utils";
+import {
+  getResourceName,
+  ResourceKey,
+} from "../../../shared/config/global.config";
 
 /**
  * Calcula o resultado da Pilha de Tributo baseado nas decisões dos jogadores
@@ -137,11 +141,11 @@ export async function processTributePile(
  */
 export function selectRandomTributesResource(): ResourceType {
   const resources: ResourceType[] = [
-    "ORE",
-    "FOOD",
-    "ARCANE",
-    "EXPERIENCE",
-    "DEVOTION",
+    "ore",
+    "supplies",
+    "arcane",
+    "experience",
+    "devotion",
   ];
   return resources[Math.floor(Math.random() * resources.length)];
 }
@@ -213,12 +217,15 @@ export async function validateTributeSubmission(
     }
 
     const playerResources = JSON.parse(player.resources);
-    const availableAmount = playerResources[resourceType.toLowerCase()] || 0;
+    const resourceKey = resourceType.toLowerCase() as ResourceKey;
+    const availableAmount = playerResources[resourceKey] || 0;
 
     if (availableAmount < amount) {
       return {
         valid: false,
-        reason: `Recursos insuficientes. Disponível: ${availableAmount}, Necessário: ${amount}`,
+        reason: `${getResourceName(
+          resourceKey
+        )} insuficiente. Disponível: ${availableAmount}, Necessário: ${amount}`,
       };
     }
   }

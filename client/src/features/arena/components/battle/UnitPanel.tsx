@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import type { ArenaUnit } from "../../types/arena.types";
 import { getConditionInfo } from "../../constants";
+import { ATTRIBUTE_NAMES } from "../../../../../../shared/config/global.config";
 
 // =============================================================================
 // COMPONENTES INTERNOS
@@ -283,37 +284,35 @@ const ConditionBadge: React.FC<{ condition: string }> = ({ condition }) => {
   );
 };
 
-// Definições de tooltips para atributos
+// Definições de tooltips para atributos (usa config global)
 const ATTRIBUTE_TOOLTIPS: Record<
   string,
   { icon: string; name: string; description: string }
 > = {
   combat: {
-    icon: "⚔️",
-    name: "Combate",
-    description: "Determina dados de ataque e dano. Dano = Sucessos × Combate.",
+    icon: ATTRIBUTE_NAMES.combat.icon,
+    name: ATTRIBUTE_NAMES.combat.name,
+    description: ATTRIBUTE_NAMES.combat.description,
   },
   acuity: {
-    icon: "👁️",
-    name: "Acuidade",
-    description:
-      "Dados de defesa e movimento. Defesa = Sucessos × (Acuidade ÷ 2).",
+    icon: ATTRIBUTE_NAMES.acuity.icon,
+    name: ATTRIBUTE_NAMES.acuity.name,
+    description: ATTRIBUTE_NAMES.acuity.description,
   },
   focus: {
-    icon: "🎯",
-    name: "Foco",
-    description: "Poder mágico. Proteção Mágica = Foco × 4. Usado para magias.",
+    icon: ATTRIBUTE_NAMES.focus.icon,
+    name: ATTRIBUTE_NAMES.focus.name,
+    description: ATTRIBUTE_NAMES.focus.description,
   },
   armor: {
-    icon: "🛡️",
-    name: "Armadura",
-    description:
-      "Proteção física. Proteção Física = Armadura × 4. Absorve dano físico.",
+    icon: ATTRIBUTE_NAMES.armor.icon,
+    name: ATTRIBUTE_NAMES.armor.name,
+    description: ATTRIBUTE_NAMES.armor.description,
   },
   vitality: {
-    icon: "❤️",
-    name: "Vitalidade",
-    description: "Resistência vital. HP Máximo = Vitalidade × 2.",
+    icon: ATTRIBUTE_NAMES.vitality.icon,
+    name: ATTRIBUTE_NAMES.vitality.name,
+    description: ATTRIBUTE_NAMES.vitality.description,
   },
 };
 

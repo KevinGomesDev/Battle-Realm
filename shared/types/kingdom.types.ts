@@ -1,4 +1,8 @@
 import type { SkillDefinition } from "./skills.types";
+import type { ResourceKey, AttributeKey } from "../config/global.config";
+
+// Re-exporta tipos do config global para uso em kingdom
+export type { ResourceKey, AttributeKey };
 
 // ===========================================
 // KINGDOM TYPES - Shared between Client/Server
@@ -25,15 +29,12 @@ export type Race =
   | "MORTO_VIVO"
   | "INSETO";
 
-export type ResourceType =
-  | "ore"
-  | "supplies"
-  | "arcane"
-  | "experience"
-  | "devotion";
+// Alias para compatibilidade (usa ResourceKey do global.config)
+export type ResourceType = ResourceKey;
 
 // ============ BASE INTERFACES ============
 
+// Usa AttributeKey do global.config para garantir consistência
 export interface BaseAttributes {
   combat: number;
   acuity: number;

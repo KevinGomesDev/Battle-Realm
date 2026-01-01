@@ -10,6 +10,7 @@ import {
 } from "../../types";
 import { spendResources } from "../turn.utils";
 import { getClassByCode } from "../../data/classes.data";
+import { getResourceName } from "../../../../shared/config/global.config";
 
 // ... (calculateHeroLevelUpCost, calculateHeroRecruitmentCost, canHeroLevelUp e levelUpHero permanecem iguais) ...
 
@@ -100,8 +101,9 @@ export async function canHeroLevelUp(
   if (!isInCapital && !hasArena) {
     return {
       canLevel: false,
-      reason:
-        "Herói precisa estar na Capital ou em território com Produtor de Experiência (Arena)",
+      reason: `Herói precisa estar na Capital ou em território com Produtor de ${getResourceName(
+        "experience"
+      )} (Arena)`,
     };
   }
 
@@ -141,7 +143,7 @@ export async function levelUpHero(
   } catch (error) {
     return {
       success: false,
-      message: `Experiência insuficiente. Custo: ${cost}`,
+      message: `${getResourceName("experience")} insuficiente. Custo: ${cost}`,
     };
   }
 
@@ -184,7 +186,9 @@ export async function levelUpHero(
 
   return {
     success: true,
-    message: `Herói subiu para nível ${newLevel}! Custo: ${cost} Experiência`,
+    message: `Herói subiu para nível ${newLevel}! Custo: ${cost} ${getResourceName(
+      "experience"
+    )}`,
     unit: updatedUnit,
   };
 }
@@ -244,7 +248,7 @@ export async function recruitHero(
   } catch (error) {
     return {
       success: false,
-      message: `Minério insuficiente. Custo: ${cost}`,
+      message: `${getResourceName("ore")} insuficiente. Custo: ${cost}`,
     };
   }
 

@@ -1,6 +1,10 @@
 // src/utils/turn.utils.ts
 import { prisma } from "../lib/prisma";
 import { TurnType, TURN_ORDER, PlayerResources } from "../types";
+import {
+  getResourceName,
+  ResourceKey,
+} from "../../../shared/config/global.config";
 
 /**
  * Calcula os recursos que um jogador deve receber no início do Turno de Administração
@@ -206,7 +210,9 @@ export async function spendResources(
   for (const [key, value] of Object.entries(costs)) {
     const resourceKey = key as keyof PlayerResources;
     if (value && currentResources[resourceKey] < value) {
-      throw new Error(`Recursos insuficientes: ${key}`);
+      throw new Error(
+        `Recursos insuficientes: ${getResourceName(key as ResourceKey)}`
+      );
     }
   }
 

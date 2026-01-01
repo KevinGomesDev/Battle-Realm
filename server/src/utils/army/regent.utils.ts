@@ -7,6 +7,7 @@ import {
   REGENT_INITIAL_ATTRIBUTE_POINTS,
 } from "../../types";
 import { spendResources } from "../turn.utils";
+import { getResourceName } from "../../../../shared/config/global.config";
 
 /**
  * Calcula o custo de experiência para regente subir de nível
@@ -71,8 +72,9 @@ export async function canRegentLevelUp(
   if (!isInCapital && !hasArena) {
     return {
       canLevel: false,
-      reason:
-        "Regente precisa estar na Capital ou em território com Produtor de Experiência (Arena)",
+      reason: `Regente precisa estar na Capital ou em território com Produtor de ${getResourceName(
+        "experience"
+      )} (Arena)`,
     };
   }
 
@@ -112,7 +114,7 @@ export async function levelUpRegent(
   } catch (error) {
     return {
       success: false,
-      message: `Experiência insuficiente. Custo: ${cost}`,
+      message: `${getResourceName("experience")} insuficiente. Custo: ${cost}`,
     };
   }
 
@@ -155,7 +157,9 @@ export async function levelUpRegent(
 
   return {
     success: true,
-    message: `Regente subiu para nível ${newLevel}! Custo: ${cost} Experiência`,
+    message: `Regente subiu para nível ${newLevel}! Custo: ${cost} ${getResourceName(
+      "experience"
+    )}`,
     unit: updatedUnit,
   };
 }
