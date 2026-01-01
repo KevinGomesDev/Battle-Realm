@@ -80,7 +80,11 @@ export interface ArenaContextType {
   startBattle: () => void;
   beginAction: (unitId: string) => void;
   moveUnit: (unitId: string, toX: number, toY: number) => void;
-  attackUnit: (attackerUnitId: string, targetUnitId: string) => void;
+  attackUnit: (
+    attackerUnitId: string,
+    targetUnitId?: string,
+    targetObstacleId?: string
+  ) => void;
   endAction: (unitId: string) => void;
   executeAction: (
     actionName: string,
@@ -114,4 +118,5 @@ export type ArenaAction =
   | { type: "SET_ERROR"; payload: string | null }
   | { type: "SET_REMATCH_PENDING"; payload: boolean }
   | { type: "SET_OPPONENT_WANTS_REMATCH"; payload: boolean }
+  | { type: "DESTROY_OBSTACLE"; payload: { obstacleId: string } }
   | { type: "RESET" };

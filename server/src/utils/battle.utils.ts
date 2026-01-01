@@ -85,6 +85,7 @@ export function applyBurningOnAction(
 }
 
 // Aplica dano com proteção e tipos (VERDADEIRO ignora proteção)
+// damageType: "FISICO" usa physicalProtection, "MAGICO" usa magicalProtection, "VERDADEIRO" ignora ambos
 export function applyProtectionDamage(
   protection: number,
   protectionBroken: boolean,
@@ -116,15 +117,90 @@ export function applyProtectionDamage(
   return { newProtection, newProtectionBroken, newHp };
 }
 
-// ---------- Dice Helpers ----------
-export function rollD6(times: number): number[] {
-  const results: number[] = [];
-  for (let i = 0; i < Math.max(0, times); i++) {
-    results.push(Math.floor(Math.random() * 6) + 1);
+/**
+ * Aplica dano com sistema de proteção física e mágica
+ * @param physicalProtection Proteção física atual
+ * @param magicalProtection Proteção mágica atual
+ * @param physicalProtectionBroken Se proteção física foi quebrada
+ * @param magicalProtectionBroken Se proteção mágica foi quebrada
+ * @param currentHp HP atual
+ * @param damage Dano a aplicar
+ * @param damageType "FISICO" | "MAGICO" | "VERDADEIRO"
+ */
+export function applyDualProtectionDamage(
+  physicalProtection: number,
+  magicalProtection: number,
+  physicalProtectionBroken: boolean,
+  magicalProtectionBroken: boolean,
+  currentHp: number,
+  damage: number,
+  damageType: string
+): {
+  newPhysicalProtection: number;
+  newMagicalProtection: number;
+  newPhysicalProtectionBroken: boolean;
+  newMagicalProtectionBroken: boolean;
+  newHp: number;
+  damageAbsorbed: number;
+  damageToHp: number;
+} {
+  let newPhysicalProtection = physicalProtection;
+  let newMagicalProtection = magicalProtection;
+  let newPhysicalProtectionBroken = physicalProtectionBroken;
+  let newMagicalProtectionBroken = magicalProtectionBroken;
+  let newHp = currentHp;
+  let damageAbsorbed = 0;
+  let damageToHp = 0;
+
+  if (damageType === "VERDADEIRO") {
+    // Dano verdadeiro ignora toda proteção
+    damageToHp = damage;
+    newHp = Math.max(0, currentHp - damage);
+  } else if (damageType === "FISICO") {
+    // Dano físico usa proteção física
+    if (!physicalProtectionBroken && physicalProtection > 0) {
+      if (damage >= physicalProtection) {
+        damageAbsorbed = physicalProtection;
+        newPhysicalProtection = 0;
+        newPhysicalProtectionBroken = true;
+        // Excedente perdido
+      } else {
+        damageAbsorbed = damage;
+        newPhysicalProtection = physicalProtection - damage;
+      }
+    } else {
+      damageToHp = damage;
+      newHp = Math.max(0, currentHp - damage);
+    }
+  } else if (damageType === "MAGICO") {
+    // Dano mágico usa proteção mágica
+    if (!magicalProtectionBroken && magicalProtection > 0) {
+      if (damage >= magicalProtection) {
+        damageAbsorbed = magicalProtection;
+        newMagicalProtection = 0;
+        newMagicalProtectionBroken = true;
+        // Excedente perdido
+      } else {
+        damageAbsorbed = damage;
+        newMagicalProtection = magicalProtection - damage;
+      }
+    } else {
+      damageToHp = damage;
+      newHp = Math.max(0, currentHp - damage);
+    }
   }
-  return results;
+
+  return {
+    newPhysicalProtection,
+    newMagicalProtection,
+    newPhysicalProtectionBroken,
+    newMagicalProtectionBroken,
+    newHp,
+    damageAbsorbed,
+    damageToHp,
+  };
 }
 
-export function countSuccesses(dice: number[], threshold = 4): number {
-  return dice.filter((d) => d >= threshold).length;
-}
+// ---------- Dice Helpers ----------
+// MIGRADO para server/src/logic/dice-system.ts
+// Use rollD6Test, rollContestedTest, etc.

@@ -29,7 +29,6 @@ model User {
 model Kingdom {
   id             String    @id @default(uuid())
   name           String
-  capitalName    String
   description    String?   // História ou descrição do reino (opcional)
   alignment      Alignment
   race           Race
@@ -53,6 +52,7 @@ model TroopTemplate {
   slotIndex      Int       // 0-4 (5 tropas por reino)
   name           String    // Nome personalizado da tropa
   description    String?   // História ou descrição da tropa (opcional)
+  avatar         String?   // ID do sprite (ex: "[1].png")
   passiveId      String    // ID da passiva escolhida
   resourceType   String    // minerio, suprimentos, arcana, experiencia
   // Atributos base (10 pontos distribuídos)
@@ -176,9 +176,11 @@ model Unit {
   category       UnitCategory
   troopSlot      Int?         // Para TROOP: índice do template de tropa (0-4)
   level          Int          @default(1)
-  // Classe do Herói/Regente (código string, ex: BARBARIAN, WARRIOR)
+  // Avatar (nome do arquivo sprite em public/sprites/Characters)
+  avatar         String?      // ID do sprite (ex: "[1].png")
+  // Classe do Herói (código string, ex: BARBARIAN, WARRIOR) - Regentes NÃO possuem classe
   classCode      String?      // Código da classe (dados em server/src/data/classes.data.ts)
-  classFeatures  String       @default("[]") // IDs das skills aprendidas
+  classFeatures  String       @default("[]") // IDs das skills aprendidas (Regentes escolhem de qualquer classe)
   combat         Int
   acuity         Int
   focus          Int
@@ -286,7 +288,7 @@ model Battle {
   // Clima e Terreno
   weather          String   @default("SUNNY")   // SUNNY | RAIN | STORM | SNOW | BLIZZARD | FALLING_LEAVES
   terrainType      String   @default("PLAINS")  // FOREST | PLAINS | MOUNTAIN | DESERT | ICE | WASTELAND | SWAMP | RUINS
-  territorySize    TerritorySize   @default("MEDIUM")  // SMALL | MEDIUM | LARGE
+  territorySize    TerritorySize   @default(MEDIUM)  // SMALL | MEDIUM | LARGE
   obstacles        String   @default("[]")      // JSON: [{id, posX, posY, emoji}...]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -307,6 +309,7 @@ model BattleUnit {
   userId      String?     // Owner User ID (for Arena)
   kingdomId   String?     // Owner Kingdom ID
   name        String      @default("Unit")
+  avatar      String?     // ID do sprite (ex: "[1].png")
   category    String      @default("TROOP")
   troopSlot   Int?        // Para TROOP: índice do template (0-4)
   level       Int         @default(1)  // Nível da unidade

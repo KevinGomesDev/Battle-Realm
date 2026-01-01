@@ -17,6 +17,7 @@ import {
   WEATHER_DEFINITIONS,
 } from "../../../shared/types/battle.types";
 import type { ArenaMapConfig } from "../../../shared/types/arena.types";
+import { OBSTACLE_CONFIG } from "../../../shared/config/global.config";
 
 // Função simples para gerar ID único
 function generateObstacleId(): string {
@@ -101,6 +102,9 @@ export function generateObstacles(
       posX: x,
       posY: y,
       emoji,
+      hp: OBSTACLE_CONFIG.defaultHp,
+      maxHp: OBSTACLE_CONFIG.defaultHp,
+      destroyed: false,
     });
 
     usedPositions.add(posKey);

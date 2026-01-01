@@ -6,3 +6,4 @@ export * from "./map";
 export * from "./game";
 export * from "./arena";
 export * from "./events";
+export * from "./dice-roll";

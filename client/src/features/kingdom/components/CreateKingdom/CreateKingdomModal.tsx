@@ -1,22 +1,23 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useKingdom, useKingdomStaticData } from "../../hooks/useKingdom";
 import {
   useKingdomForm,
   useRegentForm,
   useTroopsForm,
-  useCreationWizard,
 } from "../../hooks/useKingdomForm";
-import { socketService } from "@/services/socket.service";
-import { Step1Kingdom } from "./Step1Kingdom";
-import { Step2Regent } from "./Step2Regent";
+import { Step1KingdomInfo } from "./Step1KingdomInfo";
+import { Step2Alignment } from "./Step2Alignment";
+import { Step3RegentSheet } from "./Step3RegentSheet";
 import { Step3Troops } from "./Step3Troops";
 import { TemplateSelection } from "./TemplateSelection";
-import { LoadingSpinner, StepIndicator, Breadcrumb } from "../ui";
+import { LoadingSpinner, StepIndicator } from "../ui";
 
 interface CreateKingdomModalProps {
   onClose: () => void;
   onSuccess: () => void;
 }
+
+type WizardStep = "info" | "alignment" | "regent" | "troops";
 
 export const CreateKingdomModal: React.FC<CreateKingdomModalProps> = ({
   onClose,
@@ -28,11 +29,16 @@ export const CreateKingdomModal: React.FC<CreateKingdomModalProps> = ({
     error: kingdomError,
   } = useKingdom();
 
+  // View state: templates or custom
+  const [view, setView] = useState<"templates" | "custom">("templates");
+  const [currentStep, setCurrentStep] = useState<WizardStep>("info");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   // Form hooks
   const kingdomForm = useKingdomForm();
   const regentForm = useRegentForm();
   const troopsForm = useTroopsForm();
-  const wizard = useCreationWizard();
 
   // Static data
   const staticData = useKingdomStaticData();
@@ -46,33 +52,70 @@ export const CreateKingdomModal: React.FC<CreateKingdomModalProps> = ({
     });
   }, []);
 
-  // Step handlers
-  const handleNextToRegent = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!kingdomForm.isValid) return;
-    wizard.nextStep();
+  // Navigation
+  const goToCustom = () => setView("custom");
+  const goToTemplates = () => setView("templates");
+
+  const nextStep = () => {
+    const steps: WizardStep[] = ["info", "alignment", "regent", "troops"];
+    const currentIndex = steps.indexOf(currentStep);
+    if (currentIndex < steps.length - 1) {
+      setCurrentStep(steps[currentIndex + 1]);
+    }
   };
 
-  const handleNextToTroops = (e: React.FormEvent) => {
+  const prevStep = () => {
+    const steps: WizardStep[] = ["info", "alignment", "regent", "troops"];
+    const currentIndex = steps.indexOf(currentStep);
+    if (currentIndex > 0) {
+      setCurrentStep(steps[currentIndex - 1]);
+    } else {
+      goToTemplates();
+    }
+  };
+
+  // Step handlers
+  const handleNextFromInfo = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regentForm.isValid) return;
-    wizard.nextStep();
+    if (kingdomForm.data.name.length >= 3) {
+      nextStep();
+    }
+  };
+
+  const handleNextFromAlignment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (kingdomForm.data.alignment) {
+      nextStep();
+    }
+  };
+
+  const handleNextFromRegent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (regentForm.isValid) {
+      nextStep();
+    }
   };
 
   const handleFinalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!troopsForm.allValid) return;
 
-    wizard.startSubmit();
+    setIsSubmitting(true);
+    setSubmitError(null);
 
     try {
-      // Create kingdom with troops
       await createKingdom({
         name: kingdomForm.data.name,
-        capitalName: kingdomForm.data.capitalName,
-        race: kingdomForm.data.race as any,
+        description: kingdomForm.data.description,
+        race: (kingdomForm.data.race as any) || "HUMANOIDE",
         alignment: kingdomForm.data.alignment as any,
         raceMetadata: kingdomForm.data.raceMetadata,
+        regent: {
+          name: regentForm.data.name,
+          avatar: regentForm.data.avatar,
+          attributes: regentForm.data.attributes,
+          initialSkillId: regentForm.data.initialSkillId,
+        },
         troopTemplates: troopsForm.templates.map((t) => ({
           slotIndex: t.slotIndex,
           name: t.name,
@@ -86,41 +129,11 @@ export const CreateKingdomModal: React.FC<CreateKingdomModalProps> = ({
         })),
       });
 
-      // Create regent via socket (separate endpoint)
-      await new Promise<void>((resolve, reject) => {
-        const cleanup = () => {
-          socketService.off("army:recruit_regent_success", successHandler);
-          socketService.off("error", errorHandler);
-        };
-
-        const successHandler = () => {
-          cleanup();
-          resolve();
-        };
-
-        const errorHandler = (data: { message: string }) => {
-          cleanup();
-          reject(new Error(data.message));
-        };
-
-        socketService.on("army:recruit_regent_success", successHandler);
-        socketService.on("error", errorHandler);
-
-        socketService.emit("army:recruit_regent", {
-          name: regentForm.data.name,
-          class: regentForm.data.classCode,
-          attributeDistribution: regentForm.data.attributes,
-        });
-
-        setTimeout(() => {
-          cleanup();
-          reject(new Error("Timeout ao criar regente"));
-        }, 15000);
-      });
-
       onSuccess();
     } catch (err: any) {
-      wizard.endSubmit(err.message || "Erro ao criar reino");
+      setSubmitError(err.message || "Erro ao criar reino");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -128,112 +141,153 @@ export const CreateKingdomModal: React.FC<CreateKingdomModalProps> = ({
     onSuccess();
   };
 
-  const currentError = wizard.submitError || kingdomError;
-  const isLoading = wizard.isSubmitting || isCreatingKingdom;
+  const currentError = submitError || kingdomError;
+  const isLoading = isSubmitting || isCreatingKingdom;
+
+  const getStepNumber = () => {
+    const steps: WizardStep[] = ["info", "alignment", "regent", "troops"];
+    return steps.indexOf(currentStep);
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      {/* Backdrop com efeito de sombra/névoa */}
       <div
-        className="absolute inset-0 bg-gradient-to-b from-citadel-obsidian/90 via-black/80 to-citadel-obsidian/90 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Modal Container */}
+      {/* Efeitos de sombra nas bordas - fade effect como se fosse feito de sombras */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-transparent to-black opacity-70" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black via-transparent to-black opacity-70" />
+        {/* Cantos mais escuros */}
+        <div className="absolute top-0 left-0 w-1/4 h-1/4 bg-gradient-to-br from-black to-transparent opacity-80" />
+        <div className="absolute top-0 right-0 w-1/4 h-1/4 bg-gradient-to-bl from-black to-transparent opacity-80" />
+        <div className="absolute bottom-0 left-0 w-1/4 h-1/4 bg-gradient-to-tr from-black to-transparent opacity-80" />
+        <div className="absolute bottom-0 right-0 w-1/4 h-1/4 bg-gradient-to-tl from-black to-transparent opacity-80" />
+      </div>
+
+      {/* Modal Container - mais largo (max-w-6xl) */}
       <div
-        className="relative bg-gradient-to-b from-citadel-granite via-citadel-carved to-citadel-obsidian 
-                      border-2 border-metal-iron shadow-2xl rounded-2xl
-                      w-full max-w-4xl max-h-[90vh] overflow-hidden"
+        className="relative w-full max-w-6xl max-h-[90vh] overflow-hidden
+                   bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900
+                   rounded-2xl shadow-2xl shadow-black/50"
       >
+        {/* Efeito de borda suave com gradiente - borda esvaecida */}
+        <div className="absolute inset-0 rounded-2xl pointer-events-none">
+          <div className="absolute inset-0 rounded-2xl border border-amber-900/20" />
+          <div className="absolute inset-[1px] rounded-2xl border border-slate-700/30" />
+          {/* Glow sutil nas bordas */}
+          <div className="absolute -inset-1 rounded-2xl bg-gradient-to-b from-amber-900/10 via-transparent to-amber-900/5 blur-sm" />
+        </div>
+
         {/* Header */}
-        <ModalHeader
-          title={
-            wizard.view === "templates"
+        <div className="relative px-6 py-4 border-b border-slate-700/50 bg-slate-900/50">
+          <h1 className="text-center text-2xl font-bold text-amber-400">
+            {view === "templates"
               ? "⚔️ Fundar Novo Reino ⚔️"
-              : getStepTitle(wizard.step)
-          }
-          showBreadcrumb={wizard.view === "custom"}
-          currentStep={wizard.stepNumber - 1}
-          onClose={onClose}
-        />
+              : getStepTitle(currentStep)}
+          </h1>
+
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center
+                       text-slate-400 hover:text-white transition-colors rounded-lg
+                       hover:bg-slate-700/50"
+          >
+            ✕
+          </button>
+        </div>
 
         {/* Progress Bar */}
-        {wizard.view === "custom" && (
+        {view === "custom" && (
           <div className="px-6 pt-4">
             <StepIndicator
-              steps={["Reino", "Regente", "Tropas"]}
-              currentStep={wizard.stepNumber - 1}
+              steps={["Reino", "Alinhamento", "Regente", "Tropas"]}
+              currentStep={getStepNumber()}
             />
           </div>
         )}
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
-          {wizard.view === "templates" && (
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+          {view === "templates" && (
             <TemplateSelection
               onSelectTemplate={handleTemplateSuccess}
-              onCustomCreate={wizard.goToCustom}
+              onCustomCreate={goToCustom}
             />
           )}
 
-          {wizard.view === "custom" && (
+          {view === "custom" && (
             <>
               {staticData.isLoading ? (
                 <LoadingSpinner message="Carregando dados do reino..." />
               ) : (
                 <>
-                  {wizard.step === "kingdom" && (
-                    <Step1Kingdom
+                  {currentStep === "info" && (
+                    <Step1KingdomInfo
                       kingdomName={kingdomForm.data.name}
                       setKingdomName={(v) => kingdomForm.update({ name: v })}
-                      capitalName={kingdomForm.data.capitalName}
-                      setCapitalName={(v) =>
-                        kingdomForm.update({ capitalName: v })
+                      description={kingdomForm.data.description || ""}
+                      setDescription={(v) =>
+                        kingdomForm.update({ description: v })
                       }
-                      selectedRace={kingdomForm.data.race}
-                      setSelectedRace={(v) => kingdomForm.update({ race: v })}
+                      error={currentError}
+                      isLoading={isLoading}
+                      onNext={handleNextFromInfo}
+                      onCancel={goToTemplates}
+                    />
+                  )}
+
+                  {currentStep === "alignment" && (
+                    <Step2Alignment
                       selectedAlignment={kingdomForm.data.alignment}
                       setSelectedAlignment={(v) =>
                         kingdomForm.update({ alignment: v })
                       }
-                      races={staticData.races}
                       alignments={staticData.alignments}
                       error={currentError}
                       isLoading={isLoading}
-                      onNext={handleNextToRegent}
-                      onCancel={wizard.goToTemplates}
+                      onNext={handleNextFromAlignment}
+                      onBack={prevStep}
                     />
                   )}
 
-                  {wizard.step === "regent" && (
-                    <Step2Regent
+                  {currentStep === "regent" && (
+                    <Step3RegentSheet
                       regentName={regentForm.data.name}
                       setRegentName={(v) => regentForm.update({ name: v })}
-                      selectedClass={regentForm.data.classCode}
-                      setSelectedClass={(v) =>
-                        regentForm.update({ classCode: v })
+                      regentDescription=""
+                      setRegentDescription={() => {}}
+                      selectedAvatar={regentForm.data.avatar || ""}
+                      setSelectedAvatar={(v) =>
+                        regentForm.update({ avatar: v })
+                      }
+                      selectedSkillId={regentForm.data.initialSkillId}
+                      setSelectedSkillId={(v) =>
+                        regentForm.update({ initialSkillId: v || undefined })
                       }
                       attributes={regentForm.data.attributes}
                       updateAttribute={regentForm.updateAttribute}
-                      classes={staticData.classes}
+                      totalPoints={regentForm.totalPoints}
                       error={currentError}
                       isLoading={isLoading}
-                      totalPoints={regentForm.totalPoints}
-                      onSubmit={handleNextToTroops}
-                      onBack={wizard.prevStep}
+                      onSubmit={handleNextFromRegent}
+                      onBack={prevStep}
                     />
                   )}
 
-                  {wizard.step === "troops" && (
+                  {currentStep === "troops" && (
                     <Step3Troops
                       templates={troopsForm.templates}
-                      setTemplates={() => {}} // Not used with new hook
+                      setTemplates={() => {}}
                       passives={staticData.passives}
                       error={currentError}
                       isLoading={isLoading}
                       onSubmit={handleFinalSubmit}
-                      onBack={wizard.prevStep}
-                      // New props for hook integration
+                      onBack={prevStep}
                       activeSlot={troopsForm.activeSlot}
                       setActiveSlot={troopsForm.setActiveSlot}
                       updateTemplate={troopsForm.updateTemplate}
@@ -245,73 +299,21 @@ export const CreateKingdomModal: React.FC<CreateKingdomModalProps> = ({
             </>
           )}
         </div>
-
-        {/* Footer Line */}
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-metal-iron/30 to-transparent" />
       </div>
     </div>
   );
 };
 
-// ============ HELPER COMPONENTS ============
-
-interface ModalHeaderProps {
-  title: string;
-  showBreadcrumb: boolean;
-  currentStep: number;
-  onClose: () => void;
-}
-
-const ModalHeader: React.FC<ModalHeaderProps> = ({
-  title,
-  showBreadcrumb,
-  currentStep,
-  onClose,
-}) => (
-  <div
-    className="relative bg-gradient-to-r from-citadel-obsidian via-citadel-slate to-citadel-obsidian 
-                  border-b border-metal-iron/50 px-6 py-4"
-  >
-    {/* Corner Decorations */}
-    <div className="absolute top-0 left-0 w-8 h-8 border-l-2 border-t-2 border-metal-gold/50 rounded-tl-lg" />
-    <div className="absolute top-0 right-0 w-8 h-8 border-r-2 border-t-2 border-metal-gold/50 rounded-tr-lg" />
-
-    {/* Title */}
-    <h1
-      className="text-center text-2xl font-bold text-parchment-light tracking-wider"
-      style={{ fontFamily: "'Cinzel', serif" }}
-    >
-      {title}
-    </h1>
-
-    {/* Breadcrumb */}
-    {showBreadcrumb && (
-      <Breadcrumb
-        items={["Reino", "Regente", "Tropas"]}
-        currentIndex={currentStep}
-      />
-    )}
-
-    {/* Close Button */}
-    <button
-      onClick={onClose}
-      className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center
-                 text-parchment-dark hover:text-war-ember transition-colors
-                 border border-metal-iron/50 rounded-lg hover:border-war-ember/50"
-    >
-      ✕
-    </button>
-  </div>
-);
-
-function getStepTitle(step: string): string {
+function getStepTitle(step: WizardStep): string {
   switch (step) {
-    case "kingdom":
-      return "Criar Reino";
+    case "info":
+      return "🏰 Identidade do Reino";
+    case "alignment":
+      return "⚖️ Alinhamento";
     case "regent":
-      return "Criar Regente";
+      return "👑 Criar Regente";
     case "troops":
-      return "Configurar Tropas";
+      return "⚔️ Configurar Tropas";
     default:
       return "Criar Reino";
   }

@@ -7,6 +7,7 @@ export interface TroopTemplateDefinition {
   slotIndex: number;
   name: string;
   description?: string;
+  avatar?: string; // ID do sprite (ex: "[1].png")
   passiveId: string;
   resourceType: string;
   combat: number;
@@ -19,7 +20,8 @@ export interface TroopTemplateDefinition {
 export interface RegentDefinition {
   name: string;
   description?: string;
-  classCode: string; // Código da classe (ex: "WARRIOR", "CLERIC")
+  avatar?: string; // ID do sprite (ex: "[1].png")
+  initialSkillId?: string; // Skill inicial escolhida no nível 1
   combat: number;
   acuity: number;
   focus: number;
@@ -30,7 +32,6 @@ export interface RegentDefinition {
 export interface KingdomTemplateDefinition {
   id: string;
   name: string;
-  capitalName: string;
   description: string;
   alignment: Alignment;
   race: Race;
@@ -46,7 +47,6 @@ export interface KingdomTemplateDefinition {
 const VALDORIA: KingdomTemplateDefinition = {
   id: "template_valdoria",
   name: "Império Solar de Valdoria",
-  capitalName: "Solenheim",
   description: `Erguido sobre as ruínas da antiga civilização élfica, o Império Solar de Valdoria é um bastião de ordem e luz nas terras do norte. Fundado há 500 anos pelo Primeiro Imperador Aldric, o reino é governado por uma linhagem de regentes abençoados pelo Sol Eterno.
 
 Os valdorianos acreditam que foram escolhidos para trazer civilização e justiça ao mundo. Seus exércitos marcham sob estandartes dourados, e seus templários são temidos por demônios e mortos-vivos em todos os cantos do continente.
@@ -61,12 +61,13 @@ A capital Solenheim é conhecida como "A Cidade das Mil Torres", onde a Grande C
 Dizem que ela foi tocada pelo próprio Sol Eterno quando criança, e que seu olho esquerdo brilha com luz dourada quando usa seus poderes divinos. Empunha a lendária Lança do Amanhecer, forjada com fragmentos de uma estrela caída.
 
 Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, mesmo que isso custe sua própria vida.`,
-    classCode: "CLERIC", // Usa Cleric por ser uma guerreira divina
+    avatar: "[1].png",
+    initialSkillId: "divine_smite", // Skill de Cleric
     combat: 6,
     acuity: 4,
     focus: 6,
     armor: 5,
-    vitality: 7,
+    vitality: 9,
   },
   troopTemplates: [
     {
@@ -144,7 +145,6 @@ Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, m
 const NYXRATH: KingdomTemplateDefinition = {
   id: "template_nyxrath",
   name: "Clãs das Sombras de Nyxrath",
-  capitalName: "Véu Negro",
   description: `Nas profundezas das Montanhas Mortas, onde a luz do sol nunca alcança, os Clãs de Nyxrath prosperam nas sombras. Fundados por elfos exilados que abraçaram os poderes proibidos, eles se transformaram ao longo dos milênios em algo... diferente.
 
 Nyxrath não é um reino no sentido tradicional — é uma confederação de clãs assassinos, necromantes e comerciantes de segredos. Eles não conquistam terras; eles infiltram, corrompem e controlam das sombras.
@@ -159,10 +159,11 @@ A capital Véu Negro é uma cidade esculpida no interior de uma montanha, ilumin
 Seu corpo é uma carcaça ressecada envolta em mantos de escuridão pura. Onde seus olhos deveriam estar, apenas chamas verdes e frias queimam com conhecimento acumulado de eras. Ele carrega o Grimório Vazio, um livro que consome as almas de seus inimigos.
 
 Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento absoluto, e está disposto a destruir mundos para obtê-lo.`,
-    classCode: "WIZARD", // Mago especializado em necromancia
+    avatar: "[9].png",
+    initialSkillId: "arcane_blast", // Skill de Wizard
     combat: 2,
     acuity: 5,
-    focus: 9,
+    focus: 11,
     armor: 3,
     vitality: 9,
   },
@@ -242,7 +243,6 @@ Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento ab
 const ASHENVALE: KingdomTemplateDefinition = {
   id: "template_ashenvale",
   name: "Confederação Dracônica de Ashenvale",
-  capitalName: "Ninho das Eras",
   description: `Nas montanhas vulcânicas do leste, onde rios de lava encontram florestas eternas, os dragões de Ashenvale governam há 10.000 anos. Este não é um reino de conquista — é um santuário onde as raças dracônicas vivem em equilíbrio com a natureza primordial.
 
 A Confederação é governada por um conselho de Anciões Dracônicos, cada um representando um elemento: Fogo, Gelo, Raio, Veneno e Terra. Juntos, eles mantêm o equilíbrio que impede o mundo de ser consumido pelo caos elemental.
@@ -257,12 +257,13 @@ O Ninho das Eras é uma cidade impossível — construída nas encostas de vulc�
 Com escamas que brilham como metal derretido e olhos que são brasas de pura energia, Ignatharax é tanto uma força da natureza quanto um ser senciente. Sua voz é o rugido de vulcões, e seu sopro pode derreter montanhas.
 
 Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância ou raiva. Ele vê o mundo com a perspectiva de eras, e protege Ashenvale porque sabe que o equilíbrio é a única coisa que impede a extinção de todas as coisas.`,
-    classCode: "BARBARIAN", // Força bruta primordial
+    avatar: "[1].png",
+    initialSkillId: "reckless_attack", // Skill de Barbarian
     combat: 8,
     acuity: 4,
     focus: 5,
     armor: 6,
-    vitality: 12,
+    vitality: 7,
   },
   troopTemplates: [
     {
@@ -358,7 +359,6 @@ export function getKingdomTemplatesSummary() {
   return KINGDOM_TEMPLATES.map((t) => ({
     id: t.id,
     name: t.name,
-    capitalName: t.capitalName,
     alignment: t.alignment,
     race: t.race,
     regentName: t.regent.name,

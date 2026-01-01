@@ -2,11 +2,21 @@
 // Factory para criação de BattleUnits - elimina duplicação de código
 
 import { determineUnitActions } from "../logic/unit-actions";
+import {
+  PHYSICAL_PROTECTION_CONFIG,
+  MAGICAL_PROTECTION_CONFIG,
+  HP_CONFIG,
+  GRID_CONFIG,
+  getRandomArenaSize,
+  getGridDimensions,
+} from "../../../shared/config/global.config";
+import type { TerritorySize } from "../../../shared/types/battle.types";
 
 // Tipo para unidade do banco de dados
 interface DBUnit {
   id: string;
   name: string | null;
+  avatar: string | null; // Nome do arquivo sprite
   category: string;
   troopSlot: number | null;
   level: number;
@@ -28,6 +38,7 @@ export interface BattleUnit {
   ownerId: string;
   ownerKingdomId: string;
   name: string;
+  avatar?: string; // Nome do arquivo sprite
   category: string;
   troopSlot?: number;
   level: number;
@@ -49,6 +60,15 @@ export interface BattleUnit {
   actionsLeft: number;
   isAlive: boolean;
   actionMarks: number;
+  // Proteção Física (config: PHYSICAL_PROTECTION_CONFIG.multiplier)
+  physicalProtection: number;
+  maxPhysicalProtection: number;
+  physicalProtectionBroken: boolean;
+  // Proteção Mágica (config: MAGICAL_PROTECTION_CONFIG.multiplier)
+  magicalProtection: number;
+  maxMagicalProtection: number;
+  magicalProtectionBroken: boolean;
+  // Legado
   protection: number;
   protectionBroken: boolean;
   conditions: string[];
@@ -101,6 +121,7 @@ export function createBattleUnit(
     ownerId,
     ownerKingdomId: kingdom.id,
     name: dbUnit.name || `${kingdom.name} ${dbUnit.category}`,
+    avatar: dbUnit.avatar ?? undefined,
     category: dbUnit.category,
     troopSlot: dbUnit.troopSlot ?? undefined,
     level: dbUnit.level,
@@ -113,8 +134,8 @@ export function createBattleUnit(
     armor: dbUnit.armor,
     vitality: dbUnit.vitality,
     damageReduction: dbUnit.damageReduction || 0,
-    currentHp: dbUnit.vitality * 2, // HP = 2x Vitality
-    maxHp: dbUnit.vitality * 2,
+    currentHp: dbUnit.vitality * HP_CONFIG.multiplier,
+    maxHp: dbUnit.vitality * HP_CONFIG.multiplier,
     posX: position.x,
     posY: position.y,
     initiative: Math.floor(Math.random() * 20) + 1 + dbUnit.acuity,
@@ -122,7 +143,20 @@ export function createBattleUnit(
     actionsLeft: 1,
     isAlive: true,
     actionMarks: 0,
-    protection: (dbUnit.armor || 0) * 2,
+    // Proteção Física = Armor * PHYSICAL_PROTECTION_CONFIG.multiplier
+    physicalProtection:
+      (dbUnit.armor || 0) * PHYSICAL_PROTECTION_CONFIG.multiplier,
+    maxPhysicalProtection:
+      (dbUnit.armor || 0) * PHYSICAL_PROTECTION_CONFIG.multiplier,
+    physicalProtectionBroken: false,
+    // Proteção Mágica = Focus * MAGICAL_PROTECTION_CONFIG.multiplier
+    magicalProtection:
+      (dbUnit.focus || 0) * MAGICAL_PROTECTION_CONFIG.multiplier,
+    maxMagicalProtection:
+      (dbUnit.focus || 0) * MAGICAL_PROTECTION_CONFIG.multiplier,
+    magicalProtectionBroken: false,
+    // Legado
+    protection: (dbUnit.armor || 0) * PHYSICAL_PROTECTION_CONFIG.multiplier,
     protectionBroken: false,
     conditions: [],
     hasStartedAction: false,
@@ -158,26 +192,159 @@ export function createBattleUnitsForSide(
 }
 
 /**
+ * Gera uma posição aleatória dentro do grid, evitando posições ocupadas
+ */
+function getRandomPosition(
+  gridWidth: number,
+  gridHeight: number,
+  occupiedPositions: Set<string>
+): Position {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const x = Math.floor(Math.random() * gridWidth);
+    const y = Math.floor(Math.random() * gridHeight);
+    const key = `${x},${y}`;
+
+    if (!occupiedPositions.has(key)) {
+      return { x, y };
+    }
+    attempts++;
+  }
+
+  // Fallback: encontrar primeira posição livre
+  for (let x = 0; x < gridWidth; x++) {
+    for (let y = 0; y < gridHeight; y++) {
+      const key = `${x},${y}`;
+      if (!occupiedPositions.has(key)) {
+        return { x, y };
+      }
+    }
+  }
+
+  // Último fallback (não deveria acontecer)
+  return { x: 0, y: 0 };
+}
+
+/**
+ * Cria unidades de batalha para ambos os lados com posicionamento aleatório
+ * @param hostUnits - Unidades do host
+ * @param hostOwnerId - ID do host
+ * @param hostKingdom - Informações do reino do host
+ * @param guestUnits - Unidades do guest
+ * @param guestOwnerId - ID do guest
+ * @param guestKingdom - Informações do reino do guest
+ * @param gridWidth - Largura do grid
+ * @param gridHeight - Altura do grid
+ * @param battleType - Tipo de batalha ("arena" ou "match")
+ * @returns Objeto com unidades e posições ocupadas
+ */
+export function createBattleUnitsWithRandomPositions(
+  hostUnits: DBUnit[],
+  hostOwnerId: string,
+  hostKingdom: KingdomInfo,
+  guestUnits: DBUnit[],
+  guestOwnerId: string,
+  guestKingdom: KingdomInfo,
+  gridWidth: number,
+  gridHeight: number,
+  battleType: "arena" | "match" = "arena"
+): { units: BattleUnit[]; occupiedPositions: Position[] } {
+  const occupiedSet = new Set<string>();
+  const allUnits: BattleUnit[] = [];
+  const occupiedPositions: Position[] = [];
+
+  // Criar unidades do host com posições aleatórias
+  for (const dbUnit of hostUnits) {
+    const position = getRandomPosition(gridWidth, gridHeight, occupiedSet);
+    occupiedSet.add(`${position.x},${position.y}`);
+    occupiedPositions.push(position);
+
+    const battleUnit = createBattleUnit(
+      dbUnit,
+      hostOwnerId,
+      hostKingdom,
+      position,
+      battleType
+    );
+    allUnits.push(battleUnit);
+  }
+
+  // Criar unidades do guest com posições aleatórias
+  for (const dbUnit of guestUnits) {
+    const position = getRandomPosition(gridWidth, gridHeight, occupiedSet);
+    occupiedSet.add(`${position.x},${position.y}`);
+    occupiedPositions.push(position);
+
+    const battleUnit = createBattleUnit(
+      dbUnit,
+      guestOwnerId,
+      guestKingdom,
+      position,
+      battleType
+    );
+    allUnits.push(battleUnit);
+  }
+
+  return { units: allUnits, occupiedPositions };
+}
+
+/**
+ * Obtém o tamanho do grid baseado no território (para Arena, sorteia)
+ */
+export function getArenaBattleGridSize(): {
+  width: number;
+  height: number;
+  territorySize: TerritorySize;
+} {
+  const territorySize = getRandomArenaSize();
+  const dimensions = getGridDimensions(territorySize);
+  return {
+    width: dimensions.width,
+    height: dimensions.height,
+    territorySize: territorySize as TerritorySize,
+  };
+}
+
+/**
  * Ordena unidades por iniciativa (maior primeiro)
+ * Legado - mantido para compatibilidade visual
  */
 export function sortByInitiative(units: BattleUnit[]): BattleUnit[] {
   return [...units].sort((a, b) => b.initiative - a.initiative);
 }
 
 /**
- * Determina a ordem de ação dos jogadores baseada na iniciativa da primeira unidade
+ * Calcula a iniciativa total de um jogador (soma de Acuity de todas as suas unidades)
+ */
+export function calculatePlayerInitiative(
+  units: BattleUnit[],
+  playerId: string
+): number {
+  return units
+    .filter((u) => u.ownerId === playerId && u.isAlive)
+    .reduce((sum, u) => sum + u.acuity, 0);
+}
+
+/**
+ * Determina a ordem de ação dos jogadores baseada na soma de Acuity das unidades
+ * Jogador com maior total de Acuity age primeiro
  */
 export function determineActionOrder(
-  orderedUnits: BattleUnit[],
+  units: BattleUnit[],
   hostUserId: string,
   guestUserId: string
 ): string[] {
-  if (orderedUnits.length === 0) {
+  if (units.length === 0) {
     return [hostUserId, guestUserId];
   }
 
-  const firstUnit = orderedUnits[0];
-  return firstUnit.ownerId === hostUserId
+  const hostInitiative = calculatePlayerInitiative(units, hostUserId);
+  const guestInitiative = calculatePlayerInitiative(units, guestUserId);
+
+  // Em caso de empate, host vai primeiro
+  return hostInitiative >= guestInitiative
     ? [hostUserId, guestUserId]
     : [guestUserId, hostUserId];
 }

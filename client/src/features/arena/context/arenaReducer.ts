@@ -63,6 +63,25 @@ export function arenaReducer(
       return { ...state, rematchPending: action.payload };
     case "SET_OPPONENT_WANTS_REMATCH":
       return { ...state, opponentWantsRematch: action.payload };
+    case "DESTROY_OBSTACLE":
+      if (!state.battle?.config?.map?.obstacles) return state;
+      return {
+        ...state,
+        battle: {
+          ...state.battle,
+          config: {
+            ...state.battle.config,
+            map: {
+              ...state.battle.config.map,
+              obstacles: state.battle.config.map.obstacles.map((obs) =>
+                obs.id === action.payload.obstacleId
+                  ? { ...obs, destroyed: true, hp: 0 }
+                  : obs
+              ),
+            },
+          },
+        },
+      };
     case "RESET":
       return initialArenaState;
     default:

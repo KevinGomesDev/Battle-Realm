@@ -8,6 +8,16 @@ import React, {
 } from "react";
 import type { ArenaUnit, ArenaBattle } from "../types/arena.types";
 import type { BattleObstacle } from "../../../../../shared/types/battle.types";
+import {
+  useSprites,
+  useUnitAnimations,
+  UI_COLORS,
+  UNIT_RENDER_CONFIG,
+  type SpriteDirection,
+} from "./canvas";
+
+// Re-export SpriteDirection for external use
+export type { SpriteDirection } from "./canvas";
 
 interface ArenaBattleCanvasProps {
   battle: ArenaBattle;
@@ -16,26 +26,15 @@ interface ArenaBattleCanvasProps {
   selectedUnitId: string | null;
   onCellClick?: (x: number, y: number) => void;
   onUnitClick?: (unit: ArenaUnit) => void;
+  onObstacleClick?: (obstacle: BattleObstacle) => void;
+  /** Direção para virar a unidade selecionada (baseado no movimento/clique) */
+  unitDirection?: { unitId: string; direction: SpriteDirection } | null;
 }
 
 /**
  * ArenaBattleCanvas - Grid de batalha otimizado
  * Usa configuração recebida do servidor (battle.config)
  */
-
-// Cores locais para elementos de UI (não do mapa)
-const UI_COLORS = {
-  hostHighlight: "#7ab8ff",
-  guestHighlight: "#ff7a7a",
-  hpFull: "#4ade80",
-  hpMedium: "#fbbf24",
-  hpLow: "#ef4444",
-  protection: "#60a5fa",
-  protectionBroken: "#6b7280",
-  turnIndicator: "#ffd700",
-  deadUnit: "#4a4a4a",
-};
-
 export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
   ({
     battle,
@@ -44,6 +43,8 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
     selectedUnitId,
     onCellClick,
     onUnitClick,
+    onObstacleClick,
+    unitDirection,
   }) => {
     // Extrair configuração do servidor (grid/mapa)
     const { config } = battle;
@@ -66,6 +67,55 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
     } | null>(null);
     const [canvasSize, setCanvasSize] = useState(640);
 
+    // Hook de sprites
+    const { getSprite, allLoaded: spritesLoaded, frameIndexRef } = useSprites();
+
+    // Hook de animações de movimento
+    const {
+      getVisualPosition,
+      startMoveAnimation,
+      hasActiveAnimations,
+      updateAnimations,
+    } = useUnitAnimations();
+
+    // Rastrear posições anteriores para detectar movimento
+    const prevPositionsRef = useRef<Map<string, { x: number; y: number }>>(
+      new Map()
+    );
+
+    // Direção de cada unidade (para virar o sprite)
+    const unitDirectionsRef = useRef<Map<string, SpriteDirection>>(new Map());
+
+    // Detectar mudanças de posição e iniciar animações
+    useEffect(() => {
+      units.forEach((unit) => {
+        const prevPos = prevPositionsRef.current.get(unit.id);
+        if (prevPos && (prevPos.x !== unit.posX || prevPos.y !== unit.posY)) {
+          // Unidade moveu! Iniciar animação
+          startMoveAnimation(
+            unit.id,
+            prevPos.x,
+            prevPos.y,
+            unit.posX,
+            unit.posY
+          );
+        }
+        // Atualizar posição anterior
+        prevPositionsRef.current.set(unit.id, { x: unit.posX, y: unit.posY });
+      });
+    }, [units, startMoveAnimation]);
+
+    // Atualizar direção da unidade quando receber nova direção
+    useEffect(() => {
+      if (unitDirection) {
+        unitDirectionsRef.current.set(
+          unitDirection.unitId,
+          unitDirection.direction
+        );
+        needsRedrawRef.current = true;
+      }
+    }, [unitDirection]);
+
     // Calcular tamanho da célula baseado no canvas (usando a maior dimensão)
     const cellSize = Math.min(
       canvasSize / GRID_WIDTH,
@@ -80,7 +130,7 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
       [units, selectedUnitId]
     );
 
-    // Map de posições para lookup O(1)
+    // Map de posições de unidades vivas para lookup O(1)
     const unitPositionMap = useMemo(() => {
       const map = new Map<string, ArenaUnit>();
       units.forEach((unit) => {
@@ -91,11 +141,24 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
       return map;
     }, [units]);
 
-    // Map de obstáculos para lookup O(1)
+    // Map de cadáveres para lookup O(1) (unidades mortas que não foram removidas)
+    const corpsePositionMap = useMemo(() => {
+      const map = new Map<string, ArenaUnit>();
+      units.forEach((unit) => {
+        if (!unit.isAlive && !unit.conditions?.includes("CORPSE_REMOVED")) {
+          map.set(`${unit.posX},${unit.posY}`, unit);
+        }
+      });
+      return map;
+    }, [units]);
+
+    // Map de obstáculos para lookup O(1) (apenas não destruídos)
     const obstaclePositionMap = useMemo(() => {
       const map = new Map<string, BattleObstacle>();
       OBSTACLES.forEach((obs) => {
-        map.set(`${obs.posX},${obs.posY}`, obs);
+        if (!obs.destroyed) {
+          map.set(`${obs.posX},${obs.posY}`, obs);
+        }
       });
       return map;
     }, [OBSTACLES]);
@@ -114,8 +177,12 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
             const ny = selectedUnit.posY + dy;
             if (nx >= 0 && nx < GRID_WIDTH && ny >= 0 && ny < GRID_HEIGHT) {
               const key = `${nx},${ny}`;
-              // Verificar se não tem unidade NEM obstáculo
-              if (!unitPositionMap.has(key) && !obstaclePositionMap.has(key)) {
+              // Verificar se não tem unidade viva, cadáver NEM obstáculo
+              if (
+                !unitPositionMap.has(key) &&
+                !corpsePositionMap.has(key) &&
+                !obstaclePositionMap.has(key)
+              ) {
                 movable.add(key);
               }
             }
@@ -123,9 +190,16 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
         }
       }
       return movable;
-    }, [selectedUnit, unitPositionMap, obstaclePositionMap]);
+    }, [
+      selectedUnit,
+      unitPositionMap,
+      corpsePositionMap,
+      obstaclePositionMap,
+      GRID_WIDTH,
+      GRID_HEIGHT,
+    ]);
 
-    // Células atacáveis como Set
+    // Células atacáveis como Set (8 direções - omnidirecional)
     const attackableCells = useMemo((): Set<string> => {
       if (!selectedUnit || selectedUnit.actionsLeft <= 0) return new Set();
 
@@ -135,16 +209,28 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
         if (enemy.ownerId !== currentUserId && enemy.isAlive) {
           const dx = Math.abs(enemy.posX - selectedUnit.posX);
           const dy = Math.abs(enemy.posY - selectedUnit.posY);
-          if (dx <= 1 && dy <= 1 && dx + dy <= 1) {
+          // Chebyshev distance: máximo de |dx| e |dy| === 1 (permite diagonais)
+          if (Math.max(dx, dy) === 1) {
             attackable.add(`${enemy.posX},${enemy.posY}`);
           }
         }
       });
 
-      return attackable;
-    }, [selectedUnit, units, currentUserId]);
+      // Também incluir obstáculos adjacentes como atacáveis
+      OBSTACLES.forEach((obs) => {
+        if (!obs.destroyed) {
+          const dx = Math.abs(obs.posX - selectedUnit.posX);
+          const dy = Math.abs(obs.posY - selectedUnit.posY);
+          if (Math.max(dx, dy) === 1) {
+            attackable.add(`${obs.posX},${obs.posY}`);
+          }
+        }
+      });
 
-    // Função para desenhar unidade
+      return attackable;
+    }, [selectedUnit, units, currentUserId, OBSTACLES]);
+
+    // Função para desenhar unidade usando sprite
     const drawUnit = useCallback(
       (
         ctx: CanvasRenderingContext2D,
@@ -154,18 +240,7 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
         unit: ArenaUnit,
         isOwned: boolean
       ) => {
-        const colors = isOwned
-          ? {
-              primary: GRID_COLORS.hostPrimary,
-              secondary: GRID_COLORS.hostSecondary,
-              highlight: UI_COLORS.hostHighlight,
-            }
-          : {
-              primary: GRID_COLORS.guestPrimary,
-              secondary: GRID_COLORS.guestSecondary,
-              highlight: UI_COLORS.guestHighlight,
-            };
-
+        // Unidade morta - desenha X simples
         if (!unit.isAlive) {
           ctx.fillStyle = UI_COLORS.deadUnit;
           const cx = x + size / 2;
@@ -176,46 +251,119 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
           return;
         }
 
-        const px = Math.max(2, size / 16);
-        const offsetX = x + size * 0.15;
-        const offsetY = y + size * 0.1;
+        // Obter sprite baseado no avatar, classCode ou fallback
+        const spriteType =
+          unit.avatar || unit.classCode || (isOwned ? "swordman" : "mage");
+        const loadedSprite = getSprite(spriteType);
 
-        // Coroa
-        ctx.fillStyle = colors.highlight;
-        ctx.fillRect(offsetX + size * 0.35, offsetY, px * 2, px);
+        // Se o sprite está carregado, usa ele
+        if (loadedSprite && spritesLoaded) {
+          const { image: sprite, config } = loadedSprite;
+          const { frameWidth, frameHeight, idleFrames, idleRow } = config;
+          const currentFrame = frameIndexRef.current % idleFrames;
 
-        // Cabeça
-        ctx.fillStyle = colors.primary;
-        ctx.fillRect(offsetX + size * 0.2, offsetY + px, size * 0.5, px * 3);
+          // Calcular posição no sprite sheet
+          const srcX = currentFrame * frameWidth;
+          const srcY = idleRow * frameHeight;
 
-        // Olhos
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(offsetX + size * 0.25, offsetY + px * 2, px, px);
-        ctx.fillRect(offsetX + size * 0.45, offsetY + px * 2, px, px);
+          // Sprite maior, centralizado verticalmente
+          const destSize = size * UNIT_RENDER_CONFIG.spriteScale;
+          const offsetX = (size - destSize) / 2;
+          const offsetY = size * UNIT_RENDER_CONFIG.verticalOffset;
 
-        // Corpo
-        ctx.fillStyle = colors.primary;
-        ctx.fillRect(
-          offsetX + size * 0.15,
-          offsetY + px * 4,
-          size * 0.6,
-          px * 3
-        );
+          // Obter direção da unidade (default: right para aliado, left para inimigo)
+          const direction =
+            unitDirectionsRef.current.get(unit.id) ||
+            (isOwned ? "right" : "left");
+          const shouldFlip = direction === "left";
 
-        // Detalhe armadura
-        ctx.fillStyle = colors.highlight;
-        ctx.fillRect(offsetX + size * 0.3, offsetY + px * 4, size * 0.2, px);
+          ctx.save();
 
-        // Pernas
-        ctx.fillStyle = colors.secondary;
-        ctx.fillRect(offsetX + size * 0.2, offsetY + px * 7, px * 2, px * 2);
-        ctx.fillRect(offsetX + size * 0.45, offsetY + px * 7, px * 2, px * 2);
+          // Aplicar flip se necessário
+          if (shouldFlip) {
+            ctx.translate(x + size, y);
+            ctx.scale(-1, 1);
+            ctx.drawImage(
+              sprite,
+              srcX,
+              srcY,
+              frameWidth,
+              frameHeight,
+              offsetX,
+              offsetY,
+              destSize,
+              destSize
+            );
+          } else {
+            ctx.drawImage(
+              sprite,
+              srcX,
+              srcY,
+              frameWidth,
+              frameHeight,
+              x + offsetX,
+              y + offsetY,
+              destSize,
+              destSize
+            );
+          }
 
-        // Espada
-        ctx.fillStyle = "#c0c0c0";
-        ctx.fillRect(offsetX + size * 0.7, offsetY + px * 3, px, px * 4);
-        ctx.fillStyle = "#8b4513";
-        ctx.fillRect(offsetX + size * 0.7, offsetY + px * 7, px, px * 2);
+          ctx.restore();
+        } else {
+          // Fallback: desenho procedural caso sprite não carregue
+          const colors = isOwned
+            ? {
+                primary: GRID_COLORS.hostPrimary,
+                secondary: GRID_COLORS.hostSecondary,
+                highlight: UI_COLORS.hostHighlight,
+              }
+            : {
+                primary: GRID_COLORS.guestPrimary,
+                secondary: GRID_COLORS.guestSecondary,
+                highlight: UI_COLORS.guestHighlight,
+              };
+
+          const px = Math.max(2, size / 16);
+          const offsetX = x + size * 0.15;
+          const offsetY = y + size * 0.1;
+
+          // Coroa
+          ctx.fillStyle = colors.highlight;
+          ctx.fillRect(offsetX + size * 0.35, offsetY, px * 2, px);
+
+          // Cabeça
+          ctx.fillStyle = colors.primary;
+          ctx.fillRect(offsetX + size * 0.2, offsetY + px, size * 0.5, px * 3);
+
+          // Olhos
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(offsetX + size * 0.25, offsetY + px * 2, px, px);
+          ctx.fillRect(offsetX + size * 0.45, offsetY + px * 2, px, px);
+
+          // Corpo
+          ctx.fillStyle = colors.primary;
+          ctx.fillRect(
+            offsetX + size * 0.15,
+            offsetY + px * 4,
+            size * 0.6,
+            px * 3
+          );
+
+          // Detalhe armadura
+          ctx.fillStyle = colors.highlight;
+          ctx.fillRect(offsetX + size * 0.3, offsetY + px * 4, size * 0.2, px);
+
+          // Pernas
+          ctx.fillStyle = colors.secondary;
+          ctx.fillRect(offsetX + size * 0.2, offsetY + px * 7, px * 2, px * 2);
+          ctx.fillRect(offsetX + size * 0.45, offsetY + px * 7, px * 2, px * 2);
+
+          // Espada
+          ctx.fillStyle = "#c0c0c0";
+          ctx.fillRect(offsetX + size * 0.7, offsetY + px * 3, px, px * 4);
+          ctx.fillStyle = "#8b4513";
+          ctx.fillRect(offsetX + size * 0.7, offsetY + px * 7, px, px * 2);
+        }
 
         // Seleção
         if (unit.id === selectedUnitId) {
@@ -224,10 +372,10 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
           ctx.strokeRect(x + 2, y + 2, size - 4, size - 4);
         }
       },
-      [selectedUnitId, GRID_COLORS]
+      [selectedUnitId, GRID_COLORS, spritesLoaded, getSprite, frameIndexRef]
     );
 
-    // Função para barras de HP/Proteção
+    // Função para barras de HP/Proteção (não usada atualmente, mas mantida para referência)
     const drawUnitBars = useCallback(
       (
         ctx: CanvasRenderingContext2D,
@@ -357,8 +505,10 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
       ctx.strokeStyle = GRID_COLORS.guestSecondary;
       ctx.strokeRect(8 * cellSize, 0, 4 * cellSize, 2 * cellSize);
 
-      // === DESENHAR OBSTÁCULOS ===
+      // === DESENHAR OBSTÁCULOS (não destruídos) ===
       OBSTACLES.forEach((obstacle) => {
+        if (obstacle.destroyed) return;
+
         const cellX = obstacle.posX * cellSize;
         const cellY = obstacle.posY * cellSize;
 
@@ -372,18 +522,48 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
           cellX + cellSize / 2,
           cellY + cellSize / 2
         );
+
+        // Desenhar barra de HP do obstáculo se tiver HP
+        if (obstacle.hp !== undefined && obstacle.maxHp !== undefined) {
+          const barHeight = 4;
+          const barPadding = 2;
+          const barWidth = cellSize - barPadding * 2;
+          const hpPercentage = obstacle.hp / obstacle.maxHp;
+
+          ctx.fillStyle = "#333";
+          ctx.fillRect(
+            cellX + barPadding,
+            cellY + cellSize - barHeight - barPadding,
+            barWidth,
+            barHeight
+          );
+
+          ctx.fillStyle =
+            hpPercentage > 0.5
+              ? "#22c55e"
+              : hpPercentage > 0.25
+              ? "#eab308"
+              : "#ef4444";
+          ctx.fillRect(
+            cellX + barPadding,
+            cellY + cellSize - barHeight - barPadding,
+            barWidth * hpPercentage,
+            barHeight
+          );
+        }
       });
 
       // === DESENHAR UNIDADES ===
       units.forEach((unit) => {
-        const cellX = unit.posX * cellSize;
-        const cellY = unit.posY * cellSize;
+        // Usar posição visual interpolada (para animação suave)
+        const visualPos = getVisualPosition(unit.id, unit.posX, unit.posY);
+        const cellX = visualPos.x * cellSize;
+        const cellY = visualPos.y * cellSize;
         const isOwned = unit.ownerId === currentUserId;
 
         drawUnit(ctx, cellX, cellY, cellSize, unit, isOwned);
 
         if (unit.isAlive) {
-          drawUnitBars(ctx, cellX, cellY, cellSize, unit);
           drawConditions(ctx, cellX, cellY, unit.conditions);
         }
       });
@@ -393,8 +573,14 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
         (u) => u.ownerId === battle.currentPlayerId && u.isAlive
       );
       if (currentTurnUnit) {
-        const cellX = currentTurnUnit.posX * cellSize;
-        const cellY = currentTurnUnit.posY * cellSize;
+        // Usar posição visual interpolada para o indicador também
+        const turnVisualPos = getVisualPosition(
+          currentTurnUnit.id,
+          currentTurnUnit.posX,
+          currentTurnUnit.posY
+        );
+        const cellX = turnVisualPos.x * cellSize;
+        const cellY = turnVisualPos.y * cellSize;
         const isMyUnit = currentTurnUnit.ownerId === currentUserId;
 
         // Cor: verde para minha unidade, vermelho para inimigo
@@ -447,6 +633,7 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
       canvasWidth,
       canvasHeight,
       OBSTACLES,
+      getVisualPosition,
     ]);
 
     // === MARCAR PARA REDESENHO ===
@@ -459,6 +646,8 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
       battle.currentPlayerId,
       movableCells,
       attackableCells,
+      spritesLoaded,
+      frameIndexRef,
     ]);
 
     // === LOOP DE ANIMAÇÃO OTIMIZADO ===
@@ -468,12 +657,20 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
       const animate = () => {
         if (!running) return;
 
-        // Só redesenha se necessário OU para animação do indicador de turno
+        // Atualizar animações de movimento
+        const hasMovementAnimations = updateAnimations();
+
+        // Redesenha se: necessário, animação de turno, ou animações de movimento ativas
         const hasCurrentTurnUnit = units.some(
           (u) => u.ownerId === battle.currentPlayerId && u.isAlive
         );
 
-        if (needsRedrawRef.current || hasCurrentTurnUnit) {
+        if (
+          needsRedrawRef.current ||
+          hasCurrentTurnUnit ||
+          hasMovementAnimations ||
+          hasActiveAnimations()
+        ) {
           draw();
           needsRedrawRef.current = false;
         }
@@ -481,7 +678,7 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
         animationFrameRef.current = requestAnimationFrame(animate);
       };
 
-      animate();
+      animationFrameRef.current = requestAnimationFrame(animate);
 
       return () => {
         running = false;
@@ -561,14 +758,25 @@ export const ArenaBattleCanvas: React.FC<ArenaBattleCanvasProps> = memo(
 
         if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT) {
           const clickedUnit = unitPositionMap.get(`${x},${y}`);
+          const clickedObstacle = obstaclePositionMap.get(`${x},${y}`);
           if (clickedUnit) {
             onUnitClick?.(clickedUnit);
+          } else if (clickedObstacle) {
+            onObstacleClick?.(clickedObstacle);
           } else {
             onCellClick?.(x, y);
           }
         }
       },
-      [unitPositionMap, onCellClick, onUnitClick, GRID_WIDTH, GRID_HEIGHT]
+      [
+        unitPositionMap,
+        obstaclePositionMap,
+        onCellClick,
+        onUnitClick,
+        onObstacleClick,
+        GRID_WIDTH,
+        GRID_HEIGHT,
+      ]
     );
 
     return (

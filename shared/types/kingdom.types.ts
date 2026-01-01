@@ -45,7 +45,6 @@ export interface BaseAttributes {
 export interface Kingdom {
   id: string;
   name: string;
-  capitalName: string;
   description?: string;
   alignment: Alignment;
   race: Race;
@@ -66,7 +65,6 @@ export interface KingdomSummary {
   name: string;
   race: Race;
   alignment: Alignment;
-  capitalName: string;
 }
 
 // ============ TROOP TEMPLATE ============
@@ -77,6 +75,7 @@ export interface TroopTemplate {
   slotIndex: number;
   name: string;
   description?: string;
+  avatar?: string; // ID do sprite (ex: "[1].png")
   passiveId: string;
   resourceType: ResourceType;
   combat: number;
@@ -90,6 +89,7 @@ export interface CreateTroopTemplateData {
   slotIndex: number;
   name: string;
   description?: string;
+  avatar?: string; // ID do sprite (ex: "[1].png")
   passiveId: string;
   resourceType: ResourceType;
   combat: number;
@@ -114,8 +114,11 @@ export interface Unit {
   kingdomId?: string;
   name: string;
   description?: string;
+  avatar?: string; // ID do sprite (ex: "[1].png")
   category: UnitCategory;
-  classCode?: string;
+  level: number;
+  classCode?: string; // Heróis possuem classe, Regentes NÃO
+  classFeatures?: string[]; // Skills aprendidas (Regentes escolhem de qualquer classe)
   combat: number;
   acuity: number;
   focus: number;
@@ -128,32 +131,38 @@ export interface Unit {
 
 // ============ REGENT ============
 
+/** Dados do regente para exibição */
 export interface RegentData {
   name: string;
   description?: string;
-  classCode: string;
+  avatar?: string;
   combat: number;
   acuity: number;
   focus: number;
   armor: number;
   vitality: number;
+  skills?: string[]; // Skills aprendidas
 }
 
+/** Dados para criar um regente */
 export interface CreateRegentData {
   name: string;
-  classCode: string;
-  attributeDistribution: BaseAttributes;
+  avatar?: string;
+  attributes: BaseAttributes;
+  initialSkillId?: string; // Skill inicial (nível 1)
 }
 
 // ============ CREATE KINGDOM ============
 
+/** Dados completos para criar um reino (Reino + Regente + Tropas) */
 export interface CreateKingdomData {
   name: string;
-  capitalName: string;
+  description?: string;
   alignment: Alignment;
   race: Race;
   raceMetadata?: string;
-  troopTemplates?: CreateTroopTemplateData[];
+  regent: CreateRegentData;
+  troopTemplates: CreateTroopTemplateData[];
 }
 
 export interface CreateKingdomFromTemplateData {
@@ -178,7 +187,6 @@ export interface KingdomTemplateSummary {
 export interface KingdomTemplateDetails {
   id: string;
   name: string;
-  capitalName: string;
   description: string;
   alignment: Alignment;
   race: Race;

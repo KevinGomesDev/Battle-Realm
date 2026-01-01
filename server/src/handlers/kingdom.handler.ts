@@ -58,7 +58,7 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
   // ============================================
 
   /**
-   * Cria um novo reino (custom)
+   * Cria um novo reino completo (Reino + Regente + Tropas em transação única)
    */
   socket.on(
     "kingdom:create",
@@ -75,10 +75,11 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
         const result = await prisma.$transaction(async (tx) => {
           const randomLocation = Math.floor(Math.random() * MAP_SIZE) + 1;
 
+          // 1. Criar Reino
           const newKingdom = await tx.kingdom.create({
             data: {
               name: validated.name,
-              capitalName: validated.capitalName,
+              description: validated.description,
               alignment: validated.alignment,
               race: validated.race,
               raceMetadata: validated.raceMetadata,
@@ -87,23 +88,51 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
             },
           });
 
-          if (validated.troopTemplates?.length === 5) {
-            const troopResult = await createTroopTemplatesForKingdom(
-              newKingdom.id,
-              validated.troopTemplates as TroopTemplateData[],
-              tx
-            );
+          // 2. Criar Regente
+          const regentAttrs = validated.regent.attributes;
+          const initialSkills = validated.regent.initialSkillId
+            ? [validated.regent.initialSkillId]
+            : [];
 
-            if (!troopResult.success) {
-              throw new Error(
-                troopResult.message || "Erro ao criar tropas do reino"
-              );
-            }
+          await tx.unit.create({
+            data: {
+              kingdomId: newKingdom.id,
+              name: validated.regent.name,
+              avatar: validated.regent.avatar || null,
+              category: "REGENT",
+              level: 1,
+              combat: regentAttrs.combat,
+              acuity: regentAttrs.acuity,
+              focus: regentAttrs.focus,
+              armor: regentAttrs.armor,
+              vitality: regentAttrs.vitality,
+              currentHp: regentAttrs.vitality * 5, // HP = vitalidade * 5
+              movesLeft: 0, // Sem moves fora de partida
+              actionsLeft: 0,
+              classFeatures: JSON.stringify(initialSkills),
+            },
+          });
+
+          // 3. Criar Templates de Tropas
+          const troopResult = await createTroopTemplatesForKingdom(
+            newKingdom.id,
+            validated.troopTemplates as TroopTemplateData[],
+            tx
+          );
+
+          if (!troopResult.success) {
+            throw new Error(
+              troopResult.message || "Erro ao criar tropas do reino"
+            );
           }
 
+          // 4. Retornar reino completo
           return tx.kingdom.findUnique({
             where: { id: newKingdom.id },
-            include: { troopTemplates: { orderBy: { slotIndex: "asc" } } },
+            include: {
+              units: true,
+              troopTemplates: { orderBy: { slotIndex: "asc" } },
+            },
           });
         });
 
@@ -128,7 +157,6 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
             name: true,
             race: true,
             alignment: true,
-            capitalName: true,
           },
         });
 
@@ -348,7 +376,6 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
           const newKingdom = await tx.kingdom.create({
             data: {
               name: template.name,
-              capitalName: template.capitalName,
               description: template.description,
               alignment: template.alignment,
               race: template.race,
@@ -363,16 +390,20 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
               kingdomId: newKingdom.id,
               name: template.regent.name,
               description: template.regent.description,
+              avatar: template.regent.avatar || null,
               category: "REGENT",
-              classCode: template.regent.classCode, // Código da classe (dados estáticos)
+              level: 1,
               combat: template.regent.combat,
               acuity: template.regent.acuity,
               focus: template.regent.focus,
               armor: template.regent.armor,
               vitality: template.regent.vitality,
-              currentHp: template.regent.vitality,
-              movesLeft: template.regent.acuity,
-              actionsLeft: 3,
+              currentHp: template.regent.vitality * 5, // HP = vitality * 5
+              movesLeft: 0, // Sem moves fora de partida
+              actionsLeft: 0,
+              classFeatures: template.regent.initialSkillId
+                ? JSON.stringify([template.regent.initialSkillId])
+                : "[]",
             },
           });
 
@@ -381,6 +412,7 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
             slotIndex: t.slotIndex,
             name: t.name,
             description: t.description,
+            avatar: t.avatar,
             passiveId: t.passiveId,
             resourceType: t.resourceType,
             combat: t.combat,

@@ -32,6 +32,7 @@ export interface ArenaUnit {
   ownerId: string;
   ownerKingdomId: string;
   name: string;
+  avatar?: string; // ID do sprite (ex: "[1].png")
   category: string;
   troopSlot?: number;
   level: number;
@@ -55,6 +56,15 @@ export interface ArenaUnit {
   actionsLeft: number;
   isAlive: boolean;
   actionMarks: number;
+  // Proteção Física - ver shared/config/balance.config.ts
+  physicalProtection: number;
+  maxPhysicalProtection: number;
+  physicalProtectionBroken: boolean;
+  // Proteção Mágica - ver shared/config/balance.config.ts
+  magicalProtection: number;
+  maxMagicalProtection: number;
+  magicalProtectionBroken: boolean;
+  // Legado - manter para compatibilidade
   protection: number;
   protectionBroken: boolean;
   conditions: string[];
@@ -128,6 +138,7 @@ export interface ArenaBattle {
   status: "ACTIVE" | "ENDED";
   currentTurnIndex: number;
   currentPlayerId: string;
+  activeUnitId?: string; // Unidade ativa escolhida pelo jogador neste turno
   actionOrder: string[];
   initiativeOrder: string[];
   units: ArenaUnit[];
@@ -250,6 +261,7 @@ export interface UnitAttackedResponse {
   battleId: string;
   attackerUnitId: string;
   targetUnitId: string;
+  // Legado (manter para compatibilidade)
   diceCount: number;
   rolls: number[];
   damage: number;
@@ -257,6 +269,29 @@ export interface UnitAttackedResponse {
   targetHpAfter: number;
   targetProtection: number;
   attackerActionsLeft: number;
+  // Dados detalhados de rolagem
+  missed?: boolean;
+  attackDiceCount: number;
+  attackRolls: number[];
+  attackSuccesses: number;
+  rawDamage: number;
+  defenseDiceCount: number;
+  defenseRolls: number[];
+  defenseSuccesses: number;
+  damageReduction: number;
+  finalDamage: number;
+  targetPhysicalProtection: number;
+  targetMagicalProtection: number;
+  targetDefeated: boolean;
+  // Dados do atacante para o painel visual
+  attackerName: string;
+  attackerIcon: string;
+  attackerCombat: number;
+  // Dados do defensor para o painel visual
+  targetName: string;
+  targetIcon: string;
+  targetCombat: number;
+  targetAcuity: number; // Acuity é usado para defesa
 }
 
 export interface BattleEndedResponse {

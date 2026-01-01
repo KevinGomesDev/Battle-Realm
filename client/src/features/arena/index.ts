@@ -17,19 +17,24 @@ export {
 } from "./hooks/useArena";
 export { useBattleKeyboard } from "./hooks/useBattleKeyboard";
 
-// Components
+// Components - Main View
+export { ArenaBattleView } from "./components";
+
+// Components - Lobby
+export { ArenaList, ArenaLobbyView } from "./components/lobby";
+
+// Components - Battle
 export {
-  ArenaList,
-  ArenaLobbyView,
-  ArenaBattleCanvas,
-  ArenaBattleView,
+  BattleHeader,
+  UnitPanel,
+  InitiativePanel,
   BattleResultModal,
-} from "./components";
+} from "./components/battle";
 
-// Battle components
-export { BattleHeader, UnitPanel } from "./components/battle";
+// Components - Canvas
+export { ArenaBattleCanvas } from "./components/canvas";
 
-// Shared components
+// Components - Shared
 export {
   CircularProgress,
   MovementDots,

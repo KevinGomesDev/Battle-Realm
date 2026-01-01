@@ -13,13 +13,14 @@ export interface TroopTemplateFormData extends CreateTroopTemplateData {
 
 export interface RegentFormData {
   name: string;
-  classCode: string;
+  avatar?: string; // Nome do arquivo sprite
   attributes: BaseAttributes;
+  initialSkillId?: string; // Skill inicial escolhida
 }
 
 export interface KingdomFormData {
   name: string;
-  capitalName: string;
+  description?: string;
   race: string;
   alignment: string;
   raceMetadata?: string;
@@ -28,22 +29,23 @@ export interface KingdomFormData {
 // ============ DEFAULTS ============
 
 const DEFAULT_KINGDOM: KingdomFormData = {
-  name: "Kingdom of Ashburn",
-  capitalName: "Ashburn Capital",
-  race: "HUMANOIDE",
-  alignment: "CAOS",
+  name: "",
+  description: "",
+  race: "",
+  alignment: "",
 };
 
 const DEFAULT_REGENT: RegentFormData = {
-  name: "Lord Ashburn",
-  classCode: "WARRIOR",
+  name: "",
+  avatar: "[21].png",
   attributes: {
-    combat: 7,
-    acuity: 5,
-    focus: 5,
-    armor: 4,
-    vitality: 4,
+    combat: 0,
+    acuity: 0,
+    focus: 0,
+    armor: 0,
+    vitality: 0,
   },
+  initialSkillId: undefined,
 };
 
 const RESOURCE_ORDER: ResourceType[] = [
@@ -54,6 +56,15 @@ const RESOURCE_ORDER: ResourceType[] = [
   "devotion",
 ];
 
+// IDs de avatar padrão para cada slot de tropa (apenas personagens humanoides)
+const DEFAULT_AVATARS = [
+  "[39].png", // Slot 0 - SwordMan
+  "[36].png", // Slot 1 - ShieldMan
+  "[2].png", // Slot 2 - ArcherMan
+  "[24].png", // Slot 3 - Mage
+  "[37].png", // Slot 4 - SpearMan
+];
+
 const createDefaultTroopTemplate = (
   slotIndex: number,
   passiveId: string = ""
@@ -62,6 +73,7 @@ const createDefaultTroopTemplate = (
   name: `Tropa ${slotIndex + 1}`,
   passiveId,
   resourceType: RESOURCE_ORDER[slotIndex % 5],
+  avatar: DEFAULT_AVATARS[slotIndex % DEFAULT_AVATARS.length],
   combat: 2,
   acuity: 2,
   focus: 2,
@@ -82,11 +94,7 @@ export function useKingdomForm() {
     setData(DEFAULT_KINGDOM);
   }, []);
 
-  const isValid =
-    data.name.length >= 3 &&
-    data.capitalName.length >= 3 &&
-    data.race &&
-    data.alignment;
+  const isValid = data.name.length >= 3 && data.race && data.alignment;
 
   return { data, update, reset, isValid };
 }
@@ -116,7 +124,8 @@ export function useRegentForm() {
   }, []);
 
   const totalPoints = Object.values(data.attributes).reduce((a, b) => a + b, 0);
-  const isValid = data.name.length >= 2 && data.classCode && totalPoints === 30;
+  // Regentes não precisam de classe, apenas nome e 30 pontos distribuídos
+  const isValid = data.name.length >= 2 && totalPoints === 30;
 
   return { data, update, updateAttribute, reset, totalPoints, isValid };
 }

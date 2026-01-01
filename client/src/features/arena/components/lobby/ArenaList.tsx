@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { useArena } from "../hooks/useArena";
-import { useKingdom } from "../../kingdom";
-import { useSession } from "../../../core";
-import { useAuth } from "../../auth";
-import type { ArenaLobby } from "../types/arena.types";
+import { useArena } from "../../hooks/useArena";
+import { useKingdom } from "../../../kingdom";
+import { useSession } from "../../../../core";
+import { useAuth } from "../../../auth";
+import type { ArenaLobby } from "../../types/arena.types";
 
 interface ArenaListProps {
   onLobbyCreated?: (lobbyId: string) => void;

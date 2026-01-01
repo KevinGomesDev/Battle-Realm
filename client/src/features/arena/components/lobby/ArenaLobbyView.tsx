@@ -1,5 +1,5 @@
 import React from "react";
-import { useArena } from "../hooks/useArena";
+import { useArena } from "../../hooks/useArena";
 
 interface ArenaLobbyViewProps {
   onBattleStart?: () => void;

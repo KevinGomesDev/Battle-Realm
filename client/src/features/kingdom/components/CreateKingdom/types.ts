@@ -24,13 +24,13 @@ export interface KingdomFormData {
 
 export interface RegentFormData {
   name: string;
-  classCode: string;
-  attributeDistribution: {
+  avatar?: string; // Nome do arquivo sprite
+  attributes: {
     combat: number;
     acuity: number;
     focus: number;
     armor: number;
     vitality: number;
   };
-  initialFeature?: string;
+  initialSkillId?: string; // Skill inicial escolhida
 }

@@ -3,32 +3,16 @@
 // FONTE DE VERDADE para classes de heróis/regentes
 
 import type { HeroClassDefinition } from "../../../shared/types/skills.types";
-import {
-  BARBARIAN_SKILLS,
-  WARRIOR_SKILLS,
-  ROGUE_SKILLS,
-  RANGER_SKILLS,
-  CLERIC_SKILLS,
-  WIZARD_SKILLS,
-} from "./skills.data";
+import { WARRIOR_SKILLS, CLERIC_SKILLS, WIZARD_SKILLS } from "./skills.data";
 
 // =============================================================================
-// CLASSES
+// CLASSES (Apenas 3 classes principais)
 // =============================================================================
 
 export const HERO_CLASSES: HeroClassDefinition[] = [
   // =============================================================================
-  // FÍSICAS (FOOD)
+  // GUERREIRO - FÍSICO (FOOD)
   // =============================================================================
-  {
-    code: "BARBARIAN",
-    name: "Bárbaro",
-    description:
-      "Guerreiro selvagem que ganha força com a fúria. Pode atacar múltiplas vezes sem proteção.",
-    archetype: "PHYSICAL",
-    resourceUsed: "FOOD",
-    skills: BARBARIAN_SKILLS,
-  },
   {
     code: "WARRIOR",
     name: "Guerreiro",
@@ -38,27 +22,9 @@ export const HERO_CLASSES: HeroClassDefinition[] = [
     resourceUsed: "FOOD",
     skills: WARRIOR_SKILLS,
   },
-  {
-    code: "ROGUE",
-    name: "Ladino",
-    description:
-      "Especialista em furtividade e ataques precisos. Mestre em encontrar pontos fracos.",
-    archetype: "PHYSICAL",
-    resourceUsed: "FOOD",
-    skills: ROGUE_SKILLS,
-  },
-  {
-    code: "RANGER",
-    name: "Patrulheiro",
-    description:
-      "Caçador experiente com domínio sobre terrenos selvagens e ataques à distância.",
-    archetype: "PHYSICAL",
-    resourceUsed: "FOOD",
-    skills: RANGER_SKILLS,
-  },
 
   // =============================================================================
-  // ESPIRITUAIS (DEVOTION)
+  // CLÉRIGO - ESPIRITUAL (DEVOTION)
   // =============================================================================
   {
     code: "CLERIC",
@@ -71,7 +37,7 @@ export const HERO_CLASSES: HeroClassDefinition[] = [
   },
 
   // =============================================================================
-  // ARCANAS (ARCANA)
+  // MAGO - ARCANO (ARCANA)
   // =============================================================================
   {
     code: "WIZARD",

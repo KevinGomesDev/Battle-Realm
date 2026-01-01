@@ -41,6 +41,36 @@ export const BaseAttributesSchema = z.object({
   vitality: z.number().min(1).max(30),
 });
 
+// Atributos do Regente (devem somar 30)
+export const RegentAttributesSchema = z
+  .object({
+    combat: z.number().min(0).max(30),
+    acuity: z.number().min(0).max(30),
+    focus: z.number().min(0).max(30),
+    armor: z.number().min(0).max(30),
+    vitality: z.number().min(0).max(30),
+  })
+  .refine(
+    (data) => {
+      const total =
+        data.combat + data.acuity + data.focus + data.armor + data.vitality;
+      return total === 30;
+    },
+    { message: "Atributos do regente devem somar exatamente 30 pontos" }
+  );
+
+// ============ REGENT SCHEMA ============
+
+export const CreateRegentSchema = z.object({
+  name: z
+    .string()
+    .min(2, "Nome do regente deve ter pelo menos 2 caracteres")
+    .max(50, "Nome do regente deve ter no máximo 50 caracteres"),
+  avatar: z.string().optional(), // Nome do arquivo sprite
+  attributes: RegentAttributesSchema,
+  initialSkillId: z.string().optional(), // Skill inicial (nível 1)
+});
+
 // ============ TROOP TEMPLATE ============
 
 export const CreateTroopTemplateSchema = z.object({
@@ -72,14 +102,17 @@ export const CreateKingdomSchema = z
       .min(3, "Nome do reino deve ter pelo menos 3 caracteres")
       .max(50, "Nome do reino deve ter no máximo 50 caracteres")
       .regex(/^[a-zA-ZÀ-ÿ0-9\s'-]+$/, "Nome contém caracteres inválidos"),
-    capitalName: z
+    description: z
       .string()
-      .min(3, "Nome da capital deve ter pelo menos 3 caracteres")
-      .max(50, "Nome da capital deve ter no máximo 50 caracteres"),
+      .max(500, "Descrição deve ter no máximo 500 caracteres")
+      .optional(),
     alignment: AlignmentSchema,
     race: RaceSchema,
     raceMetadata: z.string().optional(),
-    troopTemplates: TroopTemplatesArraySchema.optional(),
+    // Regente (obrigatório para criação completa)
+    regent: CreateRegentSchema,
+    // Tropas (obrigatório para criação completa)
+    troopTemplates: TroopTemplatesArraySchema,
   })
   .refine(
     (data) => {

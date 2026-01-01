@@ -297,6 +297,7 @@ export async function recruitTroop(
         troopSlot: troopSlotIndex, // Armazena qual slot de tropa
         level,
         name: customName || template.name,
+        avatar: template.avatar, // Sprite da tropa definido no template
         classFeatures: JSON.stringify([template.passiveId]),
         combat: template.combat + bonusPerAttr + (remainder > 0 ? 1 : 0),
         acuity: template.acuity + bonusPerAttr + (remainder > 1 ? 1 : 0),

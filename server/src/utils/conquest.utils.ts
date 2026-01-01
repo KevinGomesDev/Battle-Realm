@@ -1,6 +1,7 @@
 // src/utils/conquest.utils.ts
 
 import { EVENTS, EventDef } from "../data/events";
+import { rollD6Test, AdvantageMod } from "../logic/dice-system";
 
 // Attributes usable for conquest tests
 export const CONQUEST_ATTRIBUTES = [
@@ -12,15 +13,10 @@ export const CONQUEST_ATTRIBUTES = [
 ] as const;
 export type ConquestAttribute = (typeof CONQUEST_ATTRIBUTES)[number];
 
-// Roll 1D6 (simple)
-export function rollD6(): number {
-  return Math.floor(Math.random() * 6) + 1;
-}
-
-// Check if event triggers (4+ on 1D6)
+// Check if event triggers (sucesso = 4+ em 1D6)
 export function rollEventTrigger(): { roll: number; triggered: boolean } {
-  const roll = rollD6();
-  return { roll, triggered: roll >= 4 };
+  const result = rollD6Test(1, 0);
+  return { roll: result.allRolls[0], triggered: result.success };
 }
 
 // Pick N random unique attributes
@@ -38,23 +34,32 @@ export function pickRandomEvent(): EventDef {
 // Attribute test result
 export interface AttributeTestResult {
   attribute: ConquestAttribute;
-  roll: number;
+  rolls: number[];
   attributeValue: number;
-  total: number;
-  cd: number;
+  successes: number;
+  threshold: number;
   success: boolean;
 }
 
-// Perform a single attribute test: roll 1D6 + attribute >= CD
+/**
+ * Perform a single attribute test usando o novo sistema D6
+ * Rola N dados (onde N = attributeValue), conta sucessos
+ * Sucesso se tiver pelo menos 1 sucesso
+ */
 export function testAttribute(
   attributeValue: number,
   attribute: ConquestAttribute,
-  cd: number = 3
+  advantageMod: AdvantageMod = 0
 ): AttributeTestResult {
-  const roll = rollD6();
-  const total = roll + attributeValue;
-  const success = total >= cd;
-  return { attribute, roll, attributeValue, total, cd, success };
+  const result = rollD6Test(attributeValue, advantageMod);
+  return {
+    attribute,
+    rolls: result.allRolls,
+    attributeValue,
+    successes: result.totalSuccesses,
+    threshold: result.successThreshold,
+    success: result.success,
+  };
 }
 
 // Full conquest event result
@@ -92,10 +97,11 @@ export function processConquestEvent(
 
   // Step 3: Pick 3 random attributes and test them
   const randomAttrs = pickRandomAttributes(3);
-  const CD = 3; // Crisis Meter threshold
+  // Sistema D6: cada atributo rola N dados, conta sucessos (4+)
+  // Sucesso se tiver pelo menos 1 sucesso na rolagem
 
-  const attributeTests: AttributeTestResult[] = randomAttrs.map((attr) =>
-    testAttribute(unitAttributes[attr], attr, CD)
+  const attributeTests: AttributeTestResult[] = randomAttrs.map(
+    (attr) => testAttribute(unitAttributes[attr], attr, 0) // 0 = sem vantagem/desvantagem
   );
 
   // Count successes

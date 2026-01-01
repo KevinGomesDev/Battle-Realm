@@ -9,6 +9,7 @@ import React, {
 import { socketService } from "../../../services/socket.service";
 import { useAuth } from "../../auth";
 import { useSession } from "../../../core";
+import { useDiceRoll } from "../../dice-roll";
 import { arenaReducer, initialArenaState } from "./arenaReducer";
 import { arenaLog, battleLog, lobbyLog } from "../utils";
 import type {
@@ -26,6 +27,7 @@ import type {
   ArenaLobbyStatus,
   ArenaUnit,
 } from "../types/arena.types";
+import type { DiceRollPanelData, RollOutcome } from "../../dice-roll";
 
 export const ArenaContext = createContext<ArenaContextType | null>(null);
 
@@ -37,11 +39,16 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(arenaReducer, initialArenaState);
   const { user } = useAuth();
   const { clearSession } = useSession();
+  const { openRollPanel } = useDiceRoll();
 
   // Ref para acessar valores atuais nos handlers sem causar re-render do useEffect
   // IMPORTANTE: Atualizar sincronamente durante render, NÃO em useEffect!
   const stateRef = React.useRef(state);
   stateRef.current = state; // Atualiza a cada render
+
+  // Ref para acessar openRollPanel no handler de socket
+  const openRollPanelRef = React.useRef(openRollPanel);
+  openRollPanelRef.current = openRollPanel;
 
   // Setup socket event listeners
   useEffect(() => {
@@ -208,6 +215,16 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
           hasStartedAction: true,
         },
       });
+      // Definir unidade ativa no turno
+      dispatch({
+        type: "SET_BATTLE",
+        payload: stateRef.current.battle
+          ? {
+              ...stateRef.current.battle,
+              activeUnitId: data.unitId,
+            }
+          : null,
+      });
     };
 
     const handleUnitMoved = (data: UnitMovedResponse) => {
@@ -240,21 +257,109 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         diceCount: data.diceCount,
         attackerActionsLeft: data.attackerActionsLeft,
       });
-      // Atualizar alvo (dano recebido)
-      dispatch({
-        type: "UPDATE_UNIT",
-        payload: {
-          id: data.targetUnitId,
-          currentHp: data.targetHpAfter,
-          protection: data.targetProtection,
-        },
-      });
-      // Atualizar atacante (ação consumida)
-      dispatch({
-        type: "UPDATE_UNIT",
-        payload: {
+
+      // === ABRIR PAINEL VISUAL DE ROLAGEM ===
+      // Montar DiceRollResult para ataque
+      const attackRoll = {
+        diceCount: data.attackDiceCount,
+        advantageMod: 0 as const,
+        successThreshold: 4,
+        diceResults: data.attackRolls.map((value) => ({
+          value,
+          isSuccess: value >= 4,
+          isExplosion: value === 6,
+        })),
+        totalSuccesses: data.attackSuccesses,
+        allRolls: data.attackRolls,
+        success: data.attackSuccesses > 0,
+        explosionCount: data.attackRolls.filter((v) => v === 6).length,
+      };
+
+      // Montar DiceRollResult para defesa
+      const defenseRoll = {
+        diceCount: data.defenseDiceCount,
+        advantageMod: 0 as const,
+        successThreshold: 4,
+        diceResults: data.defenseRolls.map((value) => ({
+          value,
+          isSuccess: value >= 4,
+          isExplosion: value === 6,
+        })),
+        totalSuccesses: data.defenseSuccesses,
+        allRolls: data.defenseRolls,
+        success: data.defenseSuccesses > 0,
+        explosionCount: data.defenseRolls.filter((v) => v === 6).length,
+      };
+
+      // Montar outcome
+      const outcome: RollOutcome = {
+        attackerSuccesses: data.attackSuccesses,
+        defenderSuccesses: data.defenseSuccesses,
+        netSuccesses: data.attackSuccesses - data.defenseSuccesses,
+        damageDealt: data.rawDamage,
+        damageBlocked: data.damageReduction,
+        finalDamage: data.finalDamage,
+        isCritical: data.attackSuccesses >= 5,
+        isHit: data.finalDamage > 0,
+        isDodge: data.missed ?? false,
+        isPartialBlock: data.defenseSuccesses > 0 && data.finalDamage > 0,
+      };
+
+      // Montar dados do painel
+      const panelData: DiceRollPanelData = {
+        battleId: data.battleId,
+        actionId: `attack-${Date.now()}`,
+        actionType: "attack",
+        attacker: {
           id: data.attackerUnitId,
-          actionsLeft: data.attackerActionsLeft,
+          name: data.attackerName,
+          icon: data.attackerIcon,
+          combat: data.attackerCombat,
+          diceCount: data.attackDiceCount,
+          advantageMod: 0,
+          modifiers: [],
+        },
+        defender: {
+          id: data.targetUnitId,
+          name: data.targetName,
+          icon: data.targetIcon,
+          combat: data.targetCombat,
+          diceCount: data.defenseDiceCount,
+          advantageMod: 0,
+          modifiers: [],
+        },
+        attackRoll,
+        defenseRoll,
+        outcome,
+        damageType: data.damageType as "FISICO" | "MAGICO" | "VERDADEIRO",
+      };
+
+      // Abrir o painel visual
+      openRollPanelRef.current({
+        data: panelData,
+        autoPlay: true,
+        speedMultiplier: 1,
+        onComplete: () => {
+          // Atualizar estado após animação
+          dispatch({
+            type: "UPDATE_UNIT",
+            payload: {
+              id: data.targetUnitId,
+              currentHp: data.targetHpAfter,
+              // Atualizar proteções separadas
+              physicalProtection: data.targetPhysicalProtection,
+              magicalProtection: data.targetMagicalProtection,
+              // Legado
+              protection: data.targetProtection,
+            },
+          });
+          dispatch({
+            type: "UPDATE_UNIT",
+            payload: {
+              id: data.attackerUnitId,
+              actionsLeft: data.attackerActionsLeft,
+            },
+          });
         },
       });
     };
@@ -368,6 +473,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
               ...stateRef.current.battle,
               currentPlayerId: data.currentPlayerId,
               currentTurnIndex: data.index,
+              activeUnitId: undefined, // Resetar unidade ativa ao mudar jogador
             }
           : null,
       });
@@ -515,6 +621,21 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
       handleBattleStarted(data);
     };
 
+    // Handler para quando um obstáculo é destruído
+    const handleObstacleDestroyed = (data: {
+      battleId: string;
+      obstacleId: string;
+    }) => {
+      battleLog("💥", "OBSTÁCULO DESTRUÍDO", {
+        battleId: data.battleId,
+        obstacleId: data.obstacleId,
+      });
+      dispatch({
+        type: "DESTROY_OBSTACLE",
+        payload: { obstacleId: data.obstacleId },
+      });
+    };
+
     // Handler for session restoration (reconnection)
     const handleSessionRestored = (data: {
       lobbyId: string;
@@ -628,6 +749,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
     socketService.on("battle:player_reconnected", handlePlayerReconnected);
     socketService.on("battle:rematch_requested", handleRematchRequested);
     socketService.on("battle:rematch_started", handleRematchStarted);
+    socketService.on("battle:obstacle_destroyed", handleObstacleDestroyed);
 
     return () => {
       socketService.off("battle:lobby_created", handleLobbyCreated);
@@ -659,8 +781,31 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
       socketService.off("battle:player_reconnected", handlePlayerReconnected);
       socketService.off("battle:rematch_requested", handleRematchRequested);
       socketService.off("battle:rematch_started", handleRematchStarted);
+      socketService.off("battle:obstacle_destroyed", handleObstacleDestroyed);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // Efeito para solicitar restauração de sessão após listeners registrados
+  // Resolve condição de corrida onde session:check é chamado antes dos listeners
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Pequeno delay para garantir que os listeners foram registrados
+    const timer = setTimeout(() => {
+      // Re-solicitar check de sessão para garantir que os eventos de restauração
+      // sejam recebidos pelos listeners que agora estão registrados
+      arenaLog(
+        "🔄",
+        "Re-solicitando verificação de sessão (listeners prontos)",
+        {
+          userId: user.id,
+        }
+      );
+      socketService.emit("session:check", { userId: user.id });
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [user?.id]);
 
   const createLobby = useCallback(
@@ -758,20 +903,47 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
   );
 
   const attackUnit = useCallback(
-    (attackerUnitId: string, targetUnitId: string) => {
+    (
+      attackerUnitId: string,
+      targetUnitId?: string,
+      targetObstacleId?: string
+    ) => {
       if (!state.battle) return;
+      if (!targetUnitId && !targetObstacleId) return;
+
+      // Validação local: verificar se atacante tem ações
+      const attacker = state.units.find((u) => u.id === attackerUnitId);
+      if (!attacker || attacker.actionsLeft <= 0) {
+        battleLog("⚠️", "Ataque bloqueado: sem ações disponíveis", {
+          attackerUnitId,
+          actionsLeft: attacker?.actionsLeft ?? 0,
+        });
+        return;
+      }
+
+      // Update otimista: decrementar actionsLeft imediatamente para evitar cliques duplos
+      dispatch({
+        type: "UPDATE_UNIT",
+        payload: {
+          id: attackerUnitId,
+          actionsLeft: attacker.actionsLeft - 1,
+        },
+      });
+
       battleLog("⬆️", "EMIT: arena:attack", {
         battleId: state.battle.battleId,
         attackerUnitId,
         targetUnitId,
+        targetObstacleId,
       });
       socketService.emit("battle:attack", {
         battleId: state.battle.battleId,
         attackerUnitId,
         targetUnitId,
+        targetObstacleId,
       });
     },
-    [state.battle]
+    [state.battle, state.units]
   );
 
   const endAction = useCallback(
@@ -794,6 +966,30 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
     (actionName: string, unitId: string, params?: Record<string, unknown>) => {
       if (!state.battle) return;
 
+      // Ações que consomem actionsLeft
+      const actionsThatConsumeActions = ["dash", "dodge", "skill"];
+
+      // Validação e update otimista para ações que consomem actionsLeft
+      if (actionsThatConsumeActions.includes(actionName)) {
+        const unit = state.units.find((u) => u.id === unitId);
+        if (!unit || unit.actionsLeft <= 0) {
+          battleLog("⚠️", `${actionName} bloqueado: sem ações disponíveis`, {
+            unitId,
+            actionsLeft: unit?.actionsLeft ?? 0,
+          });
+          return;
+        }
+
+        // Update otimista
+        dispatch({
+          type: "UPDATE_UNIT",
+          payload: {
+            id: unitId,
+            actionsLeft: unit.actionsLeft - 1,
+          },
+        });
+      }
+
       const eventName = `battle:${actionName}`;
       const payload = {
         battleId: state.battle.battleId,
@@ -805,7 +1001,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
 
       socketService.emit(eventName, payload);
     },
-    [state.battle]
+    [state.battle, state.units]
   );
 
   const surrender = useCallback(() => {

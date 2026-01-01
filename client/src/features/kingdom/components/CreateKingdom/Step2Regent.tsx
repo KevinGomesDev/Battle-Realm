@@ -1,13 +1,12 @@
 import React from "react";
-import { ClassCard } from "./ClassCard";
 import { AttributeRow } from "./AttributeRow";
-import type { GameClass } from "./types";
+import { AvatarSelector } from "./AnimatedCharacterSprite";
 
 interface Step2RegentProps {
   regentName: string;
   setRegentName: (value: string) => void;
-  selectedClass: string;
-  setSelectedClass: (value: string) => void;
+  selectedAvatar?: string;
+  setSelectedAvatar?: (value: string) => void;
   attributes: {
     combat: number;
     acuity: number;
@@ -19,29 +18,31 @@ interface Step2RegentProps {
     key: "combat" | "acuity" | "focus" | "armor" | "vitality",
     value: number
   ) => void;
-  classes: GameClass[];
   error: string | null;
   isLoading: boolean;
   totalPoints: number;
   onSubmit: (e: React.FormEvent) => void;
   onBack: () => void;
+  // Manter props antigas para compatibilidade temporária
+  selectedClass?: string;
+  setSelectedClass?: (value: string) => void;
+  classes?: any[];
 }
 
 export const Step2Regent: React.FC<Step2RegentProps> = ({
   regentName,
   setRegentName,
-  selectedClass,
-  setSelectedClass,
+  selectedAvatar = "[1].png",
+  setSelectedAvatar,
   attributes,
   updateAttribute,
-  classes,
   error,
   isLoading,
   totalPoints,
   onSubmit,
   onBack,
 }) => {
-  const isRegentValid = regentName && selectedClass && totalPoints === 30;
+  const isRegentValid = regentName.length >= 2 && totalPoints === 30;
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
@@ -67,28 +68,23 @@ export const Step2Regent: React.FC<Step2RegentProps> = ({
         />
       </div>
 
-      {/* Class Selection */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <label className="block text-sm font-semibold text-white">
-            Escolha a Classe do Regente
-          </label>
-          {selectedClass === "WARRIOR" && (
-            <span className="text-xs bg-green-600 text-white px-2 py-1 rounded">
-              ★ Pré-selecionado
-            </span>
-          )}
-        </div>
-        <div className="grid grid-cols-1 gap-3">
-          {classes.map((cls) => (
-            <ClassCard
-              key={cls.id}
-              gameClass={cls}
-              isSelected={selectedClass === cls.id}
-              onSelect={() => setSelectedClass(cls.id)}
-            />
-          ))}
-        </div>
+      {/* Avatar Selection */}
+      <div className="flex justify-center">
+        <AvatarSelector
+          selectedAvatar={selectedAvatar}
+          onSelectAvatar={(avatar) => setSelectedAvatar?.(avatar)}
+          spriteSize={96}
+        />
+      </div>
+
+      {/* Info about Regents */}
+      <div className="bg-purple-900/20 border border-purple-700 rounded p-3">
+        <p className="text-purple-400 text-sm">
+          <span className="font-semibold">💡 Sobre Regentes:</span> Diferente de
+          Heróis, Regentes não possuem classe fixa. No nível 1 (e a cada 3
+          níveis), seu Regente pode escolher uma skill de{" "}
+          <strong>qualquer</strong> classe!
+        </p>
       </div>
 
       {/* Attribute Distribution */}

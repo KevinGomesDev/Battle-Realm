@@ -200,10 +200,10 @@ export const registerActionHandlers = (io: Server, socket: Socket) => {
                   : null,
                 tests: conquestResult.attributeTests.map((t) => ({
                   attribute: t.attribute,
-                  roll: t.roll,
+                  rolls: t.rolls,
                   attributeValue: t.attributeValue,
-                  total: t.total,
-                  cd: t.cd,
+                  successes: t.successes,
+                  threshold: t.threshold,
                   success: t.success,
                 })),
                 overallSuccess: conquestResult.overallSuccess,

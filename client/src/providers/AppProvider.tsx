@@ -10,6 +10,7 @@ import { MatchProvider } from "../features/match";
 import { MapProvider } from "../features/map";
 import { GameDataProvider } from "../features/game";
 import { ArenaProvider } from "../features/arena";
+import { DiceRollProvider } from "../features/dice-roll";
 
 interface AppProviderProps {
   children: React.ReactNode;
@@ -26,7 +27,8 @@ interface AppProviderProps {
  * 5. GameDataProvider - Independent
  * 6. MatchProvider - Depends on Auth, Kingdom, Session
  * 7. MapProvider - Independent (used by Match internally)
- * 8. ArenaProvider - Depends on Auth, Session
+ * 8. DiceRollProvider - Independent (UI overlay for dice rolls) - ANTES do Arena!
+ * 9. ArenaProvider - Depends on Auth, Session, DiceRoll
  */
 export function AppProvider({ children }: AppProviderProps) {
   return (
@@ -37,7 +39,9 @@ export function AppProvider({ children }: AppProviderProps) {
             <GameDataProvider>
               <MatchProvider>
                 <MapProvider>
-                  <ArenaProvider>{children}</ArenaProvider>
+                  <DiceRollProvider>
+                    <ArenaProvider>{children}</ArenaProvider>
+                  </DiceRollProvider>
                 </MapProvider>
               </MatchProvider>
             </GameDataProvider>

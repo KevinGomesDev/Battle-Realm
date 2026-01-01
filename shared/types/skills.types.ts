@@ -196,7 +196,8 @@ export function isInSkillRange(
 }
 
 /**
- * Verifica se um alvo adjacente (1 bloco) é válido
+ * Verifica se um alvo adjacente (1 bloco Manhattan - 4 direções) é válido
+ * Apenas cima, baixo, esquerda, direita
  */
 export function isAdjacent(
   x1: number,
@@ -208,7 +209,22 @@ export function isAdjacent(
 }
 
 /**
- * Obtém todas as posições adjacentes a um ponto
+ * Verifica adjacência omnidirecional (8 direções - inclui diagonais)
+ * Usa distância Chebyshev (máximo de |dx| e |dy|)
+ */
+export function isAdjacentOmnidirectional(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number
+): boolean {
+  const dx = Math.abs(x1 - x2);
+  const dy = Math.abs(y1 - y2);
+  return Math.max(dx, dy) === 1;
+}
+
+/**
+ * Obtém todas as posições adjacentes a um ponto (4 direções - Manhattan)
  */
 export function getAdjacentPositions(
   x: number,
@@ -222,6 +238,38 @@ export function getAdjacentPositions(
     { dx: 0, dy: 1 }, // baixo
     { dx: -1, dy: 0 }, // esquerda
     { dx: 1, dy: 0 }, // direita
+  ];
+
+  for (const { dx, dy } of deltas) {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight) {
+      positions.push({ x: nx, y: ny });
+    }
+  }
+
+  return positions;
+}
+
+/**
+ * Obtém todas as posições adjacentes incluindo diagonais (8 direções)
+ */
+export function getAdjacentPositionsOmnidirectional(
+  x: number,
+  y: number,
+  gridWidth: number,
+  gridHeight: number
+): Array<{ x: number; y: number }> {
+  const positions: Array<{ x: number; y: number }> = [];
+  const deltas = [
+    { dx: 0, dy: -1 }, // cima
+    { dx: 0, dy: 1 }, // baixo
+    { dx: -1, dy: 0 }, // esquerda
+    { dx: 1, dy: 0 }, // direita
+    { dx: -1, dy: -1 }, // diagonal superior esquerda
+    { dx: 1, dy: -1 }, // diagonal superior direita
+    { dx: -1, dy: 1 }, // diagonal inferior esquerda
+    { dx: 1, dy: 1 }, // diagonal inferior direita
   ];
 
   for (const { dx, dy } of deltas) {

@@ -8,8 +8,11 @@ import {
 } from "../utils/battle.utils";
 import {
   createBattleUnitsForSide,
+  createBattleUnitsWithRandomPositions,
+  getArenaBattleGridSize,
   sortByInitiative,
   determineActionOrder,
+  BattleUnit,
 } from "../utils/battle-unit.factory";
 import { canJoinNewSession } from "../utils/session.utils";
 import {
@@ -25,17 +28,34 @@ import {
   executeThrowAction,
   executeFleeAction,
   executeCastAction,
-  executeAttackObstacle,
   CombatUnit,
   calculateBaseMovement,
 } from "../logic/combat-actions";
 import { determineUnitActions } from "../logic/unit-actions";
-import { ARENA_CONFIG, generateArenaConfig } from "../data/arena-config";
+import { getConditionColorsMap } from "../logic/conditions";
+import { generateBattleMap } from "../logic/battle-map";
+import {
+  PHYSICAL_PROTECTION_CONFIG,
+  MAGICAL_PROTECTION_CONFIG,
+  HP_CONFIG,
+  TURN_CONFIG,
+  ARENA_COLORS,
+} from "../../../shared/config/global.config";
 import type {
   ArenaLobbyData,
   ArenaBattleData,
 } from "../../../shared/types/session.types";
 import type { ArenaConfig } from "../../../shared/types/arena.types";
+import type {
+  BattleObstacle,
+  WeatherType,
+  BattleTerrainType,
+  TerritorySize,
+} from "../../../shared/types/battle.types";
+import {
+  WEATHER_DEFINITIONS,
+  BATTLE_TERRAIN_DEFINITIONS,
+} from "../../../shared/types/battle.types";
 
 // Usar tipos do shared para consistência
 type BattleLobby = ArenaLobbyData;
@@ -57,6 +77,8 @@ interface Battle {
   logs: BattleLog[];
   createdAt: Date;
   config: ArenaConfig; // Configuração completa (inclui mapa, clima, obstáculos)
+  activeUnitId?: string; // ID da unidade ativa no turno atual (escolhida pelo jogador)
+  roundActionsCount: Map<string, number>; // Contador de ações por jogador na rodada atual
   // IDs para persistência
   hostUserId: string;
   guestUserId: string;
@@ -67,42 +89,7 @@ interface Battle {
   ransomResource?: string;
 }
 
-interface BattleUnit {
-  id: string;
-  sourceUnitId: string; // Original Unit ID in database
-  ownerId: string; // UserId (Arena) ou MatchPlayerId (Match)
-  ownerKingdomId: string;
-  name: string;
-  category: string;
-  troopSlot?: number; // Para TROOP: índice do template (0-4)
-  level: number;
-  classCode?: string; // Código da classe do herói/regente (ex: BARBARIAN)
-  classFeatures: string[]; // Skills aprendidas
-  equipment: string[]; // Itens equipados
-  // Stats
-  combat: number;
-  acuity: number;
-  focus: number;
-  armor: number;
-  vitality: number;
-  damageReduction: number; // Fixed DR, most units have 0
-  currentHp: number;
-  maxHp: number; // HP máximo = vitality * 2
-  // Battle state
-  posX: number;
-  posY: number;
-  initiative: number;
-  movesLeft: number;
-  actionsLeft: number;
-  isAlive: boolean;
-  actionMarks: number;
-  protection: number;
-  protectionBroken: boolean;
-  conditions: string[];
-  hasStartedAction: boolean; // If unit already started action this turn
-  actions: string[]; // Available actions: ["attack", "move", ...]
-  grabbedByUnitId?: string; // ID da unidade que está agarrando
-}
+// BattleUnit é importado de battle-unit.factory.ts
 
 interface BattleLog {
   id: string;
@@ -111,8 +98,8 @@ interface BattleLog {
   payload: any;
 }
 
-// Constantes
-const TURN_TIMER_SECONDS = 30; // Duração do turno em segundos
+// Constantes (agora usando config centralizada)
+const TURN_TIMER_SECONDS = TURN_CONFIG.timerSeconds;
 
 // Armazenamento em memória (pode ser migrado para Redis/DB depois)
 const battleLobbies: Map<string, BattleLobby> = new Map();
@@ -134,6 +121,9 @@ const battleTimerIntervals: Map<
   string,
   ReturnType<typeof setInterval>
 > = new Map();
+
+// Mapa para rastrear batalhas com modal de dice ativo (timer pausado)
+const battleDiceModalPaused: Map<string, boolean> = new Map();
 
 // Exportar referências para o session handler (mantendo nomes antigos para compatibilidade)
 export {
@@ -175,6 +165,14 @@ function startBattleTurnTimer(battle: Battle): void {
   // Limpar timer anterior se existir
   stopBattleTurnTimer(battle.id);
 
+  // Não iniciar timer se batalha já terminou
+  if (battle.status === "ENDED") {
+    console.log(
+      `[ARENA] Timer não iniciado - batalha ${battle.id} já terminou`
+    );
+    return;
+  }
+
   // Não iniciar timer se nenhum jogador está conectado
   if (!hasConnectedPlayers(battle)) {
     console.log(
@@ -197,6 +195,11 @@ function startBattleTurnTimer(battle: Battle): void {
 
   // Iniciar intervalo de 1 segundo
   const interval = setInterval(() => {
+    // Se modal de dice está ativo, pausar contagem
+    if (battleDiceModalPaused.get(battle.id)) {
+      return; // Não decrementa timer enquanto modal está aberto
+    }
+
     battle.turnTimer--;
 
     if (battle.turnTimer <= 0) {
@@ -235,6 +238,7 @@ function stopBattleTurnTimer(battleId: string): void {
  */
 function cleanupBattle(battleId: string): void {
   stopBattleTurnTimer(battleId);
+  battleDiceModalPaused.delete(battleId);
   activeBattles.delete(battleId);
 }
 
@@ -260,14 +264,39 @@ export function pauseBattleTimerIfNoPlayers(battleId: string): void {
  */
 export function resumeBattleTimer(battleId: string): void {
   const battle = activeBattles.get(battleId);
-  if (!battle) return;
+  if (!battle) {
+    console.log(
+      `[ARENA] resumeBattleTimer: Batalha ${battleId} não encontrada`
+    );
+    return;
+  }
+
+  const hasPlayers = hasConnectedPlayers(battle);
+  const hasTimer = battleTimerIntervals.has(battleId);
+
+  console.log(
+    `[ARENA] resumeBattleTimer: battleId=${battleId}, hasPlayers=${hasPlayers}, hasTimer=${hasTimer}, currentTimer=${battle.turnTimer}`
+  );
 
   // Só retomar se não houver timer ativo e houver jogadores conectados
-  if (!battleTimerIntervals.has(battleId) && hasConnectedPlayers(battle)) {
+  if (!hasTimer && hasPlayers) {
     console.log(
       `[ARENA] Retomando timer - jogador reconectou na batalha ${battleId}`
     );
     startBattleTurnTimer(battle);
+  } else if (hasTimer && hasPlayers) {
+    // Timer já está rodando, emitir estado atual para sincronizar cliente
+    const lobby = battleLobbies.get(battle.lobbyId);
+    if (lobby && ioRef) {
+      ioRef.to(lobby.lobbyId).emit("battle:turn_timer", {
+        battleId: battle.id,
+        timer: battle.turnTimer,
+        currentPlayerId: battle.actionOrder[battle.currentTurnIndex],
+      });
+      console.log(
+        `[ARENA] Timer sync emitido para ${lobby.lobbyId}, timer=${battle.turnTimer}`
+      );
+    }
   }
 }
 
@@ -281,11 +310,13 @@ async function handleTimerExpired(battle: Battle): Promise<void> {
   if (!lobby) return;
 
   const currentPlayerId = battle.actionOrder[battle.currentTurnIndex];
-  const currentUnit = battle.units.find(
-    (u) => u.ownerId === currentPlayerId && u.isAlive
-  );
 
-  if (currentUnit) {
+  // Usar a unidade ativa do turno (se definida), senão não incrementa actionMarks
+  const currentUnit = battle.activeUnitId
+    ? battle.units.find((u) => u.id === battle.activeUnitId)
+    : null;
+
+  if (currentUnit && currentUnit.hasStartedAction) {
     // Aplica queimando
     if (currentUnit.conditions.includes("QUEIMANDO")) {
       currentUnit.currentHp = Math.max(0, currentUnit.currentHp - 2);
@@ -314,9 +345,79 @@ async function handleTimerExpired(battle: Battle): Promise<void> {
       isAlive: currentUnit.isAlive,
       conditions: currentUnit.conditions,
     });
+
+    // Se unidade morreu (por QUEIMANDO, etc), emitir evento de derrota
+    if (!currentUnit.isAlive) {
+      ioRef.to(lobby.lobbyId).emit("battle:unit_defeated", {
+        battleId: battle.id,
+        unitId: currentUnit.id,
+      });
+    }
   }
 
-  // Avança jogador
+  // ============================================================
+  // VERIFICAR VITÓRIA - Pode acontecer por morte via condição
+  // ============================================================
+  const aliveBySide = new Map<string, number>();
+  for (const u of battle.units) {
+    if (u.isAlive) {
+      const count = aliveBySide.get(u.ownerId) || 0;
+      aliveBySide.set(u.ownerId, count + 1);
+    }
+  }
+
+  console.log("[ARENA] Timer expirado - Verificando vitória:", {
+    aliveBySideSize: aliveBySide.size,
+    aliveBySide: Object.fromEntries(aliveBySide),
+  });
+
+  if (aliveBySide.size <= 1) {
+    battle.status = "ENDED";
+    stopBattleTurnTimer(battle.id);
+    const winnerId = aliveBySide.keys().next().value || null;
+    const winnerKingdom = battle.units.find(
+      (u) => u.ownerId === winnerId
+    )?.ownerKingdomId;
+
+    ioRef.to(lobby.lobbyId).emit("battle:battle_ended", {
+      battleId: battle.id,
+      winnerId,
+      winnerKingdomId: winnerKingdom,
+      reason:
+        aliveBySide.size === 0
+          ? "Empate - Todas as unidades foram derrotadas"
+          : "Todas as unidades inimigas foram derrotadas",
+      finalUnits: battle.units,
+    });
+
+    // Atualizar estatísticas
+    const loserId =
+      winnerId === lobby.hostUserId ? lobby.guestUserId : lobby.hostUserId;
+    await updateUserStats(winnerId, loserId, battle.isArena);
+
+    // Limpar referências
+    userToLobby.delete(lobby.hostUserId);
+    if (lobby.guestUserId) {
+      userToLobby.delete(lobby.guestUserId);
+    }
+
+    lobby.status = "ENDED";
+    await deleteBattleFromDB(battle.id);
+    await deleteLobbyFromDB(lobby.lobbyId);
+    console.log(
+      `[ARENA] Batalha ${battle.id} finalizada via timer. Vencedor: ${winnerId}`
+    );
+    return; // Não continuar se a batalha terminou
+  }
+
+  // Incrementar contador de ações do jogador (se agiu com uma unidade)
+  if (currentUnit && currentUnit.hasStartedAction) {
+    const currentCount = battle.roundActionsCount.get(currentPlayerId) || 0;
+    battle.roundActionsCount.set(currentPlayerId, currentCount + 1);
+  }
+
+  // Avança jogador e reseta unidade ativa
+  battle.activeUnitId = undefined;
   if (battle.actionOrder.length) {
     battle.currentTurnIndex =
       (battle.currentTurnIndex + 1) % battle.actionOrder.length;
@@ -329,24 +430,16 @@ async function handleTimerExpired(battle: Battle): Promise<void> {
     index: battle.currentTurnIndex,
   });
 
-  // Checa fim do round
-  const aliveUnits = battle.units.filter((u) => u.isAlive);
-  let allDone = true;
-  for (const u of aliveUnits) {
-    const m = getMaxMarksByCategory(u.category);
-    if (u.actionMarks < m) {
-      allDone = false;
-      break;
-    }
-  }
+  // Checa fim do round - todos os jogadores agiram 1x
+  const allPlayersActed = battle.actionOrder.every(
+    (playerId) => (battle.roundActionsCount.get(playerId) || 0) >= 1
+  );
 
-  if (allDone) {
-    // Novo round - reseta marcas
+  if (allPlayersActed) {
+    // Novo round - reseta contadores
     battle.round++;
-    for (const u of battle.units) {
-      if (u.isAlive) {
-        u.actionMarks = 0;
-      }
+    for (const playerId of battle.actionOrder) {
+      battle.roundActionsCount.set(playerId, 0);
     }
     ioRef.to(lobby.lobbyId).emit("battle:new_round", {
       battleId: battle.id,
@@ -368,6 +461,9 @@ async function handleTimerExpired(battle: Battle): Promise<void> {
  */
 async function saveBattleToDB(battle: Battle): Promise<void> {
   try {
+    // Extrair dados do mapa
+    const mapConfig = battle.config?.map;
+
     // Criar ou atualizar a batalha
     await prisma.battle.upsert({
       where: { id: battle.id },
@@ -377,6 +473,8 @@ async function saveBattleToDB(battle: Battle): Promise<void> {
         currentTurnIndex: battle.currentTurnIndex,
         initiativeOrder: JSON.stringify(battle.initiativeOrder),
         actionOrder: JSON.stringify(battle.actionOrder),
+        // Persistir obstáculos atualizados (podem ser destruídos)
+        obstacles: JSON.stringify(mapConfig?.obstacles || []),
         updatedAt: new Date(),
       },
       create: {
@@ -394,6 +492,11 @@ async function saveBattleToDB(battle: Battle): Promise<void> {
         currentTurnIndex: battle.currentTurnIndex,
         initiativeOrder: JSON.stringify(battle.initiativeOrder),
         actionOrder: JSON.stringify(battle.actionOrder),
+        // Clima e Terreno
+        weather: mapConfig?.weather || "SUNNY",
+        terrainType: mapConfig?.terrainType || "PLAINS",
+        territorySize: mapConfig?.territorySize || "MEDIUM",
+        obstacles: JSON.stringify(mapConfig?.obstacles || []),
       },
     });
 
@@ -420,6 +523,7 @@ async function saveBattleToDB(battle: Battle): Promise<void> {
           userId: unit.ownerId,
           kingdomId: unit.ownerKingdomId,
           name: unit.name,
+          avatar: unit.avatar,
           category: unit.category,
           troopSlot: unit.troopSlot,
           level: unit.level,
@@ -632,6 +736,54 @@ async function updateUserStats(
 }
 
 /**
+ * Cria a configuração base da Arena usando cores e condições globais
+ */
+function createBaseArenaConfig(): Omit<ArenaConfig, "grid" | "map"> {
+  return {
+    colors: ARENA_COLORS,
+    conditionColors: getConditionColorsMap(),
+  };
+}
+
+/**
+ * Reconstrói a ArenaConfig a partir dos dados salvos no banco de dados
+ */
+function reconstructArenaConfig(dbBattle: {
+  gridWidth: number;
+  gridHeight: number;
+  weather: string;
+  terrainType: string;
+  territorySize: string;
+  obstacles: string;
+}): ArenaConfig {
+  const weather = dbBattle.weather as WeatherType;
+  const terrainType = dbBattle.terrainType as BattleTerrainType;
+  const territorySize = dbBattle.territorySize as TerritorySize;
+  const obstacles: BattleObstacle[] = JSON.parse(dbBattle.obstacles || "[]");
+
+  const weatherDef = WEATHER_DEFINITIONS[weather] || WEATHER_DEFINITIONS.SUNNY;
+  const terrainDef =
+    BATTLE_TERRAIN_DEFINITIONS[terrainType] ||
+    BATTLE_TERRAIN_DEFINITIONS.PLAINS;
+
+  return {
+    ...createBaseArenaConfig(),
+    grid: { width: dbBattle.gridWidth, height: dbBattle.gridHeight },
+    map: {
+      weather,
+      weatherEmoji: weatherDef.emoji,
+      weatherName: weatherDef.name,
+      weatherEffect: weatherDef.effect,
+      weatherCssFilter: weatherDef.cssFilter,
+      terrainType,
+      terrainName: terrainDef.name,
+      territorySize,
+      obstacles,
+    },
+  };
+}
+
+/**
  * Load active Arena activeBattles from database (for recovery after restart)
  */
 async function loadBattlesFromDB(): Promise<void> {
@@ -648,6 +800,7 @@ async function loadBattlesFromDB(): Promise<void> {
         ownerId: u.userId || "",
         ownerKingdomId: u.kingdomId || "",
         name: u.name,
+        avatar: u.avatar ?? undefined,
         category: u.category,
         troopSlot: u.troopSlot ?? undefined,
         level: u.level,
@@ -661,7 +814,7 @@ async function loadBattlesFromDB(): Promise<void> {
         vitality: u.vitality,
         damageReduction: u.damageReduction,
         currentHp: u.currentHp,
-        maxHp: u.vitality * 2, // HP máximo = vitality * 2
+        maxHp: u.vitality * HP_CONFIG.multiplier,
         posX: u.posX,
         posY: u.posY,
         initiative: u.initiative,
@@ -669,6 +822,14 @@ async function loadBattlesFromDB(): Promise<void> {
         actionsLeft: u.actionsLeft,
         isAlive: u.isAlive,
         actionMarks: u.actionMarks,
+        // Proteção dual - usa config centralizado
+        physicalProtection: u.armor * PHYSICAL_PROTECTION_CONFIG.multiplier,
+        maxPhysicalProtection: u.armor * PHYSICAL_PROTECTION_CONFIG.multiplier,
+        physicalProtectionBroken: false,
+        magicalProtection: u.focus * MAGICAL_PROTECTION_CONFIG.multiplier,
+        maxMagicalProtection: u.focus * MAGICAL_PROTECTION_CONFIG.multiplier,
+        magicalProtectionBroken: false,
+        // Legado
         protection: u.protection,
         protectionBroken: u.protectionBroken,
         conditions: JSON.parse(u.conditions),
@@ -690,7 +851,11 @@ async function loadBattlesFromDB(): Promise<void> {
         units,
         logs: [],
         createdAt: dbBattle.createdAt,
-        config: ARENA_CONFIG, // Usar config default ao recuperar do banco
+        config: reconstructArenaConfig(dbBattle), // Reconstruir config com dados do banco
+        roundActionsCount: new Map<string, number>([
+          [dbBattle.hostUserId || "", 0],
+          [dbBattle.guestUserId || "", 0],
+        ]),
         hostUserId: dbBattle.hostUserId || "",
         guestUserId: dbBattle.guestUserId || "",
         hostKingdomId: dbBattle.hostKingdomId || "",
@@ -1113,45 +1278,53 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
         });
       }
 
+      // Obter tamanho do grid baseado em território aleatório para Arena
       const {
-        grid: { width: gridWidth, height: gridHeight },
-      } = ARENA_CONFIG;
+        width: gridWidth,
+        height: gridHeight,
+        territorySize,
+      } = getArenaBattleGridSize();
 
       const battleId = generateId();
 
-      // Criar unidades usando o factory
-      const hostUnits = createBattleUnitsForSide(
-        hostKingdom.units,
-        lobby.hostUserId,
-        { id: hostKingdom.id, name: hostKingdom.name },
-        { x: 9, y: 1 },
-        "horizontal",
-        "arena"
-      );
+      // Criar unidades com posicionamento aleatório
+      const { units: allUnits, occupiedPositions } =
+        createBattleUnitsWithRandomPositions(
+          hostKingdom.units,
+          lobby.hostUserId,
+          { id: hostKingdom.id, name: hostKingdom.name },
+          guestKingdom.units,
+          lobby.guestUserId as string,
+          { id: guestKingdom.id, name: guestKingdom.name },
+          gridWidth,
+          gridHeight,
+          "arena"
+        );
 
-      const guestUnits = createBattleUnitsForSide(
-        guestKingdom.units,
-        lobby.guestUserId,
-        { id: guestKingdom.id, name: guestKingdom.name },
-        { x: 9, y: gridHeight - 2 },
-        "horizontal",
-        "arena"
-      );
-
-      // Combinar e ordenar por iniciativa
-      const allUnits = [...hostUnits, ...guestUnits];
+      // Ordenar por iniciativa para exibição
       const orderedUnits = sortByInitiative(allUnits);
 
-      // Determinar ordem de ação baseada em iniciativa
+      // Determinar ordem de ação baseada na soma de Acuity das unidades de cada jogador
       const actionOrder = determineActionOrder(
-        orderedUnits,
+        allUnits,
         lobby.hostUserId,
         lobby.guestUserId
       );
 
       // Gerar configuração do mapa com clima, terreno e obstáculos
-      const unitPositions = orderedUnits.map((u) => ({ x: u.posX, y: u.posY }));
-      const arenaConfig = generateArenaConfig(unitPositions);
+      // Usa o territorySize sorteado para definir quantidade de obstáculos
+      const mapConfig = generateBattleMap({
+        gridWidth,
+        gridHeight,
+        territorySize,
+        unitPositions: occupiedPositions,
+      });
+
+      const arenaConfig: ArenaConfig = {
+        ...createBaseArenaConfig(),
+        grid: { width: gridWidth, height: gridHeight },
+        map: mapConfig,
+      };
 
       const battle: Battle = {
         id: battleId,
@@ -1178,6 +1351,10 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
         ],
         createdAt: new Date(),
         config: arenaConfig,
+        roundActionsCount: new Map<string, number>([
+          [lobby.hostUserId, 0],
+          [lobby.guestUserId as string, 0],
+        ]),
         hostUserId: lobby.hostUserId,
         guestUserId: lobby.guestUserId as string,
         hostKingdomId: lobby.hostKingdomId,
@@ -1191,6 +1368,13 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
       // Persistir batalha e lobby no banco
       await saveBattleToDB(battle);
       await saveLobbyToDB(lobby);
+
+      // Log de debug para verificar quem está no room
+      const roomSockets = await io.in(lobbyId).fetchSockets();
+      console.log(
+        `[ARENA] Room ${lobbyId} tem ${roomSockets.length} sockets:`,
+        roomSockets.map((s) => ({ id: s.id, userId: socketToUser.get(s.id) }))
+      );
 
       io.to(lobbyId).emit("battle:battle_started", {
         battleId,
@@ -1214,7 +1398,62 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
       // Iniciar timer compartilhado do turno
       startBattleTurnTimer(battle);
 
-      console.log(`[ARENA] Batalha iniciada: ${battleId}`);
+      // Log detalhado das configurações do mapa
+      console.log("\n" + "=".repeat(60));
+      console.log("[ARENA] 🗺️  NOVA BATALHA INICIADA");
+      console.log("=".repeat(60));
+      console.log(`[ARENA] ID da Batalha: ${battleId}`);
+      console.log(`[ARENA] Lobby ID: ${lobbyId}`);
+      console.log(`[ARENA] Host: ${hostKingdom.name} (${lobby.hostUserId})`);
+      console.log(`[ARENA] Guest: ${guestKingdom.name} (${lobby.guestUserId})`);
+      console.log("-".repeat(60));
+      console.log("[ARENA] 📐 GRID:");
+      console.log(`[ARENA]   Tamanho do Território: ${territorySize}`);
+      console.log(
+        `[ARENA]   Dimensões: ${gridWidth}x${gridHeight} (${
+          gridWidth * gridHeight
+        } células)`
+      );
+      console.log("-".repeat(60));
+      console.log("[ARENA] 🌤️  CLIMA E TERRENO:");
+      console.log(
+        `[ARENA]   Clima: ${mapConfig.weatherName} ${mapConfig.weatherEmoji}`
+      );
+      console.log(`[ARENA]   Efeito: ${mapConfig.weatherEffect}`);
+      console.log(`[ARENA]   Terreno: ${mapConfig.terrainName}`);
+      console.log("-".repeat(60));
+      console.log("[ARENA] 🪨 OBSTÁCULOS:");
+      console.log(`[ARENA]   Quantidade: ${mapConfig.obstacles.length}`);
+      if (mapConfig.obstacles.length > 0) {
+        console.log(
+          `[ARENA]   Posições: ${mapConfig.obstacles
+            .map((o) => `(${o.posX},${o.posY})`)
+            .join(", ")}`
+        );
+      }
+      console.log("-".repeat(60));
+      console.log("[ARENA] ⚔️  UNIDADES:");
+      orderedUnits.forEach((unit, idx) => {
+        const side = unit.ownerId === lobby.hostUserId ? "HOST" : "GUEST";
+        console.log(
+          `[ARENA]   ${idx + 1}. [${side}] ${unit.name} - Pos: (${unit.posX},${
+            unit.posY
+          }) - Initiative: ${unit.initiative}`
+        );
+      });
+      console.log("-".repeat(60));
+      console.log("[ARENA] 🎲 ORDEM DE AÇÃO:");
+      console.log(
+        `[ARENA]   ${actionOrder
+          .map(
+            (id, i) =>
+              `${i + 1}. ${
+                id === lobby.hostUserId ? hostKingdom.name : guestKingdom.name
+              }`
+          )
+          .join(" → ")}`
+      );
+      console.log("=".repeat(60) + "\n");
     } catch (err) {
       console.error("[ARENA] start_battle error:", err);
       socket.emit("battle:error", { message: "Erro ao iniciar batalha" });
@@ -1224,6 +1463,24 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
   // ============================================
   // BATTLE ACTIONS
   // ============================================
+
+  // Handler para pausar timer quando modal de dice abre
+  socket.on("battle:dice_modal_open", ({ battleId }) => {
+    if (!battleId) return;
+    battleDiceModalPaused.set(battleId, true);
+    console.log(
+      `[ARENA] Timer pausado - modal de dice aberto na batalha ${battleId}`
+    );
+  });
+
+  // Handler para retomar timer quando modal de dice fecha
+  socket.on("battle:dice_modal_close", ({ battleId }) => {
+    if (!battleId) return;
+    battleDiceModalPaused.delete(battleId);
+    console.log(
+      `[ARENA] Timer retomado - modal de dice fechado na batalha ${battleId}`
+    );
+  });
 
   // Começar ação de uma unidade
   socket.on("battle:begin_action", async ({ battleId, unitId, userId }) => {
@@ -1242,6 +1499,13 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
             message: "Não é sua vez de agir",
           });
         }
+      }
+
+      // Impedir escolha de outra unidade se já há uma ativa neste turno
+      if (battle.activeUnitId && battle.activeUnitId !== unitId) {
+        return socket.emit("battle:error", {
+          message: "Você já escolheu uma unidade para este turno",
+        });
       }
 
       const unit = battle.units.find((u) => u.id === unitId);
@@ -1302,6 +1566,7 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
         unit.actionsLeft = 1;
       }
       unit.hasStartedAction = true;
+      battle.activeUnitId = unitId; // Define esta unidade como ativa do turno
 
       socket.emit("battle:action_started", {
         battleId,
@@ -1372,7 +1637,13 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
       unit.actionsLeft = 0;
       unit.hasStartedAction = false; // Reset para próxima ação
 
-      // Avança jogador
+      // Incrementar contador de ações do jogador
+      const currentActionsCount =
+        battle.roundActionsCount.get(currentPlayerId) || 0;
+      battle.roundActionsCount.set(currentPlayerId, currentActionsCount + 1);
+
+      // Avança jogador e reseta unidade ativa
+      battle.activeUnitId = undefined;
       const oldTurnIndex = battle.currentTurnIndex;
       if (battle.actionOrder.length) {
         battle.currentTurnIndex =
@@ -1410,30 +1681,93 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
         console.error(`[ARENA] Lobby não encontrado para batalha ${battleId}`);
       }
 
-      // Checa fim da batalha
-      const aliveUnits = battle.units.filter((u) => u.isAlive);
-      let allDone = true;
-      for (const u of aliveUnits) {
-        const m = getMaxMarksByCategory(u.category);
-        if (u.actionMarks < m) {
-          allDone = false;
-          break;
-        }
-      }
+      // Checa fim do round - todos os jogadores agiram 1x
+      const allPlayersActed = battle.actionOrder.every(
+        (playerId) => (battle.roundActionsCount.get(playerId) || 0) >= 1
+      );
 
-      if (allDone) {
-        // Novo round - reseta marcas
+      if (allPlayersActed) {
+        // Novo round - reseta contadores
         battle.round++;
-        for (const u of battle.units) {
-          if (u.isAlive) {
-            u.actionMarks = 0;
-          }
+        for (const playerId of battle.actionOrder) {
+          battle.roundActionsCount.set(playerId, 0);
         }
         if (lobby) {
           io.to(lobby.lobbyId).emit("battle:new_round", {
             battleId,
             round: battle.round,
           });
+        }
+      }
+
+      // ============================================================
+      // VERIFICAR TÉRMINO PARA BATALHAS NÃO-ARENA (3 Action Marks)
+      // ============================================================
+      if (!battle.isArena && lobby) {
+        // Verificar se TODAS as unidades vivas atingiram o máximo de actionMarks
+        const allUnitsExhausted = battle.units
+          .filter((u) => u.isAlive)
+          .every((u) => {
+            const maxMarks = getMaxMarksByCategory(u.category);
+            return u.actionMarks >= maxMarks;
+          });
+
+        if (allUnitsExhausted) {
+          battle.status = "ENDED";
+          stopBattleTurnTimer(battle.id);
+
+          // Determinar vencedor por HP total restante
+          const hpByPlayer = new Map<string, number>();
+          for (const u of battle.units) {
+            if (u.isAlive) {
+              const currentHp = hpByPlayer.get(u.ownerId) || 0;
+              hpByPlayer.set(u.ownerId, currentHp + u.currentHp);
+            }
+          }
+
+          // Encontrar jogador com mais HP
+          let winnerId: string | null = null;
+          let maxHp = -1;
+          for (const [playerId, totalHp] of hpByPlayer.entries()) {
+            if (totalHp > maxHp) {
+              maxHp = totalHp;
+              winnerId = playerId;
+            }
+          }
+
+          const winnerKingdom = battle.units.find(
+            (u) => u.ownerId === winnerId
+          )?.ownerKingdomId;
+
+          io.to(lobby.lobbyId).emit("battle:battle_ended", {
+            battleId,
+            winnerId,
+            winnerKingdomId: winnerKingdom,
+            reason: "Todas as unidades estão exaustas (3 Action Marks)",
+            finalUnits: battle.units,
+          });
+
+          // Atualizar estatísticas
+          const loserId =
+            winnerId === lobby.hostUserId
+              ? lobby.guestUserId
+              : lobby.hostUserId;
+          await updateUserStats(winnerId, loserId, battle.isArena);
+
+          // Limpar referências
+          userToLobby.delete(lobby.hostUserId);
+          if (lobby.guestUserId) {
+            userToLobby.delete(lobby.guestUserId);
+          }
+
+          lobby.status = "ENDED";
+          await deleteBattleFromDB(battleId);
+          await deleteLobbyFromDB(lobby.lobbyId);
+          console.log(
+            `[BATTLE] Batalha ${battleId} finalizada por exaustão. Vencedor: ${winnerId}`
+          );
+
+          return; // Não continuar se a batalha terminou
         }
       }
 
@@ -1467,7 +1801,8 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
         toY,
         battle.gridWidth,
         battle.gridHeight,
-        battle.units as CombatUnit[]
+        battle.units as CombatUnit[],
+        battle.config.map.obstacles || []
       );
 
       if (!result.success) {
@@ -1506,13 +1841,14 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
     }
   });
 
-  // Atacar unidade adjacente
+  // Atacar unidade adjacente, cadáver ou obstáculo
   socket.on(
     "battle:attack",
     async ({
       battleId,
       attackerUnitId,
       targetUnitId,
+      targetObstacleId,
       damageType = "FISICO",
     }) => {
       try {
@@ -1522,33 +1858,67 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
         }
 
         const attacker = battle.units.find((u) => u.id === attackerUnitId);
-        const target = battle.units.find((u) => u.id === targetUnitId);
-
         if (!attacker || !attacker.isAlive) {
           return socket.emit("battle:error", { message: "Atacante inválido" });
         }
-        if (!target) {
-          return socket.emit("battle:error", { message: "Alvo inválido" });
+
+        // Determinar alvo: unidade/cadáver OU obstáculo
+        let target: BattleUnit | undefined = undefined;
+        let obstacle: BattleObstacle | undefined = undefined;
+
+        if (targetUnitId) {
+          target = battle.units.find((u) => u.id === targetUnitId);
+          if (!target) {
+            return socket.emit("battle:error", { message: "Alvo inválido" });
+          }
+        } else if (targetObstacleId) {
+          obstacle = battle.config.map?.obstacles?.find(
+            (o) => o.id === targetObstacleId
+          );
+          if (!obstacle) {
+            return socket.emit("battle:error", {
+              message: "Obstáculo não encontrado",
+            });
+          }
+          if (obstacle.destroyed) {
+            return socket.emit("battle:error", {
+              message: "Obstáculo já destruído",
+            });
+          }
+        } else {
+          return socket.emit("battle:error", {
+            message: "Nenhum alvo especificado",
+          });
         }
 
-        // Executar ação de ataque usando combat-actions
+        // Executar ação de ataque unificada
         const result = executeAttackAction(
           attacker as CombatUnit,
-          target as CombatUnit,
-          damageType
+          target as CombatUnit | null,
+          damageType,
+          obstacle
         );
 
         if (!result.success) {
           return socket.emit("battle:error", { message: result.error });
         }
 
+        // Log de ataque
+        const logType = result.obstacleDestroyed
+          ? "ATTACK_OBSTACLE_DESTROY"
+          : result.targetDefeated
+          ? "ATTACK_KILL"
+          : "ATTACK";
+
         battle.logs.push({
           id: generateId(),
           timestamp: new Date(),
-          type: result.targetDefeated ? "ATTACK_KILL" : "ATTACK",
+          type: logType,
           payload: {
             attackerUnitId,
-            targetUnitId,
+            targetUnitId: targetUnitId || null,
+            targetObstacleId: targetObstacleId || null,
+            targetType: result.targetType,
             diceCount: result.diceCount,
             rolls: result.rolls,
             damage: result.finalDamage,
@@ -1559,10 +1929,14 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
 
         const lobby = battleLobbies.get(battle.lobbyId);
         if (lobby) {
+          // Emitir evento para todos os clientes
           io.to(lobby.lobbyId).emit("battle:unit_attacked", {
             battleId,
             attackerUnitId,
-            targetUnitId,
+            targetUnitId: targetUnitId || null,
+            targetObstacleId: targetObstacleId || null,
+            targetType: result.targetType,
+            // Legado
             diceCount: result.diceCount,
             rolls: result.rolls,
             damage: result.finalDamage,
@@ -1570,9 +1944,42 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
             targetHpAfter: result.targetHpAfter,
             targetProtection: result.targetProtection,
             attackerActionsLeft: attacker.actionsLeft,
+            // Dados detalhados de rolagem
+            missed: result.missed ?? false,
+            attackDiceCount: result.attackDiceCount ?? 0,
+            attackRolls: result.attackRolls ?? [],
+            attackSuccesses: result.attackSuccesses ?? 0,
+            rawDamage: result.rawDamage ?? 0,
+            defenseDiceCount: result.defenseDiceCount ?? 0,
+            defenseRolls: result.defenseRolls ?? [],
+            defenseSuccesses: result.defenseSuccesses ?? 0,
+            damageReduction: result.damageReduction ?? 0,
+            finalDamage: result.finalDamage ?? 0,
+            targetPhysicalProtection: result.targetPhysicalProtection ?? 0,
+            targetMagicalProtection: result.targetMagicalProtection ?? 0,
+            targetDefeated: result.targetDefeated ?? false,
+            obstacleDestroyed: result.obstacleDestroyed ?? false,
+            obstacleId: result.obstacleId ?? null,
+            // Dados dos combatentes para o painel visual
+            attackerName: attacker.name,
+            attackerIcon: "⚔️",
+            attackerCombat: attacker.combat,
+            targetName: target?.name ?? obstacle?.id ?? "Obstáculo",
+            targetIcon: target ? "🛡️" : "🪨",
+            targetCombat: target?.combat ?? 0,
+            targetAcuity: target?.acuity ?? 0,
           });
 
-          if (result.targetDefeated) {
+          // Emitir evento de obstáculo destruído
+          if (result.obstacleDestroyed && result.obstacleId) {
+            io.to(lobby.lobbyId).emit("battle:obstacle_destroyed", {
+              battleId,
+              obstacleId: result.obstacleId,
+            });
+          }
+
+          // Verificar derrota de unidade
+          if (result.targetDefeated && target) {
             io.to(lobby.lobbyId).emit("battle:unit_defeated", {
               battleId,
               unitId: target.id,
@@ -1586,6 +1993,13 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
                 aliveBySide.set(u.ownerId, count + 1);
               }
             }
+
+            console.log("[ARENA] Verificando vitória:", {
+              aliveBySideSize: aliveBySide.size,
+              aliveBySide: Object.fromEntries(aliveBySide),
+              totalUnits: battle.units.length,
+              aliveUnits: battle.units.filter((u) => u.isAlive).length,
+            });
 
             if (aliveBySide.size <= 1) {
               battle.status = "ENDED";
@@ -1984,47 +2398,50 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
             cleanupBattle(oldBattle.id);
           }
 
-          // Criar nova batalha usando factory
+          // Criar nova batalha usando factory com posições aleatórias
           const battleId = generateId();
           const {
-            grid: { width: gridWidth, height: gridHeight },
-          } = ARENA_CONFIG;
+            width: gridWidth,
+            height: gridHeight,
+            territorySize,
+          } = getArenaBattleGridSize();
 
-          // Usar factory para criar unidades
-          const hostUnits = createBattleUnitsForSide(
-            hostKingdom.units,
-            lobby.hostUserId,
-            { id: hostKingdom.id, name: hostKingdom.name },
-            { x: 0, y: Math.floor(gridHeight / 2) },
-            "vertical",
-            "arena"
-          );
+          // Criar unidades com posicionamento aleatório
+          const { units: allUnits, occupiedPositions } =
+            createBattleUnitsWithRandomPositions(
+              hostKingdom.units,
+              lobby.hostUserId,
+              { id: hostKingdom.id, name: hostKingdom.name },
+              guestKingdom.units,
+              lobby.guestUserId as string,
+              { id: guestKingdom.id, name: guestKingdom.name },
+              gridWidth,
+              gridHeight,
+              "arena"
+            );
 
-          const guestUnits = createBattleUnitsForSide(
-            guestKingdom.units,
-            lobby.guestUserId,
-            { id: guestKingdom.id, name: guestKingdom.name },
-            { x: gridWidth - 1, y: Math.floor(gridHeight / 2) },
-            "vertical",
-            "arena"
-          );
-
-          // Combinar e ordenar por iniciativa
-          const allUnits = [...hostUnits, ...guestUnits];
+          // Ordenar por iniciativa para exibição
           const orderedUnits = sortByInitiative(allUnits);
           const initiativeOrder = orderedUnits.map((u) => u.id);
           const actionOrder = determineActionOrder(
-            orderedUnits,
+            allUnits,
             lobby.hostUserId,
             lobby.guestUserId
           );
 
           // Gerar configuração do mapa para a revanche
-          const unitPositions = orderedUnits.map((u) => ({
-            x: u.posX,
-            y: u.posY,
-          }));
-          const rematchConfig = generateArenaConfig(unitPositions);
+          const mapConfig = generateBattleMap({
+            gridWidth,
+            gridHeight,
+            territorySize,
+            unitPositions: occupiedPositions,
+          });
+
+          const rematchConfig: ArenaConfig = {
+            ...createBaseArenaConfig(),
+            grid: { width: gridWidth, height: gridHeight },
+            map: mapConfig,
+          };
 
           // Criar nova batalha
           const newBattle: Battle = {
@@ -2042,6 +2459,10 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
             logs: [],
             createdAt: new Date(),
             config: rematchConfig,
+            roundActionsCount: new Map<string, number>([
+              [lobby.hostUserId, 0],
+              [lobby.guestUserId as string, 0],
+            ]),
             hostUserId: lobby.hostUserId,
             guestUserId: lobby.guestUserId as string,
             hostKingdomId: hostKingdom.id,
@@ -2076,7 +2497,68 @@ export const registerBattleHandlers = (io: Server, socket: Socket) => {
             },
           });
 
-          console.log(`[ARENA] Revanche iniciada! Nova batalha: ${battleId}`);
+          // Log detalhado das configurações da revanche
+          console.log("\n" + "=".repeat(60));
+          console.log("[ARENA] 🔄 REVANCHE INICIADA");
+          console.log("=".repeat(60));
+          console.log(`[ARENA] ID da Batalha: ${battleId}`);
+          console.log(`[ARENA] Lobby ID: ${lobbyId}`);
+          console.log(
+            `[ARENA] Host: ${hostKingdom.name} (${lobby.hostUserId})`
+          );
+          console.log(
+            `[ARENA] Guest: ${guestKingdom.name} (${lobby.guestUserId})`
+          );
+          console.log("-".repeat(60));
+          console.log("[ARENA] 📐 GRID:");
+          console.log(`[ARENA]   Tamanho do Território: ${territorySize}`);
+          console.log(
+            `[ARENA]   Dimensões: ${gridWidth}x${gridHeight} (${
+              gridWidth * gridHeight
+            } células)`
+          );
+          console.log("-".repeat(60));
+          console.log("[ARENA] 🌤️  CLIMA E TERRENO:");
+          console.log(
+            `[ARENA]   Clima: ${mapConfig.weatherName} ${mapConfig.weatherEmoji}`
+          );
+          console.log(`[ARENA]   Efeito: ${mapConfig.weatherEffect}`);
+          console.log(`[ARENA]   Terreno: ${mapConfig.terrainName}`);
+          console.log("-".repeat(60));
+          console.log("[ARENA] 🪨 OBSTÁCULOS:");
+          console.log(`[ARENA]   Quantidade: ${mapConfig.obstacles.length}`);
+          if (mapConfig.obstacles.length > 0) {
+            console.log(
+              `[ARENA]   Posições: ${mapConfig.obstacles
+                .map((o) => `(${o.posX},${o.posY})`)
+                .join(", ")}`
+            );
+          }
+          console.log("-".repeat(60));
+          console.log("[ARENA] ⚔️  UNIDADES:");
+          orderedUnits.forEach((unit, idx) => {
+            const side = unit.ownerId === lobby.hostUserId ? "HOST" : "GUEST";
+            console.log(
+              `[ARENA]   ${idx + 1}. [${side}] ${unit.name} - Pos: (${
+                unit.posX
+              },${unit.posY}) - Initiative: ${unit.initiative}`
+            );
+          });
+          console.log("-".repeat(60));
+          console.log("[ARENA] 🎲 ORDEM DE AÇÃO:");
+          console.log(
+            `[ARENA]   ${actionOrder
+              .map(
+                (id, i) =>
+                  `${i + 1}. ${
+                    id === lobby.hostUserId
+                      ? hostKingdom.name
+                      : guestKingdom.name
+                  }`
+              )
+              .join(" → ")}`
+          );
+          console.log("=".repeat(60) + "\n");
         } finally {
           // Sempre limpar o lock
           rematchLocks.delete(lobbyId);

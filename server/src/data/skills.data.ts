@@ -249,14 +249,11 @@ export const WIZARD_SKILLS: SkillDefinition[] = [
 ];
 
 // =============================================================================
-// TODAS AS SKILLS (para busca rápida)
+// TODAS AS SKILLS (para busca rápida) - Apenas 3 classes
 // =============================================================================
 
 export const ALL_SKILLS: SkillDefinition[] = [
-  ...BARBARIAN_SKILLS,
   ...WARRIOR_SKILLS,
-  ...ROGUE_SKILLS,
-  ...RANGER_SKILLS,
   ...CLERIC_SKILLS,
   ...WIZARD_SKILLS,
 ];

@@ -9,7 +9,6 @@ import {
   setArenaRefs,
 } from "../utils/session.utils";
 import { resumeBattleTimer } from "./battle.handler";
-import { ARENA_CONFIG } from "../data/arena-config";
 import type {
   ArenaLobbyData,
   ArenaBattleData,
@@ -235,8 +234,11 @@ export const registerSessionHandlers = (io: Server, socket: Socket): void => {
           });
         }
 
-        // Entrar na sala da batalha
+        // Entrar na sala da batalha e do lobby (timer emite para lobbyId)
         socket.join(session.battleId!);
+        if (session.lobbyId) {
+          socket.join(session.lobbyId);
+        }
 
         // Atualizar socketId se reconectando durante batalha
         if (lobby) {
@@ -302,13 +304,14 @@ export const registerSessionHandlers = (io: Server, socket: Socket): void => {
           gridHeight: battle.gridHeight,
         });
 
-        // Retomar timer da batalha se estava pausado (após toda config da sessão)
-        if (wasDisconnected) {
-          resumeBattleTimer(session.battleId!);
-        }
+        // Sempre tentar retomar timer da batalha (caso esteja pausado ou não iniciado)
+        // resumeBattleTimer já verifica se há timer ativo antes de criar novo
+        resumeBattleTimer(session.battleId!);
 
         console.log(
-          `[SESSION] Usuário ${userId} retomou batalha de Arena ${session.battleId}`
+          `[SESSION] Usuário ${userId} retomou batalha de Arena ${
+            session.battleId
+          }${wasDisconnected ? " (estava desconectado)" : ""}`
         );
       }
     } catch (error) {

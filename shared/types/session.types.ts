@@ -55,6 +55,7 @@ export interface ArenaBattleData {
   status: string; // "ACTIVE" | "ENDED"
   round: number;
   currentTurnIndex: number;
+  activeUnitId?: string; // Unidade ativa escolhida pelo jogador neste turno
   gridWidth: number;
   gridHeight: number;
   units: any[]; // ArenaUnit[]
@@ -128,6 +129,7 @@ export interface SessionActiveBattleResponse {
   battleStatus: ArenaBattleStatus;
   round: number;
   currentTurnIndex: number;
+  activeUnitId?: string;
   units: any[];
   initiativeOrder: string[];
   actionOrder: string[];
@@ -184,6 +186,7 @@ export interface BattleBattleRestoredResponse {
   status: ArenaBattleStatus;
   currentTurnIndex: number;
   currentPlayerId: string;
+  activeUnitId?: string;
   turnTimer?: number;
   units: any[];
   initiativeOrder: string[];

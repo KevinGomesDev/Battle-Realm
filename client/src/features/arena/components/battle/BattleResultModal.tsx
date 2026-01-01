@@ -1,5 +1,5 @@
 import React from "react";
-import type { ArenaUnit, BattleEndedResponse } from "../types/arena.types";
+import type { ArenaUnit, BattleEndedResponse } from "../../types/arena.types";
 
 interface BattleResultModalProps {
   result: BattleEndedResponse;

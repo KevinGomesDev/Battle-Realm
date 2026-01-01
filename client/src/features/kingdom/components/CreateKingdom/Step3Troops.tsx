@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import type { TroopPassive, TroopTemplate, BaseAttributes } from "./types";
+import { AvatarSelector } from "./AnimatedCharacterSprite";
 
 const RESOURCE_TYPES = [
   { id: "ore", name: "Ore", color: "text-amber-400" },
@@ -141,6 +142,15 @@ export const Step3Troops: React.FC<Step3TroopsProps> = ({
             placeholder="Ex: Guardas Reais"
             className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
             required
+          />
+        </div>
+
+        {/* Aparência da Tropa */}
+        <div className="flex justify-center">
+          <AvatarSelector
+            selectedAvatar={currentTemplate.avatar || "[1].png"}
+            onSelectAvatar={(avatar) => updateTemplate(activeSlot, { avatar })}
+            spriteSize={80}
           />
         </div>
 

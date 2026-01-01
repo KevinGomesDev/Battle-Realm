@@ -1,14 +1,16 @@
 // Arena Components - Barrel Export
 
-// Main views
-export { ArenaList } from "./ArenaList";
-export { ArenaLobbyView } from "./ArenaLobbyView";
-export { ArenaBattleCanvas } from "./ArenaBattleCanvas";
+// Main View (orchestrates battle components)
 export { ArenaBattleView } from "./ArenaBattleView";
-export { BattleResultModal } from "./BattleResultModal";
+
+// Lobby components
+export * from "./lobby";
 
 // Battle components
 export * from "./battle";
+
+// Canvas components
+export * from "./canvas";
 
 // Shared components
 export * from "./shared";
