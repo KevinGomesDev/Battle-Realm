@@ -62,7 +62,7 @@ Dizem que ela foi tocada pelo próprio Sol Eterno quando criança, e que seu olh
 
 Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, mesmo que isso custe sua própria vida.`,
     avatar: "1",
-    initialSkillId: "divine_smite", // Skill de Cleric
+    initialSkillId: "HEAL", // Skill de Cleric (curar aliados)
     combat: 6,
     acuity: 4,
     focus: 6,
@@ -76,7 +76,7 @@ Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, m
       description:
         "A elite montada de Valdoria. Cada cavaleiro passa por 10 anos de treinamento e deve completar uma peregrinação ao Pico Solar antes de receber sua armadura dourada. São implacáveis contra as forças das trevas.",
       avatar: "2",
-      passiveId: "charge",
+      passiveId: "INVESTIDA",
       resourceType: "minerio",
       combat: 4,
       acuity: 2,
@@ -90,7 +90,7 @@ Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, m
       description:
         "Guerreiros-sacerdotes que canalizam o poder do Sol Eterno. Seus escudos são abençoados para repelir magia negra, e suas espadas queimam com fogo sagrado.",
       avatar: "3",
-      passiveId: "shield_wall",
+      passiveId: "ESCUDO_PROTETOR",
       resourceType: "devocao",
       combat: 2,
       acuity: 1,
@@ -104,7 +104,7 @@ Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, m
       description:
         "Treinados desde a infância nas torres da capital, estes arqueiros são capazes de acertar um alvo a 300 metros. Suas flechas são abençoadas por clérigos antes de cada batalha.",
       avatar: "4",
-      passiveId: "first_strike",
+      passiveId: "EMBOSCADA",
       resourceType: "suprimentos",
       combat: 3,
       acuity: 4,
@@ -118,7 +118,7 @@ Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, m
       description:
         "Cidadãos comuns que servem o Império em tempos de guerra. O que lhes falta em habilidade, compensam em números e devoção fervorosa à Imperatriz.",
       avatar: "5",
-      passiveId: "expendable",
+      passiveId: "FURTIVIDADE",
       resourceType: "suprimentos",
       combat: 2,
       acuity: 2,
@@ -132,7 +132,7 @@ Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, m
       description:
         "Sacerdotes que abandonaram os templos para curar feridos no campo de batalha. Carregam relíquias sagradas que podem fechar feridas e banir espíritos malignos.",
       avatar: "6",
-      passiveId: "healer",
+      passiveId: "ESCUDO_PROTETOR",
       resourceType: "devocao",
       combat: 1,
       acuity: 2,
@@ -165,7 +165,7 @@ Seu corpo é uma carcaça ressecada envolta em mantos de escuridão pura. Onde s
 
 Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento absoluto, e está disposto a destruir mundos para obtê-lo.`,
     avatar: "9",
-    initialSkillId: "arcane_blast", // Skill de Wizard
+    initialSkillId: "FIREBALL", // Skill de Wizard
     combat: 2,
     acuity: 5,
     focus: 11,
@@ -179,7 +179,7 @@ Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento ab
       description:
         "Assassinos de elite que treinam desde crianças nas artes da morte invisível. Dizem que suas sombras se movem independentemente, e que podem matar um homem antes que ele perceba que está morto.",
       avatar: "10",
-      passiveId: "assassin",
+      passiveId: "EMBOSCADA",
       resourceType: "suprimentos",
       combat: 4,
       acuity: 4,
@@ -193,7 +193,7 @@ Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento ab
       description:
         "Os ossos de guerreiros caídos, reanimados e vestidos com armaduras forjadas em forjas alimentadas por almas. Não sentem dor, não sentem medo, e nunca param até que seus ossos virem pó.",
       avatar: "11",
-      passiveId: "undying",
+      passiveId: "ESCUDO_PROTETOR",
       resourceType: "arcana",
       combat: 2,
       acuity: 1,
@@ -207,7 +207,7 @@ Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento ab
       description:
         "Fantasmas de generais e campeões mortos, amarrados ao serviço eterno de Nyxrath. Podem atravessar paredes e drenar a vida dos vivos com seu toque gelado.",
       avatar: "12",
-      passiveId: "ethereal",
+      passiveId: "FURTIVIDADE",
       resourceType: "arcana",
       combat: 3,
       acuity: 3,
@@ -221,7 +221,7 @@ Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento ab
       description:
         "Fanáticos que veneram Malachar como um deus. Praticam rituais de sangue para canalizar magia negra, e muitos voluntariamente se transformam em mortos-vivos.",
       avatar: "13",
-      passiveId: "blood_magic",
+      passiveId: "TIRO_RAPIDO",
       resourceType: "devocao",
       combat: 1,
       acuity: 2,
@@ -235,7 +235,7 @@ Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento ab
       description:
         "Construtos grotescos feitos de partes de centenas de corpos. Cada um é único em sua monstruosidade, costurado e animado por magia profana. São usados como tanques de guerra vivos.",
       avatar: "14",
-      passiveId: "regeneration",
+      passiveId: "ESCUDO_PROTETOR",
       resourceType: "arcana",
       combat: 3,
       acuity: 0,
@@ -268,7 +268,7 @@ Com escamas que brilham como metal derretido e olhos que são brasas de pura ene
 
 Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância ou raiva. Ele vê o mundo com a perspectiva de eras, e protege Ashenvale porque sabe que o equilíbrio é a única coisa que impede a extinção de todas as coisas.`,
     avatar: "7",
-    initialSkillId: "reckless_attack", // Skill de Barbarian
+    initialSkillId: "RECKLESS_ATTACK", // Skill de Barbarian
     combat: 8,
     acuity: 4,
     focus: 5,
@@ -282,7 +282,7 @@ Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância 
       description:
         "Jovens dragões que ainda não atingiram maturidade plena, mas são ferozes em batalha. Seu fogo é temperamental e explosivo, perfeito para causar caos nas linhas inimigas.",
       avatar: "8",
-      passiveId: "fire_breath",
+      passiveId: "TIRO_RAPIDO",
       resourceType: "arcana",
       combat: 4,
       acuity: 3,
@@ -296,7 +296,7 @@ Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância 
       description:
         "Pequenas criaturas reptilianas que servem os dragões com devoção fanática. São excelentes mineradores e trapaceiros, preparando emboscadas e armadilhas para os inimigos de seus mestres.",
       avatar: "15",
-      passiveId: "ambush",
+      passiveId: "EMBOSCADA",
       resourceType: "minerio",
       combat: 2,
       acuity: 3,
@@ -310,7 +310,7 @@ Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância 
       description:
         "Humanos transformados pelo sangue dracônico em guerreiros híbridos. Com escamas, garras e um sopro elemental menor, são a infantaria pesada da Confederação.",
       avatar: "1",
-      passiveId: "elemental_resistance",
+      passiveId: "ESCUDO_PROTETOR",
       resourceType: "experiencia",
       combat: 3,
       acuity: 2,
@@ -324,7 +324,7 @@ Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância 
       description:
         "Místicos que canalizam o poder dos vulcões de Ashenvale. Podem invocar espíritos elementais e curar aliados com o calor regenerativo do magma.",
       avatar: "5",
-      passiveId: "summon_elemental",
+      passiveId: "TIRO_RAPIDO",
       resourceType: "devocao",
       combat: 1,
       acuity: 2,
@@ -338,7 +338,7 @@ Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância 
       description:
         "Dragões serpentinos que vivem nas profundezas. Podem atravessar rocha sólida e emergir sob os pés dos inimigos. Seu ácido derrete armaduras como manteiga.",
       avatar: "9",
-      passiveId: "burrow",
+      passiveId: "INVESTIDA",
       resourceType: "minerio",
       combat: 3,
       acuity: 2,

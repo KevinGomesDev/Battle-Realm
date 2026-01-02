@@ -55,6 +55,7 @@ export interface ArenaUnit {
   posY: number;
   movesLeft: number;
   actionsLeft: number;
+  attacksLeftThisTurn: number; // Ataques restantes neste turno (extraAttacks)
   isAlive: boolean;
   actionMarks: number;
   // Proteção Física - ver shared/config/balance.config.ts
@@ -267,6 +268,7 @@ export interface UnitAttackedResponse {
   targetHpAfter: number;
   targetProtection: number;
   attackerActionsLeft: number;
+  attackerAttacksLeftThisTurn: number; // Ataques extras restantes
   // Dados detalhados de rolagem
   missed?: boolean;
   attackDiceCount: number;

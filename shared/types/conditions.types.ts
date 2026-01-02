@@ -51,6 +51,24 @@ export interface ConditionEffects {
   invisible?: boolean;
   flying?: boolean;
   phasing?: boolean;
+
+  // === EFEITOS DE SKILLS PASSIVAS ===
+  extraAttacks?: number; // Ataques adicionais por ação de ataque
+  minAttackSuccesses?: number; // Mínimo de acertos garantidos em ataques
+  conditionalBonusDamage?: number; // Dano bônus condicional
+  bonusActionSkills?: string[]; // Skills que são ações bônus (não consomem ação)
+  assassinateDamageMultiplier?: number; // Multiplicador de dano para assassinato
+  ignoreDifficultTerrain?: boolean; // Ignora terreno difícil
+  markedByHunter?: boolean; // Marcado por Hunter's Mark
+  advantageOnNextAttack?: boolean; // Vantagem no próximo ataque
+  disadvantageOnAttacks?: boolean; // Desvantagem em ataques
+  shieldAllyDamageTransfer?: number; // Dano transferido de aliados adjacentes para si
+  chargeBonusDamage?: number; // Dano bônus de investida
+  chargeMinDistance?: number; // Distância mínima para investida
+  ambushBonusDamage?: number; // Dano bônus de emboscada
+  immuneToRangedIfAdjacentAlly?: boolean; // Imune a ranged se adjacente a aliado
+  extraRangedAttacks?: number; // Ataques à distância extras
+  rangedDamagePenalty?: number; // Penalidade de dano em ataques à distância
 }
 
 /**
@@ -62,7 +80,9 @@ export type ConditionExpiry =
   | "on_action"
   | "on_damage"
   | "manual"
-  | "permanent";
+  | "permanent"
+  | "end_of_battle"
+  | "duration";
 
 /**
  * Definição completa de uma condição
@@ -72,6 +92,7 @@ export interface ConditionDefinition {
   name: string;
   description: string;
   expiry: ConditionExpiry;
+  durationRounds?: number; // Para expiry: "duration"
   stackable?: boolean;
   maxStacks?: number;
   effects: ConditionEffects;

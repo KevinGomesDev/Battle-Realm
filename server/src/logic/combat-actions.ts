@@ -5,6 +5,8 @@ import {
 import {
   scanConditionsForAction,
   applyConditionScanResult,
+  getMinAttackSuccesses,
+  getExtraAttacksFromConditions,
 } from "./conditions";
 import {
   getManhattanDistance,
@@ -44,6 +46,7 @@ export interface CombatUnit {
   posY: number;
   movesLeft: number;
   actionsLeft: number;
+  attacksLeftThisTurn: number; // Ataques restantes neste turno (para extraAttacks)
   isAlive: boolean;
   // Proteção Física - ver shared/config/balance.config.ts
   physicalProtection: number;
@@ -92,6 +95,8 @@ export interface AttackActionResult {
   // Para obstáculos
   obstacleDestroyed?: boolean;
   obstacleId?: string;
+  // Para múltiplos ataques (extraAttacks)
+  attacksLeftThisTurn?: number; // Ataques restantes após este
 }
 
 export interface DashActionResult {
@@ -229,8 +234,17 @@ export function executeAttackAction(
   if (!attacker.isAlive) {
     return { success: false, error: "Dead unit cannot attack" };
   }
-  if (attacker.actionsLeft <= 0) {
-    return { success: false, error: "No actions left this turn" };
+
+  // === SISTEMA DE MÚLTIPLOS ATAQUES (extraAttacks) ===
+  // Se attacksLeftThisTurn > 0, significa que já gastou a ação e tem ataques extras
+  // Se attacksLeftThisTurn === 0, precisa gastar ação para iniciar sequência de ataques
+  const hasAttacksRemaining = attacker.attacksLeftThisTurn > 0;
+
+  if (!hasAttacksRemaining) {
+    // Primeira vez atacando - precisa ter ação disponível
+    if (attacker.actionsLeft <= 0) {
+      return { success: false, error: "No actions left this turn" };
+    }
   }
 
   // Varredura de condições do atacante
@@ -264,13 +278,38 @@ export function executeAttackAction(
     return { success: false, error: "Target must be adjacent" };
   }
 
-  // Consumir ação do atacante
-  attacker.actionsLeft = Math.max(0, attacker.actionsLeft - 1);
+  // === CONSUMO DE AÇÃO E ATAQUES EXTRAS ===
+  if (!hasAttacksRemaining) {
+    // Primeiro ataque: consumir ação e calcular total de ataques
+    attacker.actionsLeft = Math.max(0, attacker.actionsLeft - 1);
+
+    // Calcular ataques extras baseado nas condições
+    // RECKLESS_ATTACK só dá extra se não tiver proteção
+    const hasProtection = attacker.physicalProtection > 0;
+    const extraAttacks = getExtraAttacksFromConditions(
+      attacker.conditions,
+      hasProtection
+    );
+
+    // Total = 1 (ataque base) + extras
+    // Já vamos executar 1 agora, então setamos os restantes
+    attacker.attacksLeftThisTurn = extraAttacks; // Se 0, não sobra nenhum
+  } else {
+    // Ataque subsequente: apenas decrementar contador
+    attacker.attacksLeftThisTurn = Math.max(
+      0,
+      attacker.attacksLeftThisTurn - 1
+    );
+  }
 
   // === ROLAGEM DE ATAQUE ===
   const attackDiceCount = Math.max(1, attacker.combat);
   const attackRoll = rollD6Test(attackDiceCount, 0);
-  const attackSuccesses = attackRoll.totalSuccesses;
+
+  // Verificar mínimo de acertos garantidos (ex: WILD_FURY garante mínimo 2)
+  const minSuccesses = getMinAttackSuccesses(attacker.conditions);
+  const attackSuccesses = Math.max(attackRoll.totalSuccesses, minSuccesses);
+
   const rawDamage = calculateDamageFromSuccesses(
     attackSuccesses,
     attacker.combat
@@ -311,6 +350,7 @@ export function executeAttackAction(
       obstacleDestroyed: destroyed,
       obstacleId: obstacle.id,
       targetDefeated: destroyed,
+      attacksLeftThisTurn: attacker.attacksLeftThisTurn,
     };
   }
 
@@ -344,6 +384,7 @@ export function executeAttackAction(
       damageType,
       targetHpAfter: 0,
       targetDefeated: destroyed,
+      attacksLeftThisTurn: attacker.attacksLeftThisTurn,
     };
   }
 
@@ -383,6 +424,7 @@ export function executeAttackAction(
       targetPhysicalProtection: target.physicalProtection,
       targetMagicalProtection: target.magicalProtection,
       targetDefeated: false,
+      attacksLeftThisTurn: attacker.attacksLeftThisTurn,
     };
   }
 
@@ -466,6 +508,7 @@ export function executeAttackAction(
     targetPhysicalProtection: target.physicalProtection,
     targetMagicalProtection: target.magicalProtection,
     targetDefeated,
+    attacksLeftThisTurn: attacker.attacksLeftThisTurn,
   };
 }
 
@@ -961,3 +1004,156 @@ export function executeCastAction(
 }
 
 // executeAttackObstacle foi removido - use executeAttackAction com o parâmetro obstacle
+
+// =============================================================================
+// SISTEMA DE SKILLS - Re-exportar do arquivo dedicado
+// =============================================================================
+
+import { findSkillByCode } from "../data/skills.data";
+import {
+  getManhattanDistance as getSkillManhattanDistance,
+  DEFAULT_RANGE_VALUES,
+  type SkillExecutionResult,
+  type SkillCombatUnit,
+} from "../../../shared/types/skills.types";
+
+// Re-exportar tipos e funções do skill-executors
+export {
+  executeSkill,
+  tickSkillCooldowns,
+  isSkillOnCooldown,
+  getSkillCooldown,
+  SKILL_EXECUTORS,
+} from "./skill-executors";
+
+// Re-exportar condições de skills
+export {
+  SKILL_CONDITIONS,
+  getSkillCondition,
+  isSkillCondition,
+} from "./skill-conditions";
+
+// Alias para compatibilidade
+export type SkillActionResult = SkillExecutionResult;
+
+/**
+ * Valida se a unidade pode usar uma skill
+ */
+export function validateSkillUse(
+  caster: CombatUnit,
+  skillCode: string,
+  target: CombatUnit | null,
+  isArena: boolean
+): { valid: boolean; error?: string } {
+  // Verificar se a skill existe
+  const skill = findSkillByCode(skillCode);
+  if (!skill) {
+    return { valid: false, error: "Skill não encontrada" };
+  }
+
+  // Verificar se é uma skill ativa
+  if (skill.category !== "ACTIVE") {
+    return { valid: false, error: "Apenas skills ativas podem ser usadas" };
+  }
+
+  // Verificar se a unidade tem essa skill nas ações
+  if (!caster.actions.includes(skillCode)) {
+    return { valid: false, error: "Unidade não possui esta skill" };
+  }
+
+  // Verificar se está vivo
+  if (!caster.isAlive) {
+    return { valid: false, error: "Unidade morta não pode usar skills" };
+  }
+
+  // Verificar se tem ações disponíveis (Arena não tem custo de recurso, mas consome ação)
+  if (caster.actionsLeft <= 0) {
+    return { valid: false, error: "Sem ações restantes neste turno" };
+  }
+
+  // Validar range e alvo
+  if (skill.range === "SELF") {
+    // Skills SELF não precisam de alvo ou o alvo é o próprio caster
+    if (target && target.id !== caster.id) {
+      return {
+        valid: false,
+        error: "Esta skill só pode ser usada em si mesmo",
+      };
+    }
+  } else if (skill.range === "ADJACENT") {
+    if (!target) {
+      return { valid: false, error: "Skill requer um alvo" };
+    }
+    if (
+      !isAdjacentOmnidirectional(
+        caster.posX,
+        caster.posY,
+        target.posX,
+        target.posY
+      )
+    ) {
+      return { valid: false, error: "Alvo não está adjacente" };
+    }
+  } else if (skill.range === "RANGED" || skill.range === "AREA") {
+    if (!target && skill.targetType !== "SELF") {
+      return { valid: false, error: "Skill requer um alvo" };
+    }
+    if (target) {
+      const rangeValue = skill.rangeValue ?? DEFAULT_RANGE_VALUES[skill.range];
+      const distance = getSkillManhattanDistance(
+        caster.posX,
+        caster.posY,
+        target.posX,
+        target.posY
+      );
+      if (distance > rangeValue) {
+        return {
+          valid: false,
+          error: `Alvo fora de alcance (máx: ${rangeValue})`,
+        };
+      }
+    }
+  }
+
+  // Validar tipo de alvo
+  if (target && skill.targetType) {
+    const isSameOwner = caster.ownerId === target.ownerId;
+    if (skill.targetType === "ALLY" && !isSameOwner) {
+      return { valid: false, error: "Skill só pode ser usada em aliados" };
+    }
+    if (skill.targetType === "ENEMY" && isSameOwner) {
+      return { valid: false, error: "Skill só pode ser usada em inimigos" };
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Executa uma skill ativa
+ * Delega para o sistema de skill-executors
+ */
+export function executeSkillAction(
+  caster: CombatUnit,
+  skillCode: string,
+  target: CombatUnit | null,
+  allUnits: CombatUnit[],
+  isArena: boolean = true
+): SkillActionResult {
+  // Importar dinamicamente para evitar dependência circular
+  const { executeSkill } = require("./skill-executors");
+
+  // Validar uso primeiro
+  const validation = validateSkillUse(caster, skillCode, target, isArena);
+  if (!validation.valid) {
+    return { success: false, error: validation.error };
+  }
+
+  // Delegar para o executor centralizado
+  return executeSkill(
+    caster as SkillCombatUnit,
+    skillCode,
+    target as SkillCombatUnit | null,
+    allUnits as SkillCombatUnit[]
+  );
+}

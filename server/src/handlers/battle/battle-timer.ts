@@ -267,6 +267,7 @@ async function handleTimerExpired(battle: Battle): Promise<void> {
       hasStartedAction: u.hasStartedAction,
       movesLeft: u.movesLeft,
       actionsLeft: u.actionsLeft,
+      attacksLeftThisTurn: u.attacksLeftThisTurn,
       conditions: u.conditions,
       currentHp: u.currentHp,
       isAlive: u.isAlive,

@@ -403,6 +403,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
       const newPhysicalProtection = data.targetPhysicalProtection;
       const newMagicalProtection = data.targetMagicalProtection;
       const newAttackerActionsLeft = data.attackerActionsLeft;
+      const newAttackerAttacksLeftThisTurn = data.attackerAttacksLeftThisTurn;
 
       // Se o alvo vai morrer, marcar como pendente (para ignorar handleUnitDefeated)
       if (targetWillDie) {
@@ -427,12 +428,13 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
             },
           });
 
-          // Atualizar ações do atacante
+          // Atualizar ações e ataques extras do atacante
           dispatch({
             type: "UPDATE_UNIT",
             payload: {
               id: attackerId,
               actionsLeft: newAttackerActionsLeft,
+              attacksLeftThisTurn: newAttackerAttacksLeftThisTurn,
             },
           });
 
@@ -600,6 +602,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         hasStartedAction: boolean;
         movesLeft: number;
         actionsLeft: number;
+        attacksLeftThisTurn: number;
         conditions: string[];
         currentHp: number;
         isAlive: boolean;
@@ -632,6 +635,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
               hasStartedAction: serverUnit.hasStartedAction,
               movesLeft: serverUnit.movesLeft,
               actionsLeft: serverUnit.actionsLeft,
+              attacksLeftThisTurn: serverUnit.attacksLeftThisTurn,
               conditions: serverUnit.conditions,
               currentHp: serverUnit.currentHp,
               isAlive: serverUnit.isAlive,
@@ -779,6 +783,35 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
       });
     };
 
+    // Handler para toasts de batalha (ataques extras, etc)
+    const handleBattleToast = (data: {
+      battleId: string;
+      targetUserId: string;
+      type: "info" | "success" | "warning" | "error";
+      title: string;
+      message: string;
+      duration?: number;
+    }) => {
+      // Só mostrar toast para o jogador alvo
+      if (data.targetUserId === user.id) {
+        battleLog("🔔", "TOAST", {
+          type: data.type,
+          title: data.title,
+          message: data.message,
+        });
+        // Usar dispatch de erro como toast temporário (será mostrado na UI)
+        // Podemos melhorar isso depois com um sistema de toasts dedicado
+        dispatch({
+          type: "SET_ERROR",
+          payload: `${data.title}: ${data.message}`,
+        });
+        // Limpar após a duração
+        setTimeout(() => {
+          dispatch({ type: "SET_ERROR", payload: null });
+        }, data.duration ?? 3000);
+      }
+    };
+
     // Handler for session restoration (reconnection)
     const handleSessionRestored = (data: {
       lobbyId: string;
@@ -892,6 +925,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
     socketService.on("battle:rematch_requested", handleRematchRequested);
     socketService.on("battle:rematch_declined", handleRematchDeclined);
     socketService.on("battle:obstacle_destroyed", handleObstacleDestroyed);
+    socketService.on("battle:toast", handleBattleToast);
 
     return () => {
       socketService.off("battle:lobby_created", handleLobbyCreated);
@@ -925,6 +959,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
       socketService.off("battle:rematch_requested", handleRematchRequested);
       socketService.off("battle:rematch_declined", handleRematchDeclined);
       socketService.off("battle:obstacle_destroyed", handleObstacleDestroyed);
+      socketService.off("battle:toast", handleBattleToast);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);

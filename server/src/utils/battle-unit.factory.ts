@@ -2,6 +2,7 @@
 // Factory para criação de BattleUnits - elimina duplicação de código
 
 import { determineUnitActions } from "../logic/unit-actions";
+import { findSkillByCode } from "../data/skills.data";
 import {
   PHYSICAL_PROTECTION_CONFIG,
   MAGICAL_PROTECTION_CONFIG,
@@ -59,6 +60,7 @@ export interface BattleUnit {
   posY: number;
   movesLeft: number;
   actionsLeft: number;
+  attacksLeftThisTurn: number; // Ataques restantes neste turno (para extraAttacks)
   isAlive: boolean;
   actionMarks: number;
   physicalProtection: number;
@@ -73,6 +75,8 @@ export interface BattleUnit {
   size: UnitSize;
   // Alcance de visão calculado (max(10, focus))
   visionRange: number;
+  // Cooldowns de skills: skillCode -> rodadas restantes
+  skillCooldowns: Record<string, number>;
 }
 
 interface KingdomInfo {
@@ -100,7 +104,10 @@ export function createBattleUnit(
   position: Position,
   battleType: "arena" | "match" = "arena"
 ): BattleUnit {
-  // Determinar ações dinamicamente baseado nos stats
+  // Parse classFeatures do JSON
+  const classFeatures: string[] = JSON.parse(dbUnit.classFeatures || "[]");
+
+  // Determinar ações dinamicamente baseado nos stats e skills
   const unitActions = determineUnitActions(
     {
       combat: dbUnit.combat,
@@ -109,9 +116,22 @@ export function createBattleUnit(
       armor: dbUnit.armor,
       vitality: dbUnit.vitality,
       category: dbUnit.category,
+      classFeatures, // Passa skills aprendidas para adicionar ativas às ações
     },
     { battleType }
   );
+
+  // Coletar condições iniciais de skills passivas
+  const initialConditions: string[] = [];
+  for (const skillCode of classFeatures) {
+    const skill = findSkillByCode(skillCode);
+    if (skill && skill.category === "PASSIVE" && skill.conditionApplied) {
+      // Adicionar condição permanente da passiva
+      if (!initialConditions.includes(skill.conditionApplied)) {
+        initialConditions.push(skill.conditionApplied);
+      }
+    }
+  }
 
   return {
     id: generateUnitId(),
@@ -124,7 +144,7 @@ export function createBattleUnit(
     troopSlot: dbUnit.troopSlot ?? undefined,
     level: dbUnit.level,
     classCode: dbUnit.classCode ?? undefined,
-    classFeatures: JSON.parse(dbUnit.classFeatures || "[]"),
+    classFeatures, // Já foi parseado acima
     equipment: JSON.parse(dbUnit.equipment || "[]"),
     combat: dbUnit.combat,
     acuity: dbUnit.acuity,
@@ -138,6 +158,7 @@ export function createBattleUnit(
     posY: position.y,
     movesLeft: 0,
     actionsLeft: 1,
+    attacksLeftThisTurn: 0, // Ataques disponíveis (setado ao usar ação de ataque)
     isAlive: true,
     actionMarks: 0,
     // Proteção Física = Armor * PHYSICAL_PROTECTION_CONFIG.multiplier
@@ -150,13 +171,15 @@ export function createBattleUnit(
       (dbUnit.focus || 0) * MAGICAL_PROTECTION_CONFIG.multiplier,
     maxMagicalProtection:
       (dbUnit.focus || 0) * MAGICAL_PROTECTION_CONFIG.multiplier,
-    conditions: [],
+    conditions: initialConditions, // Condições iniciais de passivas
     hasStartedAction: false,
     actions: unitActions,
     // Tamanho da unidade (default: NORMAL 1x1)
     size: dbUnit.size || "NORMAL",
     // Alcance de visão = max(10, focus)
     visionRange: calculateUnitVision(dbUnit.focus),
+    // Cooldowns de skills inicializam vazios
+    skillCooldowns: {},
   };
 }
 

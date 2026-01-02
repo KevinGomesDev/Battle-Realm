@@ -7,6 +7,7 @@ import type {
   ConditionExpiry,
   ConditionInfo,
 } from "../../../shared/types/conditions.types";
+import { SKILL_CONDITIONS } from "./skill-conditions";
 
 // Re-exportar tipos para uso em outros arquivos do server
 export type {
@@ -19,7 +20,8 @@ export type {
 // Alias para manter compatibilidade com código existente
 export type ConditionEffect = ConditionDefinition;
 
-export const CONDITIONS: Record<string, ConditionDefinition> = {
+// Condições de combate gerais
+const COMBAT_CONDITIONS: Record<string, ConditionDefinition> = {
   GRAPPLED: {
     id: "GRAPPLED",
     name: "Grappled",
@@ -108,6 +110,12 @@ export const CONDITIONS: Record<string, ConditionDefinition> = {
       movementMultiplier: 0.5,
     },
   },
+};
+
+// CONDITIONS unifica condições de combate e condições de skills
+export const CONDITIONS: Record<string, ConditionDefinition> = {
+  ...COMBAT_CONDITIONS,
+  ...SKILL_CONDITIONS,
 };
 
 // Helper para obter mapa de cores das condições (usado pelo arena-config)
@@ -345,6 +353,138 @@ export function removeCondition(
   conditionId: string
 ): string[] {
   return conditions.filter((c) => c !== conditionId);
+}
+
+// =============================================================================
+// BUSCA GENÉRICA DE EFEITOS DE CONDIÇÕES
+// =============================================================================
+
+/**
+ * Resultado de uma busca de efeito em condições
+ */
+export interface ConditionEffectMatch {
+  conditionId: string;
+  conditionName: string;
+  effectValue: unknown;
+}
+
+/**
+ * Busca um efeito específico em todas as condições de uma unidade
+ * @param conditions Lista de IDs de condições da unidade
+ * @param effectKey Nome do efeito a buscar (ex: "extraAttacks", "minAttackSuccesses")
+ * @returns Lista de matches com conditionId, nome e valor do efeito
+ */
+export function searchConditionEffect(
+  conditions: string[],
+  effectKey: keyof ConditionEffects
+): ConditionEffectMatch[] {
+  const matches: ConditionEffectMatch[] = [];
+
+  for (const condId of conditions) {
+    const cond = CONDITIONS[condId];
+    if (!cond) continue;
+
+    const value = cond.effects[effectKey];
+    if (value !== undefined) {
+      matches.push({
+        conditionId: condId,
+        conditionName: cond.name,
+        effectValue: value,
+      });
+    }
+  }
+
+  return matches;
+}
+
+/**
+ * Soma valores numéricos de um efeito em todas as condições
+ * @param conditions Lista de IDs de condições da unidade
+ * @param effectKey Nome do efeito numérico
+ * @returns Soma de todos os valores
+ */
+export function sumConditionEffect(
+  conditions: string[],
+  effectKey: keyof ConditionEffects
+): number {
+  let total = 0;
+
+  for (const condId of conditions) {
+    const cond = CONDITIONS[condId];
+    if (!cond) continue;
+
+    const value = cond.effects[effectKey];
+    if (typeof value === "number") {
+      total += value;
+    }
+  }
+
+  return total;
+}
+
+/**
+ * Pega o maior valor numérico de um efeito em todas as condições
+ * @param conditions Lista de IDs de condições da unidade
+ * @param effectKey Nome do efeito numérico
+ * @returns Maior valor encontrado (0 se nenhum)
+ */
+export function maxConditionEffect(
+  conditions: string[],
+  effectKey: keyof ConditionEffects
+): number {
+  let max = 0;
+
+  for (const condId of conditions) {
+    const cond = CONDITIONS[condId];
+    if (!cond) continue;
+
+    const value = cond.effects[effectKey];
+    if (typeof value === "number" && value > max) {
+      max = value;
+    }
+  }
+
+  return max;
+}
+
+/**
+ * Calcula o número de ataques extras baseado nas condições da unidade
+ * @param conditions Lista de IDs de condições da unidade
+ * @param hasProtection Se a unidade ainda tem proteção física > 0
+ * @returns Número de ataques extras (0 = apenas 1 ataque normal)
+ */
+export function getExtraAttacksFromConditions(
+  conditions: string[],
+  hasProtection: boolean
+): number {
+  let extraAttacks = 0;
+
+  // Busca todas as condições que têm extraAttacks
+  const matches = searchConditionEffect(conditions, "extraAttacks");
+
+  for (const match of matches) {
+    // RECKLESS_ATTACK só dá extra attacks se NÃO tiver proteção
+    if (match.conditionId === "RECKLESS_ATTACK") {
+      if (!hasProtection && typeof match.effectValue === "number") {
+        extraAttacks += match.effectValue;
+      }
+      continue;
+    }
+
+    // Outras condições com extraAttacks (como EXTRA_ATTACK do Warrior)
+    if (typeof match.effectValue === "number") {
+      extraAttacks += match.effectValue;
+    }
+  }
+
+  return extraAttacks;
+}
+
+/**
+ * Calcula o mínimo de acertos garantidos em ataques (ex: WILD_FURY)
+ */
+export function getMinAttackSuccesses(conditions: string[]): number {
+  return maxConditionEffect(conditions, "minAttackSuccesses");
 }
 
 // =============================================================================

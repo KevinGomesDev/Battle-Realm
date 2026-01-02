@@ -19,6 +19,7 @@ import {
   emitConditionRemovedEvent,
 } from "./combat-events";
 import { getMaxMarksByCategory } from "../utils/battle.utils";
+import { tickSkillCooldowns } from "./skill-executors";
 
 // =============================================================================
 // TIPOS
@@ -128,6 +129,7 @@ export function processUnitTurnEndConditions(unit: BattleUnit): TurnEndResult {
   // 6. Resetar recursos do turno
   unit.movesLeft = 0;
   unit.actionsLeft = 0;
+  unit.attacksLeftThisTurn = 0; // Resetar ataques extras
   unit.hasStartedAction = false;
 
   return {
@@ -273,6 +275,11 @@ export async function processNewRound(
     // Resetar movimentos e ações para 0 - serão definidos ao escolher a unidade
     unit.movesLeft = 0;
     unit.actionsLeft = 0;
+    // Resetar ataques extras
+    unit.attacksLeftThisTurn = 0;
+
+    // Reduzir cooldowns de skills em 1 a cada rodada
+    tickSkillCooldowns(unit);
   }
 
   // Processar condições de início de turno para todas as unidades vivas
@@ -518,6 +525,7 @@ export function emitTurnEndEvents(
       hasStartedAction: u.hasStartedAction,
       movesLeft: u.movesLeft,
       actionsLeft: u.actionsLeft,
+      attacksLeftThisTurn: u.attacksLeftThisTurn,
       conditions: u.conditions,
       currentHp: u.currentHp,
       isAlive: u.isAlive,

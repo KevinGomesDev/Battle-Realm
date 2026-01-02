@@ -108,12 +108,14 @@ export async function saveBattleToDB(battle: Battle): Promise<void> {
           currentHp: unit.currentHp,
           movesLeft: unit.movesLeft,
           actionsLeft: unit.actionsLeft,
+          attacksLeftThisTurn: unit.attacksLeftThisTurn,
           isAlive: unit.isAlive,
           actionMarks: unit.actionMarks,
           protection: unit.physicalProtection,
           protectionBroken: false,
           conditions: JSON.stringify(unit.conditions),
           hasStartedAction: unit.hasStartedAction,
+          skillCooldowns: JSON.stringify(unit.skillCooldowns || {}),
         },
         create: {
           id: unit.id,
@@ -148,6 +150,7 @@ export async function saveBattleToDB(battle: Battle): Promise<void> {
           actions: JSON.stringify(unit.actions),
           size: unit.size || "NORMAL",
           visionRange: unit.visionRange || 10,
+          skillCooldowns: JSON.stringify(unit.skillCooldowns || {}),
         },
       });
     }
@@ -351,6 +354,7 @@ export async function loadBattlesFromDB(): Promise<void> {
         initiative: u.initiative,
         movesLeft: u.movesLeft,
         actionsLeft: u.actionsLeft,
+        attacksLeftThisTurn: u.attacksLeftThisTurn ?? 0,
         isAlive: u.isAlive,
         actionMarks: u.actionMarks,
         physicalProtection:
@@ -365,6 +369,8 @@ export async function loadBattlesFromDB(): Promise<void> {
         size:
           (u.size as "NORMAL" | "LARGE" | "HUGE" | "GARGANTUAN") || "NORMAL",
         visionRange: u.visionRange ?? Math.max(10, u.focus),
+        // Cooldowns de skills (lidos do banco ou default vazio)
+        skillCooldowns: JSON.parse(u.skillCooldowns || "{}"),
       }));
 
       const battle: Battle = {

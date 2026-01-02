@@ -5,8 +5,10 @@ import {
   executeDashAction,
   executeDodgeAction,
   executeMoveAction,
+  executeSkillAction,
   type CombatUnit,
 } from "../../logic/combat-actions";
+import { findSkillByCode } from "../../data/skills.data";
 import {
   processUnitTurnEndConditions,
   advanceToNextPlayer,
@@ -21,6 +23,10 @@ import {
   getEffectiveAcuityWithConditions,
   getMaxMarksByCategory,
 } from "../../utils/battle.utils";
+import {
+  getExtraAttacksFromConditions,
+  getMinAttackSuccesses,
+} from "../../logic/conditions";
 import {
   activeBattles,
   battleLobbies,
@@ -269,6 +275,7 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
           hasStartedAction: u.hasStartedAction,
           movesLeft: u.movesLeft,
           actionsLeft: u.actionsLeft,
+          attacksLeftThisTurn: u.attacksLeftThisTurn,
           conditions: u.conditions,
           currentHp: u.currentHp,
           isAlive: u.isAlive,
@@ -455,6 +462,7 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
             damageType: result.damageType,
             targetHpAfter: result.targetHpAfter,
             attackerActionsLeft: attacker.actionsLeft,
+            attackerAttacksLeftThisTurn: result.attacksLeftThisTurn ?? 0,
             missed: result.missed ?? false,
             attackDiceCount: result.attackDiceCount ?? 0,
             attackRolls: result.attackRolls ?? [],
@@ -478,6 +486,18 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
             targetCombat: target?.combat ?? 0,
             targetAcuity: target?.acuity ?? 0,
           });
+
+          // Emitir toast se houver ataques extras disponíveis
+          if ((result.attacksLeftThisTurn ?? 0) > 0) {
+            io.to(lobby.lobbyId).emit("battle:toast", {
+              battleId,
+              targetUserId: attacker.ownerId,
+              type: "info",
+              title: "⚔️ Ataques Extras!",
+              message: `${attacker.name} pode atacar mais ${result.attacksLeftThisTurn} vez(es)!`,
+              duration: 3000,
+            });
+          }
 
           if (result.obstacleDestroyed && result.obstacleId) {
             io.to(lobby.lobbyId).emit("battle:obstacle_destroyed", {
@@ -699,6 +719,149 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
       console.error("[ARENA] surrender error:", err);
     }
   });
+
+  // ==========================================================================
+  // SKILL HANDLER - Uso de habilidades ativas
+  // ==========================================================================
+  socket.on(
+    "battle:use_skill",
+    async ({
+      battleId,
+      casterUnitId,
+      skillCode,
+      targetUnitId,
+    }: {
+      battleId: string;
+      casterUnitId: string;
+      skillCode: string;
+      targetUnitId?: string;
+    }) => {
+      try {
+        const battle = activeBattles.get(battleId);
+        if (!battle || battle.status !== "ACTIVE") {
+          return socket.emit("battle:error", { message: "Batalha inválida" });
+        }
+
+        const caster = battle.units.find((u) => u.id === casterUnitId);
+        if (!caster || !caster.isAlive) {
+          return socket.emit("battle:error", { message: "Unidade inválida" });
+        }
+
+        // Buscar skill para info
+        const skill = findSkillByCode(skillCode);
+        if (!skill) {
+          return socket.emit("battle:error", {
+            message: "Skill não encontrada",
+          });
+        }
+
+        let target: (typeof battle.units)[number] | null = null;
+        if (targetUnitId) {
+          target = battle.units.find((u) => u.id === targetUnitId) || null;
+          if (!target) {
+            return socket.emit("battle:error", {
+              message: "Alvo não encontrado",
+            });
+          }
+        }
+
+        // Executar skill
+        const result = executeSkillAction(
+          caster as CombatUnit,
+          skillCode,
+          target as CombatUnit | null,
+          battle.units as CombatUnit[],
+          battle.isArena
+        );
+
+        if (!result.success) {
+          return socket.emit("battle:error", { message: result.error });
+        }
+
+        const lobby = battleLobbies.get(battle.lobbyId);
+        if (lobby) {
+          // Emitir evento de skill usada
+          io.to(lobby.lobbyId).emit("battle:skill_used", {
+            battleId,
+            casterUnitId,
+            skillCode,
+            skillName: skill.name,
+            targetUnitId: targetUnitId || null,
+            result: {
+              healAmount: result.healAmount,
+              damageDealt: result.damageDealt,
+              conditionApplied: result.conditionApplied,
+              conditionRemoved: result.conditionRemoved,
+              actionsGained: result.actionsGained,
+            },
+            casterActionsLeft: result.casterActionsLeft,
+            targetHpAfter: result.targetHpAfter,
+            targetDefeated: result.targetDefeated,
+            casterName: caster.name,
+            targetName: target?.name || null,
+          });
+
+          // Se alvo foi derrotado, verificar vitória
+          if (result.targetDefeated && target) {
+            io.to(lobby.lobbyId).emit("battle:unit_defeated", {
+              battleId,
+              unitId: target.id,
+            });
+
+            const victoryCheck = checkVictoryCondition(battle);
+
+            if (victoryCheck.battleEnded) {
+              battle.status = "ENDED";
+              stopBattleTurnTimer(battle.id);
+
+              emitBattleEndEvents(
+                io,
+                lobby.lobbyId,
+                battle.id,
+                victoryCheck,
+                battle.units
+              );
+
+              const loserId =
+                victoryCheck.winnerId === lobby.hostUserId
+                  ? lobby.guestUserId
+                  : lobby.hostUserId;
+              await updateUserStats(
+                victoryCheck.winnerId,
+                loserId,
+                battle.isArena
+              );
+
+              userToLobby.delete(lobby.hostUserId);
+              if (lobby.guestUserId) {
+                userToLobby.delete(lobby.guestUserId);
+              }
+
+              lobby.status = "ENDED";
+              await deleteBattleFromDB(battleId);
+              await deleteLobbyFromDB(lobby.lobbyId);
+              console.log(
+                `[ARENA] Batalha ${battleId} finalizada por skill. Vencedor: ${victoryCheck.winnerId}`
+              );
+            }
+          }
+        }
+
+        if (battle.status === "ACTIVE") {
+          await saveBattleToDB(battle);
+        }
+
+        console.log(
+          `[ARENA] Skill ${skillCode} usada por ${caster.name} -> ${
+            target?.name || "self"
+          }`
+        );
+      } catch (err) {
+        console.error("[ARENA] use_skill error:", err);
+        socket.emit("battle:error", { message: "Erro ao usar skill" });
+      }
+    }
+  );
 
   socket.on("battle:leave_battle", async ({ battleId, userId }) => {
     try {

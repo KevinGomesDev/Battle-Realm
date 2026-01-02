@@ -44,6 +44,62 @@ export const DEFAULT_RANGE_VALUES: Record<SkillRange, number> = {
 // =============================================================================
 
 /**
+ * Resultado da execução de uma skill
+ */
+export interface SkillExecutionResult {
+  success: boolean;
+  error?: string;
+  skillCode?: string;
+  // Dados da execução
+  healAmount?: number;
+  damageDealt?: number;
+  conditionApplied?: string;
+  conditionRemoved?: string;
+  actionsGained?: number;
+  movementGained?: number;
+  // Dados de rolagem (se aplicável)
+  rolls?: number[];
+  successes?: number;
+  // Estado após execução
+  casterActionsLeft?: number;
+  targetHpAfter?: number;
+  targetDefeated?: boolean;
+  // Posição (para teleporte)
+  newPosX?: number;
+  newPosY?: number;
+}
+
+/**
+ * Unidade de combate para execução de skills
+ */
+export interface SkillCombatUnit {
+  id: string;
+  ownerId: string;
+  name: string;
+  category: string;
+  combat: number;
+  acuity: number;
+  focus: number;
+  armor: number;
+  vitality: number;
+  damageReduction: number;
+  currentHp: number;
+  posX: number;
+  posY: number;
+  movesLeft: number;
+  actionsLeft: number;
+  isAlive: boolean;
+  physicalProtection: number;
+  maxPhysicalProtection: number;
+  magicalProtection: number;
+  maxMagicalProtection: number;
+  conditions: string[];
+  actions: string[];
+  // Cooldowns de skills: skillCode -> rodadas restantes
+  skillCooldowns?: Record<string, number>;
+}
+
+/**
  * Definição de uma skill/habilidade
  */
 export interface SkillDefinition {
@@ -65,9 +121,13 @@ export interface SkillDefinition {
   // Alvo (para ACTIVE com AREA)
   targetType?: SkillTargetType;
 
-  // Execução
+  // Execução (apenas para ACTIVE)
   functionName?: string; // Nome da função que executa a skill
-  conditionApplied?: string; // Para PASSIVE: condição que aplica
+  consumesAction?: boolean; // Se consome ação ao usar. Default: true
+  cooldown?: number; // Rodadas de espera após uso. Default: 0
+
+  // Condição aplicada (para PASSIVE ou algumas ACTIVE)
+  conditionApplied?: string;
 
   // Extras
   metadata?: Record<string, any>;

@@ -310,7 +310,10 @@ export const ArenaBattleCanvas = memo(
         if (!isMyTurn) return new Set();
         // Só mostrar células atacáveis quando ação de ataque estiver selecionada
         if (pendingAction !== "attack") return new Set();
-        if (!selectedUnit || selectedUnit.actionsLeft <= 0) return new Set();
+        if (!selectedUnit) return new Set();
+        // Pode atacar se tem ações OU ataques extras restantes
+        const hasExtraAttacks = (selectedUnit.attacksLeftThisTurn ?? 0) > 0;
+        if (selectedUnit.actionsLeft <= 0 && !hasExtraAttacks) return new Set();
 
         const attackable = new Set<string>();
 

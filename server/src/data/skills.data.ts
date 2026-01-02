@@ -8,8 +8,8 @@ import type { SkillDefinition } from "../../../shared/types/skills.types";
 // BÁRBARO - Skills (PHYSICAL / FOOD)
 // =============================================================================
 
-export const BARBARIAN_WILD_FURY: SkillDefinition = {
-  code: "BARBARIAN_WILD_FURY",
+export const WILD_FURY: SkillDefinition = {
+  code: "WILD_FURY",
   name: "Fúria Selvagem",
   description:
     "Todo dano recebido reduzido em 1. Ataques têm mínimo 2 de acertos. Duplicado sem Proteção.",
@@ -17,16 +17,16 @@ export const BARBARIAN_WILD_FURY: SkillDefinition = {
   conditionApplied: "WILD_FURY",
 };
 
-export const BARBARIAN_RECKLESS_ATTACK: SkillDefinition = {
-  code: "BARBARIAN_RECKLESS_ATTACK",
+export const RECKLESS_ATTACK: SkillDefinition = {
+  code: "RECKLESS_ATTACK",
   name: "Ataque Descuidado",
   description: "Sem Proteção: Pode atacar 2x quando usa Ação de Ataque.",
   category: "PASSIVE",
   conditionApplied: "RECKLESS_ATTACK",
 };
 
-export const BARBARIAN_TOTAL_DESTRUCTION: SkillDefinition = {
-  code: "BARBARIAN_TOTAL_DESTRUCTION",
+export const TOTAL_DESTRUCTION: SkillDefinition = {
+  code: "TOTAL_DESTRUCTION",
   name: "Destruição Total",
   description:
     "Escolha dano de 1 até seu Combate em alvo adjacente. Você recebe o mesmo dano.",
@@ -35,20 +35,22 @@ export const BARBARIAN_TOTAL_DESTRUCTION: SkillDefinition = {
   range: "ADJACENT",
   targetType: "ENEMY",
   functionName: "executeTotalDestruction",
+  consumesAction: true,
+  cooldown: 0,
 };
 
 export const BARBARIAN_SKILLS: SkillDefinition[] = [
-  BARBARIAN_WILD_FURY,
-  BARBARIAN_RECKLESS_ATTACK,
-  BARBARIAN_TOTAL_DESTRUCTION,
+  WILD_FURY,
+  RECKLESS_ATTACK,
+  TOTAL_DESTRUCTION,
 ];
 
 // =============================================================================
 // GUERREIRO - Skills (PHYSICAL / FOOD)
 // =============================================================================
 
-export const WARRIOR_EXTRA_ATTACK: SkillDefinition = {
-  code: "WARRIOR_EXTRA_ATTACK",
+export const EXTRA_ATTACK: SkillDefinition = {
+  code: "EXTRA_ATTACK",
   name: "Ataque Extra",
   description:
     "Quando usa a Ação de Ataque, você pode realizar um ataque a mais.",
@@ -56,8 +58,8 @@ export const WARRIOR_EXTRA_ATTACK: SkillDefinition = {
   conditionApplied: "EXTRA_ATTACK",
 };
 
-export const WARRIOR_SECOND_WIND: SkillDefinition = {
-  code: "WARRIOR_SECOND_WIND",
+export const SECOND_WIND: SkillDefinition = {
+  code: "SECOND_WIND",
   name: "Retomar Fôlego",
   description:
     "Recupera HP igual à sua Vitalidade. Pode ser usado uma vez por batalha.",
@@ -65,30 +67,34 @@ export const WARRIOR_SECOND_WIND: SkillDefinition = {
   costTier: "LOW",
   range: "SELF",
   functionName: "executeSecondWind",
+  consumesAction: true,
+  cooldown: 999, // Uma vez por batalha
 };
 
-export const WARRIOR_ACTION_SURGE: SkillDefinition = {
-  code: "WARRIOR_ACTION_SURGE",
+export const ACTION_SURGE: SkillDefinition = {
+  code: "ACTION_SURGE",
   name: "Surto de Ação",
   description: "Você recebe uma ação extra em seu turno.",
   category: "ACTIVE",
   costTier: "MEDIUM",
   range: "SELF",
   functionName: "executeActionSurge",
+  consumesAction: false, // NÃO consome ação!
+  cooldown: 3,
 };
 
 export const WARRIOR_SKILLS: SkillDefinition[] = [
-  WARRIOR_EXTRA_ATTACK,
-  WARRIOR_SECOND_WIND,
-  WARRIOR_ACTION_SURGE,
+  EXTRA_ATTACK,
+  SECOND_WIND,
+  ACTION_SURGE,
 ];
 
 // =============================================================================
 // LADINO - Skills (PHYSICAL / FOOD)
 // =============================================================================
 
-export const ROGUE_SNEAK_ATTACK: SkillDefinition = {
-  code: "ROGUE_SNEAK_ATTACK",
+export const SNEAK_ATTACK: SkillDefinition = {
+  code: "SNEAK_ATTACK",
   name: "Ataque Furtivo",
   description:
     "Causa +3 de dano ao atacar um inimigo que não te viu ou que está flanqueado.",
@@ -96,16 +102,16 @@ export const ROGUE_SNEAK_ATTACK: SkillDefinition = {
   conditionApplied: "SNEAK_ATTACK",
 };
 
-export const ROGUE_CUNNING_ACTION: SkillDefinition = {
-  code: "ROGUE_CUNNING_ACTION",
+export const CUNNING_ACTION: SkillDefinition = {
+  code: "CUNNING_ACTION",
   name: "Ação Ardilosa",
   description: "Pode usar Dash, Disengage ou Hide como ação bônus.",
   category: "PASSIVE",
   conditionApplied: "CUNNING_ACTION",
 };
 
-export const ROGUE_ASSASSINATE: SkillDefinition = {
-  code: "ROGUE_ASSASSINATE",
+export const ASSASSINATE: SkillDefinition = {
+  code: "ASSASSINATE",
   name: "Assassinar",
   description:
     "Primeiro ataque em combate contra alvo que não agiu causa dano dobrado.",
@@ -114,17 +120,17 @@ export const ROGUE_ASSASSINATE: SkillDefinition = {
 };
 
 export const ROGUE_SKILLS: SkillDefinition[] = [
-  ROGUE_SNEAK_ATTACK,
-  ROGUE_CUNNING_ACTION,
-  ROGUE_ASSASSINATE,
+  SNEAK_ATTACK,
+  CUNNING_ACTION,
+  ASSASSINATE,
 ];
 
 // =============================================================================
 // PATRULHEIRO - Skills (PHYSICAL / FOOD)
 // =============================================================================
 
-export const RANGER_HUNTERS_MARK: SkillDefinition = {
-  code: "RANGER_HUNTERS_MARK",
+export const HUNTERS_MARK: SkillDefinition = {
+  code: "HUNTERS_MARK",
   name: "Marca do Caçador",
   description:
     "Marca um inimigo. Todos os seus ataques contra ele causam +2 de dano.",
@@ -134,10 +140,12 @@ export const RANGER_HUNTERS_MARK: SkillDefinition = {
   rangeValue: 6,
   targetType: "ENEMY",
   functionName: "executeHuntersMark",
+  consumesAction: true,
+  cooldown: 0,
 };
 
-export const RANGER_NATURAL_EXPLORER: SkillDefinition = {
-  code: "RANGER_NATURAL_EXPLORER",
+export const NATURAL_EXPLORER: SkillDefinition = {
+  code: "NATURAL_EXPLORER",
   name: "Explorador Natural",
   description:
     "+2 de movimento em terrenos naturais. Não sofre penalidades de terreno difícil.",
@@ -145,8 +153,8 @@ export const RANGER_NATURAL_EXPLORER: SkillDefinition = {
   conditionApplied: "NATURAL_EXPLORER",
 };
 
-export const RANGER_VOLLEY: SkillDefinition = {
-  code: "RANGER_VOLLEY",
+export const VOLLEY: SkillDefinition = {
+  code: "VOLLEY",
   name: "Rajada",
   description: "Ataca todos os inimigos em uma área com metade do dano normal.",
   category: "ACTIVE",
@@ -155,40 +163,48 @@ export const RANGER_VOLLEY: SkillDefinition = {
   rangeValue: 2,
   targetType: "ENEMY",
   functionName: "executeVolley",
+  consumesAction: true,
+  cooldown: 2,
 };
 
 export const RANGER_SKILLS: SkillDefinition[] = [
-  RANGER_HUNTERS_MARK,
-  RANGER_NATURAL_EXPLORER,
-  RANGER_VOLLEY,
+  HUNTERS_MARK,
+  NATURAL_EXPLORER,
+  VOLLEY,
 ];
 
 // =============================================================================
 // CLÉRIGO - Skills (SPIRITUAL / DEVOTION)
 // =============================================================================
 
-export const CLERIC_HEAL: SkillDefinition = {
-  code: "CLERIC_HEAL",
+export const HEAL: SkillDefinition = {
+  code: "HEAL",
   name: "Curar",
-  description: "Cura um aliado adjacente em 1d6 + Foco de HP.",
+  description: "Cura um aliado adjacente em Foco de HP.",
   category: "ACTIVE",
   costTier: "LOW",
   range: "ADJACENT",
   targetType: "ALLY",
   functionName: "executeHeal",
+  consumesAction: true,
+  cooldown: 1,
 };
 
-export const CLERIC_CELESTIAL_EXPULSION: SkillDefinition = {
-  code: "CLERIC_CELESTIAL_EXPULSION",
+export const CELESTIAL_EXPULSION: SkillDefinition = {
+  code: "CELESTIAL_EXPULSION",
   name: "Expulsão Celestial",
-  description:
-    "Você e aliados adjacentes não podem ser afetados por Maldições.",
-  category: "PASSIVE",
-  conditionApplied: "CELESTIAL_EXPULSION",
+  description: "Remove condições negativas do alvo.",
+  category: "ACTIVE",
+  costTier: "MEDIUM",
+  range: "ADJACENT",
+  targetType: "ALLY",
+  functionName: "executeCelestialExpulsion",
+  consumesAction: true,
+  cooldown: 2,
 };
 
-export const CLERIC_BLESS: SkillDefinition = {
-  code: "CLERIC_BLESS",
+export const BLESS: SkillDefinition = {
+  code: "BLESS",
   name: "Abençoar",
   description: "Aliados em área ganham +1 em todos os testes por 3 turnos.",
   category: "ACTIVE",
@@ -197,20 +213,22 @@ export const CLERIC_BLESS: SkillDefinition = {
   rangeValue: 2,
   targetType: "ALLY",
   functionName: "executeBless",
+  consumesAction: true,
+  cooldown: 3,
 };
 
 export const CLERIC_SKILLS: SkillDefinition[] = [
-  CLERIC_HEAL,
-  CLERIC_CELESTIAL_EXPULSION,
-  CLERIC_BLESS,
+  HEAL,
+  CELESTIAL_EXPULSION,
+  BLESS,
 ];
 
 // =============================================================================
 // MAGO - Skills (ARCANE / ARCANA)
 // =============================================================================
 
-export const WIZARD_ARCANE_MASTERY: SkillDefinition = {
-  code: "WIZARD_ARCANE_MASTERY",
+export const ARCANE_MASTERY: SkillDefinition = {
+  code: "ARCANE_MASTERY",
   name: "Maestria Arcana",
   description:
     "Pode conjurar qualquer magia arcana. +1 dado em todos os testes de Foco.",
@@ -218,8 +236,8 @@ export const WIZARD_ARCANE_MASTERY: SkillDefinition = {
   conditionApplied: "ARCANE_MASTERY",
 };
 
-export const WIZARD_FIREBALL: SkillDefinition = {
-  code: "WIZARD_FIREBALL",
+export const FIREBALL: SkillDefinition = {
+  code: "FIREBALL",
   name: "Bola de Fogo",
   description: "Causa 2d6 de dano de fogo em todos os alvos em uma área.",
   category: "ACTIVE",
@@ -228,10 +246,12 @@ export const WIZARD_FIREBALL: SkillDefinition = {
   rangeValue: 3,
   targetType: "ALL",
   functionName: "executeFireball",
+  consumesAction: true,
+  cooldown: 2,
 };
 
-export const WIZARD_TELEPORT: SkillDefinition = {
-  code: "WIZARD_TELEPORT",
+export const TELEPORT: SkillDefinition = {
+  code: "TELEPORT",
   name: "Teleportar",
   description: "Teleporta para qualquer posição dentro do alcance.",
   category: "ACTIVE",
@@ -240,12 +260,14 @@ export const WIZARD_TELEPORT: SkillDefinition = {
   rangeValue: 6,
   targetType: "SELF",
   functionName: "executeTeleport",
+  consumesAction: true,
+  cooldown: 3,
 };
 
 export const WIZARD_SKILLS: SkillDefinition[] = [
-  WIZARD_ARCANE_MASTERY,
-  WIZARD_FIREBALL,
-  WIZARD_TELEPORT,
+  ARCANE_MASTERY,
+  FIREBALL,
+  TELEPORT,
 ];
 
 // =============================================================================
@@ -257,7 +279,7 @@ export const TROOP_SKILLS: SkillDefinition[] = [
     code: "ESCUDO_PROTETOR",
     name: "Escudo Protetor",
     description:
-      "A tropa pode usar sua Reação para absorver parte do dano de um aliado adjacente, reduzindo o dano em 2.",
+      "Quando um aliado adjacente recebe dano, 2 desse dano é automaticamente transferido para você.",
     category: "PASSIVE",
     availableForTroops: true,
     conditionApplied: "ESCUDO_PROTETOR",
@@ -301,11 +323,14 @@ export const TROOP_SKILLS: SkillDefinition[] = [
 ];
 
 // =============================================================================
-// TODAS AS SKILLS (para busca rápida) - Apenas 3 classes
+// TODAS AS SKILLS (para busca rápida) - Todas as classes + Tropas
 // =============================================================================
 
 export const ALL_SKILLS: SkillDefinition[] = [
+  ...BARBARIAN_SKILLS,
   ...WARRIOR_SKILLS,
+  ...ROGUE_SKILLS,
+  ...RANGER_SKILLS,
   ...CLERIC_SKILLS,
   ...WIZARD_SKILLS,
   ...TROOP_SKILLS,

@@ -701,30 +701,36 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
                       const color =
                         COLOR_CLASSES[actionInfo.color] || COLOR_CLASSES.gray;
 
+                      // Para ataques: permite se tem ações OU ataques extras restantes
+                      // Para outras ações: só permite se tem ações
+                      const isAttackAction = actionKey === "attack";
+                      const hasExtraAttacks =
+                        (selectedUnit.attacksLeftThisTurn ?? 0) > 0;
+                      const canExecute = isAttackAction
+                        ? selectedUnit.actionsLeft > 0 || hasExtraAttacks
+                        : selectedUnit.actionsLeft > 0;
+
                       return (
                         <div key={actionKey} className="relative group">
                           <button
                             onClick={() => {
-                              if (selectedUnit.actionsLeft <= 0) return;
+                              if (!canExecute) return;
                               if (isTargetAction) {
                                 onSetPendingAction(isActive ? null : actionKey);
                               } else {
                                 onExecuteAction(actionKey, selectedUnit.id);
                               }
                             }}
-                            disabled={selectedUnit.actionsLeft <= 0}
+                            disabled={!canExecute}
                             className={`w-full p-1.5 rounded-lg border-2 text-center transition-all ${
                               isActive
                                 ? color.active
-                                : selectedUnit.actionsLeft > 0
+                                : canExecute
                                 ? `${color.normal} cursor-pointer`
                                 : "bg-gray-800/40 border-gray-600/30 opacity-50 cursor-not-allowed"
                             }`}
                             style={{
-                              cursor:
-                                selectedUnit.actionsLeft > 0
-                                  ? "pointer"
-                                  : "not-allowed",
+                              cursor: canExecute ? "pointer" : "not-allowed",
                             }}
                           >
                             <span className="text-lg block">

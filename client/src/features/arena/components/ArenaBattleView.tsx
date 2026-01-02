@@ -138,6 +138,7 @@ export const ArenaBattleView: React.FC = () => {
       !myAliveUnit.hasStartedAction &&
       myAliveUnit.movesLeft === 0 &&
       myAliveUnit.actionsLeft === 0 &&
+      (myAliveUnit.attacksLeftThisTurn ?? 0) === 0 &&
       beginActionCalledRef.current !== turnKey;
 
     if (shouldBeginAction) {
@@ -180,7 +181,8 @@ export const ArenaBattleView: React.FC = () => {
     if (
       myUnit.hasStartedAction &&
       myUnit.movesLeft === 0 &&
-      myUnit.actionsLeft === 0
+      myUnit.actionsLeft === 0 &&
+      (myUnit.attacksLeftThisTurn ?? 0) === 0
     ) {
       // Usar debounce para dar tempo de respostas do servidor (ex: Disparada restaura movimento)
       autoEndTimerRef.current = setTimeout(() => {
@@ -202,7 +204,8 @@ export const ArenaBattleView: React.FC = () => {
           currentUnit &&
           currentUnit.hasStartedAction &&
           currentUnit.movesLeft === 0 &&
-          currentUnit.actionsLeft === 0
+          currentUnit.actionsLeft === 0 &&
+          (currentUnit.attacksLeftThisTurn ?? 0) === 0
         ) {
           console.log(
             "%c[ArenaBattleView] ✅ Movimentos e ações esgotados - Auto-encerrar turno",
@@ -238,7 +241,8 @@ export const ArenaBattleView: React.FC = () => {
     if (
       myUnit.hasStartedAction &&
       myUnit.movesLeft === 0 &&
-      myUnit.actionsLeft === 0
+      myUnit.actionsLeft === 0 &&
+      (myUnit.attacksLeftThisTurn ?? 0) === 0
     ) {
       console.log(
         "%c[ArenaBattleView] ✅ Dice roll fechou - Auto-encerrar turno",
