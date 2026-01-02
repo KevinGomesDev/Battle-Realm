@@ -1,6 +1,5 @@
 import {
   validateGridMove,
-  applyProtectionDamage,
   applyDualProtectionDamage,
 } from "../utils/battle.utils";
 import {
@@ -49,14 +48,9 @@ export interface CombatUnit {
   // Proteção Física - ver shared/config/balance.config.ts
   physicalProtection: number;
   maxPhysicalProtection: number;
-  physicalProtectionBroken: boolean;
   // Proteção Mágica - ver shared/config/balance.config.ts
   magicalProtection: number;
   maxMagicalProtection: number;
-  magicalProtectionBroken: boolean;
-  // Legado - manter para compatibilidade
-  protection: number;
-  protectionBroken: boolean;
   conditions: string[];
   actions: string[];
 }
@@ -98,10 +92,6 @@ export interface AttackActionResult {
   // Para obstáculos
   obstacleDestroyed?: boolean;
   obstacleId?: string;
-  // Legado
-  diceCount?: number;
-  rolls?: number[];
-  targetProtection?: number;
 }
 
 export interface DashActionResult {
@@ -321,9 +311,6 @@ export function executeAttackAction(
       obstacleDestroyed: destroyed,
       obstacleId: obstacle.id,
       targetDefeated: destroyed,
-      // Legado
-      diceCount: attackDiceCount,
-      rolls: attackRoll.allRolls,
     };
   }
 
@@ -357,9 +344,6 @@ export function executeAttackAction(
       damageType,
       targetHpAfter: 0,
       targetDefeated: destroyed,
-      // Legado
-      diceCount: attackDiceCount,
-      rolls: attackRoll.allRolls,
     };
   }
 
@@ -399,10 +383,6 @@ export function executeAttackAction(
       targetPhysicalProtection: target.physicalProtection,
       targetMagicalProtection: target.magicalProtection,
       targetDefeated: false,
-      // Legado
-      diceCount: 0,
-      rolls: [],
-      targetProtection: target.protection,
     };
   }
 
@@ -428,8 +408,6 @@ export function executeAttackAction(
     damageType,
     targetPhysicalProtection: target.physicalProtection,
     targetMagicalProtection: target.magicalProtection,
-    targetPhysicalProtectionBroken: target.physicalProtectionBroken,
-    targetMagicalProtectionBroken: target.magicalProtectionBroken,
     targetCurrentHp: target.currentHp,
   });
 
@@ -437,8 +415,6 @@ export function executeAttackAction(
   const protectionResult = applyDualProtectionDamage(
     target.physicalProtection,
     target.magicalProtection,
-    target.physicalProtectionBroken,
-    target.magicalProtectionBroken,
     target.currentHp,
     damageToApply,
     damageType
@@ -455,14 +431,7 @@ export function executeAttackAction(
 
   target.physicalProtection = protectionResult.newPhysicalProtection;
   target.magicalProtection = protectionResult.newMagicalProtection;
-  target.physicalProtectionBroken =
-    protectionResult.newPhysicalProtectionBroken;
-  target.magicalProtectionBroken = protectionResult.newMagicalProtectionBroken;
   target.currentHp = protectionResult.newHp;
-
-  // Sincronizar com campo legado
-  target.protection = target.physicalProtection;
-  target.protectionBroken = target.physicalProtectionBroken;
 
   // Aplicar expiração de condições
   attacker.conditions = applyConditionScanResult(
@@ -497,10 +466,6 @@ export function executeAttackAction(
     targetPhysicalProtection: target.physicalProtection,
     targetMagicalProtection: target.magicalProtection,
     targetDefeated,
-    // Legado
-    diceCount: attackDiceCount,
-    rolls: attackRoll.allRolls,
-    targetProtection: target.protection,
   };
 }
 
@@ -890,27 +855,29 @@ export function executeThrowAction(
   let targetDamage = 0;
 
   if (successes > 0) {
-    const attackerResult = applyProtectionDamage(
-      attacker.protection,
-      attacker.protectionBroken,
+    // Aplicar dano no atacante (colisão causa dano físico)
+    const attackerResult = applyDualProtectionDamage(
+      attacker.physicalProtection,
+      attacker.magicalProtection,
       attacker.currentHp,
       successes,
       "FISICO"
     );
-    attacker.protection = attackerResult.newProtection;
-    attacker.protectionBroken = attackerResult.newProtectionBroken;
+    attacker.physicalProtection = attackerResult.newPhysicalProtection;
+    attacker.magicalProtection = attackerResult.newMagicalProtection;
     attacker.currentHp = attackerResult.newHp;
     attackerDamage = successes;
 
-    const targetResult = applyProtectionDamage(
-      target.protection,
-      target.protectionBroken,
+    // Aplicar dano no alvo (colisão causa dano físico)
+    const targetResult = applyDualProtectionDamage(
+      target.physicalProtection,
+      target.magicalProtection,
       target.currentHp,
       successes,
       "FISICO"
     );
-    target.protection = targetResult.newProtection;
-    target.protectionBroken = targetResult.newProtectionBroken;
+    target.physicalProtection = targetResult.newPhysicalProtection;
+    target.magicalProtection = targetResult.newMagicalProtection;
     target.currentHp = targetResult.newHp;
     targetDamage = successes;
 

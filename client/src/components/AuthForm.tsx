@@ -1,11 +1,9 @@
 import React, { useState } from "react";
 import { ErrorAlert, SuccessAlert } from "@/components/Alerts";
+import type { AuthFormData } from "../../../shared/types/auth.types";
 
-export interface AuthFormData {
-  username: string;
-  email?: string;
-  password: string;
-}
+// Re-export for backwards compatibility
+export type { AuthFormData } from "../../../shared/types/auth.types";
 
 interface AuthFormProps {
   mode: "login" | "register";

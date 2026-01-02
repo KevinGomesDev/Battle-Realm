@@ -46,16 +46,30 @@ import {
   TROOP_RESOURCE_MAP,
 } from "../data/archetypes";
 
-export interface RegisterData {
-  username: string;
-  email: string;
-  password: string;
-}
-
-export interface LoginData {
-  username: string;
-  password: string;
-}
+// ============ RE-EXPORT SHARED TYPES ============
+export type {
+  RegisterData,
+  LoginData,
+  User,
+} from "../../../shared/types/auth.types";
+export type {
+  MatchStatus,
+  TurnType as MatchTurnType,
+  Match,
+  OpenMatch,
+  MatchPlayer,
+  CompleteMatchState,
+  MatchMapData,
+  PreparationData,
+  PlayerResources,
+} from "../../../shared/types/match.types";
+export type {
+  Territory,
+  TerrainName,
+  TerritoryType,
+  TerrainTypeConfig,
+  StructureInfo,
+} from "../../../shared/types/map.types";
 
 export interface CreateKingdomData {
   name: string;
@@ -136,14 +150,7 @@ export interface UnitDefinition {
 import { ResourceKey } from "../../../shared/config/global.config";
 export type ResourceType = ResourceKey;
 
-// Interface para os recursos de um jogador
-export interface PlayerResources {
-  ore: number;
-  supplies: number;
-  arcane: number;
-  experience: number;
-  devotion: number;
-}
+// PlayerResources já exportado de shared/types/match.types.ts
 
 // --- TURNOS E RODADAS ---
 // Importado de ./data/turns

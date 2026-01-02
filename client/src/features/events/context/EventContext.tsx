@@ -15,6 +15,10 @@ import type {
   EventContext as EventContextType,
   EventFilter,
 } from "../../../../../shared/types/events.types";
+import {
+  EventToastContainer,
+  type EventToastData,
+} from "../components/EventToast";
 
 // =============================================================================
 // TYPES
@@ -22,7 +26,9 @@ import type {
 
 interface EventState {
   events: GameEvent[];
+  toasts: EventToastData[];
   isLoading: boolean;
+  isHistoryOpen: boolean;
   currentContext: EventContextType | null;
   currentContextId: string | null;
   maxEvents: number;
@@ -33,6 +39,9 @@ type EventAction =
   | { type: "SET_EVENTS"; payload: GameEvent[] }
   | { type: "CLEAR_EVENTS" }
   | { type: "SET_LOADING"; payload: boolean }
+  | { type: "SET_HISTORY_OPEN"; payload: boolean }
+  | { type: "ADD_TOAST"; payload: EventToastData }
+  | { type: "REMOVE_TOAST"; payload: string }
   | {
       type: "SET_CONTEXT";
       payload: { context: EventContextType; contextId?: string };
@@ -47,6 +56,11 @@ interface EventContextValue {
   ) => void;
   fetchHistory: (filter?: EventFilter) => Promise<void>;
   clearEvents: () => void;
+  showToast: (event: GameEvent) => void;
+  dismissToast: (id: string) => void;
+  openHistory: () => void;
+  closeHistory: () => void;
+  toggleHistory: () => void;
 }
 
 // =============================================================================
@@ -55,7 +69,9 @@ interface EventContextValue {
 
 const initialState: EventState = {
   events: [],
+  toasts: [],
   isLoading: false,
+  isHistoryOpen: false,
   currentContext: null,
   currentContextId: null,
   maxEvents: 100,
@@ -80,6 +96,20 @@ function eventReducer(state: EventState, action: EventAction): EventState {
     case "SET_LOADING":
       return { ...state, isLoading: action.payload };
 
+    case "SET_HISTORY_OPEN":
+      return { ...state, isHistoryOpen: action.payload };
+
+    case "ADD_TOAST":
+      // Limitar a 5 toasts simultâneos
+      const newToasts = [action.payload, ...state.toasts].slice(0, 5);
+      return { ...state, toasts: newToasts };
+
+    case "REMOVE_TOAST":
+      return {
+        ...state,
+        toasts: state.toasts.filter((t) => t.id !== action.payload),
+      };
+
     case "SET_CONTEXT":
       return {
         ...state,
@@ -101,16 +131,35 @@ const EventContext = createContext<EventContextValue | null>(null);
 interface EventProviderProps {
   children: ReactNode;
   maxEvents?: number;
+  toastDuration?: number;
+  toastPosition?: "top-center" | "top-right" | "bottom-center" | "bottom-right";
 }
 
 export function EventProvider({
   children,
   maxEvents = 100,
+  toastDuration = 3000,
+  toastPosition = "top-center",
 }: EventProviderProps) {
   const [state, dispatch] = useReducer(eventReducer, {
     ...initialState,
     maxEvents,
   });
+
+  // Função para mostrar toast
+  const showToast = useCallback((event: GameEvent) => {
+    const toastData: EventToastData = {
+      id: `toast-${event.id}-${Date.now()}`,
+      event,
+      createdAt: Date.now(),
+    };
+    dispatch({ type: "ADD_TOAST", payload: toastData });
+  }, []);
+
+  // Função para remover toast
+  const dismissToast = useCallback((id: string) => {
+    dispatch({ type: "REMOVE_TOAST", payload: id });
+  }, []);
 
   // Listener para novos eventos
   useEffect(() => {
@@ -123,7 +172,14 @@ export function EventProvider({
             ? new Date(event.timestamp)
             : event.timestamp,
       };
+
+      // Adicionar ao histórico
       dispatch({ type: "ADD_EVENT", payload: eventWithDate });
+
+      // Mostrar toast se não for evento de baixa importância
+      if (event.severity !== "INFO" || event.category === "COMBAT") {
+        showToast(eventWithDate);
+      }
     };
 
     socketService.on("event:new", handleNewEvent);
@@ -131,7 +187,7 @@ export function EventProvider({
     return () => {
       socketService.off("event:new", handleNewEvent);
     };
-  }, []);
+  }, [showToast]);
 
   // Inscrever em contexto de eventos
   const subscribeToContext = useCallback(
@@ -182,16 +238,43 @@ export function EventProvider({
     dispatch({ type: "CLEAR_EVENTS" });
   }, []);
 
+  // Controle do histórico
+  const openHistory = useCallback(() => {
+    dispatch({ type: "SET_HISTORY_OPEN", payload: true });
+  }, []);
+
+  const closeHistory = useCallback(() => {
+    dispatch({ type: "SET_HISTORY_OPEN", payload: false });
+  }, []);
+
+  const toggleHistory = useCallback(() => {
+    dispatch({ type: "SET_HISTORY_OPEN", payload: !state.isHistoryOpen });
+  }, [state.isHistoryOpen]);
+
   const value: EventContextValue = {
     state,
     subscribeToContext,
     unsubscribeFromContext,
     fetchHistory,
     clearEvents,
+    showToast,
+    dismissToast,
+    openHistory,
+    closeHistory,
+    toggleHistory,
   };
 
   return (
-    <EventContext.Provider value={value}>{children}</EventContext.Provider>
+    <EventContext.Provider value={value}>
+      {children}
+      {/* Renderizar container de toasts */}
+      <EventToastContainer
+        toasts={state.toasts}
+        onDismiss={dismissToast}
+        duration={toastDuration}
+        position={toastPosition}
+      />
+    </EventContext.Provider>
   );
 }
 

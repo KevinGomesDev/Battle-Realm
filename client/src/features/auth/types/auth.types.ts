@@ -1,11 +1,17 @@
-// Auth Types
+// Auth Types - Re-exports shared types and adds frontend-specific types
+// FONTE DE VERDADE: shared/types/auth.types.ts
 
-export interface User {
-  id: string;
-  username: string;
-  email?: string;
-  token?: string;
-}
+// ============ RE-EXPORT SHARED TYPES ============
+export type {
+  User,
+  RegisterData,
+  LoginData,
+  AuthResponse,
+} from "../../../../../shared/types/auth.types";
+
+// ============ FRONTEND-SPECIFIC STATE ============
+
+import type { User } from "../../../../../shared/types/auth.types";
 
 export interface AuthState {
   user: User | null;

@@ -8,6 +8,8 @@ import {
   HP_CONFIG,
   getRandomArenaSize,
   getGridDimensions,
+  calculateUnitVision,
+  type UnitSize,
 } from "../../../shared/config/global.config";
 import type { TerritorySize } from "../../../shared/types/battle.types";
 
@@ -28,6 +30,7 @@ interface DBUnit {
   armor: number;
   vitality: number;
   damageReduction: number | null;
+  size?: UnitSize | null; // Tamanho da unidade
 }
 
 // Tipo para BattleUnit
@@ -54,26 +57,22 @@ export interface BattleUnit {
   maxHp: number;
   posX: number;
   posY: number;
-  initiative: number;
   movesLeft: number;
   actionsLeft: number;
   isAlive: boolean;
   actionMarks: number;
-  // Proteção Física (config: PHYSICAL_PROTECTION_CONFIG.multiplier)
   physicalProtection: number;
   maxPhysicalProtection: number;
-  physicalProtectionBroken: boolean;
-  // Proteção Mágica (config: MAGICAL_PROTECTION_CONFIG.multiplier)
   magicalProtection: number;
   maxMagicalProtection: number;
-  magicalProtectionBroken: boolean;
-  // Legado
-  protection: number;
-  protectionBroken: boolean;
   conditions: string[];
   hasStartedAction: boolean;
   actions: string[];
   grabbedByUnitId?: string;
+  // Tamanho da unidade (células ocupadas) - default NORMAL (1x1)
+  size: UnitSize;
+  // Alcance de visão calculado (max(10, focus))
+  visionRange: number;
 }
 
 interface KingdomInfo {
@@ -137,7 +136,6 @@ export function createBattleUnit(
     maxHp: dbUnit.vitality * HP_CONFIG.multiplier,
     posX: position.x,
     posY: position.y,
-    initiative: Math.floor(Math.random() * 20) + 1 + dbUnit.acuity,
     movesLeft: 0,
     actionsLeft: 1,
     isAlive: true,
@@ -147,19 +145,18 @@ export function createBattleUnit(
       (dbUnit.armor || 0) * PHYSICAL_PROTECTION_CONFIG.multiplier,
     maxPhysicalProtection:
       (dbUnit.armor || 0) * PHYSICAL_PROTECTION_CONFIG.multiplier,
-    physicalProtectionBroken: false,
     // Proteção Mágica = Focus * MAGICAL_PROTECTION_CONFIG.multiplier
     magicalProtection:
       (dbUnit.focus || 0) * MAGICAL_PROTECTION_CONFIG.multiplier,
     maxMagicalProtection:
       (dbUnit.focus || 0) * MAGICAL_PROTECTION_CONFIG.multiplier,
-    magicalProtectionBroken: false,
-    // Legado
-    protection: (dbUnit.armor || 0) * PHYSICAL_PROTECTION_CONFIG.multiplier,
-    protectionBroken: false,
     conditions: [],
     hasStartedAction: false,
     actions: unitActions,
+    // Tamanho da unidade (default: NORMAL 1x1)
+    size: dbUnit.size || "NORMAL",
+    // Alcance de visão = max(10, focus)
+    visionRange: calculateUnitVision(dbUnit.focus),
   };
 }
 
@@ -304,14 +301,6 @@ export function getArenaBattleGridSize(): {
     height: dimensions.height,
     territorySize: territorySize as TerritorySize,
   };
-}
-
-/**
- * Ordena unidades por iniciativa (maior primeiro)
- * Legado - mantido para compatibilidade visual
- */
-export function sortByInitiative(units: BattleUnit[]): BattleUnit[] {
-  return [...units].sort((a, b) => b.initiative - a.initiative);
 }
 
 /**

@@ -1,15 +1,17 @@
 import React from "react";
 import { useMatch } from "../../match";
 import { useAuth } from "../../auth";
+import { useConnection } from "../../../core";
 import { RESOURCE_NAMES } from "../../../../../shared/config/global.config";
 
 /**
- * TopHUD - Barra Superior do Mapa
+ * TopHUD - Barra Superior do Mapa (estilo Topbar padrão)
  * Exibe informações da partida e recursos do jogador
  */
 export const TopHUD: React.FC = () => {
   const { currentMatch, myPlayerId, completeMatchState } = useMatch();
   const { user } = useAuth();
+  const { isConnected } = useConnection();
 
   if (!currentMatch || !completeMatchState) {
     return null;
@@ -27,46 +29,44 @@ export const TopHUD: React.FC = () => {
   };
 
   return (
-    <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none">
-      {/* Barra Superior Medieval */}
-      <div className="bg-gradient-to-b from-citadel-granite to-citadel-carved border-b-4 border-metal-iron shadow-stone-raised pointer-events-auto">
+    <div className="relative z-20">
+      {/* Topbar padrão */}
+      <div className="bg-citadel-granite border-b-4 border-citadel-carved shadow-stone-raised">
         {/* Textura de pedra */}
-        <div className="absolute inset-0 bg-stone-texture opacity-50"></div>
+        <div className="absolute inset-0 bg-stone-texture opacity-50" />
 
-        <div className="relative px-4 py-3">
+        <div className="relative px-4 sm:px-6 py-3">
           <div className="max-w-screen-2xl mx-auto flex items-center justify-between">
-            {/* ESQUERDA: Info da Partida */}
-            <div className="flex items-center gap-4">
+            {/* ESQUERDA: Brasão + Info da Partida */}
+            <div className="flex items-center gap-3">
               {/* Brasão */}
-              <div className="relative">
-                <div
-                  className="w-12 h-14 bg-citadel-carved border-2 border-metal-iron rounded-b-lg shadow-stone-raised flex items-center justify-center"
-                  style={{
-                    clipPath: "polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%)",
-                  }}
-                >
-                  <span className="text-xl">🏰</span>
-                </div>
+              <div
+                className="w-10 h-12 bg-citadel-carved border-2 border-metal-iron rounded-b-lg shadow-stone-raised flex items-center justify-center"
+                style={{
+                  clipPath: "polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%)",
+                }}
+              >
+                <span className="text-xl">🏰</span>
               </div>
 
-              {/* Info da Sala */}
+              {/* Info da Partida */}
               <div>
-                <div
-                  className="text-parchment-light font-bold text-sm tracking-wider"
+                <h1
+                  className="text-xl font-bold tracking-wider text-parchment-light"
                   style={{ fontFamily: "'Cinzel', serif" }}
                 >
                   {myPlayer?.kingdomName || "Kingdom"}
-                </div>
+                </h1>
                 <div className="text-parchment-aged text-xs">
                   {completeMatchState?.currentRound
                     ? `Round ${completeMatchState.currentRound}`
-                    : "Preparing"}{" "}
+                    : "Preparando"}{" "}
                   • {completeMatchState?.currentTurn || currentMatch.status}
                 </div>
               </div>
             </div>
 
-            {/* CENTRO: Recursos (usa config global) */}
+            {/* CENTRO: Recursos */}
             <div className="flex items-center gap-2">
               {/* Ore */}
               <div
@@ -130,16 +130,44 @@ export const TopHUD: React.FC = () => {
               </div>
             </div>
 
-            {/* DIREITA: Comandante */}
-            <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-b from-metal-bronze to-metal-copper px-3 py-1.5 rounded border-2 border-metal-rust/50 shadow-lg">
-                <div className="text-citadel-obsidian font-bold text-xs tracking-wide">
-                  {user?.username || "Commander"}
+            {/* DIREITA: Usuário + Status de Conexão */}
+            <div className="flex items-center gap-4">
+              {/* Nome do Usuário */}
+              <div className="hidden sm:flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-b from-metal-bronze to-metal-copper rounded-md border border-metal-iron flex items-center justify-center">
+                  <span className="text-sm">👤</span>
                 </div>
+                <span
+                  className="text-parchment-light font-semibold text-sm"
+                  style={{ fontFamily: "'Cinzel', serif" }}
+                >
+                  {user?.username || "Commander"}
+                </span>
               </div>
 
-              {/* Status */}
-              <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-lg"></div>
+              {/* Status de Conexão */}
+              <div
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
+                  isConnected
+                    ? "bg-green-900/30 border-green-600/50"
+                    : "bg-war-blood/30 border-war-crimson/50"
+                }`}
+              >
+                <div
+                  className={`w-2.5 h-2.5 rounded-full ${
+                    isConnected
+                      ? "bg-green-500 animate-pulse"
+                      : "bg-war-crimson"
+                  }`}
+                />
+                <span
+                  className={`text-xs font-semibold ${
+                    isConnected ? "text-green-400" : "text-war-ember"
+                  }`}
+                >
+                  {isConnected ? "Online" : "Offline"}
+                </span>
+              </div>
             </div>
           </div>
         </div>

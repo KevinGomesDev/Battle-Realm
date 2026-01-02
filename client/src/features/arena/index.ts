@@ -66,7 +66,6 @@ export type {
   ArenaKingdom,
   ArenaBattle,
   ArenaBattleResult,
-  ArenaLog,
   ArenaState,
   ArenaContextType,
   ArenaAction,

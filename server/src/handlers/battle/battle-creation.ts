@@ -4,7 +4,6 @@ import {
   createBattleUnitsWithRandomPositions,
   determineActionOrder,
   getArenaBattleGridSize,
-  sortByInitiative,
 } from "../../utils/battle-unit.factory";
 import type { ArenaConfig } from "../../../../shared/types/arena.types";
 import type { Battle } from "./battle-types";
@@ -23,7 +22,6 @@ interface CreateBattleParams {
   hostKingdom: any;
   guestKingdom: any;
   io: any;
-  isRematch?: boolean;
 }
 
 export async function createAndStartBattle({
@@ -31,7 +29,6 @@ export async function createAndStartBattle({
   hostKingdom,
   guestKingdom,
   io,
-  isRematch = false,
 }: CreateBattleParams): Promise<Battle> {
   const lobbyId = lobby.lobbyId;
   const {
@@ -55,9 +52,7 @@ export async function createAndStartBattle({
       "arena"
     );
 
-  const orderedUnits = sortByInitiative(allUnits);
-  const initiativeOrder = orderedUnits.map((u) => u.id);
-
+  // Determinar ordem de ação baseada na soma de Acuity
   const actionOrder = determineActionOrder(
     allUnits,
     lobby.hostUserId,
@@ -86,22 +81,8 @@ export async function createAndStartBattle({
     currentTurnIndex: 0,
     status: "ACTIVE",
     turnTimer: 0,
-    initiativeOrder,
     actionOrder,
-    units: orderedUnits,
-    logs: isRematch
-      ? []
-      : [
-          {
-            id: generateId(),
-            timestamp: new Date(),
-            type: "START",
-            payload: {
-              hostKingdomName: hostKingdom.name,
-              guestKingdomName: guestKingdom.name,
-            },
-          },
-        ],
+    units: allUnits,
     createdAt: new Date(),
     config: arenaConfig,
     roundActionsCount: new Map<string, number>([
@@ -125,8 +106,7 @@ export async function createAndStartBattle({
     battleId,
     lobbyId,
     config: arenaConfig,
-    units: orderedUnits,
-    initiativeOrder,
+    units: allUnits,
     actionOrder,
     hostKingdom: {
       id: hostKingdom.id,
@@ -140,19 +120,13 @@ export async function createAndStartBattle({
     },
   };
 
-  if (isRematch) {
-    io.to(lobbyId).emit("battle:rematch_started", battleEventData);
-  } else {
-    io.to(lobbyId).emit("battle:battle_started", battleEventData);
-  }
+  // Sempre emite o mesmo evento - o cliente trata igualmente
+  io.to(lobbyId).emit("battle:battle_started", battleEventData);
 
   startBattleTurnTimer(battle);
 
-  const logType = isRematch
-    ? "🔄 REVANCHE INICIADA"
-    : "🗺️  NOVA BATALHA INICIADA";
   console.log("\n" + "=".repeat(60));
-  console.log(`[ARENA] ${logType}`);
+  console.log(`[ARENA] 🗺️  NOVA BATALHA INICIADA`);
   console.log("=".repeat(60));
   console.log(`[ARENA] ID da Batalha: ${battleId}`);
   console.log(`[ARENA] Lobby ID: ${lobbyId}`);
@@ -185,12 +159,12 @@ export async function createAndStartBattle({
   }
   console.log("-".repeat(60));
   console.log("[ARENA] ⚔️  UNIDADES:");
-  orderedUnits.forEach((unit, idx) => {
+  allUnits.forEach((unit, idx) => {
     const side = unit.ownerId === lobby.hostUserId ? "HOST" : "GUEST";
     console.log(
       `[ARENA]   ${idx + 1}. [${side}] ${unit.name} - Pos: (${unit.posX},${
         unit.posY
-      }) - Initiative: ${unit.initiative}`
+      })`
     );
   });
   console.log("-".repeat(60));

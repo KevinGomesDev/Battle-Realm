@@ -785,12 +785,14 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
         });
       }
 
-      // Se a partida está em WAITING, apenas remove o jogador
+      // Se a partida está em WAITING, gerenciar lobby corretamente
       if (match.status === "WAITING") {
-        await prisma.matchPlayer.delete({ where: { id: player.id } });
+        const isHost = player.playerIndex === 0;
+        const otherPlayers = match.players.filter((p) => p.userId !== userId);
 
-        // Se era o único jogador (host), cancela a partida
-        if (match.players.length === 1) {
+        // Se era o único jogador (ou host sem outros jogadores), cancela a partida
+        if (otherPlayers.length === 0) {
+          await prisma.matchPlayer.delete({ where: { id: player.id } });
           await prisma.territory.deleteMany({ where: { matchId } });
           await prisma.match.delete({ where: { id: matchId } });
 
@@ -798,11 +800,69 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
           socket.emit("match:left", {
             message: "Partida cancelada (você era o único jogador).",
           });
-          console.log(`[MATCH] Partida ${matchId} cancelada pelo host`);
+
+          // Notificar todos que o lobby foi removido
+          io.emit("match:lobbies_updated", {
+            action: "removed",
+            matchId,
+          });
+
+          console.log(`[MATCH] Partida ${matchId} cancelada - lobby vazio`);
           return;
         }
 
-        // Notifica os outros jogadores
+        // Se host sai mas tem outros jogadores, passa o host para o próximo
+        if (isHost) {
+          const newHost = otherPlayers[0];
+
+          // Atualizar o novo host para índice 0
+          await prisma.matchPlayer.update({
+            where: { id: newHost.id },
+            data: {
+              playerIndex: 0,
+              playerColor: PLAYER_COLORS[0],
+            },
+          });
+
+          // Remover o host antigo
+          await prisma.matchPlayer.delete({ where: { id: player.id } });
+
+          socket.leave(matchId);
+          io.to(matchId).emit("match:host_changed", {
+            newHostUserId: newHost.userId,
+            message: "O host saiu. Você agora é o host.",
+          });
+          socket.emit("match:left", { message: "Você saiu da partida." });
+
+          // Atualizar info do lobby com novo host
+          const newHostUser = await prisma.user.findUnique({
+            where: { id: newHost.userId },
+          });
+          const newHostKingdom = await prisma.kingdom.findUnique({
+            where: { id: newHost.kingdomId },
+          });
+
+          io.emit("match:lobbies_updated", {
+            action: "updated",
+            match: {
+              id: matchId,
+              hostUsername: newHostUser?.username || "Unknown",
+              hostKingdomName: newHostKingdom?.name || "Unknown",
+              playerCount: otherPlayers.length,
+              createdAt: match.createdAt,
+            },
+          });
+
+          await broadcastMatchState(io, matchId);
+          console.log(
+            `[MATCH] Host ${userId} saiu. Novo host: ${newHost.userId}`
+          );
+          return;
+        }
+
+        // Guest sai normalmente
+        await prisma.matchPlayer.delete({ where: { id: player.id } });
+
         socket.leave(matchId);
         io.to(matchId).emit("match:player_left", {
           userId,
@@ -810,6 +870,8 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
         });
         socket.emit("match:left", { message: "Você saiu da partida." });
         await broadcastMatchState(io, matchId);
+
+        console.log(`[MATCH] Jogador ${userId} saiu da partida ${matchId}`);
         return;
       }
 

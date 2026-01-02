@@ -326,7 +326,6 @@ export function registerBattleLobbyHandlers(io: Server, socket: Socket): void {
         hostKingdom,
         guestKingdom,
         io,
-        isRematch: false,
       });
     } catch (err) {
       console.error("[ARENA] start_battle error:", err);

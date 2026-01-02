@@ -1,5 +1,12 @@
 // Barrel export para componentes de Dashboard
-export { ConnectionStatus } from "./ConnectionStatus";
-export { UserProfile } from "./UserProfile";
-export { KingdomList } from "./KingdomList";
+export { SectionCard } from "./SectionCard";
 export { Ranking } from "./Ranking";
+
+// Seções com hooks de ações
+export { KingdomSection, useKingdomSectionActions } from "./KingdomSection";
+export { MatchSection, useMatchSectionActions } from "./MatchSection";
+export { ArenaSection, useArenaSectionActions } from "./ArenaSection";
+
+// Lobbies compactos
+export { MatchLobby } from "./MatchLobby";
+export { ArenaLobby } from "./ArenaLobby";

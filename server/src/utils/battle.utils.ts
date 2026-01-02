@@ -1,5 +1,8 @@
 import { SkillDefinition, COST_VALUES } from "../types";
 
+// Re-exportar do global.config para manter compatibilidade
+export { getMaxMarksByCategory } from "../../../shared/config/global.config";
+
 export function calculateSkillCost(
   skill: SkillDefinition,
   timesUsedInBattle: number
@@ -47,20 +50,6 @@ export function validateGridMove(
   return { valid: true, cost: dist };
 }
 
-// Retorna marcas máximas por categoria
-export function getMaxMarksByCategory(category: string): number {
-  switch (category) {
-    case "TROOP":
-      return 1;
-    case "HERO":
-      return 2;
-    case "REGENT":
-      return 3;
-    default:
-      return 1;
-  }
-}
-
 // Calcula acuidade efetiva dada lista de condições
 export function getEffectiveAcuityWithConditions(
   baseAcuity: number,
@@ -84,45 +73,12 @@ export function applyBurningOnAction(
   return currentHp;
 }
 
-// Aplica dano com proteção e tipos (VERDADEIRO ignora proteção)
-// damageType: "FISICO" usa physicalProtection, "MAGICO" usa magicalProtection, "VERDADEIRO" ignora ambos
-export function applyProtectionDamage(
-  protection: number,
-  protectionBroken: boolean,
-  currentHp: number,
-  damage: number,
-  damageType: string
-): {
-  newProtection: number;
-  newProtectionBroken: boolean;
-  newHp: number;
-} {
-  let newProtection = protection;
-  let newProtectionBroken = protectionBroken;
-  let newHp = currentHp;
-
-  if (damageType !== "VERDADEIRO" && !protectionBroken && protection > 0) {
-    // Dano vai na proteção primeiro. Se proteção zerar, excedente é perdido.
-    if (damage >= protection) {
-      newProtection = 0;
-      newProtectionBroken = true; // Não é mais recuperável nesta batalha
-      // Excedente perdido, não aplica na vitalidade
-    } else {
-      newProtection = protection - damage;
-    }
-  } else {
-    newHp = Math.max(0, currentHp - damage);
-  }
-
-  return { newProtection, newProtectionBroken, newHp };
-}
-
 /**
- * Aplica dano com sistema de proteção física e mágica
+ * Aplica dano com sistema de proteção física e mágica.
+ * O dano excedente (quando proteção zera) passa para o HP.
+ *
  * @param physicalProtection Proteção física atual
  * @param magicalProtection Proteção mágica atual
- * @param physicalProtectionBroken Se proteção física foi quebrada
- * @param magicalProtectionBroken Se proteção mágica foi quebrada
  * @param currentHp HP atual
  * @param damage Dano a aplicar
  * @param damageType "FISICO" | "MAGICO" | "VERDADEIRO"
@@ -130,61 +86,61 @@ export function applyProtectionDamage(
 export function applyDualProtectionDamage(
   physicalProtection: number,
   magicalProtection: number,
-  physicalProtectionBroken: boolean,
-  magicalProtectionBroken: boolean,
   currentHp: number,
   damage: number,
   damageType: string
 ): {
   newPhysicalProtection: number;
   newMagicalProtection: number;
-  newPhysicalProtectionBroken: boolean;
-  newMagicalProtectionBroken: boolean;
   newHp: number;
   damageAbsorbed: number;
   damageToHp: number;
 } {
   let newPhysicalProtection = physicalProtection;
   let newMagicalProtection = magicalProtection;
-  let newPhysicalProtectionBroken = physicalProtectionBroken;
-  let newMagicalProtectionBroken = magicalProtectionBroken;
   let newHp = currentHp;
   let damageAbsorbed = 0;
   let damageToHp = 0;
 
   if (damageType === "VERDADEIRO") {
-    // Dano verdadeiro ignora toda proteção
+    // Dano verdadeiro ignora toda proteção, vai direto no HP
     damageToHp = damage;
     newHp = Math.max(0, currentHp - damage);
   } else if (damageType === "FISICO") {
     // Dano físico usa proteção física
-    if (!physicalProtectionBroken && physicalProtection > 0) {
+    if (physicalProtection > 0) {
       if (damage >= physicalProtection) {
+        // Proteção absorve o que pode, excedente vai para HP
         damageAbsorbed = physicalProtection;
+        damageToHp = damage - physicalProtection;
         newPhysicalProtection = 0;
-        newPhysicalProtectionBroken = true;
-        // Excedente perdido
+        newHp = Math.max(0, currentHp - damageToHp);
       } else {
+        // Proteção absorve todo o dano
         damageAbsorbed = damage;
         newPhysicalProtection = physicalProtection - damage;
       }
     } else {
+      // Sem proteção física, dano vai direto no HP
       damageToHp = damage;
       newHp = Math.max(0, currentHp - damage);
     }
   } else if (damageType === "MAGICO") {
     // Dano mágico usa proteção mágica
-    if (!magicalProtectionBroken && magicalProtection > 0) {
+    if (magicalProtection > 0) {
       if (damage >= magicalProtection) {
+        // Proteção absorve o que pode, excedente vai para HP
         damageAbsorbed = magicalProtection;
+        damageToHp = damage - magicalProtection;
         newMagicalProtection = 0;
-        newMagicalProtectionBroken = true;
-        // Excedente perdido
+        newHp = Math.max(0, currentHp - damageToHp);
       } else {
+        // Proteção absorve todo o dano
         damageAbsorbed = damage;
         newMagicalProtection = magicalProtection - damage;
       }
     } else {
+      // Sem proteção mágica, dano vai direto no HP
       damageToHp = damage;
       newHp = Math.max(0, currentHp - damage);
     }
@@ -193,14 +149,8 @@ export function applyDualProtectionDamage(
   return {
     newPhysicalProtection,
     newMagicalProtection,
-    newPhysicalProtectionBroken,
-    newMagicalProtectionBroken,
     newHp,
     damageAbsorbed,
     damageToHp,
   };
 }
-
-// ---------- Dice Helpers ----------
-// MIGRADO para server/src/logic/dice-system.ts
-// Use rollD6Test, rollContestedTest, etc.

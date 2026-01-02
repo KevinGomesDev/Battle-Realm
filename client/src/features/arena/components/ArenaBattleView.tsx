@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useArena } from "../hooks/useArena";
 import { useAuth } from "../../auth";
+import { useDiceRoll } from "../../dice-roll";
 import {
   ArenaBattleCanvas,
   type SpriteDirection,
@@ -14,6 +15,7 @@ import {
   PauseMenu,
 } from "./battle";
 import { FullScreenLoading } from "@/components/FullScreenLoading";
+import { BattleChat } from "../../chat";
 import type { ArenaUnit } from "../types/arena.types";
 
 /**
@@ -30,6 +32,7 @@ export const ArenaBattleView: React.FC = () => {
       units,
       rematchPending,
       opponentWantsRematch,
+      error: arenaError,
     },
     beginAction,
     moveUnit,
@@ -53,6 +56,11 @@ export const ArenaBattleView: React.FC = () => {
   const autoEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Timer para debounce do auto-end
   const unitsRef = useRef(units); // Ref para acessar units atualizado dentro do setTimeout
   const cameraCenteredRef = useRef<string | null>(null); // Controla se já centralizou a câmera neste turno
+
+  // Hook de dice roll para verificar se animação está ativa
+  const { isOpen: isDiceRollOpen } = useDiceRoll();
+  const isDiceRollOpenRef = useRef(isDiceRollOpen);
+  isDiceRollOpenRef.current = isDiceRollOpen;
 
   // Manter ref sincronizada
   useEffect(() => {
@@ -91,35 +99,65 @@ export const ArenaBattleView: React.FC = () => {
 
   // Auto-selecionar a unidade do turno atual quando muda de turno ou monta
   // E guiar câmera para ela APENAS UMA VEZ no início do turno
+  const beginActionCalledRef = useRef<string | null>(null); // Rastreia se beginAction já foi chamado para este turno
+
   useEffect(() => {
     if (!battle || !user) return;
 
     const isMyTurnNow = battle.currentPlayerId === user.id;
-    if (isMyTurnNow) {
-      // Encontrar minha unidade viva do turno atual
-      const myAliveUnit = units.find((u) => u.ownerId === user.id && u.isAlive);
-      if (myAliveUnit) {
-        // SEMPRE selecionar minha unidade quando é meu turno
-        setSelectedUnitId(myAliveUnit.id);
 
-        // Guiar câmera para a unidade selecionada APENAS UMA VEZ por turno
-        // Usa a combinação currentPlayerId+round como chave para detectar novo turno
-        const turnKey = `${battle.currentPlayerId}-${battle.round}`;
-        if (cameraCenteredRef.current !== turnKey) {
-          cameraCenteredRef.current = turnKey;
-          // Pequeno delay para garantir que o canvas está pronto
-          setTimeout(() => {
-            canvasRef.current?.centerOnUnit(myAliveUnit.id);
-          }, 100);
-        }
-
-        // Se a unidade ainda não iniciou ação, iniciar
-        if (!myAliveUnit.hasStartedAction && myAliveUnit.movesLeft === 0) {
-          beginAction(myAliveUnit.id);
-        }
-      }
+    // Reset do ref quando não é mais meu turno
+    if (!isMyTurnNow) {
+      beginActionCalledRef.current = null;
+      return;
     }
-  }, [battle?.currentPlayerId, battle?.round, user?.id, units, beginAction]);
+
+    // Encontrar minha unidade viva do turno atual
+    const myAliveUnit = units.find((u) => u.ownerId === user.id && u.isAlive);
+    if (!myAliveUnit) return;
+
+    // SEMPRE selecionar minha unidade quando é meu turno
+    setSelectedUnitId(myAliveUnit.id);
+
+    // Guiar câmera para a unidade selecionada APENAS UMA VEZ por turno
+    // Usa a combinação currentPlayerId+round como chave para detectar novo turno
+    const turnKey = `${battle.currentPlayerId}-${battle.round}`;
+    if (cameraCenteredRef.current !== turnKey) {
+      cameraCenteredRef.current = turnKey;
+      // Pequeno delay para garantir que o canvas está pronto
+      setTimeout(() => {
+        canvasRef.current?.centerOnUnit(myAliveUnit.id);
+      }, 100);
+    }
+
+    // Se ainda não há unidade ativa E esta unidade não iniciou ação → iniciar
+    // Usar o turnKey para evitar chamar múltiplas vezes no mesmo turno
+    const hasNoActiveUnit = !battle.activeUnitId;
+    const shouldBeginAction =
+      hasNoActiveUnit &&
+      !myAliveUnit.hasStartedAction &&
+      myAliveUnit.movesLeft === 0 &&
+      myAliveUnit.actionsLeft === 0 &&
+      beginActionCalledRef.current !== turnKey;
+
+    if (shouldBeginAction) {
+      console.log(
+        `[ArenaBattleView] 🎬 Auto-iniciando ação para ${myAliveUnit.name} (turnKey: ${turnKey})`
+      );
+      beginActionCalledRef.current = turnKey;
+      // Pequeno delay para garantir que o estado está sincronizado
+      setTimeout(() => {
+        beginAction(myAliveUnit.id);
+      }, 50);
+    }
+  }, [
+    battle?.currentPlayerId,
+    battle?.round,
+    battle?.activeUnitId,
+    user?.id,
+    units,
+    beginAction,
+  ]);
 
   // Auto-encerrar turno quando movimentos E ações acabarem
   // Usa debounce para evitar finalização prematura após skills que restauram movimento (ex: Disparada)
@@ -146,6 +184,15 @@ export const ArenaBattleView: React.FC = () => {
     ) {
       // Usar debounce para dar tempo de respostas do servidor (ex: Disparada restaura movimento)
       autoEndTimerRef.current = setTimeout(() => {
+        // Não encerrar se a animação do dado ainda está ativa
+        if (isDiceRollOpenRef.current) {
+          console.log(
+            "%c[ArenaBattleView] ⏳ Aguardando animação do dado terminar antes de auto-encerrar",
+            "color: #f59e0b; font-weight: bold;"
+          );
+          return;
+        }
+
         // Verificar novamente após o delay usando ref para estado atualizado
         const currentUnits = unitsRef.current;
         const currentUnit = currentUnits.find(
@@ -176,11 +223,44 @@ export const ArenaBattleView: React.FC = () => {
     };
   }, [battle?.currentPlayerId, user?.id, units, endAction]);
 
-  // Resetar lock de movimento quando unidade termina de mover
+  // Quando o dice roll fecha, verificar se deve auto-encerrar turno
+  useEffect(() => {
+    if (isDiceRollOpen) return; // Só processar quando fecha
+    if (!battle || !user || autoEndTriggeredRef.current) return;
+
+    const isMyTurnNow = battle.currentPlayerId === user.id;
+    if (!isMyTurnNow) return;
+
+    const myUnit = units.find((u) => u.ownerId === user.id && u.isAlive);
+    if (!myUnit) return;
+
+    // Verificar se deve auto-encerrar
+    if (
+      myUnit.hasStartedAction &&
+      myUnit.movesLeft === 0 &&
+      myUnit.actionsLeft === 0
+    ) {
+      console.log(
+        "%c[ArenaBattleView] ✅ Dice roll fechou - Auto-encerrar turno",
+        "color: #22c55e; font-weight: bold;"
+      );
+      autoEndTriggeredRef.current = true;
+      endAction(myUnit.id);
+    }
+  }, [isDiceRollOpen, battle?.currentPlayerId, user?.id, units, endAction]);
+
+  // Resetar lock de movimento quando unidade termina de mover OU quando há erro
   useEffect(() => {
     // Resetar lock quando movesLeft muda (movimento foi processado)
     isMovingRef.current = false;
   }, [units]);
+
+  // Resetar lock de movimento quando há erro (ex: colisão com obstáculo)
+  useEffect(() => {
+    if (arenaError) {
+      isMovingRef.current = false;
+    }
+  }, [arenaError]);
 
   // Handler para centralizar mapa em uma unidade (chamado pelo InitiativePanel)
   const handleInitiativeUnitClick = useCallback((unit: ArenaUnit) => {
@@ -376,19 +456,33 @@ export const ArenaBattleView: React.FC = () => {
           unitName: unit.name,
           hasStartedAction: unit.hasStartedAction,
           movesLeft: unit.movesLeft,
+          activeUnitId: battle.activeUnitId,
         }
       );
       setSelectedUnitId(unit.id);
       setPendingAction(null); // Limpa ação pendente ao trocar unidade
-      // Se é meu turno e a unidade NÃO começou a ação ainda, iniciar
+
+      // Se é meu turno E não há unidade ativa ainda E esta unidade não começou ação
+      // → iniciar ação desta unidade
+      const hasNoActiveUnit = !battle.activeUnitId;
       const hasNotStarted = !unit.hasStartedAction && unit.movesLeft === 0;
-      if (isMyTurn && hasNotStarted) {
+      if (isMyTurn && hasNoActiveUnit && hasNotStarted) {
         console.log(
-          "%c[ArenaBattleView] ▶️ Iniciando ação da unidade",
+          "%c[ArenaBattleView] ▶️ Iniciando ação da unidade (primeira do turno)",
           "color: #f59e0b;",
           { unitId: unit.id }
         );
         beginAction(unit.id);
+      } else if (
+        isMyTurn &&
+        battle.activeUnitId &&
+        battle.activeUnitId !== unit.id
+      ) {
+        console.log(
+          "%c[ArenaBattleView] 👁️ Apenas visualizando (outra unidade já está ativa)",
+          "color: #8b5cf6;",
+          { unitId: unit.id, activeUnitId: battle.activeUnitId }
+        );
       }
     }
   };
@@ -573,6 +667,7 @@ export const ArenaBattleView: React.FC = () => {
               onCellClick={handleCellClick}
               onObstacleClick={handleObstacleClick}
               unitDirection={unitDirection}
+              pendingAction={pendingAction}
             />
           </div>
         </div>
@@ -580,6 +675,7 @@ export const ArenaBattleView: React.FC = () => {
         {/* UnitPanel - Painel lateral direito */}
         <UnitPanel
           selectedUnit={selectedUnit ?? null}
+          activeUnitId={battle.activeUnitId}
           isMyTurn={isMyTurn}
           currentUserId={user.id}
           pendingAction={pendingAction}
@@ -604,6 +700,14 @@ export const ArenaBattleView: React.FC = () => {
           opponentWantsRematch={opponentWantsRematch}
         />
       )}
+
+      {/* Chat de Batalha - Abre com Enter */}
+      <BattleChat
+        battleId={battle.battleId}
+        currentUnitId={battle.activeUnitId}
+        units={units}
+        currentUserId={user.id}
+      />
     </div>
   );
 };

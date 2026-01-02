@@ -10,7 +10,6 @@ export type {
   ArenaConfig,
   ArenaKingdom,
   ArenaBattle,
-  ArenaLog,
   ArenaBattleResult,
   // Payloads
   CreateLobbyPayload,
@@ -44,7 +43,6 @@ import type {
   ArenaBattle,
   ArenaBattleResult,
   ArenaUnit,
-  ArenaLog,
 } from "../../../../../shared/types/arena.types";
 
 // =============================================================================
@@ -60,7 +58,6 @@ export interface ArenaState {
   battle: ArenaBattle | null;
   battleResult: ArenaBattleResult | null;
   units: ArenaUnit[];
-  logs: ArenaLog[];
   isHost: boolean;
   isLoading: boolean;
   error: string | null;
@@ -111,8 +108,6 @@ export type ArenaAction =
   | { type: "SET_BATTLE_RESULT"; payload: ArenaBattleResult | null }
   | { type: "SET_UNITS"; payload: ArenaUnit[] }
   | { type: "UPDATE_UNIT"; payload: Partial<ArenaUnit> & { id: string } }
-  | { type: "ADD_LOG"; payload: ArenaLog }
-  | { type: "SET_LOGS"; payload: ArenaLog[] }
   | { type: "SET_IS_HOST"; payload: boolean }
   | { type: "SET_LOADING"; payload: boolean }
   | { type: "SET_ERROR"; payload: string | null }

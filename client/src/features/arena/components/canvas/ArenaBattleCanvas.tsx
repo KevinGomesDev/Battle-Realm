@@ -38,6 +38,8 @@ interface ArenaBattleCanvasProps {
   onObstacleClick?: (obstacle: BattleObstacle) => void;
   /** Direção para virar a unidade selecionada (baseado no movimento/clique) */
   unitDirection?: { unitId: string; direction: SpriteDirection } | null;
+  /** Ação pendente - quando "attack", mostra células atacáveis */
+  pendingAction?: string | null;
 }
 
 /**
@@ -56,6 +58,7 @@ export const ArenaBattleCanvas = memo(
         onUnitClick,
         onObstacleClick,
         unitDirection,
+        pendingAction,
       },
       ref
     ) => {
@@ -173,6 +176,77 @@ export const ArenaBattleCanvas = memo(
         return map;
       }, [units]);
 
+      // === FOG OF WAR - Células visíveis pelo jogador atual ===
+      // Calcula quais células são visíveis baseado no visionRange de cada unidade aliada
+      const visibleCells = useMemo((): Set<string> => {
+        const visible = new Set<string>();
+
+        // Obter todas as unidades aliadas vivas
+        const myUnits = units.filter(
+          (u) => u.ownerId === currentUserId && u.isAlive
+        );
+
+        // Se não tem unidades, não mostra nada (ou mostra tudo para debug)
+        if (myUnits.length === 0) {
+          // Fallback: mostrar tudo se não tem unidades
+          for (let x = 0; x < GRID_WIDTH; x++) {
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+              visible.add(`${x},${y}`);
+            }
+          }
+          return visible;
+        }
+
+        // Para cada unidade aliada, adicionar células visíveis
+        myUnits.forEach((unit) => {
+          // visionRange vem do servidor (max(10, focus))
+          // Se não tiver, usa default de 10
+          const visionRange = unit.visionRange ?? 10;
+          const unitSize = unit.size ?? "NORMAL";
+
+          // Dimensão baseada no tamanho da unidade
+          const dimension =
+            unitSize === "NORMAL"
+              ? 1
+              : unitSize === "LARGE"
+              ? 2
+              : unitSize === "HUGE"
+              ? 4
+              : 8; // GARGANTUAN
+
+          // Para cada célula ocupada pela unidade, calcular visão
+          for (let dx = 0; dx < dimension; dx++) {
+            for (let dy = 0; dy < dimension; dy++) {
+              const unitCellX = unit.posX + dx;
+              const unitCellY = unit.posY + dy;
+
+              // Adicionar todas as células dentro do alcance de visão
+              for (let vx = -visionRange; vx <= visionRange; vx++) {
+                for (let vy = -visionRange; vy <= visionRange; vy++) {
+                  // Usar distância de Manhattan
+                  if (Math.abs(vx) + Math.abs(vy) <= visionRange) {
+                    const targetX = unitCellX + vx;
+                    const targetY = unitCellY + vy;
+
+                    // Verificar limites do grid
+                    if (
+                      targetX >= 0 &&
+                      targetX < GRID_WIDTH &&
+                      targetY >= 0 &&
+                      targetY < GRID_HEIGHT
+                    ) {
+                      visible.add(`${targetX},${targetY}`);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        return visible;
+      }, [units, currentUserId, GRID_WIDTH, GRID_HEIGHT]);
+
       // Map de obstáculos para lookup O(1) (apenas não destruídos)
       const obstaclePositionMap = useMemo(() => {
         const map = new Map<string, BattleObstacle>();
@@ -184,8 +258,13 @@ export const ArenaBattleCanvas = memo(
         return map;
       }, [OBSTACLES]);
 
+      // Verificar se é o turno do jogador atual
+      const isMyTurn = battle.currentPlayerId === currentUserId;
+
       // Células movíveis como Set para O(1) lookup
+      // Só mostra quando é o turno do jogador
       const movableCells = useMemo((): Set<string> => {
+        if (!isMyTurn) return new Set();
         if (!selectedUnit || selectedUnit.movesLeft <= 0) return new Set();
 
         const movable = new Set<string>();
@@ -215,6 +294,7 @@ export const ArenaBattleCanvas = memo(
         }
         return movable;
       }, [
+        isMyTurn,
         selectedUnit,
         unitPositionMap,
         corpsePositionMap,
@@ -224,7 +304,12 @@ export const ArenaBattleCanvas = memo(
       ]);
 
       // Células atacáveis como Set (8 direções - omnidirecional)
+      // Só mostra quando pendingAction === "attack"
       const attackableCells = useMemo((): Set<string> => {
+        // Só mostrar quando for meu turno
+        if (!isMyTurn) return new Set();
+        // Só mostrar células atacáveis quando ação de ataque estiver selecionada
+        if (pendingAction !== "attack") return new Set();
         if (!selectedUnit || selectedUnit.actionsLeft <= 0) return new Set();
 
         const attackable = new Set<string>();
@@ -252,7 +337,14 @@ export const ArenaBattleCanvas = memo(
         });
 
         return attackable;
-      }, [selectedUnit, units, currentUserId, OBSTACLES]);
+      }, [
+        isMyTurn,
+        selectedUnit,
+        units,
+        currentUserId,
+        OBSTACLES,
+        pendingAction,
+      ]);
 
       // Função para desenhar unidade usando sprite
       const drawUnit = useCallback(
@@ -608,9 +700,13 @@ export const ArenaBattleCanvas = memo(
           ctx.strokeRect(cellX, cellY, cellSize, cellSize);
         }
 
-        // === DESENHAR OBSTÁCULOS (não destruídos) ===
+        // === DESENHAR OBSTÁCULOS (não destruídos e visíveis) ===
         OBSTACLES.forEach((obstacle) => {
           if (obstacle.destroyed) return;
+
+          // Fog of War: só desenha se célula é visível
+          const obsKey = `${obstacle.posX},${obstacle.posY}`;
+          if (!visibleCells.has(obsKey)) return;
 
           const cellX = obstacle.posX * cellSize;
           const cellY = obstacle.posY * cellSize;
@@ -629,11 +725,17 @@ export const ArenaBattleCanvas = memo(
 
         // === DESENHAR UNIDADES ===
         units.forEach((unit) => {
+          // Fog of War: unidades aliadas sempre visíveis, inimigas só se em célula visível
+          const isOwned = unit.ownerId === currentUserId;
+          const unitKey = `${unit.posX},${unit.posY}`;
+
+          // Inimigos só aparecem se estiverem em célula visível
+          if (!isOwned && !visibleCells.has(unitKey)) return;
+
           // Usar posição visual interpolada (para animação suave)
           const visualPos = getVisualPosition(unit.id, unit.posX, unit.posY);
           const cellX = visualPos.x * cellSize;
           const cellY = visualPos.y * cellSize;
-          const isOwned = unit.ownerId === currentUserId;
 
           drawUnit(ctx, cellX, cellY, cellSize, unit, isOwned);
 
@@ -642,11 +744,45 @@ export const ArenaBattleCanvas = memo(
           }
         });
 
+        // === FOG OF WAR - Desenhar névoa sobre células não visíveis ===
+        // Desenha uma camada semi-transparente escura sobre células fora da visão
+        for (let x = 0; x < GRID_WIDTH; x++) {
+          for (let y = 0; y < GRID_HEIGHT; y++) {
+            const cellKey = `${x},${y}`;
+            if (!visibleCells.has(cellKey)) {
+              const cellX = x * cellSize;
+              const cellY = y * cellSize;
+
+              // Névoa escura semi-transparente
+              ctx.fillStyle = "rgba(10, 10, 20, 0.75)";
+              ctx.fillRect(cellX, cellY, cellSize, cellSize);
+
+              // Padrão de nuvem sutil (efeito visual)
+              const animTime = animationTimeRef.current;
+              const cloudOffset =
+                Math.sin((x + y) * 0.5 + animTime / 2000) * 0.1;
+              ctx.fillStyle = `rgba(40, 40, 60, ${0.3 + cloudOffset})`;
+              ctx.beginPath();
+              ctx.arc(
+                cellX + cellSize / 2,
+                cellY + cellSize / 2,
+                cellSize * 0.4,
+                0,
+                Math.PI * 2
+              );
+              ctx.fill();
+            }
+          }
+        }
+
         // Indicador de turno - Quadrado ao redor da unidade do turno atual (sem gap)
+        // APENAS visível para o jogador que está no turno (não mostra turno do adversário)
         const currentTurnUnit = units.find(
           (u) => u.ownerId === battle.currentPlayerId && u.isAlive
         );
-        if (currentTurnUnit) {
+        const isMyTurn = battle.currentPlayerId === currentUserId;
+
+        if (currentTurnUnit && isMyTurn) {
           // Usar posição visual interpolada para o indicador também
           const turnVisualPos = getVisualPosition(
             currentTurnUnit.id,
@@ -655,10 +791,9 @@ export const ArenaBattleCanvas = memo(
           );
           const cellX = turnVisualPos.x * cellSize;
           const cellY = turnVisualPos.y * cellSize;
-          const isMyUnit = currentTurnUnit.ownerId === currentUserId;
 
-          // Cor: emerald para minha unidade, vermelho para inimigo
-          const turnColor = isMyUnit ? "#10b981" : "#ef4444";
+          // Cor: emerald (sempre minha unidade, já que só mostra no meu turno)
+          const turnColor = "#10b981";
 
           // Efeito pulsante usando timestamp do animation frame (não Date.now())
           const animTime = animationTimeRef.current;
@@ -689,7 +824,10 @@ export const ArenaBattleCanvas = memo(
         currentUserId,
         movableCells,
         attackableCells,
+        visibleCells,
         cellSize,
+        GRID_WIDTH,
+        GRID_HEIGHT,
         drawUnit,
         drawConditions,
         GRID_COLORS,
@@ -708,6 +846,7 @@ export const ArenaBattleCanvas = memo(
         battle.currentPlayerId,
         movableCells,
         attackableCells,
+        visibleCells,
         spritesLoaded,
         // frameIndex removido - agora controlado pelo loop de animação
       ]);
@@ -900,13 +1039,18 @@ export const ArenaBattleCanvas = memo(
             height={canvasHeight}
             style={{
               imageRendering: "pixelated",
-              cursor: hoveredCell
-                ? movableCells.has(`${hoveredCell.x},${hoveredCell.y}`)
-                  ? "var(--cursor-action)"
-                  : attackableCells.has(`${hoveredCell.x},${hoveredCell.y}`)
-                  ? "var(--cursor-skill)"
-                  : "var(--cursor-target)"
-                : "var(--cursor-default)",
+              cursor: (() => {
+                if (!hoveredCell) return "default";
+                const cellKey = `${hoveredCell.x},${hoveredCell.y}`;
+                // Unidade clicável (viva)
+                if (unitPositionMap.has(cellKey)) return "pointer";
+                // Célula de movimento
+                if (movableCells.has(cellKey)) return "pointer";
+                // Célula de ataque
+                if (attackableCells.has(cellKey)) return "crosshair";
+                // Default
+                return "default";
+              })(),
               filter: WEATHER_CSS_FILTER || undefined,
               transition: "filter 0.5s ease-in-out, cursor 0.1s ease",
             }}

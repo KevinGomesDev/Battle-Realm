@@ -19,6 +19,14 @@ import {
 } from "../../utils/battle.utils";
 import type { Battle } from "./battle-types";
 import { TURN_TIMER_SECONDS } from "./battle-types";
+import {
+  processUnitTurnEndConditions,
+  advanceToNextPlayer,
+  checkVictoryCondition,
+  recordPlayerAction,
+  emitBattleEndEvents,
+  processNewRound,
+} from "../../logic/round-control";
 
 function hasConnectedPlayers(battle: Battle): boolean {
   const lobby = battleLobbies.get(battle.lobbyId);
@@ -161,24 +169,12 @@ async function handleTimerExpired(battle: Battle): Promise<void> {
     ? battle.units.find((u) => u.id === battle.activeUnitId)
     : null;
 
+  // Se havia uma unidade com turno iniciado, processar fim de turno
   if (currentUnit && currentUnit.hasStartedAction) {
-    if (currentUnit.conditions.includes("QUEIMANDO")) {
-      currentUnit.currentHp = Math.max(0, currentUnit.currentHp - 2);
-      if (currentUnit.currentHp <= 0) {
-        currentUnit.isAlive = false;
-      }
-    }
+    // Usar RoundControl para processar condições de fim de turno
+    const turnEndResult = processUnitTurnEndConditions(currentUnit);
 
-    currentUnit.conditions = currentUnit.conditions.filter(
-      (c) => c !== "DERRUBADA" && c !== "DODGING"
-    );
-
-    const maxMarks = getMaxMarksByCategory(currentUnit.category);
-    currentUnit.actionMarks = Math.min(maxMarks, currentUnit.actionMarks + 1);
-    currentUnit.movesLeft = 0;
-    currentUnit.actionsLeft = 0;
-    currentUnit.hasStartedAction = false;
-
+    // Emitir evento de turno finalizado
     io.to(lobby.lobbyId).emit("battle:unit_turn_ended", {
       battleId: battle.id,
       unitId: currentUnit.id,
@@ -186,51 +182,54 @@ async function handleTimerExpired(battle: Battle): Promise<void> {
       currentHp: currentUnit.currentHp,
       isAlive: currentUnit.isAlive,
       conditions: currentUnit.conditions,
+      damageFromConditions: turnEndResult.damageFromConditions,
+      conditionsRemoved: turnEndResult.conditionsRemoved,
     });
 
-    if (!currentUnit.isAlive) {
+    if (turnEndResult.unitDefeated) {
       io.to(lobby.lobbyId).emit("battle:unit_defeated", {
         battleId: battle.id,
         unitId: currentUnit.id,
+        reason: "condition_damage",
       });
     }
+  } else {
+    // Jogador não escolheu nenhuma unidade - apenas passar o turno
+    console.log(
+      `[ARENA] Timer expirado - Jogador ${currentPlayerId} não escolheu nenhuma unidade, passando turno`
+    );
   }
 
-  const aliveBySide = new Map<string, number>();
-  for (const u of battle.units) {
-    if (u.isAlive) {
-      const count = aliveBySide.get(u.ownerId) || 0;
-      aliveBySide.set(u.ownerId, count + 1);
-    }
-  }
+  // Registrar ação do jogador (mesmo que não tenha escolhido unidade)
+  // Isso garante que o sistema de rodadas funcione corretamente
+  recordPlayerAction(battle, currentPlayerId);
+
+  // Verificar condições de vitória usando RoundControl
+  const victoryCheck = checkVictoryCondition(battle);
 
   console.log("[ARENA] Timer expirado - Verificando vitória:", {
-    aliveBySideSize: aliveBySide.size,
-    aliveBySide: Object.fromEntries(aliveBySide),
+    battleEnded: victoryCheck.battleEnded,
+    winnerId: victoryCheck.winnerId,
+    reason: victoryCheck.reason,
   });
 
-  if (aliveBySide.size <= 1) {
+  if (victoryCheck.battleEnded) {
     battle.status = "ENDED";
     stopBattleTurnTimer(battle.id);
-    const winnerId = aliveBySide.keys().next().value || null;
-    const winnerKingdom = battle.units.find(
-      (u) => u.ownerId === winnerId
-    )?.ownerKingdomId;
 
-    io.to(lobby.lobbyId).emit("battle:battle_ended", {
-      battleId: battle.id,
-      winnerId,
-      winnerKingdomId: winnerKingdom,
-      reason:
-        aliveBySide.size === 0
-          ? "Empate - Todas as unidades foram derrotadas"
-          : "Todas as unidades inimigas foram derrotadas",
-      finalUnits: battle.units,
-    });
+    emitBattleEndEvents(
+      io,
+      lobby.lobbyId,
+      battle.id,
+      victoryCheck,
+      battle.units
+    );
 
     const loserId =
-      winnerId === lobby.hostUserId ? lobby.guestUserId : lobby.hostUserId;
-    await updateUserStats(winnerId, loserId, battle.isArena);
+      victoryCheck.winnerId === lobby.hostUserId
+        ? lobby.guestUserId
+        : lobby.hostUserId;
+    await updateUserStats(victoryCheck.winnerId, loserId, battle.isArena);
 
     userToLobby.delete(lobby.hostUserId);
     if (lobby.guestUserId) {
@@ -241,46 +240,47 @@ async function handleTimerExpired(battle: Battle): Promise<void> {
     await deleteBattleFromDB(battle.id);
     await deleteLobbyFromDB(lobby.lobbyId);
     console.log(
-      `[ARENA] Batalha ${battle.id} finalizada via timer. Vencedor: ${winnerId}`
+      `[ARENA] Batalha ${battle.id} finalizada via timer. Vencedor: ${victoryCheck.winnerId}`
     );
     return;
   }
 
-  if (currentUnit && currentUnit.hasStartedAction) {
-    const currentCount = battle.roundActionsCount.get(currentPlayerId) || 0;
-    battle.roundActionsCount.set(currentPlayerId, currentCount + 1);
-  }
+  // Avançar para próximo jogador usando RoundControl
+  const turnTransition = advanceToNextPlayer(battle);
 
-  battle.activeUnitId = undefined;
-  if (battle.actionOrder.length) {
-    battle.currentTurnIndex =
-      (battle.currentTurnIndex + 1) % battle.actionOrder.length;
-  }
-
+  // Emitir evento de próximo jogador
   io.to(lobby.lobbyId).emit("battle:next_player", {
     battleId: battle.id,
-    currentPlayerId: battle.actionOrder[battle.currentTurnIndex],
-    index: battle.currentTurnIndex,
+    currentPlayerId: turnTransition.nextPlayerId,
+    index: turnTransition.nextTurnIndex,
     round: battle.round,
   });
 
-  const allPlayersActed = battle.actionOrder.every(
-    (playerId) => (battle.roundActionsCount.get(playerId) || 0) >= 1
-  );
+  // Se avançou rodada, emitir evento
+  if (turnTransition.roundAdvanced) {
+    // Processar nova rodada (reseta hasStartedAction de todas as unidades)
+    await processNewRound(battle, io, lobby.lobbyId);
 
-  if (allPlayersActed) {
-    battle.round++;
-    for (const playerId of battle.actionOrder) {
-      battle.roundActionsCount.set(playerId, 0);
-    }
+    // Enviar unidades atualizadas junto com nova rodada
+    const serializedUnits = battle.units.map((u) => ({
+      id: u.id,
+      hasStartedAction: u.hasStartedAction,
+      movesLeft: u.movesLeft,
+      actionsLeft: u.actionsLeft,
+      conditions: u.conditions,
+      currentHp: u.currentHp,
+      isAlive: u.isAlive,
+    }));
+
     io.to(lobby.lobbyId).emit("battle:new_round", {
       battleId: battle.id,
       round: battle.round,
+      units: serializedUnits,
     });
     io.to(lobby.lobbyId).emit("battle:next_player", {
       battleId: battle.id,
-      currentPlayerId: battle.actionOrder[battle.currentTurnIndex],
-      index: battle.currentTurnIndex,
+      currentPlayerId: turnTransition.nextPlayerId,
+      index: turnTransition.nextTurnIndex,
       round: battle.round,
     });
     console.log(

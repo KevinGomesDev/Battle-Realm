@@ -11,8 +11,7 @@ interface ArenaListProps {
 }
 
 /**
- * Lista de Arenas - Estilo Cidadela de Pedra
- * Permite criar e entrar em arenas de combate PvP
+ * Lista de Arenas - Compacta
  */
 export const ArenaList: React.FC<ArenaListProps> = () => {
   const {
@@ -35,42 +34,24 @@ export const ArenaList: React.FC<ArenaListProps> = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [joiningLobbyId, setJoiningLobbyId] = useState<string | null>(null);
 
-  // Carregar reinos e lobbies ao montar
   useEffect(() => {
     loadKingdoms().catch(console.error);
     listLobbies();
   }, [loadKingdoms, listLobbies]);
 
-  // Selecionar primeiro reino por padrão
   useEffect(() => {
     if (kingdoms.length > 0 && !selectedKingdom) {
-      // Preferir reino com regente
       setSelectedKingdom(kingdoms[0].id);
     }
   }, [kingdoms, selectedKingdom]);
 
   const handleCreateLobby = async () => {
     if (!selectedKingdom || !authState.user?.id) return;
-
-    console.log(
-      "%c[ArenaList] 🎮 Criando lobby...",
-      "color: #f59e0b; font-weight: bold;",
-      { selectedKingdom, userId: authState.user.id }
-    );
-
-    // Verificar se pode entrar em nova sessão
     const canJoin = await canJoinSession(authState.user.id);
     if (!canJoin) {
-      console.log(
-        "%c[ArenaList] ❌ Não pode criar lobby - sessão ativa",
-        "color: #ef4444;",
-        sessionState.canJoinReason
-      );
       alert(sessionState.canJoinReason || "Você já está em uma sessão ativa");
       return;
     }
-
-    console.log("%c[ArenaList] ✅ Pode criar lobby", "color: #22c55e;");
     setIsCreating(true);
     createLobby(selectedKingdom);
     setTimeout(() => setIsCreating(false), 1000);
@@ -78,26 +59,11 @@ export const ArenaList: React.FC<ArenaListProps> = () => {
 
   const handleJoinLobby = async (lobbyId: string) => {
     if (!selectedKingdom || !authState.user?.id) return;
-
-    console.log(
-      "%c[ArenaList] 🚪 Entrando no lobby...",
-      "color: #f59e0b; font-weight: bold;",
-      { lobbyId, selectedKingdom, userId: authState.user.id }
-    );
-
-    // Verificar se pode entrar em nova sessão
     const canJoin = await canJoinSession(authState.user.id);
     if (!canJoin) {
-      console.log(
-        "%c[ArenaList] ❌ Não pode entrar - sessão ativa",
-        "color: #ef4444;",
-        sessionState.canJoinReason
-      );
       alert(sessionState.canJoinReason || "Você já está em uma sessão ativa");
       return;
     }
-
-    console.log("%c[ArenaList] ✅ Pode entrar no lobby", "color: #22c55e;");
     setJoiningLobbyId(lobbyId);
     joinLobby(lobbyId, selectedKingdom);
     setTimeout(() => setJoiningLobbyId(null), 1000);
@@ -114,33 +80,31 @@ export const ArenaList: React.FC<ArenaListProps> = () => {
   };
 
   return (
-    <div className="space-y-5">
-      {/* Seletor de Reino */}
-      <div className="bg-citadel-slate/50 border-2 border-metal-iron/50 rounded-lg p-4">
-        <label className="block text-parchment-aged text-sm font-semibold mb-2 tracking-wide">
-          Escolha seu Regente para a Arena:
+    <div className="space-y-3">
+      {/* Seletor de Reino - Compacto */}
+      <div className="bg-citadel-obsidian/30 border border-metal-iron/30 rounded p-2">
+        <label className="block text-parchment-aged text-[10px] font-semibold mb-1 uppercase tracking-wider">
+          Escolha seu Regente:
         </label>
         {isLoadingKingdoms ? (
-          <div className="text-parchment-dark text-sm flex items-center gap-2">
-            <div className="animate-spin w-4 h-4 border-2 border-metal-bronze border-t-transparent rounded-full"></div>
-            Consultando registros...
+          <div className="text-parchment-dark text-xs flex items-center gap-1">
+            <div className="animate-spin w-3 h-3 border border-metal-bronze border-t-transparent rounded-full" />
+            Carregando...
           </div>
         ) : kingdoms.length === 0 ? (
-          <div className="text-war-ember text-sm flex items-center gap-2">
-            <span>⚠️</span> Funde um reino com Regente antes de entrar na arena
+          <div className="text-war-ember text-xs">
+            ⚠️ Funde um reino primeiro
           </div>
         ) : (
           <select
             value={selectedKingdom}
             onChange={(e) => setSelectedKingdom(e.target.value)}
-            className="w-full px-4 py-3 bg-citadel-obsidian border-2 border-metal-iron rounded-lg 
-                       text-parchment-light focus:outline-none focus:border-metal-bronze 
-                       transition-colors cursor-pointer"
-            style={{ fontFamily: "'Cinzel', serif" }}
+            className="w-full px-2 py-1.5 text-xs bg-citadel-obsidian border border-metal-iron/50 rounded
+                       text-parchment-light focus:outline-none focus:border-purple-500 transition-colors"
           >
             {kingdoms.map((kingdom) => (
               <option key={kingdom.id} value={kingdom.id}>
-                {kingdom.name} • {kingdom.race} • {kingdom.alignment}
+                {kingdom.name} • {kingdom.race}
               </option>
             ))}
           </select>
@@ -149,136 +113,91 @@ export const ArenaList: React.FC<ArenaListProps> = () => {
 
       {/* Erro */}
       {error && (
-        <div className="p-3 bg-war-blood/20 border-2 border-war-crimson rounded-lg flex items-center justify-between">
-          <p className="text-war-ember text-sm flex items-center gap-2">
-            <span>⚠️</span> {error}
-          </p>
+        <div className="p-2 bg-war-blood/20 border border-war-crimson/50 rounded flex items-center justify-between">
+          <p className="text-war-ember text-xs">⚠️ {error}</p>
           <button
             onClick={clearError}
-            className="text-parchment-dark hover:text-parchment-light text-sm"
+            className="text-parchment-dark hover:text-parchment-light text-xs"
           >
             ✕
           </button>
         </div>
       )}
 
-      {/* Botões de Ação */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* Criar Arena */}
-        <button
-          onClick={handleCreateLobby}
-          disabled={isCreating || !selectedKingdom || kingdoms.length === 0}
-          className="group relative px-6 py-4 bg-gradient-to-b from-purple-700 to-purple-900 
-                     border-3 border-metal-iron rounded-lg shadow-forge-glow
-                     hover:from-purple-600 hover:to-purple-800
-                     disabled:from-citadel-granite disabled:to-citadel-carved disabled:shadow-none
-                     active:animate-stone-press transition-all duration-200
-                     disabled:cursor-not-allowed"
-        >
-          <div className="absolute top-1 left-1 w-2 h-2 bg-metal-iron rounded-full"></div>
-          <div className="absolute top-1 right-1 w-2 h-2 bg-metal-iron rounded-full"></div>
-          <div className="absolute bottom-1 left-1 w-2 h-2 bg-metal-iron rounded-full"></div>
-          <div className="absolute bottom-1 right-1 w-2 h-2 bg-metal-iron rounded-full"></div>
-
-          {isCreating ? (
-            <span className="relative text-parchment-light font-bold tracking-wide flex items-center justify-center gap-2">
-              <div className="animate-spin w-5 h-5 border-2 border-parchment-light border-t-transparent rounded-full"></div>
-              Preparando...
-            </span>
-          ) : (
-            <span
-              className="relative text-parchment-light font-bold tracking-wide flex items-center justify-center gap-2"
-              style={{ fontFamily: "'Cinzel', serif" }}
-            >
-              🏟️ CRIAR ARENA
-            </span>
-          )}
-        </button>
-      </div>
+      {/* Botão Criar */}
+      <button
+        onClick={handleCreateLobby}
+        disabled={isCreating || !selectedKingdom || kingdoms.length === 0}
+        className="w-full py-2 text-xs font-bold uppercase tracking-wider
+                   bg-gradient-to-b from-purple-600 to-purple-800
+                   border border-metal-iron rounded
+                   hover:from-purple-500 hover:to-purple-700
+                   disabled:from-citadel-slate disabled:to-citadel-granite disabled:text-parchment-dark
+                   text-parchment-light transition-all disabled:cursor-not-allowed"
+      >
+        {isCreating ? (
+          <span className="flex items-center justify-center gap-2">
+            <div className="animate-spin w-3 h-3 border border-current border-t-transparent rounded-full" />
+            Criando...
+          </span>
+        ) : (
+          "🏟️ Criar Arena"
+        )}
+      </button>
 
       {/* Divisor */}
-      <div className="flex items-center gap-4">
-        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-metal-iron to-transparent"></div>
-        <span className="text-parchment-dark text-xs tracking-widest uppercase">
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-px bg-metal-iron/30" />
+        <span className="text-parchment-dark text-[10px] uppercase tracking-wider">
           Arenas Abertas
         </span>
-        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-metal-iron to-transparent"></div>
+        <div className="flex-1 h-px bg-metal-iron/30" />
       </div>
 
-      {/* Lista de Arenas */}
+      {/* Lista */}
       {isLoading && lobbies.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-8">
-          <div className="relative w-10 h-10">
-            <div className="absolute inset-0 border-3 border-purple-600 rounded-full animate-spin border-t-transparent"></div>
-            <div
-              className="absolute inset-2 border-2 border-purple-400 rounded-full animate-spin border-b-transparent"
-              style={{ animationDirection: "reverse" }}
-            ></div>
-          </div>
-          <p className="text-parchment-dark mt-4">Procurando arenas...</p>
+        <div className="flex items-center justify-center py-4">
+          <div className="animate-spin w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full" />
         </div>
       ) : lobbies.length === 0 ? (
-        <div className="text-center py-8 bg-citadel-slate/20 rounded-xl border-2 border-dashed border-metal-iron/30">
-          <div className="text-5xl mb-4">🏟️</div>
-          <p className="text-parchment-dark">Nenhuma arena disponível</p>
-          <p className="text-parchment-dark/60 text-sm mt-1">
-            Crie uma arena para desafiar outros Regentes!
+        <div className="text-center py-4 bg-citadel-slate/10 rounded border border-dashed border-metal-iron/20">
+          <div className="text-xl mb-1">🏟️</div>
+          <p className="text-parchment-dark text-xs">
+            Nenhuma arena disponível
+          </p>
+          <p className="text-parchment-dark/60 text-[10px]">
+            Crie uma para desafiar!
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-1 max-h-40 overflow-y-auto">
           {lobbies.map((lobby: ArenaLobby) => (
             <div
               key={lobby.lobbyId}
-              className="group relative bg-gradient-to-b from-citadel-granite to-citadel-carved 
-                         border-2 border-metal-iron rounded-lg p-4 
-                         hover:border-purple-600 hover:shadow-[0_0_20px_rgba(147,51,234,0.3)]
-                         transition-all duration-300 shadow-stone-raised"
+              className="flex items-center justify-between p-2 bg-citadel-slate/20 border border-metal-iron/20 rounded
+                         hover:border-purple-500/30 transition-all"
             >
-              {/* Rebites */}
-              <div className="absolute top-2 left-2 w-2 h-2 bg-metal-iron rounded-full border border-metal-rust/30"></div>
-              <div className="absolute top-2 right-2 w-2 h-2 bg-metal-iron rounded-full border border-metal-rust/30"></div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-purple-400">🏟️</span>
-                    <span
-                      className="text-parchment-light font-bold"
-                      style={{ fontFamily: "'Cinzel', serif" }}
-                    >
-                      {lobby.hostKingdomName}
-                    </span>
-                    <span className="text-parchment-dark text-sm">
-                      • {lobby.hostUsername}
-                    </span>
-                  </div>
-                  <div className="text-metal-steel text-xs">
-                    📜 Criada em {formatDate(lobby.createdAt)}
-                  </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-parchment-light truncate flex items-center gap-1">
+                  <span className="text-purple-400">🏟️</span>
+                  {lobby.hostKingdomName}
                 </div>
-
-                <button
-                  onClick={() => handleJoinLobby(lobby.lobbyId)}
-                  disabled={
-                    joiningLobbyId === lobby.lobbyId || !selectedKingdom
-                  }
-                  className="px-4 py-2 bg-gradient-to-b from-purple-700 to-purple-900 
-                             border-2 border-metal-iron rounded-lg
-                             hover:from-purple-600 hover:to-purple-800
-                             disabled:from-citadel-granite disabled:to-citadel-carved
-                             text-parchment-light font-semibold transition-all
-                             disabled:text-parchment-dark disabled:cursor-not-allowed"
-                >
-                  {joiningLobbyId === lobby.lobbyId ? (
-                    <span className="flex items-center gap-2">
-                      <div className="animate-spin w-4 h-4 border-2 border-parchment-light border-t-transparent rounded-full"></div>
-                    </span>
-                  ) : (
-                    <span>⚔️ Desafiar</span>
-                  )}
-                </button>
+                <div className="text-[10px] text-parchment-dark">
+                  {lobby.hostUsername} • {formatDate(lobby.createdAt)}
+                </div>
               </div>
+              <button
+                onClick={() => handleJoinLobby(lobby.lobbyId)}
+                disabled={joiningLobbyId === lobby.lobbyId || !selectedKingdom}
+                className="px-2 py-1 text-[10px] font-semibold
+                           bg-gradient-to-b from-purple-600 to-purple-800
+                           border border-metal-iron/50 rounded
+                           hover:from-purple-500 hover:to-purple-700
+                           disabled:from-citadel-slate disabled:to-citadel-granite
+                           text-parchment-light transition-all disabled:cursor-not-allowed"
+              >
+                {joiningLobbyId === lobby.lobbyId ? "..." : "⚔️ Desafiar"}
+              </button>
             </div>
           ))}
         </div>

@@ -83,6 +83,56 @@ import { EventProvider, EventLog } from "@/features/events";
 
 ---
 
+## Sistema de Round Control (Turnos e Rodadas)
+
+### FONTE DE VERDADE: `server/src/logic/round-control.ts`
+
+O **RoundControl** centraliza TODA a lógica de:
+
+- Troca de turnos (unit → unit, player → player)
+- Avanço de rodadas
+- Processamento de efeitos de início/fim de turno
+- Processamento de condições que expiram
+- Verificação de condições de vitória
+
+### Funções Principais
+
+```typescript
+import {
+  processUnitTurnEndConditions, // Processa fim de turno de unidade
+  advanceToNextPlayer, // Avança para próximo jogador
+  recordPlayerAction, // Registra ação do jogador na rodada
+  checkVictoryCondition, // Verifica se batalha terminou
+  checkExhaustionCondition, // Verifica exaustão (não-arena)
+  processNewRound, // Processa início de nova rodada
+  emitBattleEndEvents, // Emite eventos de fim de batalha
+  emitExhaustionEndEvents, // Emite eventos de exaustão
+} from "../../logic/round-control";
+```
+
+### Fluxo de Fim de Turno
+
+```typescript
+// 1. Processar condições de fim de turno
+const turnEndResult = processUnitTurnEndConditions(unit);
+
+// 2. Registrar ação do jogador
+recordPlayerAction(battle, currentPlayerId);
+
+// 3. Verificar vitória
+const victoryCheck = checkVictoryCondition(battle);
+
+// 4. Avançar para próximo jogador
+const turnTransition = advanceToNextPlayer(battle);
+
+// 5. Se avançou rodada, processar
+if (turnTransition.roundAdvanced) {
+  await processNewRound(battle, io, lobby.lobbyId);
+}
+```
+
+---
+
 ## Sistema de Skills
 
 ### Dados Estáticos (não banco)
@@ -140,6 +190,7 @@ export function registerFeatureHandlers(io: Server, socket: Socket) {
 | Nova skill/classe          | `server/src/data/skills.data.ts` ou `classes.data.ts` |
 | Novo evento de combate     | `server/src/logic/combat-events.ts`                   |
 | Lógica de combate          | `server/src/logic/combat-actions.ts`                  |
+| Lógica de turnos/rodadas   | `server/src/logic/round-control.ts`                   |
 | Novo componente de feature | `client/src/features/{feature}/components/`           |
 
 ---

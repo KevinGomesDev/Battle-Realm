@@ -2,6 +2,7 @@ import React, { useState, useRef } from "react";
 import type { ArenaUnit } from "../../types/arena.types";
 import { getConditionInfo } from "../../constants";
 import { ATTRIBUTE_NAMES } from "../../../../../../shared/config/global.config";
+import { useDiceRoll, DiceRollPanel } from "../../../dice-roll";
 
 // =============================================================================
 // COMPONENTES INTERNOS
@@ -514,6 +515,7 @@ const COLOR_CLASSES: Record<string, { active: string; normal: string }> = {
 
 interface UnitPanelProps {
   selectedUnit: ArenaUnit | null;
+  activeUnitId: string | undefined; // Unidade que está efetivamente no turno
   isMyTurn: boolean;
   currentUserId: string;
   pendingAction: string | null;
@@ -528,6 +530,7 @@ interface UnitPanelProps {
  */
 export const UnitPanel: React.FC<UnitPanelProps> = ({
   selectedUnit,
+  activeUnitId,
   isMyTurn,
   currentUserId,
   pendingAction,
@@ -535,6 +538,16 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
   onExecuteAction,
   onEndAction,
 }) => {
+  // Só mostra ações se a unidade selecionada É a unidade ativa do turno
+  const isActiveUnit = selectedUnit?.id === activeUnitId;
+
+  // Hook para rolagem de dados
+  const {
+    panelData,
+    isOpen: isDiceRollVisible,
+    closeRollPanel,
+  } = useDiceRoll();
+
   return (
     <div className="w-80 xl:w-96 flex-shrink-0 p-2 flex flex-col gap-2 overflow-y-auto overflow-x-hidden">
       {/* Painel da Unidade Selecionada */}
@@ -569,23 +582,21 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
               current={selectedUnit.physicalProtection}
               max={selectedUnit.maxPhysicalProtection}
               color={
-                selectedUnit.physicalProtectionBroken ? "#6b7280" : "#60a5fa"
+                selectedUnit.physicalProtection > 0 ? "#60a5fa" : "#6b7280"
               }
               size={64}
               label="P. Física"
               icon="🛡️"
-              tooltip="Proteção Física. Absorve dano FÍSICO antes do HP. Proteção = Armadura × 4. Se quebrar, não regenera."
+              tooltip="Proteção Física. Absorve dano FÍSICO antes do HP. Proteção = Armadura × 4."
             />
             <CircularProgress
               current={selectedUnit.magicalProtection}
               max={selectedUnit.maxMagicalProtection}
-              color={
-                selectedUnit.magicalProtectionBroken ? "#6b7280" : "#a855f7"
-              }
+              color={selectedUnit.magicalProtection > 0 ? "#a855f7" : "#6b7280"}
               size={64}
               label="P. Mágica"
               icon="✨"
-              tooltip="Proteção Mágica. Absorve dano MÁGICO antes do HP. Proteção = Foco × 4. Se quebrar, não regenera."
+              tooltip="Proteção Mágica. Absorve dano MÁGICO antes do HP. Proteção = Foco × 4."
             />
           </div>
 
@@ -601,28 +612,36 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
             />
           </div>
 
-          {/* Ações e Movimentos */}
-          <div className="border-t border-metal-iron/30 pt-3 mb-3">
-            <div className="grid grid-cols-2 gap-2">
-              {/* Ações - Quadrados Verdes */}
-              <div className="flex flex-col items-center">
-                <ActionSquares total={1} remaining={selectedUnit.actionsLeft} />
-                <span className="text-parchment-dark text-[10px] mt-1">
-                  Ações
-                </span>
-              </div>
-              {/* Movimentos - Bolinhas Azuis */}
-              <div className="flex flex-col items-center">
-                <MovementDots
-                  total={Math.max(selectedUnit.movesLeft, selectedUnit.acuity)}
-                  remaining={selectedUnit.movesLeft}
-                />
-                <span className="text-parchment-dark text-[10px] mt-1">
-                  Movimentos
-                </span>
+          {/* Ações e Movimentos - só mostra quando é meu turno E a unidade selecionada é a ativa */}
+          {isMyTurn && isActiveUnit && selectedUnit.hasStartedAction && (
+            <div className="border-t border-metal-iron/30 pt-3 mb-3">
+              <div className="grid grid-cols-2 gap-2">
+                {/* Ações - Quadrados Verdes */}
+                <div className="flex flex-col items-center">
+                  <ActionSquares
+                    total={1}
+                    remaining={selectedUnit.actionsLeft}
+                  />
+                  <span className="text-parchment-dark text-[10px] mt-1">
+                    Ações
+                  </span>
+                </div>
+                {/* Movimentos - Bolinhas Azuis */}
+                <div className="flex flex-col items-center">
+                  <MovementDots
+                    total={Math.max(
+                      selectedUnit.movesLeft,
+                      selectedUnit.acuity
+                    )}
+                    remaining={selectedUnit.movesLeft}
+                  />
+                  <span className="text-parchment-dark text-[10px] mt-1">
+                    Movimentos
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Condições - Bloco dedicado com tooltips */}
           {selectedUnit.conditions.length > 0 && (
@@ -638,101 +657,118 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
             </div>
           )}
 
-          {/* Lista de Ações Disponíveis */}
-          {isMyTurn && selectedUnit.ownerId === currentUserId && (
-            <div className="border-t border-metal-iron/30 pt-3">
-              <h4 className="text-parchment-dark text-xs mb-2 font-semibold flex items-center gap-1">
-                <span>⚡</span> Ações
-                {pendingAction && (
-                  <span className="ml-auto text-amber-400 text-[10px] animate-pulse">
-                    Selecione um alvo...
-                  </span>
-                )}
-              </h4>
-
-              {/* Grid de Ações */}
-              <div className="grid grid-cols-3 gap-1.5 mb-3">
-                {selectedUnit.actions
-                  ?.filter((actionKey) => actionKey !== "move")
-                  .map((actionKey) => {
-                    const actionInfo = ACTIONS_INFO[actionKey];
-                    if (!actionInfo) return null;
-
-                    const isTargetAction = actionInfo.requiresTarget;
-                    const isActive = pendingAction === actionKey;
-                    const color =
-                      COLOR_CLASSES[actionInfo.color] || COLOR_CLASSES.gray;
-
-                    return (
-                      <div key={actionKey} className="relative group">
-                        <button
-                          onClick={() => {
-                            if (selectedUnit.actionsLeft <= 0) return;
-                            if (isTargetAction) {
-                              onSetPendingAction(isActive ? null : actionKey);
-                            } else {
-                              onExecuteAction(actionKey, selectedUnit.id);
-                            }
-                          }}
-                          disabled={selectedUnit.actionsLeft <= 0}
-                          className={`w-full p-1.5 rounded-lg border-2 text-center transition-all ${
-                            isActive
-                              ? color.active
-                              : selectedUnit.actionsLeft > 0
-                              ? `${color.normal} cursor-pointer`
-                              : "bg-gray-800/40 border-gray-600/30 opacity-50 cursor-not-allowed"
-                          }`}
-                          style={{
-                            cursor:
-                              selectedUnit.actionsLeft > 0
-                                ? isTargetAction
-                                  ? "var(--cursor-target)"
-                                  : "var(--cursor-action)"
-                                : "var(--cursor-not-allowed)",
-                          }}
-                        >
-                          <span className="text-lg block">
-                            {actionInfo.icon}
-                          </span>
-                          <span className="text-parchment-light text-[10px] font-semibold block">
-                            {actionInfo.name}
-                          </span>
-                        </button>
-                        <div className="absolute z-[9999] top-full left-1/2 -translate-x-1/2 mt-2 w-40 p-2 bg-citadel-obsidian border border-metal-iron rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                          <p className="text-parchment-light font-bold text-[10px] mb-0.5">
-                            {actionInfo.icon} {actionInfo.name}
-                          </p>
-                          <p className="text-parchment-aged text-[9px]">
-                            {actionInfo.description}
-                          </p>
-                          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45 w-1.5 h-1.5 bg-citadel-obsidian border-l border-t border-metal-iron"></div>
-                        </div>
-                      </div>
-                    );
-                  })}
+          {/* Mensagem quando está visualizando outra unidade (não a ativa) */}
+          {isMyTurn &&
+            selectedUnit.ownerId === currentUserId &&
+            !isActiveUnit && (
+              <div className="border-t border-metal-iron/30 pt-3">
+                <div className="bg-amber-900/30 border border-amber-600/50 rounded-lg p-3 text-center">
+                  <p className="text-amber-400 text-xs font-semibold mb-1">
+                    👁️ Visualizando
+                  </p>
+                  <p className="text-parchment-dark text-[10px]">
+                    Clique na unidade ativa para agir com ela, ou finalize o
+                    turno atual.
+                  </p>
+                </div>
               </div>
+            )}
 
-              {/* Cancelar ação pendente */}
-              {pendingAction && (
+          {/* Lista de Ações Disponíveis - só mostra se for a unidade ativa do turno */}
+          {isMyTurn &&
+            selectedUnit.ownerId === currentUserId &&
+            isActiveUnit && (
+              <div className="border-t border-metal-iron/30 pt-3">
+                <h4 className="text-parchment-dark text-xs mb-2 font-semibold flex items-center gap-1">
+                  <span>⚡</span> Ações
+                  {pendingAction && (
+                    <span className="ml-auto text-amber-400 text-[10px] animate-pulse">
+                      Selecione um alvo...
+                    </span>
+                  )}
+                </h4>
+
+                {/* Grid de Ações */}
+                <div className="grid grid-cols-3 gap-1.5 mb-3">
+                  {selectedUnit.actions
+                    ?.filter((actionKey) => actionKey !== "move")
+                    .map((actionKey) => {
+                      const actionInfo = ACTIONS_INFO[actionKey];
+                      if (!actionInfo) return null;
+
+                      const isTargetAction = actionInfo.requiresTarget;
+                      const isActive = pendingAction === actionKey;
+                      const color =
+                        COLOR_CLASSES[actionInfo.color] || COLOR_CLASSES.gray;
+
+                      return (
+                        <div key={actionKey} className="relative group">
+                          <button
+                            onClick={() => {
+                              if (selectedUnit.actionsLeft <= 0) return;
+                              if (isTargetAction) {
+                                onSetPendingAction(isActive ? null : actionKey);
+                              } else {
+                                onExecuteAction(actionKey, selectedUnit.id);
+                              }
+                            }}
+                            disabled={selectedUnit.actionsLeft <= 0}
+                            className={`w-full p-1.5 rounded-lg border-2 text-center transition-all ${
+                              isActive
+                                ? color.active
+                                : selectedUnit.actionsLeft > 0
+                                ? `${color.normal} cursor-pointer`
+                                : "bg-gray-800/40 border-gray-600/30 opacity-50 cursor-not-allowed"
+                            }`}
+                            style={{
+                              cursor:
+                                selectedUnit.actionsLeft > 0
+                                  ? "pointer"
+                                  : "not-allowed",
+                            }}
+                          >
+                            <span className="text-lg block">
+                              {actionInfo.icon}
+                            </span>
+                            <span className="text-parchment-light text-[10px] font-semibold block">
+                              {actionInfo.name}
+                            </span>
+                          </button>
+                          <div className="absolute z-[9999] top-full left-1/2 -translate-x-1/2 mt-2 w-40 p-2 bg-citadel-obsidian border border-metal-iron rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            <p className="text-parchment-light font-bold text-[10px] mb-0.5">
+                              {actionInfo.icon} {actionInfo.name}
+                            </p>
+                            <p className="text-parchment-aged text-[9px]">
+                              {actionInfo.description}
+                            </p>
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45 w-1.5 h-1.5 bg-citadel-obsidian border-l border-t border-metal-iron"></div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                {/* Cancelar ação pendente */}
+                {pendingAction && (
+                  <button
+                    onClick={() => onSetPendingAction(null)}
+                    className="w-full mb-2 py-1.5 bg-gray-700/50 border border-gray-600 rounded text-parchment-dark text-xs hover:bg-gray-600/50 transition-colors"
+                  >
+                    ✕ Cancelar{" "}
+                    {pendingAction === "attack" ? "Ataque" : pendingAction}
+                  </button>
+                )}
+
+                {/* Finalizar Turno */}
                 <button
-                  onClick={() => onSetPendingAction(null)}
-                  className="w-full mb-2 py-1.5 bg-gray-700/50 border border-gray-600 rounded text-parchment-dark text-xs hover:bg-gray-600/50 transition-colors"
+                  onClick={onEndAction}
+                  className="w-full py-2 bg-gradient-to-b from-amber-600 to-amber-800 border-2 border-amber-500 rounded-lg text-parchment-light text-sm font-bold hover:from-amber-500 hover:to-amber-700 transition-all flex items-center justify-center gap-2"
                 >
-                  ✕ Cancelar{" "}
-                  {pendingAction === "attack" ? "Ataque" : pendingAction}
+                  <span>⏭️</span>
+                  <span>Finalizar Turno</span>
                 </button>
-              )}
-
-              {/* Finalizar Turno */}
-              <button
-                onClick={onEndAction}
-                className="w-full py-2 bg-gradient-to-b from-amber-600 to-amber-800 border-2 border-amber-500 rounded-lg text-parchment-light text-sm font-bold hover:from-amber-500 hover:to-amber-700 transition-all flex items-center justify-center gap-2"
-              >
-                <span>⏭️</span>
-                <span>Finalizar Turno</span>
-              </button>
-            </div>
-          )}
+              </div>
+            )}
         </div>
       ) : (
         <div className="bg-citadel-granite rounded-xl border-2 border-metal-iron p-3 shadow-stone-raised flex-shrink-0">
@@ -741,6 +777,14 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
           </p>
         </div>
       )}
+
+      {/* Painel de Rolagem de Dados - Aparece abaixo do painel de unidade */}
+      <DiceRollPanel
+        data={panelData}
+        isVisible={isDiceRollVisible}
+        onClose={closeRollPanel}
+        autoCloseDelay={3000}
+      />
     </div>
   );
 };

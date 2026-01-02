@@ -1,5 +1,5 @@
 // client/src/features/dice-roll/context/DiceRollContext.tsx
-// Context global para gerenciar o modal de rolagem
+// Context global para gerenciar o painel de rolagem
 
 import {
   createContext,
@@ -14,7 +14,6 @@ import type {
   OpenRollPanelOptions,
   OnRollCompleteCallback,
 } from "../types/dice-roll.types";
-import DiceRollModal from "../components/DiceRollModal";
 import { socketService } from "../../../services/socket.service";
 
 interface DiceRollContextValue {
@@ -24,6 +23,8 @@ interface DiceRollContextValue {
   closeRollPanel: () => void;
   /** Se o painel está aberto */
   isOpen: boolean;
+  /** Dados do painel (para renderizar externamente) */
+  panelData: DiceRollPanelData | null;
 }
 
 const DiceRollContext = createContext<DiceRollContextValue | null>(null);
@@ -85,19 +86,10 @@ export function DiceRollProvider({ children }: DiceRollProviderProps) {
         openRollPanel,
         closeRollPanel,
         isOpen,
+        panelData,
       }}
     >
       {children}
-
-      {/* Modal renderizado aqui para estar acima de tudo */}
-      {panelData && (
-        <DiceRollModal
-          data={panelData}
-          isOpen={isOpen}
-          onClose={closeRollPanel}
-          autoCloseDelay={panelData.actionType === "attack" ? 3000 : 0}
-        />
-      )}
     </DiceRollContext.Provider>
   );
 }

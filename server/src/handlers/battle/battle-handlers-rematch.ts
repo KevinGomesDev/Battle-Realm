@@ -50,6 +50,18 @@ export function registerBattleRematchHandlers(
         });
       }
 
+      // Verificar se ambos os jogadores ainda estão presentes no lobby
+      const opponentId =
+        userId === lobby.hostUserId ? lobby.guestUserId : lobby.hostUserId;
+      if (!opponentId || !userToLobby.has(opponentId)) {
+        console.log(
+          `[ARENA] request_rematch ERRO: oponente ${opponentId} já saiu do lobby`
+        );
+        return socket.emit("battle:error", {
+          message: "O oponente já saiu. Não é possível pedir revanche.",
+        });
+      }
+
       if (!rematchRequests.has(lobbyId)) {
         rematchRequests.set(lobbyId, new Set());
       }
@@ -102,21 +114,25 @@ export function registerBattleRematchHandlers(
             return;
           }
 
+          // Pegar referência da batalha antiga ANTES de criar a nova
           const oldBattle = [...activeBattles.values()].find(
             (b) => b.lobbyId === lobbyId
           );
-          if (oldBattle) {
-            cleanupBattle(oldBattle.id);
-            await deleteBattleFromDB(oldBattle.id);
-          }
+          const oldBattleId = oldBattle?.id;
 
+          // Criar nova batalha PRIMEIRO (para não haver gap na sessão)
           await createAndStartBattle({
             lobby,
             hostKingdom,
             guestKingdom,
             io,
-            isRematch: true,
           });
+
+          // Depois de criar a nova, limpar a antiga
+          if (oldBattleId) {
+            cleanupBattle(oldBattleId);
+            await deleteBattleFromDB(oldBattleId);
+          }
         } finally {
           rematchLocks.delete(lobbyId);
         }

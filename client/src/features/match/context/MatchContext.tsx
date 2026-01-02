@@ -487,6 +487,60 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  // Sair do lobby/partida
+  const leaveMatch = useCallback(
+    async (matchId: string): Promise<void> => {
+      dispatch({ type: "SET_LOADING", payload: true });
+      dispatch({ type: "SET_ERROR", payload: null });
+
+      try {
+        socketService.emit("match:leave", {
+          matchId,
+          userId,
+        });
+
+        await new Promise<void>((resolve, reject) => {
+          let timeoutId: ReturnType<typeof setTimeout>;
+
+          const successHandler = (data: { message: string }) => {
+            clearTimeout(timeoutId);
+            socketService.off("match:left", successHandler);
+            socketService.off("error", errorHandler);
+            // Limpar estado local
+            dispatch({ type: "RESET" });
+            resolve();
+          };
+
+          const errorHandler = (data: { message: string }) => {
+            clearTimeout(timeoutId);
+            socketService.off("match:left", successHandler);
+            socketService.off("error", errorHandler);
+            reject(new Error(data.message || "Erro ao sair da partida"));
+          };
+
+          socketService.on("match:left", successHandler);
+          socketService.on("error", errorHandler);
+
+          timeoutId = setTimeout(() => {
+            socketService.off("match:left", successHandler);
+            socketService.off("error", errorHandler);
+            reject(new Error("Timeout ao sair da partida"));
+          }, 10000);
+        });
+
+        dispatch({ type: "SET_LOADING", payload: false });
+      } catch (error: any) {
+        dispatch({
+          type: "SET_ERROR",
+          payload: error?.message || "Erro ao sair da partida",
+        });
+        dispatch({ type: "SET_LOADING", payload: false });
+        throw error;
+      }
+    },
+    [userId]
+  );
+
   // Novo: Requisitar estado completo da partida
   const requestMatchState = useCallback(
     async (matchId: string): Promise<void> => {
@@ -522,7 +576,7 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
   // Listener para atualizações em tempo real da lista de lobbies
   React.useEffect(() => {
     const handleLobbiesUpdated = (data: {
-      action: "created" | "removed";
+      action: "created" | "removed" | "updated";
       match?: OpenMatch;
       matchId?: string;
     }) => {
@@ -537,6 +591,14 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
         dispatch({
           type: "SET_OPEN_MATCHES",
           payload: state.openMatches.filter((m) => m.id !== data.matchId),
+        });
+      } else if (data.action === "updated" && data.match) {
+        // Atualiza lobby existente (ex: quando host muda)
+        dispatch({
+          type: "SET_OPEN_MATCHES",
+          payload: state.openMatches.map((m) =>
+            m.id === data.match!.id ? data.match! : m
+          ),
         });
       }
     };
@@ -607,6 +669,7 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
     listOpenMatches,
     createMatch,
     joinMatch,
+    leaveMatch,
     getPreparationData,
     requestMapData,
     requestMatchState,

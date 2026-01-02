@@ -1,314 +1,236 @@
 import React, { useState } from "react";
-import { useConnection } from "../core";
-import { useAuth } from "../features/auth";
 import { useMatch } from "../features/match";
 import { useArena } from "../features/arena";
-import { KingdomList } from "../components/Dashboard/KingdomList";
-import { Ranking } from "../components/Dashboard/Ranking";
-import { MatchList, MatchLobby } from "../features/match";
-import { ArenaList, ArenaLobbyView, ArenaBattleView } from "../features/arena";
+import { EventHistory } from "../features/events";
+import {
+  SectionCard,
+  Ranking,
+  KingdomSection,
+  useKingdomSectionActions,
+  MatchSection,
+  useMatchSectionActions,
+  ArenaSection,
+  useArenaSectionActions,
+  MatchLobby,
+  ArenaLobby,
+} from "../components/Dashboard";
+import { ArenaBattleView } from "../features/arena";
 import { SessionGuard } from "../components/SessionGuard";
+import { Topbar } from "../components/Topbar";
 import MapPage from "./MapPage";
+import { CreateKingdomModal } from "../features/kingdom";
+import { GlobalChat } from "../features/chat";
 
-type DashboardTab = "home" | "match" | "arena";
+// =============================================================================
+// BOTÕES DE HEADER
+// =============================================================================
+
+/** Botão compacto para header - Fundar Reino */
+const FundarReinoBtn: React.FC<{ onClick: () => void }> = ({ onClick }) => (
+  <button
+    onClick={onClick}
+    className="px-2 py-0.5 text-[10px] font-semibold
+               bg-gradient-to-b from-metal-bronze to-metal-copper
+               border border-metal-iron/50 rounded
+               hover:from-metal-gold hover:to-metal-bronze
+               text-citadel-obsidian transition-all"
+  >
+    ⚒️ Fundar
+  </button>
+);
+
+/** Botão compacto para header - Criar Partida */
+const CriarPartidaBtn: React.FC<{
+  onClick: () => void;
+  disabled?: boolean;
+  isLoading?: boolean;
+}> = ({ onClick, disabled, isLoading }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className="px-2 py-0.5 text-[10px] font-semibold
+               bg-gradient-to-b from-war-crimson to-war-blood
+               border border-metal-iron/50 rounded
+               hover:from-war-ember hover:to-war-crimson
+               disabled:from-citadel-slate disabled:to-citadel-granite
+               text-parchment-light transition-all disabled:cursor-not-allowed"
+  >
+    {isLoading ? "..." : "Criar Partida"}
+  </button>
+);
+
+/** Botão compacto para header - Criar Arena */
+const CriarArenaBtn: React.FC<{
+  onClick: () => void;
+  disabled?: boolean;
+  isLoading?: boolean;
+}> = ({ onClick, disabled, isLoading }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className="px-2 py-0.5 text-[10px] font-semibold
+               bg-gradient-to-b from-purple-600 to-purple-800
+               border border-metal-iron/50 rounded
+               hover:from-purple-500 hover:to-purple-700
+               disabled:from-citadel-slate disabled:to-citadel-granite
+               text-parchment-light transition-all disabled:cursor-not-allowed"
+  >
+    {isLoading ? "..." : "Criar Arena"}
+  </button>
+);
+
+// =============================================================================
+// COMPONENTE PRINCIPAL
+// =============================================================================
 
 /**
  * Dashboard Page - A CIDADELA DE PEDRA
- * Layout com 3 abas: Início, Encontrar Partida, Modo Arena
+ * Visão única com todas as seções lado a lado
  */
 const DashboardPage: React.FC = () => {
-  const { isConnected } = useConnection();
-  const { user, logout } = useAuth();
   const { currentMatch } = useMatch();
   const { state: arenaState } = useArena();
 
-  const [activeTab, setActiveTab] = useState<DashboardTab>("home");
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
+
+  // Hooks para ações dos headers
+  const kingdomActions = useKingdomSectionActions();
+  const matchActions = useMatchSectionActions();
+  const arenaActions = useArenaSectionActions();
 
   // Se há uma partida ativa, vai direto para o mapa
   if (currentMatch) {
     return <MapPage />;
   }
 
-  // Se está em batalha de arena (ativa ou acabou de terminar com resultado pendente), mostrar tela de batalha
+  // Se está em batalha de arena, mostrar tela de batalha
   if (arenaState.battle || arenaState.battleResult) {
     return <ArenaBattleView />;
   }
 
-  const tabs: { id: DashboardTab; label: string; icon: string }[] = [
-    { id: "home", label: "Início", icon: "🏰" },
-    { id: "match", label: "Encontrar Partida", icon: "⚔️" },
-    { id: "arena", label: "Modo Arena", icon: "🏟️" },
-  ];
-
   return (
-    <div className="relative min-h-screen overflow-hidden bg-citadel-obsidian">
-      {/* === AMBIENTE: Vista da Cidadela === */}
-      <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-citadel-slate via-citadel-obsidian to-black"></div>
-        <div className="absolute inset-0 bg-torch-light opacity-40"></div>
-        <div className="absolute top-0 left-0 w-1/4 h-full bg-gradient-to-r from-torch-glow/10 to-transparent"></div>
-        <div className="absolute top-0 right-0 w-1/4 h-full bg-gradient-to-l from-torch-glow/10 to-transparent"></div>
+    <div className="relative min-h-screen flex flex-col bg-citadel-obsidian">
+      {/* === AMBIENTE === */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-b from-citadel-slate/80 via-citadel-obsidian to-black" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-torch-glow/5 via-transparent to-transparent" />
       </div>
 
-      {/* === TOPBAR SIMPLIFICADA === */}
-      <div className="relative z-20">
-        <div className="bg-citadel-granite border-b-4 border-citadel-carved shadow-stone-raised">
-          <div className="absolute inset-0 bg-stone-texture opacity-50"></div>
+      {/* === TOPBAR === */}
+      <Topbar context="dashboard" />
 
-          <div className="relative px-4 sm:px-6 py-3">
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
-              {/* ESQUERDA: Logo e Título */}
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-12 bg-citadel-carved border-2 border-metal-iron rounded-b-lg shadow-stone-raised flex items-center justify-center"
-                  style={{
-                    clipPath: "polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%)",
-                  }}
-                >
-                  <span className="text-xl">🏰</span>
-                </div>
-                <div>
-                  <h1
-                    className="text-xl font-bold tracking-wider text-parchment-light"
-                    style={{ fontFamily: "'Cinzel', serif" }}
-                  >
-                    BATTLE REALM
-                  </h1>
-                </div>
-              </div>
+      {/* === CONTEÚDO PRINCIPAL === */}
+      <div className="relative z-10 flex-1 p-3 overflow-auto">
+        <div className="max-w-[1920px] mx-auto h-full">
+          {/* Grid de 4 colunas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 h-full">
+            {/* 1. Seus Reinos */}
+            <SectionCard
+              title="Seus Reinos"
+              icon="🏰"
+              accentColor="bronze"
+              headerAction={
+                <FundarReinoBtn onClick={kingdomActions.openModal} />
+              }
+            >
+              <KingdomSection />
+            </SectionCard>
 
-              {/* DIREITA: Usuário + Status + Logout */}
-              <div className="flex items-center gap-4">
-                {/* Nome do Usuário */}
-                {user && (
-                  <div className="hidden sm:flex items-center gap-2">
-                    <div className="w-8 h-8 bg-gradient-to-b from-metal-bronze to-metal-copper rounded-md border border-metal-iron flex items-center justify-center">
-                      <span className="text-sm">👤</span>
-                    </div>
-                    <span
-                      className="text-parchment-light font-semibold text-sm"
-                      style={{ fontFamily: "'Cinzel', serif" }}
-                    >
-                      {user.username}
-                    </span>
-                  </div>
-                )}
+            {/* 2. Sala de Guerra */}
+            <SectionCard
+              title="Sala de Guerra"
+              icon="⚔️"
+              accentColor="crimson"
+              headerAction={
+                !activeMatchId && (
+                  <CriarPartidaBtn
+                    onClick={() =>
+                      matchActions.handleCreate((id) => setActiveMatchId(id))
+                    }
+                    disabled={
+                      !matchActions.hasKingdoms || matchActions.isCreating
+                    }
+                    isLoading={matchActions.isCreating}
+                  />
+                )
+              }
+            >
+              {activeMatchId ? (
+                <MatchLobby
+                  matchId={activeMatchId}
+                  onLeave={() => setActiveMatchId(null)}
+                  onGameStart={() => {}}
+                />
+              ) : (
+                <MatchSection
+                  onMatchJoined={(matchId) => setActiveMatchId(matchId)}
+                />
+              )}
+            </SectionCard>
 
-                {/* Status de Conexão */}
-                <div
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
-                    isConnected
-                      ? "bg-green-900/30 border-green-600/50"
-                      : "bg-war-blood/30 border-war-crimson/50"
-                  }`}
-                >
-                  <div
-                    className={`w-2.5 h-2.5 rounded-full ${
-                      isConnected
-                        ? "bg-green-500 animate-pulse"
-                        : "bg-war-crimson"
-                    }`}
-                  ></div>
-                  <span
-                    className={`text-xs font-semibold ${
-                      isConnected ? "text-green-400" : "text-war-ember"
-                    }`}
-                  >
-                    {isConnected ? "Online" : "Offline"}
-                  </span>
-                </div>
+            {/* 3. Arena de Combate */}
+            <SectionCard
+              title="Arena"
+              icon="🏟️"
+              accentColor="purple"
+              headerAction={
+                !arenaState.currentLobby && (
+                  <CriarArenaBtn
+                    onClick={arenaActions.handleCreate}
+                    disabled={
+                      !arenaActions.hasKingdoms || arenaActions.isCreating
+                    }
+                    isLoading={arenaActions.isCreating}
+                  />
+                )
+              }
+            >
+              {arenaState.currentLobby ? <ArenaLobby /> : <ArenaSection />}
+            </SectionCard>
 
-                {/* Botão de Logout */}
-                {user && (
-                  <button
-                    onClick={() => logout()}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-war-blood/30 hover:bg-war-blood/50 border border-war-crimson/50 hover:border-war-crimson rounded-lg transition-all group"
-                    title="Sair"
-                  >
-                    <span className="text-sm group-hover:scale-110 transition-transform">
-                      🚪
-                    </span>
-                    <span className="hidden sm:inline text-xs font-semibold text-war-ember group-hover:text-parchment-light transition-colors">
-                      Sair
-                    </span>
-                  </button>
-                )}
-              </div>
-            </div>
+            {/* 4. Ranking */}
+            <SectionCard title="Ranking" icon="🏆" accentColor="gold">
+              <Ranking />
+            </SectionCard>
+          </div>
+
+          {/* 5. Chat Global */}
+          <div className="mt-3">
+            <SectionCard title="Chat Global" icon="💬" accentColor="bronze">
+              <GlobalChat />
+            </SectionCard>
           </div>
         </div>
       </div>
 
-      {/* === NAVEGAÇÃO POR ABAS === */}
-      <div className="relative z-10 bg-citadel-slate/80 border-b border-metal-iron/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <nav className="flex gap-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`relative px-4 py-3 font-semibold text-sm transition-all ${
-                  activeTab === tab.id
-                    ? "text-parchment-light"
-                    : "text-parchment-dark hover:text-parchment-aged"
-                }`}
-                style={{ fontFamily: "'Cinzel', serif" }}
-              >
-                <span className="flex items-center gap-2">
-                  <span>{tab.icon}</span>
-                  <span className="hidden sm:inline">{tab.label}</span>
-                </span>
-                {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-metal-bronze via-metal-gold to-metal-bronze"></div>
-                )}
-              </button>
-            ))}
-          </nav>
-        </div>
-      </div>
+      {/* === MODAL DE HISTÓRICO DE EVENTOS === */}
+      <EventHistory />
 
-      {/* === CONTEÚDO PRINCIPAL === */}
-      <div className="relative z-10 p-4 sm:p-6 lg:p-8">
-        <div className="max-w-5xl mx-auto">
-          {/* TAB: INÍCIO (Dashboard) */}
-          {activeTab === "home" && (
-            <div className="space-y-6">
-              {/* Reinos do Jogador */}
-              <div className="relative">
-                <div className="absolute -inset-1 bg-gradient-to-b from-metal-bronze to-metal-copper opacity-20 rounded-xl blur-sm"></div>
-                <div className="relative bg-gradient-to-b from-citadel-granite to-citadel-carved border-4 border-metal-iron rounded-xl overflow-hidden shadow-stone-raised">
-                  <div className="bg-gradient-to-r from-citadel-carved via-citadel-granite to-citadel-carved border-b-2 border-metal-rust/50 px-6 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-metal-bronze border-2 border-metal-iron rounded flex items-center justify-center">
-                        <span>🏰</span>
-                      </div>
-                      <h2
-                        className="text-parchment-light font-bold tracking-wider"
-                        style={{ fontFamily: "'Cinzel', serif" }}
-                      >
-                        SEUS REINOS
-                      </h2>
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <KingdomList />
-                  </div>
-                </div>
-              </div>
-
-              {/* Ranking de Vitórias */}
-              <Ranking />
-            </div>
-          )}
-
-          {/* TAB: ENCONTRAR PARTIDA */}
-          {activeTab === "match" && (
-            <div className="relative">
-              <div className="absolute -inset-1 bg-gradient-to-b from-war-blood to-war-crimson opacity-30 rounded-xl blur-sm"></div>
-              <div className="relative bg-gradient-to-b from-citadel-granite to-citadel-carved border-4 border-metal-iron rounded-xl overflow-hidden shadow-stone-raised">
-                <div className="bg-gradient-to-r from-citadel-carved via-citadel-granite to-citadel-carved border-b-2 border-metal-rust/50 px-6 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-war-crimson border-2 border-metal-iron rounded flex items-center justify-center">
-                      <span>⚔️</span>
-                    </div>
-                    <h2
-                      className="text-parchment-light font-bold tracking-wider"
-                      style={{ fontFamily: "'Cinzel', serif" }}
-                    >
-                      SALA DE GUERRA
-                    </h2>
-                  </div>
-                </div>
-
-                <div className="p-6">
-                  {activeMatchId ? (
-                    <MatchLobby
-                      matchId={activeMatchId}
-                      onLeave={() => setActiveMatchId(null)}
-                      onGameStart={() => {
-                        // Jogo iniciado
-                      }}
-                    />
-                  ) : (
-                    <MatchList
-                      onMatchCreated={(matchId) => setActiveMatchId(matchId)}
-                      onMatchJoined={(matchId) => setActiveMatchId(matchId)}
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB: MODO ARENA */}
-          {activeTab === "arena" && (
-            <div className="relative">
-              <div className="absolute -inset-1 bg-gradient-to-b from-purple-900 to-purple-700 opacity-30 rounded-xl blur-sm"></div>
-              <div className="relative bg-gradient-to-b from-citadel-granite to-citadel-carved border-4 border-metal-iron rounded-xl overflow-hidden shadow-stone-raised">
-                <div className="bg-gradient-to-r from-citadel-carved via-citadel-granite to-citadel-carved border-b-2 border-metal-rust/50 px-6 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-purple-700 border-2 border-metal-iron rounded flex items-center justify-center">
-                      <span>🏟️</span>
-                    </div>
-                    <h2
-                      className="text-parchment-light font-bold tracking-wider"
-                      style={{ fontFamily: "'Cinzel', serif" }}
-                    >
-                      ARENA DE COMBATE
-                    </h2>
-                    <span className="text-xs text-purple-400 bg-purple-900/50 px-2 py-0.5 rounded border border-purple-600/50">
-                      PvP 1v1
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-6">
-                  {arenaState.currentLobby ? (
-                    <ArenaLobbyView
-                      onLeave={() => {}}
-                      onBattleStart={() => {}}
-                    />
-                  ) : (
-                    <ArenaList />
-                  )}
-                </div>
-              </div>
-
-              {/* Descrição do Modo Arena */}
-              {!arenaState.currentLobby && (
-                <div className="mt-4 p-4 bg-citadel-slate/30 rounded-lg border border-metal-iron/30">
-                  <h3 className="text-parchment-aged font-semibold mb-2">
-                    ⚔️ O que é o Modo Arena?
-                  </h3>
-                  <p className="text-parchment-dark text-sm leading-relaxed">
-                    A Arena é um modo de combate PvP independente de partidas.
-                    Dois Regentes se enfrentam em um grid 20x20, usando suas
-                    habilidades e estratégias para derrotar o oponente. Cada
-                    Regente possui 3 marcas de ação por rodada.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+      {/* === MODAL DE CRIAÇÃO DE REINO === */}
+      {kingdomActions.isModalOpen && (
+        <CreateKingdomModal
+          onClose={kingdomActions.closeModal}
+          onSuccess={() => {
+            kingdomActions.closeModal();
+            // Forçar recarregar reinos após criação
+            window.location.reload();
+          }}
+        />
+      )}
 
       {/* === FONTE === */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cinzel+Decorative:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap');
       `}</style>
     </div>
   );
 };
 
-// Wrap com SessionGuard para verificar sessão ativa
-const DashboardPageWithSessionGuard: React.FC = () => {
-  return (
-    <SessionGuard>
-      <DashboardPage />
-    </SessionGuard>
-  );
-};
+// Wrap com SessionGuard
+const DashboardPageWithSessionGuard: React.FC = () => (
+  <SessionGuard>
+    <DashboardPage />
+  </SessionGuard>
+);
 
 export default DashboardPageWithSessionGuard;

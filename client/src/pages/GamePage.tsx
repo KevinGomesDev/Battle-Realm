@@ -6,6 +6,7 @@ import {
   MatchControls,
 } from "../features/match";
 import { MapCanvas } from "../features/map";
+import { Topbar } from "../components/Topbar";
 
 interface GamePageProps {
   matchId: string;
@@ -101,18 +102,7 @@ const GamePage: React.FC<GamePageProps> = ({
       {/* Content */}
       <div className="relative z-10 p-4">
         {/* Header */}
-        <div className="mb-4 flex items-center justify-between">
-          <button
-            onClick={onBack}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-          >
-            ← Voltar
-          </button>
-          <h1 className="text-3xl font-black bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
-            ⚔️ BATTLE REALM
-          </h1>
-          <div className="w-24"></div> {/* Spacer */}
-        </div>
+        <Topbar context="game" onBack={onBack} />
 
         {/* Main Game Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">

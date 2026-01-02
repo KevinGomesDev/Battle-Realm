@@ -39,7 +39,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(arenaReducer, initialArenaState);
   const { user } = useAuth();
   const { clearSession } = useSession();
-  const { openRollPanel } = useDiceRoll();
+  const { openRollPanel, isOpen: isDiceRollOpen } = useDiceRoll();
 
   // Ref para acessar valores atuais nos handlers sem causar re-render do useEffect
   // IMPORTANTE: Atualizar sincronamente durante render, NÃO em useEffect!
@@ -49,6 +49,17 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
   // Ref para acessar openRollPanel no handler de socket
   const openRollPanelRef = React.useRef(openRollPanel);
   openRollPanelRef.current = openRollPanel;
+
+  // Ref para estado do dice roll panel (para evitar dependência no useEffect)
+  const isDiceRollOpenRef = React.useRef(isDiceRollOpen);
+  isDiceRollOpenRef.current = isDiceRollOpen;
+
+  // Ref para armazenar resultado da batalha pendente (quando painel de dados está aberto)
+  const pendingBattleEndRef = React.useRef<BattleEndedResponse | null>(null);
+
+  // Ref para rastrear unidades que terão morte atualizada no onComplete do painel de dados
+  // Isso evita que handleUnitDefeated atualize a morte antes da animação completar
+  const pendingDeathUnitsRef = React.useRef<Set<string>>(new Set());
 
   // Setup socket event listeners
   useEffect(() => {
@@ -200,7 +211,6 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         unitsCount: data.units.length,
         hostKingdom: data.hostKingdom.name,
         guestKingdom: data.guestKingdom.name,
-        initiativeOrder: data.initiativeOrder,
         actionOrder: data.actionOrder,
       });
       battleLog(
@@ -214,6 +224,12 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
           hp: `${u.currentHp}/${u.vitality}`,
         }))
       );
+
+      // Limpar estado anterior (necessário quando uma nova batalha começa)
+      dispatch({ type: "SET_BATTLE_RESULT", payload: null });
+      dispatch({ type: "SET_REMATCH_PENDING", payload: false });
+      dispatch({ type: "SET_OPPONENT_WANTS_REMATCH", payload: false });
+
       const battle: ArenaBattle = {
         battleId: data.battleId,
         lobbyId: data.lobbyId, // Salvar lobbyId para revanche
@@ -223,7 +239,6 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         currentTurnIndex: 0,
         currentPlayerId: data.actionOrder[0],
         actionOrder: data.actionOrder,
-        initiativeOrder: data.initiativeOrder,
         units: data.units,
         hostKingdom: data.hostKingdom,
         guestKingdom: data.guestKingdom,
@@ -285,6 +300,13 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
     };
 
     const handleUnitAttacked = (data: UnitAttackedResponse) => {
+      console.log("[ARENA-CLIENT] ⚔️ ATAQUE RECEBIDO:", {
+        targetUnitId: data.targetUnitId,
+        targetHpAfter: data.targetHpAfter,
+        targetDefeated: data.targetDefeated,
+        finalDamage: data.finalDamage,
+      });
+
       battleLog("⚔️", "ATAQUE!", {
         attackerUnitId: data.attackerUnitId,
         targetUnitId: data.targetUnitId,
@@ -373,37 +395,67 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         damageType: data.damageType as "FISICO" | "MAGICO" | "VERDADEIRO",
       };
 
-      // Abrir o painel visual
+      // === DADOS PARA ATUALIZAÇÃO APÓS ANIMAÇÃO ===
+      const targetWillDie = data.targetHpAfter <= 0;
+      const targetId = data.targetUnitId;
+      const attackerId = data.attackerUnitId;
+      const newHp = data.targetHpAfter;
+      const newPhysicalProtection = data.targetPhysicalProtection;
+      const newMagicalProtection = data.targetMagicalProtection;
+      const newAttackerActionsLeft = data.attackerActionsLeft;
+
+      // Se o alvo vai morrer, marcar como pendente (para ignorar handleUnitDefeated)
+      if (targetWillDie) {
+        pendingDeathUnitsRef.current.add(targetId);
+      }
+
+      // Abrir o painel visual - estado será atualizado APÓS animação completar
       openRollPanelRef.current({
         data: panelData,
         autoPlay: true,
         speedMultiplier: 1,
         onComplete: () => {
-          // Atualizar estado após animação
+          // Atualizar HP e proteções do alvo APÓS animação
           dispatch({
             type: "UPDATE_UNIT",
             payload: {
-              id: data.targetUnitId,
-              currentHp: data.targetHpAfter,
-              // Atualizar proteções separadas
-              physicalProtection: data.targetPhysicalProtection,
-              magicalProtection: data.targetMagicalProtection,
-              // Legado
-              protection: data.targetProtection,
+              id: targetId,
+              currentHp: newHp,
+              physicalProtection: newPhysicalProtection,
+              magicalProtection: newMagicalProtection,
+              ...(targetWillDie ? { isAlive: false } : {}),
             },
           });
+
+          // Atualizar ações do atacante
           dispatch({
             type: "UPDATE_UNIT",
             payload: {
-              id: data.attackerUnitId,
-              actionsLeft: data.attackerActionsLeft,
+              id: attackerId,
+              actionsLeft: newAttackerActionsLeft,
             },
           });
+
+          // Limpar pendência de morte
+          if (targetWillDie) {
+            pendingDeathUnitsRef.current.delete(targetId);
+          }
         },
       });
     };
 
     const handleUnitDefeated = (data: { battleId: string; unitId: string }) => {
+      // Se a morte está pendente de animação, ignorar este evento
+      // (a morte será aplicada no onComplete do painel de dados)
+      if (pendingDeathUnitsRef.current.has(data.unitId)) {
+        console.log(
+          "[ARENA-CLIENT] 💀 Morte pendente de animação, ignorando:",
+          data.unitId
+        );
+        return;
+      }
+
+      console.log("[ARENA-CLIENT] 💀 UNIDADE DERROTADA:", data.unitId);
       battleLog("💀", "UNIDADE DERROTADA!", {
         battleId: data.battleId,
         unitId: data.unitId,
@@ -430,15 +482,6 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
           actionsLeft: data.actionsLeft,
         },
       });
-      dispatch({
-        type: "ADD_LOG",
-        payload: {
-          id: `log_${Date.now()}`,
-          battleId: data.battleId,
-          message: "💨 Disparada! Movimentação resetada.",
-          timestamp: new Date(),
-        },
-      });
     };
 
     // Handler para Esquiva (Dodge)
@@ -457,32 +500,25 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
           conditions: data.conditions,
         },
       });
-      dispatch({
-        type: "ADD_LOG",
-        payload: {
-          id: `log_${Date.now()}`,
-          battleId: data.battleId,
-          message: "🛡️ Esquiva! Entrou em modo defensivo.",
-          timestamp: new Date(),
-        },
-      });
     };
 
     const handleProtectionRecovered = (data: {
       battleId: string;
       unitId: string;
-      protection: number;
+      physicalProtection: number;
+      magicalProtection: number;
     }) => {
       battleLog("🛡️", "PROTEÇÃO RECUPERADA", {
         unitId: data.unitId,
-        protection: data.protection,
+        physicalProtection: data.physicalProtection,
+        magicalProtection: data.magicalProtection,
       });
       dispatch({
         type: "UPDATE_UNIT",
         payload: {
           id: data.unitId,
-          protection: data.protection,
-          protectionBroken: false,
+          physicalProtection: data.physicalProtection,
+          magicalProtection: data.magicalProtection,
         },
       });
     };
@@ -499,14 +535,8 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         turnIndex: data.index,
         round: data.round,
       });
-      // Resetar hasStartedAction de todas as unidades quando muda de jogador
-      const updatedUnits = stateRef.current.units.map((u: ArenaUnit) => ({
-        ...u,
-        hasStartedAction: false,
-        movesLeft: 0,
-        actionsLeft: 0,
-      }));
-      dispatch({ type: "SET_UNITS", payload: updatedUnits });
+      // Nota: NÃO resetamos unidades aqui - servidor envia estado atualizado
+      // O reset real acontece no servidor e é sincronizado via battle:new_round
       dispatch({
         type: "SET_BATTLE",
         payload: stateRef.current.battle
@@ -562,24 +592,84 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
       });
     };
 
-    const handleNewRound = (data: { battleId: string; round: number }) => {
+    const handleNewRound = (data: {
+      battleId: string;
+      round: number;
+      units?: Array<{
+        id: string;
+        hasStartedAction: boolean;
+        movesLeft: number;
+        actionsLeft: number;
+        conditions: string[];
+        currentHp: number;
+        isAlive: boolean;
+      }>;
+    }) => {
       battleLog("🔔", "NOVA RODADA", {
         battleId: data.battleId,
         round: data.round,
         previousRound: stateRef.current.battle?.round,
+        unitsReceived: data.units?.length,
       });
-      // Atualizar round imediatamente no estado
+
+      // Atualizar round no estado
       if (stateRef.current.battle) {
-        const updatedBattle = { ...stateRef.current.battle, round: data.round };
+        const updatedBattle = {
+          ...stateRef.current.battle,
+          round: data.round,
+          activeUnitId: undefined, // Resetar unidade ativa na nova rodada
+        };
         dispatch({ type: "SET_BATTLE", payload: updatedBattle });
+      }
+
+      // Aplicar estado das unidades recebido do servidor (fonte de verdade)
+      if (data.units && data.units.length > 0) {
+        const updatedUnits = stateRef.current.units.map((u: ArenaUnit) => {
+          const serverUnit = data.units!.find((su) => su.id === u.id);
+          if (serverUnit) {
+            return {
+              ...u,
+              hasStartedAction: serverUnit.hasStartedAction,
+              movesLeft: serverUnit.movesLeft,
+              actionsLeft: serverUnit.actionsLeft,
+              conditions: serverUnit.conditions,
+              currentHp: serverUnit.currentHp,
+              isAlive: serverUnit.isAlive,
+            };
+          }
+          return u;
+        });
+        dispatch({ type: "SET_UNITS", payload: updatedUnits });
         console.log(
-          `%c[ArenaContext] Round atualizado: ${data.round}`,
+          `%c[ArenaContext] Nova rodada ${data.round} - ${data.units.length} unidades sincronizadas`,
           "color: #22c55e; font-weight: bold;"
         );
       }
     };
 
     const handleBattleEnded = (data: BattleEndedResponse) => {
+      console.log("[ARENA-CLIENT] 🏆 BATALHA FINALIZADA:", {
+        winnerId: data.winnerId,
+        reason: data.reason,
+        finalUnitsCount: data.finalUnits?.length,
+        isDiceRollOpen: isDiceRollOpenRef.current,
+      });
+
+      // Se o painel de dados está aberto, enfileirar resultado para processar depois
+      if (isDiceRollOpenRef.current) {
+        console.log(
+          "[ARENA-CLIENT] ⏳ Painel de dados aberto, enfileirando resultado da batalha"
+        );
+        pendingBattleEndRef.current = data;
+        return;
+      }
+
+      // Processar resultado imediatamente
+      processBattleEnded(data);
+    };
+
+    // Função para processar resultado da batalha (pode ser chamada imediatamente ou depois do painel de dados fechar)
+    const processBattleEnded = (data: BattleEndedResponse) => {
       battleLog("🏆", "BATALHA FINALIZADA!", {
         battleId: data.battleId,
         winnerId: data.winnerId,
@@ -654,17 +744,6 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
       if (data.userId !== user.id) {
         dispatch({ type: "SET_OPPONENT_WANTS_REMATCH", payload: true });
       }
-    };
-
-    // Handler para quando revanche é aceita e nova batalha começa
-    const handleRematchStarted = (data: BattleStartedResponse) => {
-      battleLog("⚔️", "REVANCHE INICIADA!", data);
-      // Limpar resultado anterior
-      dispatch({ type: "SET_BATTLE_RESULT", payload: null });
-      dispatch({ type: "SET_REMATCH_PENDING", payload: false });
-      dispatch({ type: "SET_OPPONENT_WANTS_REMATCH", payload: false });
-      // Configurar nova batalha (usa o handler existente)
-      handleBattleStarted(data);
     };
 
     // Handler para quando oponente declina/sai do modal de revanche
@@ -746,7 +825,6 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
       currentPlayerId: string;
       turnTimer?: number;
       units: any[];
-      initiativeOrder: string[];
       actionOrder: string[];
       hostKingdom: { id: string; name: string; ownerId: string } | null;
       guestKingdom: { id: string; name: string; ownerId: string } | null;
@@ -768,7 +846,6 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         currentTurnIndex: data.currentTurnIndex,
         currentPlayerId: data.currentPlayerId,
         actionOrder: data.actionOrder,
-        initiativeOrder: data.initiativeOrder,
         units: data.units,
         hostKingdom: data.hostKingdom || {
           id: "",
@@ -813,7 +890,6 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
     socketService.on("battle:player_disconnected", handlePlayerDisconnected);
     socketService.on("battle:player_reconnected", handlePlayerReconnected);
     socketService.on("battle:rematch_requested", handleRematchRequested);
-    socketService.on("battle:rematch_started", handleRematchStarted);
     socketService.on("battle:rematch_declined", handleRematchDeclined);
     socketService.on("battle:obstacle_destroyed", handleObstacleDestroyed);
 
@@ -847,7 +923,6 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
       socketService.off("battle:player_disconnected", handlePlayerDisconnected);
       socketService.off("battle:player_reconnected", handlePlayerReconnected);
       socketService.off("battle:rematch_requested", handleRematchRequested);
-      socketService.off("battle:rematch_started", handleRematchStarted);
       socketService.off("battle:rematch_declined", handleRematchDeclined);
       socketService.off("battle:obstacle_destroyed", handleObstacleDestroyed);
     };
@@ -875,6 +950,50 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
 
     return () => clearTimeout(timer);
   }, [user?.id]);
+
+  // Efeito para processar resultado de batalha pendente quando o painel de dados fecha
+  // Isso garante que o modal de vitória só apareça depois da animação dos dados
+  useEffect(() => {
+    // Se o painel de dados fechou e temos um resultado pendente, processar agora
+    if (!isDiceRollOpen && pendingBattleEndRef.current) {
+      console.log(
+        "[ARENA-CLIENT] 🎲 Painel de dados fechou, processando resultado pendente"
+      );
+      const pendingData = pendingBattleEndRef.current;
+      pendingBattleEndRef.current = null;
+
+      // Processar o resultado da batalha agora
+      battleLog("🏆", "BATALHA FINALIZADA (após animação)!", {
+        battleId: pendingData.battleId,
+        winnerId: pendingData.winnerId,
+        reason: pendingData.reason,
+        finalUnitsCount: pendingData.finalUnits?.length,
+      });
+
+      dispatch({
+        type: "SET_BATTLE_RESULT",
+        payload: {
+          battleId: pendingData.battleId,
+          winnerId: pendingData.winnerId,
+          winnerKingdomId: pendingData.winnerKingdomId,
+          reason: pendingData.reason,
+          surrenderedBy: pendingData.surrenderedBy,
+          disconnectedBy: pendingData.disconnectedBy,
+          finalUnits: pendingData.finalUnits || [...stateRef.current.units],
+        },
+      });
+
+      dispatch({
+        type: "SET_BATTLE",
+        payload: stateRef.current.battle
+          ? { ...stateRef.current.battle, status: "ENDED" }
+          : null,
+      });
+
+      dispatch({ type: "SET_REMATCH_PENDING", payload: false });
+      dispatch({ type: "SET_OPPONENT_WANTS_REMATCH", payload: false });
+    }
+  }, [isDiceRollOpen]);
 
   const createLobby = useCallback(
     (kingdomId: string) => {

@@ -26,6 +26,8 @@ export interface ArenaLobby {
 // UNIT TYPES
 // =============================================================================
 
+import type { UnitSize } from "../config/global.config";
+
 export interface ArenaUnit {
   id: string;
   dbId: string;
@@ -51,7 +53,6 @@ export interface ArenaUnit {
   // Battle state
   posX: number;
   posY: number;
-  initiative: number;
   movesLeft: number;
   actionsLeft: number;
   isAlive: boolean;
@@ -59,17 +60,16 @@ export interface ArenaUnit {
   // Proteção Física - ver shared/config/balance.config.ts
   physicalProtection: number;
   maxPhysicalProtection: number;
-  physicalProtectionBroken: boolean;
   // Proteção Mágica - ver shared/config/balance.config.ts
   magicalProtection: number;
   maxMagicalProtection: number;
-  magicalProtectionBroken: boolean;
-  // Legado - manter para compatibilidade
-  protection: number;
-  protectionBroken: boolean;
   conditions: string[];
   hasStartedAction?: boolean;
   actions?: string[];
+  // Tamanho da unidade (células ocupadas) - default NORMAL (1x1)
+  size?: UnitSize;
+  // Alcance de visão calculado (max(10, focus)) - calculado no servidor
+  visionRange?: number;
 }
 
 // =============================================================================
@@ -140,7 +140,6 @@ export interface ArenaBattle {
   currentPlayerId: string;
   activeUnitId?: string; // Unidade ativa escolhida pelo jogador neste turno
   actionOrder: string[];
-  initiativeOrder: string[];
   units: ArenaUnit[];
   hostKingdom: ArenaKingdom;
   guestKingdom: ArenaKingdom;
@@ -241,7 +240,6 @@ export interface BattleStartedResponse {
   lobbyId: string;
   config: ArenaConfig;
   units: ArenaUnit[];
-  initiativeOrder: string[];
   actionOrder: string[];
   hostKingdom: ArenaKingdom;
   guestKingdom: ArenaKingdom;

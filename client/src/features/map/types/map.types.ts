@@ -1,38 +1,19 @@
-// Map Types
+// Map Types - Re-exports shared types and adds frontend-specific types
+// FONTE DE VERDADE: shared/types/map.types.ts
 
-export interface Territory {
-  id: string;
-  matchId: string;
-  mapIndex: number;
-  centerX: number;
-  centerY: number;
-  type: "LAND" | "WATER";
-  terrainType: TerrainName;
-  polygonData: string;
-  size: "SMALL" | "MEDIUM" | "LARGE";
-  areaSlots: number;
-  usedSlots: number;
-  ownerId: string | null;
-  isCapital: boolean;
-  hasCrisisIntel: boolean;
-  constructionCount: number;
-  fortressCount: number;
-  isDisabled: boolean;
-  // Legacy fields
-  name?: string;
-  structures?: any[];
-  units?: any[];
-  resources?: Record<string, number>;
-}
+// ============ RE-EXPORT SHARED TYPES ============
+export type {
+  TerrainName,
+  TerritorySize,
+  TerritoryType,
+  Territory,
+  TerrainTypeConfig,
+  StructureInfo,
+} from "../../../../../shared/types/map.types";
 
-export type TerrainName =
-  | "ICE"
-  | "MOUNTAIN"
-  | "FOREST"
-  | "PLAINS"
-  | "WASTELAND"
-  | "DESERT"
-  | "OCEAN";
+// ============ FRONTEND-SPECIFIC STATE ============
+
+import type { Territory } from "../../../../../shared/types/map.types";
 
 export interface MapState {
   territories: Territory[];

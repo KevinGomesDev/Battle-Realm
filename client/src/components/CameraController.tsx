@@ -134,6 +134,9 @@ export const CameraController = forwardRef<
       zoom: initialZoom,
     });
 
+    // Estado para controlar o cursor (forçar re-render quando arrasta)
+    const [isDragging, setIsDragging] = useState(false);
+
     // Animação suave de câmera
     const animateCamera = useCallback(() => {
       if (!targetCameraRef.current) return;
@@ -245,6 +248,7 @@ export const CameraController = forwardRef<
         if (e.button !== 0) return; // Só botão esquerdo
 
         isDraggingRef.current = true;
+        setIsDragging(true);
         lastPosRef.current = { x: e.clientX, y: e.clientY };
         e.preventDefault();
       },
@@ -277,10 +281,12 @@ export const CameraController = forwardRef<
 
     const handleMouseUp = useCallback(() => {
       isDraggingRef.current = false;
+      setIsDragging(false);
     }, []);
 
     const handleMouseLeave = useCallback(() => {
       isDraggingRef.current = false;
+      setIsDragging(false);
     }, []);
 
     // === HANDLER DE ZOOM (SCROLL) ===
@@ -288,7 +294,7 @@ export const CameraController = forwardRef<
     const handleWheel = useCallback(
       (e: React.WheelEvent) => {
         if (!enableZoom) return;
-        e.preventDefault();
+        // Removido preventDefault - navegadores usam passive listener
 
         const container = containerRef.current;
         if (!container) return;
@@ -337,6 +343,7 @@ export const CameraController = forwardRef<
         if (e.touches.length === 1 && enablePan) {
           // Pan com um dedo
           isDraggingRef.current = true;
+          setIsDragging(true);
           lastPosRef.current = {
             x: e.touches[0].clientX,
             y: e.touches[0].clientY,
@@ -344,6 +351,7 @@ export const CameraController = forwardRef<
         } else if (e.touches.length === 2 && enableZoom) {
           // Pinch zoom
           isDraggingRef.current = false;
+          setIsDragging(false);
           initialPinchDistanceRef.current = getTouchDistance(e.touches);
           initialZoomOnPinchRef.current = camera.zoom;
         }
@@ -413,6 +421,7 @@ export const CameraController = forwardRef<
 
     const handleTouchEnd = useCallback(() => {
       isDraggingRef.current = false;
+      setIsDragging(false);
       initialPinchDistanceRef.current = null;
     }, []);
 
@@ -542,11 +551,7 @@ export const CameraController = forwardRef<
         ref={containerRef}
         className={`relative overflow-hidden select-none ${className}`}
         style={{
-          cursor: isDraggingRef.current
-            ? "grabbing"
-            : enablePan
-            ? "grab"
-            : "default",
+          cursor: isDragging ? "grabbing" : "default",
           touchAction: "none",
           ...style,
         }}

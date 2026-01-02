@@ -51,7 +51,6 @@ export function useArenaBattle() {
   return {
     battle: state.battle,
     units: state.units,
-    logs: state.logs,
     isInBattle: state.battle !== null && state.battle.status === "ACTIVE",
     beginAction,
     moveUnit,

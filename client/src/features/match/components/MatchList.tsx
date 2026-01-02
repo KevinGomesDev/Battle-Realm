@@ -34,13 +34,11 @@ export const MatchList: React.FC<MatchListProps> = ({
   const [isJoining, setIsJoining] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  // Carregar reinos e partidas ao montar
   useEffect(() => {
     loadKingdoms().catch(console.error);
     listOpenMatches().catch(console.error);
   }, [loadKingdoms, listOpenMatches]);
 
-  // Selecionar primeiro reino por padrão
   useEffect(() => {
     if (kingdoms.length > 0 && !selectedKingdom) {
       setSelectedKingdom(kingdoms[0].id);
@@ -52,8 +50,6 @@ export const MatchList: React.FC<MatchListProps> = ({
       setLocalError("Selecione um reino primeiro");
       return;
     }
-
-    // Verificar se pode entrar em nova sessão
     if (authState.user?.id) {
       const canJoin = await canJoinSession(authState.user.id);
       if (!canJoin) {
@@ -63,10 +59,8 @@ export const MatchList: React.FC<MatchListProps> = ({
         return;
       }
     }
-
     setIsCreating(true);
     setLocalError(null);
-
     try {
       const result = await createMatch(selectedKingdom);
       onMatchCreated?.(result.matchId);
@@ -82,8 +76,6 @@ export const MatchList: React.FC<MatchListProps> = ({
       setLocalError("Selecione um reino primeiro");
       return;
     }
-
-    // Verificar se pode entrar em nova sessão
     if (authState.user?.id) {
       const canJoin = await canJoinSession(authState.user.id);
       if (!canJoin) {
@@ -93,10 +85,8 @@ export const MatchList: React.FC<MatchListProps> = ({
         return;
       }
     }
-
     setIsJoining(matchId);
     setLocalError(null);
-
     try {
       await joinMatch(matchId, selectedKingdom);
       onMatchJoined?.(matchId);
@@ -120,33 +110,31 @@ export const MatchList: React.FC<MatchListProps> = ({
   const displayError = localError || error;
 
   return (
-    <div className="space-y-5">
-      {/* Seletor de Reino - Estilo Pergaminho */}
-      <div className="bg-citadel-slate/50 border-2 border-metal-iron/50 rounded-lg p-4">
-        <label className="block text-parchment-aged text-sm font-semibold mb-2 tracking-wide">
-          Escolha seu Domínio para a Batalha:
+    <div className="space-y-3">
+      {/* Seletor de Reino - Compacto */}
+      <div className="bg-citadel-obsidian/30 border border-metal-iron/30 rounded p-2">
+        <label className="block text-parchment-aged text-[10px] font-semibold mb-1 uppercase tracking-wider">
+          Escolha seu Reino:
         </label>
         {isLoadingKingdoms ? (
-          <div className="text-parchment-dark text-sm flex items-center gap-2">
-            <div className="animate-spin w-4 h-4 border-2 border-metal-bronze border-t-transparent rounded-full"></div>
-            Consultando registros...
+          <div className="text-parchment-dark text-xs flex items-center gap-1">
+            <div className="animate-spin w-3 h-3 border border-metal-bronze border-t-transparent rounded-full" />
+            Carregando...
           </div>
         ) : kingdoms.length === 0 ? (
-          <div className="text-war-ember text-sm flex items-center gap-2">
-            <span>⚠️</span> Funde um reino antes de entrar em batalha
+          <div className="text-war-ember text-xs">
+            ⚠️ Funde um reino primeiro
           </div>
         ) : (
           <select
             value={selectedKingdom}
             onChange={(e) => setSelectedKingdom(e.target.value)}
-            className="w-full px-4 py-3 bg-citadel-obsidian border-2 border-metal-iron rounded-lg 
-                       text-parchment-light focus:outline-none focus:border-metal-bronze 
-                       transition-colors cursor-pointer"
-            style={{ fontFamily: "'Cinzel', serif" }}
+            className="w-full px-2 py-1.5 text-xs bg-citadel-obsidian border border-metal-iron/50 rounded
+                       text-parchment-light focus:outline-none focus:border-metal-bronze transition-colors"
           >
             {kingdoms.map((kingdom) => (
               <option key={kingdom.id} value={kingdom.id}>
-                {kingdom.name} • {kingdom.race} • {kingdom.alignment}
+                {kingdom.name} • {kingdom.race}
               </option>
             ))}
           </select>
@@ -155,127 +143,84 @@ export const MatchList: React.FC<MatchListProps> = ({
 
       {/* Erro */}
       {displayError && (
-        <div className="p-3 bg-war-blood/20 border-2 border-war-crimson rounded-lg">
-          <p className="text-war-ember text-sm flex items-center gap-2">
-            <span>⚠️</span> {displayError}
-          </p>
+        <div className="p-2 bg-war-blood/20 border border-war-crimson/50 rounded">
+          <p className="text-war-ember text-xs">⚠️ {displayError}</p>
         </div>
       )}
 
-      {/* Botões de Ação */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* Criar Partida */}
-        <button
-          onClick={handleCreateMatch}
-          disabled={isCreating || !selectedKingdom || kingdoms.length === 0}
-          className="group relative px-6 py-4 bg-gradient-to-b from-war-crimson to-war-blood 
-                     border-3 border-metal-iron rounded-lg shadow-forge-glow
-                     hover:from-war-ember hover:to-war-crimson
-                     disabled:from-citadel-granite disabled:to-citadel-carved disabled:shadow-none
-                     active:animate-stone-press transition-all duration-200
-                     disabled:cursor-not-allowed"
-        >
-          <div className="absolute top-1 left-1 w-2 h-2 bg-metal-iron rounded-full"></div>
-          <div className="absolute top-1 right-1 w-2 h-2 bg-metal-iron rounded-full"></div>
-          <div className="absolute bottom-1 left-1 w-2 h-2 bg-metal-iron rounded-full"></div>
-          <div className="absolute bottom-1 right-1 w-2 h-2 bg-metal-iron rounded-full"></div>
-
-          {isCreating ? (
-            <span className="relative text-parchment-light font-bold tracking-wide flex items-center justify-center gap-2">
-              <div className="animate-spin w-5 h-5 border-2 border-parchment-light border-t-transparent rounded-full"></div>
-              Preparando...
-            </span>
-          ) : (
-            <span
-              className="relative text-parchment-light font-bold tracking-wide flex items-center justify-center gap-2"
-              style={{ fontFamily: "'Cinzel', serif" }}
-            >
-              ⚔️ DECLARAR GUERRA
-            </span>
-          )}
-        </button>
-      </div>
+      {/* Botão Criar */}
+      <button
+        onClick={handleCreateMatch}
+        disabled={isCreating || !selectedKingdom || kingdoms.length === 0}
+        className="w-full py-2 text-xs font-bold uppercase tracking-wider
+                   bg-gradient-to-b from-war-crimson to-war-blood
+                   border border-metal-iron rounded
+                   hover:from-war-ember hover:to-war-crimson
+                   disabled:from-citadel-slate disabled:to-citadel-granite disabled:text-parchment-dark
+                   text-parchment-light transition-all disabled:cursor-not-allowed"
+      >
+        {isCreating ? (
+          <span className="flex items-center justify-center gap-2">
+            <div className="animate-spin w-3 h-3 border border-current border-t-transparent rounded-full" />
+            Preparando...
+          </span>
+        ) : (
+          "Criar Partida"
+        )}
+      </button>
 
       {/* Divisor */}
-      <div className="flex items-center gap-4">
-        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-metal-iron to-transparent"></div>
-        <span className="text-parchment-dark text-xs tracking-widest uppercase">
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-px bg-metal-iron/30" />
+        <span className="text-parchment-dark text-[10px] uppercase tracking-wider">
           Guerras Ativas
         </span>
-        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-metal-iron to-transparent"></div>
+        <div className="flex-1 h-px bg-metal-iron/30" />
       </div>
 
-      {/* Lista de Partidas */}
+      {/* Lista */}
       {isLoading && openMatches.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-8">
-          <div className="relative w-10 h-10">
-            <div className="absolute inset-0 border-3 border-war-crimson rounded-full animate-spin border-t-transparent"></div>
-            <div
-              className="absolute inset-2 border-2 border-war-ember rounded-full animate-spin border-b-transparent"
-              style={{ animationDirection: "reverse" }}
-            ></div>
-          </div>
-          <p className="text-parchment-dark mt-4">Batedores procurando...</p>
+        <div className="flex items-center justify-center py-4">
+          <div className="animate-spin w-5 h-5 border-2 border-war-crimson border-t-transparent rounded-full" />
         </div>
       ) : openMatches.length === 0 ? (
-        <div className="text-center py-8 bg-citadel-slate/20 rounded-xl border-2 border-dashed border-metal-iron/30">
-          <div className="text-5xl mb-4">🏰</div>
-          <p className="text-parchment-dark">Nenhuma guerra em andamento</p>
-          <p className="text-parchment-dark/60 text-sm mt-1">
-            Declare guerra para iniciar uma batalha!
+        <div className="text-center py-4 bg-citadel-slate/10 rounded border border-dashed border-metal-iron/20">
+          <div className="text-xl mb-1">🏰</div>
+          <p className="text-parchment-dark text-xs">
+            Nenhuma guerra em andamento
+          </p>
+          <p className="text-parchment-dark/60 text-[10px]">
+            Declare guerra para iniciar!
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-1 max-h-40 overflow-y-auto">
           {openMatches.map((match: OpenMatch) => (
             <div
               key={match.id}
-              className="group relative bg-gradient-to-b from-citadel-granite to-citadel-carved 
-                         border-2 border-metal-iron rounded-lg p-4 
-                         hover:border-war-crimson hover:shadow-forge-glow
-                         transition-all duration-300 shadow-stone-raised"
+              className="flex items-center justify-between p-2 bg-citadel-slate/20 border border-metal-iron/20 rounded
+                         hover:border-war-crimson/30 transition-all"
             >
-              {/* Rebites */}
-              <div className="absolute top-2 left-2 w-2 h-2 bg-metal-iron rounded-full border border-metal-rust/30"></div>
-              <div className="absolute top-2 right-2 w-2 h-2 bg-metal-iron rounded-full border border-metal-rust/30"></div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span
-                      className="text-parchment-light font-bold"
-                      style={{ fontFamily: "'Cinzel', serif" }}
-                    >
-                      {match.kingdomName}
-                    </span>
-                    <span className="text-parchment-dark text-sm">
-                      • {match.hostName}
-                    </span>
-                  </div>
-                  <div className="text-metal-steel text-xs">
-                    📜 Declarada em {formatDate(match.createdAt)}
-                  </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-parchment-light truncate">
+                  {match.kingdomName}
                 </div>
-
-                <button
-                  onClick={() => handleJoinMatch(match.id)}
-                  disabled={isJoining === match.id || !selectedKingdom}
-                  className="px-4 py-2 bg-gradient-to-b from-war-crimson to-war-blood 
-                             border-2 border-metal-iron rounded-lg
-                             hover:from-war-ember hover:to-war-crimson
-                             disabled:from-citadel-granite disabled:to-citadel-carved
-                             text-parchment-light font-semibold transition-all
-                             disabled:text-parchment-dark disabled:cursor-not-allowed"
-                >
-                  {isJoining === match.id ? (
-                    <span className="flex items-center gap-2">
-                      <div className="animate-spin w-4 h-4 border-2 border-parchment-light border-t-transparent rounded-full"></div>
-                    </span>
-                  ) : (
-                    <span>⚔️ Entrar</span>
-                  )}
-                </button>
+                <div className="text-[10px] text-parchment-dark">
+                  {match.hostName} • {formatDate(match.createdAt)}
+                </div>
               </div>
+              <button
+                onClick={() => handleJoinMatch(match.id)}
+                disabled={isJoining === match.id || !selectedKingdom}
+                className="px-2 py-1 text-[10px] font-semibold
+                           bg-gradient-to-b from-war-crimson to-war-blood
+                           border border-metal-iron/50 rounded
+                           hover:from-war-ember hover:to-war-crimson
+                           disabled:from-citadel-slate disabled:to-citadel-granite
+                           text-parchment-light transition-all disabled:cursor-not-allowed"
+              >
+                {isJoining === match.id ? "..." : "⚔️ Entrar"}
+              </button>
             </div>
           ))}
         </div>

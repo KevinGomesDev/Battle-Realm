@@ -23,7 +23,7 @@ const WeatherIndicator: React.FC<{
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
     >
-      <div className="bg-citadel-obsidian/60 px-3 py-1 rounded border border-metal-iron cursor-help hover:bg-citadel-slate/50 transition-colors">
+      <div className="bg-citadel-carved border-2 border-metal-iron rounded px-3 py-1 cursor-help hover:bg-citadel-slate/50 transition-colors shadow-stone-inset">
         <span className="text-xl">{emoji}</span>
       </div>
       {showTooltip && (
@@ -49,6 +49,51 @@ const WeatherIndicator: React.FC<{
   );
 };
 
+/**
+ * Painel de Reino (esquerda ou direita)
+ */
+const KingdomPanel: React.FC<{
+  kingdom: ArenaKingdom;
+  unitsAlive: number;
+  isMyTurn?: boolean;
+  isOpponent?: boolean;
+}> = ({ kingdom, unitsAlive, isMyTurn, isOpponent }) => {
+  const bgColor = isOpponent
+    ? "bg-gradient-to-b from-red-600 to-red-800"
+    : "bg-gradient-to-b from-blue-600 to-blue-800";
+  const textColor = isOpponent ? "text-war-ember" : "text-green-400";
+
+  return (
+    <div
+      className={`flex items-center gap-3 ${
+        isOpponent ? "flex-row-reverse" : ""
+      }`}
+    >
+      <div
+        className={`w-10 h-10 ${bgColor} rounded-lg border-2 border-metal-iron flex items-center justify-center overflow-hidden`}
+      >
+        {isOpponent ? (
+          <span className="text-xl">⚔️</span>
+        ) : (
+          <SwordManAvatar size={40} animation={isMyTurn ? 0 : 0} />
+        )}
+      </div>
+      <div className={isOpponent ? "text-right" : ""}>
+        <p
+          className="text-parchment-light font-bold text-sm"
+          style={{ fontFamily: "'Cinzel', serif" }}
+        >
+          {kingdom.name}
+        </p>
+        <p className={`${textColor} text-xs`}>
+          {unitsAlive} unidade{unitsAlive !== 1 ? "s" : ""} viva
+          {unitsAlive !== 1 ? "s" : ""}
+        </p>
+      </div>
+    </div>
+  );
+};
+
 // =============================================================================
 // COMPONENTE PRINCIPAL
 // =============================================================================
@@ -64,6 +109,7 @@ interface BattleHeaderProps {
 
 /**
  * Header da Batalha - Exibe informações dos reinos, clima e contagem de unidades
+ * Estilizado como Topbar padrão
  */
 export const BattleHeader: React.FC<BattleHeaderProps> = ({
   myKingdom,
@@ -74,58 +120,41 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
   config,
 }) => {
   return (
-    <div className="flex-shrink-0 flex items-center justify-between bg-citadel-slate/50 border-b border-metal-iron px-4 py-2">
-      {/* Meu Reino */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-gradient-to-b from-blue-600 to-blue-800 rounded-lg border-2 border-metal-iron flex items-center justify-center overflow-hidden">
-          <SwordManAvatar size={40} animation={isMyTurn ? 0 : 0} />
-        </div>
-        <div>
-          <p
-            className="text-parchment-light font-bold text-sm"
-            style={{ fontFamily: "'Cinzel', serif" }}
-          >
-            {myKingdom.name}
-          </p>
-          <p className="text-green-400 text-xs">
-            {myUnitsAlive} unidade{myUnitsAlive !== 1 ? "s" : ""} viva
-            {myUnitsAlive !== 1 ? "s" : ""}
-          </p>
-        </div>
-      </div>
+    <div className="relative z-20 flex-shrink-0">
+      {/* Topbar padrão */}
+      <div className="bg-citadel-granite border-b-4 border-citadel-carved shadow-stone-raised">
+        {/* Textura de pedra */}
+        <div className="absolute inset-0 bg-stone-texture opacity-50" />
 
-      {/* Centro - Clima e Separador */}
-      <div className="text-center flex items-center gap-4">
-        {/* Clima */}
-        {config.map && (
-          <WeatherIndicator
-            emoji={config.map.weatherEmoji}
-            name={config.map.weatherName}
-            effect={config.map.weatherEffect}
-            terrainName={config.map.terrainName}
-          />
-        )}
+        <div className="relative px-4 sm:px-6 py-3">
+          <div className="flex items-center justify-between">
+            {/* ESQUERDA: Meu Reino */}
+            <KingdomPanel
+              kingdom={myKingdom}
+              unitsAlive={myUnitsAlive}
+              isMyTurn={isMyTurn}
+            />
 
-        {/* Separador */}
-        <p className="text-2xl font-bold text-war-crimson">⚔️</p>
-      </div>
+            {/* CENTRO: Clima e Separador */}
+            <div className="flex items-center gap-4">
+              {config.map && (
+                <WeatherIndicator
+                  emoji={config.map.weatherEmoji}
+                  name={config.map.weatherName}
+                  effect={config.map.weatherEffect}
+                  terrainName={config.map.terrainName}
+                />
+              )}
+              <span className="text-2xl font-bold text-war-crimson">⚔️</span>
+            </div>
 
-      {/* Reino Oponente */}
-      <div className="flex items-center gap-3">
-        <div className="text-right">
-          <p
-            className="text-parchment-light font-bold text-sm"
-            style={{ fontFamily: "'Cinzel', serif" }}
-          >
-            {opponentKingdom.name}
-          </p>
-          <p className="text-war-ember text-xs">
-            {enemyUnitsAlive} unidade{enemyUnitsAlive !== 1 ? "s" : ""} viva
-            {enemyUnitsAlive !== 1 ? "s" : ""}
-          </p>
-        </div>
-        <div className="w-10 h-10 bg-gradient-to-b from-red-600 to-red-800 rounded-lg border-2 border-metal-iron flex items-center justify-center">
-          <span className="text-xl">⚔️</span>
+            {/* DIREITA: Reino Oponente */}
+            <KingdomPanel
+              kingdom={opponentKingdom}
+              unitsAlive={enemyUnitsAlive}
+              isOpponent
+            />
+          </div>
         </div>
       </div>
     </div>

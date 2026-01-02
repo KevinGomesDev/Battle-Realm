@@ -1,18 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { socketService } from "../../services/socket.service";
-
-interface RankingEntry {
-  rank: number;
-  username: string;
-  victories: number;
-}
-
-interface RankingData {
-  arena: RankingEntry[];
-  match: RankingEntry[];
-}
-
-type RankingTab = "arena" | "match";
+import type {
+  RankingData,
+  RankingTab,
+} from "../../../../shared/types/ranking.types";
 
 export const Ranking: React.FC = () => {
   const [ranking, setRanking] = useState<RankingData | null>(null);
@@ -57,13 +48,13 @@ export const Ranking: React.FC = () => {
   const getRankStyle = (rank: number): string => {
     switch (rank) {
       case 1:
-        return "bg-gradient-to-r from-yellow-600/30 to-yellow-800/30 border-yellow-500/50";
+        return "bg-yellow-500/10 border-yellow-500/30";
       case 2:
-        return "bg-gradient-to-r from-gray-400/20 to-gray-600/20 border-gray-400/50";
+        return "bg-gray-400/10 border-gray-400/30";
       case 3:
-        return "bg-gradient-to-r from-orange-700/20 to-orange-900/20 border-orange-600/50";
+        return "bg-orange-600/10 border-orange-500/30";
       default:
-        return "bg-citadel-carved/30 border-metal-iron/30";
+        return "bg-citadel-slate/20 border-metal-iron/20";
     }
   };
 
@@ -71,108 +62,84 @@ export const Ranking: React.FC = () => {
     activeTab === "arena" ? ranking?.arena : ranking?.match;
 
   return (
-    <div className="bg-citadel-granite border-2 border-metal-iron rounded-xl shadow-stone-raised overflow-hidden">
-      {/* Header */}
-      <div className="bg-gradient-to-b from-citadel-slate to-citadel-granite border-b-2 border-citadel-carved p-4">
-        <h2
-          className="text-lg font-bold text-parchment-light flex items-center gap-2"
-          style={{ fontFamily: "'Cinzel', serif" }}
-        >
-          <span className="text-2xl">🏆</span>
-          Ranking de Vitórias
-        </h2>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex border-b border-citadel-carved">
+    <div className="space-y-2">
+      {/* Tabs compactas */}
+      <div className="flex gap-1 p-0.5 bg-citadel-obsidian/50 rounded">
         <button
           onClick={() => setActiveTab("arena")}
-          className={`flex-1 py-2 px-4 text-sm font-semibold transition-colors ${
+          className={`flex-1 py-1 px-2 text-[10px] font-semibold rounded transition-colors ${
             activeTab === "arena"
-              ? "bg-war-crimson/20 text-war-ember border-b-2 border-war-crimson"
-              : "text-parchment-dark hover:text-parchment-light hover:bg-citadel-carved/30"
+              ? "bg-purple-600/30 text-purple-300"
+              : "text-parchment-dark hover:text-parchment-light"
           }`}
-          style={{ fontFamily: "'Cinzel', serif" }}
         >
           🏟️ Arena
         </button>
         <button
           onClick={() => setActiveTab("match")}
-          className={`flex-1 py-2 px-4 text-sm font-semibold transition-colors ${
+          className={`flex-1 py-1 px-2 text-[10px] font-semibold rounded transition-colors ${
             activeTab === "match"
-              ? "bg-nature-forest/20 text-nature-spring border-b-2 border-nature-forest"
-              : "text-parchment-dark hover:text-parchment-light hover:bg-citadel-carved/30"
+              ? "bg-war-crimson/30 text-war-ember"
+              : "text-parchment-dark hover:text-parchment-light"
           }`}
-          style={{ fontFamily: "'Cinzel', serif" }}
         >
           ⚔️ Partidas
         </button>
       </div>
 
-      {/* Content */}
-      <div className="p-4">
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin w-8 h-8 border-4 border-metal-iron border-t-metal-gold rounded-full"></div>
-          </div>
-        ) : !currentRanking || currentRanking.length === 0 ? (
-          <div className="text-center py-8 text-parchment-dark">
-            <p className="text-3xl mb-2">📜</p>
-            <p>Nenhuma vitória registrada ainda.</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {currentRanking.map((entry) => (
-              <div
-                key={`${activeTab}-${entry.rank}`}
-                className={`flex items-center gap-3 p-3 rounded-lg border transition-all hover:scale-[1.02] ${getRankStyle(
-                  entry.rank
-                )}`}
-              >
-                {/* Rank */}
-                <div className="w-10 text-center">
-                  {entry.rank <= 3 ? (
-                    <span className="text-2xl">{getRankIcon(entry.rank)}</span>
-                  ) : (
-                    <span className="text-parchment-dark font-bold text-lg">
-                      {getRankIcon(entry.rank)}
-                    </span>
-                  )}
-                </div>
-
-                {/* Username */}
-                <div className="flex-1">
-                  <span
-                    className={`font-semibold ${
-                      entry.rank === 1
-                        ? "text-yellow-400"
-                        : entry.rank === 2
-                        ? "text-gray-300"
-                        : entry.rank === 3
-                        ? "text-orange-400"
-                        : "text-parchment-light"
-                    }`}
-                    style={{ fontFamily: "'Cinzel', serif" }}
-                  >
-                    {entry.username}
+      {/* Conteúdo */}
+      {loading ? (
+        <div className="flex items-center justify-center py-6">
+          <div className="animate-spin w-5 h-5 border-2 border-yellow-500 border-t-transparent rounded-full" />
+        </div>
+      ) : !currentRanking || currentRanking.length === 0 ? (
+        <div className="text-center py-6 text-parchment-dark text-xs">
+          <p className="text-xl mb-1">📜</p>
+          <p>Nenhuma vitória registrada.</p>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {currentRanking.slice(0, 5).map((entry) => (
+            <div
+              key={`${activeTab}-${entry.rank}`}
+              className={`flex items-center gap-2 px-2 py-1.5 rounded border text-xs ${getRankStyle(
+                entry.rank
+              )}`}
+            >
+              {/* Rank */}
+              <div className="w-6 text-center">
+                {entry.rank <= 3 ? (
+                  <span className="text-sm">{getRankIcon(entry.rank)}</span>
+                ) : (
+                  <span className="text-parchment-dark text-[10px] font-bold">
+                    {getRankIcon(entry.rank)}
                   </span>
-                </div>
-
-                {/* Victories */}
-                <div className="flex items-center gap-1">
-                  <span className="text-xl">⚔️</span>
-                  <span
-                    className="text-parchment-light font-bold"
-                    style={{ fontFamily: "'Cinzel', serif" }}
-                  >
-                    {entry.victories}
-                  </span>
-                </div>
+                )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+
+              {/* Username */}
+              <span
+                className={`flex-1 font-medium truncate ${
+                  entry.rank === 1
+                    ? "text-yellow-400"
+                    : entry.rank === 2
+                    ? "text-gray-300"
+                    : entry.rank === 3
+                    ? "text-orange-400"
+                    : "text-parchment-light"
+                }`}
+              >
+                {entry.username}
+              </span>
+
+              {/* Victories */}
+              <span className="text-parchment-aged font-bold">
+                ⚔️ {entry.victories}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

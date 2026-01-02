@@ -32,8 +32,7 @@ export const ATTRIBUTE_NAMES: Record<AttributeKey, AttributeDefinition> = {
     name: "Acuidade",
     shortName: "ACU",
     icon: "👁️",
-    description:
-      "Dados de defesa e movimento. Defesa = Sucessos × (Acuidade ÷ 2).",
+    description: "Dados de defesa e movimento. Defesa = Sucessos × Acuidade.",
     color: "text-blue-400",
   },
   focus: {
@@ -171,6 +170,192 @@ export const ALL_RESOURCE_KEYS: ResourceKey[] = [
 
 // Tipos básicos definidos localmente para evitar dependência circular
 export type TerritorySize = "SMALL" | "MEDIUM" | "LARGE";
+
+// =============================================================================
+// TAMANHO DE UNIDADES (BATTLE ONLY)
+// =============================================================================
+
+/**
+ * Tamanhos de unidades para batalha
+ * Define quantos blocos a unidade ocupa no grid
+ */
+export type UnitSize = "NORMAL" | "LARGE" | "HUGE" | "GARGANTUAN";
+
+export interface UnitSizeDefinition {
+  key: UnitSize;
+  name: string;
+  /** Dimensão em blocos (NxN) */
+  dimension: number;
+  /** Número total de células ocupadas */
+  cells: number;
+  /** Descrição para UI */
+  description: string;
+  /** Emoji para representação rápida */
+  icon: string;
+}
+
+export const UNIT_SIZE_CONFIG: Record<UnitSize, UnitSizeDefinition> = {
+  NORMAL: {
+    key: "NORMAL",
+    name: "Normal",
+    dimension: 1,
+    cells: 1,
+    description: "Unidade de tamanho padrão (1x1)",
+    icon: "👤",
+  },
+  LARGE: {
+    key: "LARGE",
+    name: "Grande",
+    dimension: 2,
+    cells: 4,
+    description: "Unidade grande (2x2)",
+    icon: "🦁",
+  },
+  HUGE: {
+    key: "HUGE",
+    name: "Enorme",
+    dimension: 4,
+    cells: 16,
+    description: "Unidade enorme (4x4)",
+    icon: "🐘",
+  },
+  GARGANTUAN: {
+    key: "GARGANTUAN",
+    name: "Colossal",
+    dimension: 8,
+    cells: 64,
+    description: "Unidade colossal (8x8)",
+    icon: "🐉",
+  },
+};
+
+export const ALL_UNIT_SIZES: UnitSize[] = [
+  "NORMAL",
+  "LARGE",
+  "HUGE",
+  "GARGANTUAN",
+];
+
+/**
+ * Obtém a definição de tamanho de unidade
+ */
+export function getUnitSizeDefinition(size: UnitSize): UnitSizeDefinition {
+  return UNIT_SIZE_CONFIG[size];
+}
+
+/**
+ * Retorna todas as células ocupadas por uma unidade baseado em sua posição e tamanho
+ * @param posX Posição X da unidade (canto superior esquerdo)
+ * @param posY Posição Y da unidade (canto superior esquerdo)
+ * @param size Tamanho da unidade
+ * @returns Array de {x, y} para cada célula ocupada
+ */
+export function getOccupiedCells(
+  posX: number,
+  posY: number,
+  size: UnitSize
+): { x: number; y: number }[] {
+  const dimension = UNIT_SIZE_CONFIG[size].dimension;
+  const cells: { x: number; y: number }[] = [];
+
+  for (let dx = 0; dx < dimension; dx++) {
+    for (let dy = 0; dy < dimension; dy++) {
+      cells.push({ x: posX + dx, y: posY + dy });
+    }
+  }
+
+  return cells;
+}
+
+/**
+ * Verifica se uma célula está ocupada por uma unidade de tamanho grande
+ * @param cellX Posição X da célula a verificar
+ * @param cellY Posição Y da célula a verificar
+ * @param unitPosX Posição X da unidade (canto superior esquerdo)
+ * @param unitPosY Posição Y da unidade (canto superior esquerdo)
+ * @param unitSize Tamanho da unidade
+ */
+export function isCellOccupiedByUnit(
+  cellX: number,
+  cellY: number,
+  unitPosX: number,
+  unitPosY: number,
+  unitSize: UnitSize
+): boolean {
+  const dimension = UNIT_SIZE_CONFIG[unitSize].dimension;
+  return (
+    cellX >= unitPosX &&
+    cellX < unitPosX + dimension &&
+    cellY >= unitPosY &&
+    cellY < unitPosY + dimension
+  );
+}
+
+// =============================================================================
+// SISTEMA DE VISÃO (BATTLE ONLY)
+// =============================================================================
+
+/**
+ * Configuração do sistema de visão
+ */
+export const VISION_CONFIG = {
+  /** Visão mínima garantida para todas as unidades */
+  minVision: 10,
+  /** Usar Focus como base de visão (se maior que minVision) */
+  usesFocus: true,
+} as const;
+
+/**
+ * Calcula o alcance de visão de uma unidade
+ * Visão = max(VISION_CONFIG.minVision, focus)
+ */
+export function calculateUnitVision(focus: number): number {
+  return Math.max(VISION_CONFIG.minVision, focus);
+}
+
+/**
+ * Verifica se uma célula está dentro do alcance de visão de uma unidade
+ * Usa distância de Manhattan (estilo grid)
+ */
+export function isCellVisible(
+  unitX: number,
+  unitY: number,
+  cellX: number,
+  cellY: number,
+  visionRange: number
+): boolean {
+  const distance = Math.abs(cellX - unitX) + Math.abs(cellY - unitY);
+  return distance <= visionRange;
+}
+
+/**
+ * Verifica se uma célula está dentro do alcance de visão de uma unidade (com tamanho)
+ * Para unidades grandes, considera a visão a partir de qualquer célula ocupada
+ */
+export function isCellVisibleByUnit(
+  unitPosX: number,
+  unitPosY: number,
+  unitSize: UnitSize,
+  unitFocus: number,
+  cellX: number,
+  cellY: number
+): boolean {
+  const visionRange = calculateUnitVision(unitFocus);
+  const dimension = UNIT_SIZE_CONFIG[unitSize].dimension;
+
+  // Para cada célula ocupada pela unidade, verificar se a célula alvo está visível
+  for (let dx = 0; dx < dimension; dx++) {
+    for (let dy = 0; dy < dimension; dy++) {
+      const checkX = unitPosX + dx;
+      const checkY = unitPosY + dy;
+      if (isCellVisible(checkX, checkY, cellX, cellY, visionRange)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
 export type WeatherType =
   | "SUNNY"
   | "RAIN"
@@ -386,7 +571,7 @@ export const ATTACK_CONFIG = {
    * Fórmula: Sucessos * (Atributo * multiplier)
    * Ex: multiplier = 1 significa Sucessos * Combat
    */
-  damageMultiplier: 1,
+  damageMultiplier: 0,
 
   /**
    * Mínimo de dados para rolar (mesmo com atributo 0)
@@ -406,23 +591,44 @@ export const DEFENSE_CONFIG = {
   attribute: "acuity" as const,
 
   /**
-   * Divisor para calcular redução de dano
-   * Fórmula: Sucessos * (Atributo / divisor)
-   * Ex: divisor = 2 significa Sucessos * (Acuity / 2)
+   * Multiplicador de redução por sucesso
+   * Fórmula: Sucessos * (Atributo * multiplier)
+   * Ex: multiplier = 1 significa Sucessos * Acuidade
    */
-  reductionDivisor: 2,
-
-  /**
-   * Mínimo de multiplicador de redução (floor)
-   * Evita que atributo muito baixo dê 0 de redução por sucesso
-   */
-  minReductionMultiplier: 0.5,
+  defenseMultiplier: 0,
 
   /**
    * Mínimo de dados para rolar (mesmo com atributo 0)
    */
   minDice: 1,
 } as const;
+
+// =============================================================================
+// CONFIGURAÇÃO DE ACTION MARKS (EXAUSTÃO)
+// =============================================================================
+
+/**
+ * Categorias de unidades e suas respectivas marcas máximas de ação.
+ * Quando actionMarks >= maxMarks, a unidade está exausta.
+ * Em Arena: unidade exausta perde 5 HP ao agir.
+ * Fora de Arena: unidade exausta não pode mais agir.
+ */
+export type UnitCategory = "TROOP" | "HERO" | "REGENT";
+
+export const ACTION_MARKS_CONFIG: Record<UnitCategory, number> = {
+  TROOP: 1,
+  HERO: 2,
+  REGENT: 3,
+} as const;
+
+/**
+ * Retorna o número máximo de marcas de ação por categoria de unidade.
+ * @param category - Categoria da unidade (TROOP, HERO, REGENT)
+ * @returns Número máximo de marcas antes de exaustão
+ */
+export function getMaxMarksByCategory(category: string): number {
+  return ACTION_MARKS_CONFIG[category as UnitCategory] ?? 1;
+}
 
 // =============================================================================
 // CONFIGURAÇÃO DE PROTEÇÃO FÍSICA
@@ -723,28 +929,37 @@ export function getDefenseDiceCount(unit: UnitAttributes): number {
 
 /**
  * Calcula dano bruto a partir de sucessos
+ * Se damageMultiplier = 0: dano = sucessos
+ * Se damageMultiplier = 1: dano = sucessos * atributo
  */
 export function calculateDamage(
   successes: number,
   unit: UnitAttributes
 ): number {
+  if (ATTACK_CONFIG.damageMultiplier === 0) {
+    return Math.max(0, successes);
+  }
   const attrValue = getAttributeValue(unit, ATTACK_CONFIG.attribute);
   return Math.max(0, successes * attrValue * ATTACK_CONFIG.damageMultiplier);
 }
 
 /**
  * Calcula redução de dano a partir de sucessos de defesa
+ * Se defenseMultiplier = 0: redução = sucessos
+ * Se defenseMultiplier = 1: redução = sucessos * atributo
  */
 export function calculateDefenseReduction(
   successes: number,
   unit: UnitAttributes
 ): number {
+  if (DEFENSE_CONFIG.defenseMultiplier === 0) {
+    return Math.max(0, successes);
+  }
   const attrValue = getAttributeValue(unit, DEFENSE_CONFIG.attribute);
-  const multiplier = Math.max(
-    DEFENSE_CONFIG.minReductionMultiplier,
-    attrValue / DEFENSE_CONFIG.reductionDivisor
+  return Math.max(
+    0,
+    Math.floor(successes * attrValue * DEFENSE_CONFIG.defenseMultiplier)
   );
-  return Math.max(0, Math.floor(successes * multiplier));
 }
 
 /**

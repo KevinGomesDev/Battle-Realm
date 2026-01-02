@@ -3,3 +3,8 @@
 
 export { EventProvider, useEvents } from "./context/EventContext";
 export { EventLog, CompactEventLog } from "./components/EventLog";
+export {
+  EventToastContainer,
+  type EventToastData,
+} from "./components/EventToast";
+export { EventHistory, EventHistoryButton } from "./components/EventHistory";

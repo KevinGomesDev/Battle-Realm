@@ -1,19 +1,12 @@
 // src/handlers/ranking.handler.ts
 import { Server, Socket } from "socket.io";
 import { PrismaClient } from "@prisma/client";
+import type {
+  RankingEntry,
+  RankingData,
+} from "../../../shared/types/ranking.types";
 
 const prisma = new PrismaClient();
-
-interface RankingEntry {
-  rank: number;
-  username: string;
-  victories: number;
-}
-
-interface RankingData {
-  arena: RankingEntry[];
-  match: RankingEntry[];
-}
 
 export function registerRankingHandlers(io: Server, socket: Socket) {
   // Buscar ranking geral

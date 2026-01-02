@@ -67,9 +67,6 @@ export const registerSessionHandlers = (io: Server, socket: Socket): void => {
       }
 
       const session = await getUserActiveSession(userId);
-      console.log(
-        `[SESSION] session:check para userId=${userId}, tipo=${session.type}, battleId=${session.battleId}, lobbyId=${session.lobbyId}`
-      );
 
       if (!session.type) {
         return socket.emit("session:none", {
@@ -272,7 +269,6 @@ export const registerSessionHandlers = (io: Server, socket: Socket): void => {
           currentPlayerId: battle.actionOrder[battle.currentTurnIndex],
           turnTimer: battle.turnTimer, // Timer atual da batalha
           units: battle.units,
-          initiativeOrder: battle.initiativeOrder,
           actionOrder: battle.actionOrder,
           hostKingdom: hostKingdom
             ? {
@@ -298,7 +294,6 @@ export const registerSessionHandlers = (io: Server, socket: Socket): void => {
           round: battle.round,
           currentTurnIndex: battle.currentTurnIndex,
           units: battle.units,
-          initiativeOrder: battle.initiativeOrder,
           actionOrder: battle.actionOrder,
           gridWidth: battle.gridWidth,
           gridHeight: battle.gridHeight,

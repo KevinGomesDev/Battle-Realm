@@ -72,7 +72,8 @@ export const SwordManAvatar: React.FC<SwordManAvatarProps> = ({
     let lastTime = 0;
 
     const draw = (timestamp: number) => {
-      if (!ctx || !img.complete) {
+      // Verificar se imagem está carregada E não está no estado 'broken'
+      if (!ctx || !img.complete || img.naturalWidth === 0) {
         animationId = requestAnimationFrame(draw);
         return;
       }
@@ -90,17 +91,21 @@ export const SwordManAvatar: React.FC<SwordManAvatarProps> = ({
       const srcX = frameRef.current * FRAME_WIDTH;
       const srcY = animation * FRAME_HEIGHT;
 
-      ctx.drawImage(
-        img,
-        srcX,
-        srcY,
-        FRAME_WIDTH,
-        FRAME_HEIGHT,
-        0,
-        0,
-        size,
-        size
-      );
+      try {
+        ctx.drawImage(
+          img,
+          srcX,
+          srcY,
+          FRAME_WIDTH,
+          FRAME_HEIGHT,
+          0,
+          0,
+          size,
+          size
+        );
+      } catch (error) {
+        console.warn("[SwordManAvatar] Falha ao desenhar sprite:", error);
+      }
 
       animationId = requestAnimationFrame(draw);
     };

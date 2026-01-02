@@ -8,6 +8,16 @@ import {
   type CombatUnit,
 } from "../../logic/combat-actions";
 import {
+  processUnitTurnEndConditions,
+  advanceToNextPlayer,
+  recordPlayerAction,
+  checkVictoryCondition,
+  checkExhaustionCondition,
+  processNewRound,
+  emitBattleEndEvents,
+  emitExhaustionEndEvents,
+} from "../../logic/round-control";
+import {
   getEffectiveAcuityWithConditions,
   getMaxMarksByCategory,
 } from "../../utils/battle.utils";
@@ -83,14 +93,6 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
         });
       }
 
-      const maxMarks = getMaxMarksByCategory(unit.category);
-
-      if (!battle.isArena && unit.actionMarks >= maxMarks) {
-        return socket.emit("battle:error", {
-          message: "Marcas de ação atingidas - unidade exausta",
-        });
-      }
-
       if (unit.hasStartedAction) {
         socket.emit("battle:action_started", {
           battleId,
@@ -106,20 +108,22 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
         unit.conditions
       );
       unit.movesLeft = effectiveAcuity;
+      unit.actionsLeft = 1;
+      unit.hasStartedAction = true;
+      battle.activeUnitId = unitId;
 
-      if (battle.isArena && unit.actionMarks >= maxMarks) {
-        unit.actionsLeft = 2;
+      // Em arena, se a unidade está exausta (actionMarks >= maxMarks), perde 5 HP
+      if (
+        battle.isArena &&
+        unit.actionMarks >= getMaxMarksByCategory(unit.category)
+      ) {
         unit.currentHp = Math.max(0, unit.currentHp - 5);
-        unit.actionMarks = 0;
+        unit.actionMarks = 0; // Reset das marcas após penalidade
 
         if (unit.currentHp <= 0) {
           unit.isAlive = false;
         }
-      } else {
-        unit.actionsLeft = 1;
       }
-      unit.hasStartedAction = true;
-      battle.activeUnitId = unitId;
 
       socket.emit("battle:action_started", {
         battleId,
@@ -168,136 +172,149 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
         `[ARENA] end_unit_action: ${unit.name} (${unitId}) finalizando turno`
       );
 
-      if (unit.conditions.includes("QUEIMANDO")) {
-        unit.currentHp = Math.max(0, unit.currentHp - 2);
-        if (unit.currentHp <= 0) {
-          unit.isAlive = false;
-        }
-      }
-
-      unit.conditions = unit.conditions.filter(
-        (c) => c !== "DERRUBADA" && c !== "DODGING"
-      );
-
-      const maxMarks = getMaxMarksByCategory(unit.category);
-      unit.actionMarks = Math.min(maxMarks, unit.actionMarks + 1);
-      unit.movesLeft = 0;
-      unit.actionsLeft = 0;
-      unit.hasStartedAction = false;
-
-      const currentActionsCount =
-        battle.roundActionsCount.get(currentPlayerId) || 0;
-      battle.roundActionsCount.set(currentPlayerId, currentActionsCount + 1);
-
-      battle.activeUnitId = undefined;
-      const oldTurnIndex = battle.currentTurnIndex;
-      if (battle.actionOrder.length) {
-        battle.currentTurnIndex =
-          (battle.currentTurnIndex + 1) % battle.actionOrder.length;
-      }
-
-      const newPlayerId = battle.actionOrder[battle.currentTurnIndex];
-      console.log(
-        `[ARENA] Turno avançado: index ${oldTurnIndex} -> ${battle.currentTurnIndex}, próximo jogador: ${newPlayerId}`
-      );
-
       const lobby = battleLobbies.get(battle.lobbyId);
-      if (lobby) {
-        io.to(lobby.lobbyId).emit("battle:unit_turn_ended", {
+      if (!lobby) {
+        console.error(`[ARENA] Lobby não encontrado para batalha ${battleId}`);
+        return;
+      }
+
+      // 1. Processar condições de fim de turno usando RoundControl
+      const turnEndResult = processUnitTurnEndConditions(unit);
+
+      // 2. Registrar ação do jogador
+      recordPlayerAction(battle, currentPlayerId);
+
+      // 3. Verificar vitória (pode ter morrido por condição)
+      const victoryCheck = checkVictoryCondition(battle);
+
+      if (victoryCheck.battleEnded) {
+        battle.status = "ENDED";
+        stopBattleTurnTimer(battle.id);
+
+        emitBattleEndEvents(
+          io,
+          lobby.lobbyId,
+          battle.id,
+          victoryCheck,
+          battle.units
+        );
+
+        const loserId =
+          victoryCheck.winnerId === lobby.hostUserId
+            ? lobby.guestUserId
+            : lobby.hostUserId;
+        await updateUserStats(victoryCheck.winnerId, loserId, battle.isArena);
+
+        userToLobby.delete(lobby.hostUserId);
+        if (lobby.guestUserId) {
+          userToLobby.delete(lobby.guestUserId);
+        }
+
+        lobby.status = "ENDED";
+        await deleteBattleFromDB(battleId);
+        await deleteLobbyFromDB(lobby.lobbyId);
+        console.log(
+          `[BATTLE] Batalha ${battleId} finalizada. Vencedor: ${victoryCheck.winnerId}`
+        );
+        return;
+      }
+
+      // 4. Avançar para próximo jogador usando RoundControl
+      const oldTurnIndex = battle.currentTurnIndex;
+      const turnTransition = advanceToNextPlayer(battle);
+
+      console.log(
+        `[ARENA] Turno avançado: index ${oldTurnIndex} -> ${turnTransition.nextTurnIndex}, próximo jogador: ${turnTransition.nextPlayerId}`
+      );
+
+      // 5. Emitir eventos de socket
+      io.to(lobby.lobbyId).emit("battle:unit_turn_ended", {
+        battleId,
+        unitId,
+        actionMarks: unit.actionMarks,
+        currentHp: unit.currentHp,
+        isAlive: unit.isAlive,
+        conditions: unit.conditions,
+        damageFromConditions: turnEndResult.damageFromConditions,
+        conditionsRemoved: turnEndResult.conditionsRemoved,
+      });
+
+      if (turnEndResult.unitDefeated) {
+        io.to(lobby.lobbyId).emit("battle:unit_defeated", {
           battleId,
           unitId,
-          actionMarks: unit.actionMarks,
-          currentHp: unit.currentHp,
-          isAlive: unit.isAlive,
-          conditions: unit.conditions,
+          reason: "condition_damage",
         });
-
-        io.to(lobby.lobbyId).emit("battle:next_player", {
-          battleId,
-          currentPlayerId: newPlayerId,
-          index: battle.currentTurnIndex,
-          round: battle.round,
-        });
-
-        console.log(
-          `[ARENA] Evento battle:next_player emitido para lobby ${lobby.lobbyId}`
-        );
-      } else {
-        console.error(`[ARENA] Lobby não encontrado para batalha ${battleId}`);
       }
 
-      const allPlayersActed = battle.actionOrder.every(
-        (playerId) => (battle.roundActionsCount.get(playerId) || 0) >= 1
+      io.to(lobby.lobbyId).emit("battle:next_player", {
+        battleId,
+        currentPlayerId: turnTransition.nextPlayerId,
+        index: turnTransition.nextTurnIndex,
+        round: battle.round,
+      });
+
+      console.log(
+        `[ARENA] Evento battle:next_player emitido para lobby ${lobby.lobbyId}`
       );
 
-      if (allPlayersActed) {
-        battle.round++;
-        for (const playerId of battle.actionOrder) {
-          battle.roundActionsCount.set(playerId, 0);
-        }
-        if (lobby) {
-          io.to(lobby.lobbyId).emit("battle:new_round", {
-            battleId,
-            round: battle.round,
-          });
-          io.to(lobby.lobbyId).emit("battle:next_player", {
-            battleId,
-            currentPlayerId: newPlayerId,
-            index: battle.currentTurnIndex,
-            round: battle.round,
-          });
-          console.log(
-            `[ARENA] Nova rodada ${battle.round} - Re-emitido battle:next_player com round atualizado`
-          );
-        }
+      // 6. Se avançou rodada, emitir evento e processar nova rodada
+      if (turnTransition.roundAdvanced) {
+        await processNewRound(battle, io, lobby.lobbyId);
+
+        // Enviar unidades atualizadas junto com nova rodada
+        // O servidor é a fonte de verdade - cliente usa estes dados
+        const serializedUnits = battle.units.map((u) => ({
+          id: u.id,
+          hasStartedAction: u.hasStartedAction,
+          movesLeft: u.movesLeft,
+          actionsLeft: u.actionsLeft,
+          conditions: u.conditions,
+          currentHp: u.currentHp,
+          isAlive: u.isAlive,
+        }));
+
+        io.to(lobby.lobbyId).emit("battle:new_round", {
+          battleId,
+          round: battle.round,
+          units: serializedUnits,
+        });
+        io.to(lobby.lobbyId).emit("battle:next_player", {
+          battleId,
+          currentPlayerId: turnTransition.nextPlayerId,
+          index: turnTransition.nextTurnIndex,
+          round: battle.round,
+        });
+        console.log(
+          `[ARENA] Nova rodada ${battle.round} - Re-emitido battle:next_player com round atualizado`
+        );
       }
 
-      if (!battle.isArena && lobby) {
-        const allUnitsExhausted = battle.units
-          .filter((u) => u.isAlive)
-          .every((u) => {
-            const maxMarks = getMaxMarksByCategory(u.category);
-            return u.actionMarks >= maxMarks;
-          });
+      // 7. Verificar exaustão (apenas para batalhas não-arena)
+      if (!battle.isArena) {
+        const exhaustionCheck = checkExhaustionCondition(battle);
 
-        if (allUnitsExhausted) {
+        if (exhaustionCheck.allExhausted) {
           battle.status = "ENDED";
           stopBattleTurnTimer(battle.id);
 
-          const hpByPlayer = new Map<string, number>();
-          for (const u of battle.units) {
-            if (u.isAlive) {
-              const currentHp = hpByPlayer.get(u.ownerId) || 0;
-              hpByPlayer.set(u.ownerId, currentHp + u.currentHp);
-            }
-          }
-
-          let winnerId: string | null = null;
-          let maxHp = -1;
-          for (const [playerId, totalHp] of hpByPlayer.entries()) {
-            if (totalHp > maxHp) {
-              maxHp = totalHp;
-              winnerId = playerId;
-            }
-          }
-
-          const winnerKingdom = battle.units.find(
-            (u) => u.ownerId === winnerId
-          )?.ownerKingdomId;
-
-          io.to(lobby.lobbyId).emit("battle:battle_ended", {
-            battleId,
-            winnerId,
-            winnerKingdomId: winnerKingdom,
-            reason: "Todas as unidades estão exaustas (3 Action Marks)",
-            finalUnits: battle.units,
-          });
+          emitExhaustionEndEvents(
+            io,
+            lobby.lobbyId,
+            battle.id,
+            exhaustionCheck,
+            battle.units
+          );
 
           const loserId =
-            winnerId === lobby.hostUserId
+            exhaustionCheck.winnerId === lobby.hostUserId
               ? lobby.guestUserId
               : lobby.hostUserId;
-          await updateUserStats(winnerId, loserId, battle.isArena);
+          await updateUserStats(
+            exhaustionCheck.winnerId,
+            loserId,
+            battle.isArena
+          );
 
           userToLobby.delete(lobby.hostUserId);
           if (lobby.guestUserId) {
@@ -308,9 +325,8 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
           await deleteBattleFromDB(battleId);
           await deleteLobbyFromDB(lobby.lobbyId);
           console.log(
-            `[BATTLE] Batalha ${battleId} finalizada por exaustão. Vencedor: ${winnerId}`
+            `[BATTLE] Batalha ${battleId} finalizada por exaustão. Vencedor: ${exhaustionCheck.winnerId}`
           );
-
           return;
         }
       }
@@ -347,17 +363,6 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
       if (!result.success) {
         return socket.emit("battle:error", { message: result.error });
       }
-
-      battle.logs.push({
-        id: generateId(),
-        timestamp: new Date(),
-        type: "MOVE",
-        payload: {
-          unitId,
-          from: [result.fromX, result.fromY],
-          to: [result.toX, result.toY],
-        },
-      });
 
       const lobby = battleLobbies.get(battle.lobbyId);
       if (lobby) {
@@ -438,29 +443,6 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
           return socket.emit("battle:error", { message: result.error });
         }
 
-        const logType = result.obstacleDestroyed
-          ? "ATTACK_OBSTACLE_DESTROY"
-          : result.targetDefeated
-          ? "ATTACK_KILL"
-          : "ATTACK";
-
-        battle.logs.push({
-          id: generateId(),
-          timestamp: new Date(),
-          type: logType,
-          payload: {
-            attackerUnitId,
-            targetUnitId: targetUnitId || null,
-            targetObstacleId: targetObstacleId || null,
-            targetType: result.targetType,
-            diceCount: result.diceCount,
-            rolls: result.rolls,
-            damage: result.finalDamage,
-            damageType: result.damageType,
-            targetHpAfter: result.targetHpAfter,
-          },
-        });
-
         const lobby = battleLobbies.get(battle.lobbyId);
         if (lobby) {
           io.to(lobby.lobbyId).emit("battle:unit_attacked", {
@@ -469,12 +451,9 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
             targetUnitId: targetUnitId || null,
             targetObstacleId: targetObstacleId || null,
             targetType: result.targetType,
-            diceCount: result.diceCount,
-            rolls: result.rolls,
             damage: result.finalDamage,
             damageType: result.damageType,
             targetHpAfter: result.targetHpAfter,
-            targetProtection: result.targetProtection,
             attackerActionsLeft: attacker.actionsLeft,
             missed: result.missed ?? false,
             attackDiceCount: result.attackDiceCount ?? 0,
@@ -513,42 +492,45 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
               unitId: target.id,
             });
 
-            const aliveBySide = new Map<string, number>();
-            for (const u of battle.units) {
-              if (u.isAlive) {
-                const count = aliveBySide.get(u.ownerId) || 0;
-                aliveBySide.set(u.ownerId, count + 1);
-              }
-            }
-
-            console.log("[ARENA] Verificando vitória:", {
-              aliveBySideSize: aliveBySide.size,
-              aliveBySide: Object.fromEntries(aliveBySide),
-              totalUnits: battle.units.length,
-              aliveUnits: battle.units.filter((u) => u.isAlive).length,
+            console.log("[ARENA] ⚔️ ATAQUE RESOLVIDO:", {
+              attackerUnitId,
+              targetUnitId,
+              damageDealt: result.finalDamage,
+              targetHpAfter: result.targetHpAfter,
+              targetDefeated: result.targetDefeated,
+              targetIsAliveInMemory: target?.isAlive,
             });
 
-            if (aliveBySide.size <= 1) {
+            // Usar checkVictoryCondition centralizado do RoundControl
+            const victoryCheck = checkVictoryCondition(battle);
+
+            console.log("[ARENA] 🏁 VERIFICANDO VITÓRIA:", {
+              battleEnded: victoryCheck.battleEnded,
+              winnerId: victoryCheck.winnerId,
+              reason: victoryCheck.reason,
+            });
+
+            if (victoryCheck.battleEnded) {
               battle.status = "ENDED";
               stopBattleTurnTimer(battle.id);
-              const winnerId = aliveBySide.keys().next().value || null;
-              const winnerKingdom = battle.units.find(
-                (u) => u.ownerId === winnerId
-              )?.ownerKingdomId;
 
-              io.to(lobby.lobbyId).emit("battle:battle_ended", {
-                battleId,
-                winnerId,
-                winnerKingdomId: winnerKingdom,
-                reason: "Todas as unidades inimigas foram derrotadas",
-                finalUnits: battle.units,
-              });
+              emitBattleEndEvents(
+                io,
+                lobby.lobbyId,
+                battle.id,
+                victoryCheck,
+                battle.units
+              );
 
               const loserId =
-                winnerId === lobby.hostUserId
+                victoryCheck.winnerId === lobby.hostUserId
                   ? lobby.guestUserId
                   : lobby.hostUserId;
-              await updateUserStats(winnerId, loserId, battle.isArena);
+              await updateUserStats(
+                victoryCheck.winnerId,
+                loserId,
+                battle.isArena
+              );
 
               userToLobby.delete(lobby.hostUserId);
               if (lobby.guestUserId) {
@@ -559,7 +541,7 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
               await deleteBattleFromDB(battleId);
               await deleteLobbyFromDB(lobby.lobbyId);
               console.log(
-                `[ARENA] Batalha ${battleId} finalizada. Vencedor: ${winnerId}`
+                `[ARENA] Batalha ${battleId} finalizada. Vencedor: ${victoryCheck.winnerId}`
               );
             }
           }
@@ -592,13 +574,6 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
       if (!result.success) {
         return socket.emit("battle:error", { message: result.error });
       }
-
-      battle.logs.push({
-        id: generateId(),
-        timestamp: new Date(),
-        type: "DASH",
-        payload: { unitId, newMovesLeft: result.newMovesLeft },
-      });
 
       const lobby = battleLobbies.get(battle.lobbyId);
       if (lobby) {
@@ -635,13 +610,6 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
         return socket.emit("battle:error", { message: result.error });
       }
 
-      battle.logs.push({
-        id: generateId(),
-        timestamp: new Date(),
-        type: "DODGE",
-        payload: { unitId },
-      });
-
       const lobby = battleLobbies.get(battle.lobbyId);
       if (lobby) {
         io.to(lobby.lobbyId).emit("battle:unit_dodged", {
@@ -677,7 +645,6 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
         currentPlayerId: battle.actionOrder[battle.currentTurnIndex],
         actionOrder: battle.actionOrder,
         units: battle.units,
-        logs: battle.logs.slice(-20),
       });
     } catch (err) {
       console.error("[ARENA] get_battle_state error:", err);

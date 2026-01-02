@@ -59,7 +59,6 @@ export interface ArenaBattleData {
   gridWidth: number;
   gridHeight: number;
   units: any[]; // ArenaUnit[]
-  initiativeOrder: string[];
   actionOrder: string[];
   turnTimer: number;
   config: any; // ArenaConfig com mapa, clima e obstáculos
@@ -131,7 +130,6 @@ export interface SessionActiveBattleResponse {
   currentTurnIndex: number;
   activeUnitId?: string;
   units: any[];
-  initiativeOrder: string[];
   actionOrder: string[];
   gridWidth: number;
   gridHeight: number;
@@ -189,7 +187,6 @@ export interface BattleBattleRestoredResponse {
   activeUnitId?: string;
   turnTimer?: number;
   units: any[];
-  initiativeOrder: string[];
   actionOrder: string[];
   hostKingdom: { id: string; name: string; ownerId: string } | null;
   guestKingdom: { id: string; name: string; ownerId: string } | null;

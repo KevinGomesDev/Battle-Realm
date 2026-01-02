@@ -17,10 +17,8 @@ export interface Battle {
   currentTurnIndex: number;
   status: "ACTIVE" | "ENDED";
   turnTimer: number;
-  initiativeOrder: string[];
   actionOrder: string[];
   units: BattleUnit[];
-  logs: BattleLog[];
   createdAt: Date;
   config: ArenaConfig;
   activeUnitId?: string;
@@ -31,13 +29,6 @@ export interface Battle {
   guestKingdomId: string;
   ransomPrice?: number;
   ransomResource?: string;
-}
-
-export interface BattleLog {
-  id: string;
-  timestamp: Date;
-  type: string;
-  payload: any;
 }
 
 export const TURN_TIMER_SECONDS = TURN_CONFIG.timerSeconds;

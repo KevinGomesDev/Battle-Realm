@@ -84,11 +84,11 @@ const MapPage: React.FC = () => {
   const displayError = localError || error;
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-citadel-obsidian">
+    <div className="relative min-h-screen flex flex-col bg-citadel-obsidian">
       {/* Ambiente de Fundo Medieval */}
-      <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-citadel-slate via-citadel-obsidian to-black"></div>
-        <div className="absolute inset-0 bg-torch-light opacity-20"></div>
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-b from-citadel-slate via-citadel-obsidian to-black" />
+        <div className="absolute inset-0 bg-torch-light opacity-20" />
       </div>
 
       {/* TopHUD - Barra Superior */}
@@ -111,15 +111,15 @@ const MapPage: React.FC = () => {
       {(isLoadingMap || isLoading) && !matchMapData && (
         <div className="absolute inset-0 flex items-center justify-center z-30 bg-citadel-obsidian/80">
           <div className="text-center">
-            <div className="w-16 h-16 border-4 border-war-crimson border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <div className="w-16 h-16 border-4 border-war-crimson border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <p className="text-parchment-aged text-lg">Loading map...</p>
           </div>
         </div>
       )}
 
-      {/* Map Canvas - Fullscreen, com padding para sidebar */}
+      {/* Map Canvas - Área principal */}
       {matchMapData && (
-        <div className="absolute inset-0 pt-16 flex items-center justify-center pr-80">
+        <div className="flex-1 relative flex items-center justify-center pr-80">
           <MapCanvas
             territories={matchMapData.territories}
             players={matchMapData.players}

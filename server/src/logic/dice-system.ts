@@ -12,6 +12,14 @@ import type {
   MultiTargetAttackResult,
 } from "../../../shared/types/dice.types";
 
+import {
+  ATTACK_CONFIG,
+  DEFENSE_CONFIG,
+  PHYSICAL_PROTECTION_CONFIG,
+  MAGICAL_PROTECTION_CONFIG,
+  DICE_CONFIG,
+} from "../../../shared/config/global.config";
+
 // Re-exportar tipos para uso externo
 export type {
   AdvantageMod,
@@ -24,18 +32,18 @@ export type {
 };
 
 // =============================================================================
-// CONSTANTES
+// CONSTANTES (do global.config.ts)
 // =============================================================================
 
 /**
  * Margem de sucesso base: 4, 5, 6 = 50%
  */
-const BASE_THRESHOLD = 4;
+const BASE_THRESHOLD = DICE_CONFIG.baseSuccessThreshold;
 
 /**
  * O 6 sempre explode (gera novo dado)
  */
-const EXPLOSION_VALUE = 6;
+const EXPLOSION_VALUE = DICE_CONFIG.explosionValue;
 
 /**
  * Máximo de explosões recursivas para evitar loops infinitos
@@ -222,52 +230,62 @@ export function rollContestedTest(
 
 /**
  * Calcula dano baseado em sucessos e atributo de combate
- * Fórmula configurada em shared/config/balance.config.ts
+ * Fórmula configurada em shared/config/global.config.ts
  * Default: Sucessos * Combat
  *
  * @param successes Número de sucessos da rolagem
  * @param combat Atributo de combate do atacante
  * @param bonusDamage Dano bônus fixo
- * @see ATTACK_CONFIG em shared/config/balance.config.ts
+ * @see ATTACK_CONFIG em shared/config/global.config.ts
  */
 export function calculateDamageFromSuccesses(
   successes: number,
   combat: number,
   bonusDamage: number = 0
 ): number {
-  // Usa ATTACK_CONFIG.damageMultiplier de balance.config.ts
-  // Por padrão: Sucessos * Combat * 1
-  return Math.max(0, successes * combat + bonusDamage);
+  // Usa ATTACK_CONFIG.damageMultiplier de global.config.ts
+  // Se multiplier = 0: dano = sucessos + bonusDamage
+  // Se multiplier = 1: dano = sucessos * combat + bonusDamage
+  if (ATTACK_CONFIG.damageMultiplier === 0) {
+    return Math.max(0, successes + bonusDamage);
+  }
+  return Math.max(
+    0,
+    successes * combat * ATTACK_CONFIG.damageMultiplier + bonusDamage
+  );
 }
 
 /**
  * Calcula redução de dano pela defesa
- * Fórmula configurada em shared/config/balance.config.ts
- * Default: Sucessos * (Acuity / 2)
+ * Se defenseMultiplier = 0: redução = sucessos
+ * Se defenseMultiplier = 1: redução = sucessos * acuidade
  *
  * @param successes Número de sucessos da rolagem de defesa
  * @param acuity Atributo de agilidade/percepção do defensor
- * @see DEFENSE_CONFIG em shared/config/balance.config.ts
  */
 export function calculateDefenseReduction(
   successes: number,
   acuity: number
 ): number {
-  // Usa DEFENSE_CONFIG.reductionDivisor (default: 2)
-  // e DEFENSE_CONFIG.minReductionMultiplier (default: 0.5)
-  const reductionMultiplier = Math.max(0.5, acuity / 2);
-  return Math.max(0, Math.floor(successes * reductionMultiplier));
+  // Usa DEFENSE_CONFIG.defenseMultiplier de global.config.ts
+  if (DEFENSE_CONFIG.defenseMultiplier === 0) {
+    return Math.max(0, successes);
+  }
+  return Math.max(
+    0,
+    Math.floor(successes * acuity * DEFENSE_CONFIG.defenseMultiplier)
+  );
 }
 
 /**
  * Calcula proteção física baseada em Armor
- * Fórmula configurada em shared/config/balance.config.ts
- * Default: Armor * 4
- * @see PHYSICAL_PROTECTION_CONFIG em shared/config/balance.config.ts
+ * Fórmula configurada em shared/config/global.config.ts
+ * Default: Armor * 2
+ * @see PHYSICAL_PROTECTION_CONFIG em shared/config/global.config.ts
  */
 export function calculatePhysicalProtection(armor: number): number {
-  // Usa PHYSICAL_PROTECTION_CONFIG.multiplier (default: 4)
-  return Math.max(0, armor * 4);
+  // Usa PHYSICAL_PROTECTION_CONFIG.multiplier de global.config.ts
+  return Math.max(0, armor * PHYSICAL_PROTECTION_CONFIG.multiplier);
 }
 
 /**

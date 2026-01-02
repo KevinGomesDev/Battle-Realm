@@ -32,8 +32,16 @@ class SocketService {
    */
   connect(url: string = "http://localhost:3000"): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (this.socket?.connected) {
-        resolve();
+      // Se já existe socket, não criar outro
+      if (this.socket) {
+        // Se já está conectado, resolve imediatamente
+        if (this.socket.connected) {
+          resolve();
+          return;
+        }
+        // Se está conectando, aguarda o evento de conexão
+        this.socket.once("connect", () => resolve());
+        this.socket.once("connect_error", (error) => reject(error));
         return;
       }
 
@@ -47,6 +55,7 @@ class SocketService {
       });
 
       this.socket.on("connect", () => {
+        console.log(`[Socket] ✅ Conectado: ${this.socket?.id}`);
         this.reconnectAttempts = 0;
         this.lastPongTime = Date.now();
         this.startHeartbeat();
@@ -54,7 +63,8 @@ class SocketService {
         resolve();
       });
 
-      this.socket.on("disconnect", (_reason) => {
+      this.socket.on("disconnect", (reason) => {
+        console.log(`[Socket] 🔴 Desconectado: ${reason}`);
         this.stopHeartbeat();
         this.stopPing();
       });

@@ -37,32 +37,16 @@ export async function emitAttackHitEvent(
     targetId: target.id,
     targetName: target.name,
     data: {
-      diceCount: result.diceCount,
-      rolls: result.rolls,
+      attackDiceCount: result.attackDiceCount,
+      attackRolls: result.attackRolls,
       rawDamage: result.rawDamage,
       finalDamage: result.finalDamage,
       damageType: result.damageType,
       targetHpAfter: result.targetHpAfter,
-      targetProtection: result.targetProtection,
+      targetPhysicalProtection: result.targetPhysicalProtection,
+      targetMagicalProtection: result.targetMagicalProtection,
     },
   });
-
-  // Se quebrou proteção
-  if (
-    result.targetProtection === 0 &&
-    result.finalDamage &&
-    result.finalDamage > 0
-  ) {
-    // Verificar se tinha proteção antes
-    await createCombatEvent({
-      battleId,
-      code: EVENT_CODES.PROTECTION_BROKEN,
-      message: `A proteção de ${target.name} foi quebrada!`,
-      severity: "WARNING",
-      targetId: target.id,
-      targetName: target.name,
-    });
-  }
 
   // Se derrotou
   if (result.targetDefeated) {
@@ -230,6 +214,29 @@ export async function emitUnitTurnStartEvent(
       unitId: unit.id,
       unitName: unit.name,
       ownerId: unit.ownerId,
+    },
+  });
+}
+
+/**
+ * Emite evento de fim de turno de unidade
+ */
+export async function emitUnitTurnEndEvent(
+  battleId: string,
+  unit: CombatUnit,
+  damageFromConditions?: number,
+  conditionsRemoved?: string[]
+): Promise<void> {
+  await createTurnEvent({
+    battleId,
+    code: EVENT_CODES.UNIT_TURN_ENDED,
+    message: `⏹️ ${unit.name} finalizou o turno`,
+    data: {
+      unitId: unit.id,
+      unitName: unit.name,
+      ownerId: unit.ownerId,
+      damageFromConditions,
+      conditionsRemoved,
     },
   });
 }

@@ -74,7 +74,6 @@ export async function saveBattleToDB(battle: Battle): Promise<void> {
         status: battle.status,
         round: battle.round,
         currentTurnIndex: battle.currentTurnIndex,
-        initiativeOrder: JSON.stringify(battle.initiativeOrder),
         actionOrder: JSON.stringify(battle.actionOrder),
         obstacles: JSON.stringify(mapConfig?.obstacles || []),
         updatedAt: new Date(),
@@ -92,7 +91,6 @@ export async function saveBattleToDB(battle: Battle): Promise<void> {
         gridHeight: battle.gridHeight,
         round: battle.round,
         currentTurnIndex: battle.currentTurnIndex,
-        initiativeOrder: JSON.stringify(battle.initiativeOrder),
         actionOrder: JSON.stringify(battle.actionOrder),
         weather: mapConfig?.weather || "SUNNY",
         terrainType: mapConfig?.terrainType || "PLAINS",
@@ -112,8 +110,8 @@ export async function saveBattleToDB(battle: Battle): Promise<void> {
           actionsLeft: unit.actionsLeft,
           isAlive: unit.isAlive,
           actionMarks: unit.actionMarks,
-          protection: unit.protection,
-          protectionBroken: unit.protectionBroken,
+          protection: unit.physicalProtection,
+          protectionBroken: false,
           conditions: JSON.stringify(unit.conditions),
           hasStartedAction: unit.hasStartedAction,
         },
@@ -139,16 +137,17 @@ export async function saveBattleToDB(battle: Battle): Promise<void> {
           currentHp: unit.currentHp,
           posX: unit.posX,
           posY: unit.posY,
-          initiative: unit.initiative,
           movesLeft: unit.movesLeft,
           actionsLeft: unit.actionsLeft,
           isAlive: unit.isAlive,
           actionMarks: unit.actionMarks,
-          protection: unit.protection,
-          protectionBroken: unit.protectionBroken,
+          protection: unit.physicalProtection,
+          protectionBroken: false,
           conditions: JSON.stringify(unit.conditions),
           hasStartedAction: unit.hasStartedAction,
           actions: JSON.stringify(unit.actions),
+          size: unit.size || "NORMAL",
+          visionRange: unit.visionRange || 10,
         },
       });
     }
@@ -253,8 +252,19 @@ export async function loadLobbiesFromDB(): Promise<void> {
 
 export async function deleteBattleFromDB(battleId: string): Promise<void> {
   try {
-    await prisma.battle.delete({ where: { id: battleId } });
-    console.log(`[ARENA] Batalha ${battleId} deletada do banco`);
+    // Primeiro deletar as unidades associadas
+    await prisma.battleUnit.deleteMany({ where: { battleId } });
+
+    // Usar deleteMany ao invés de delete para evitar erro se não existir
+    const result = await prisma.battle.deleteMany({ where: { id: battleId } });
+
+    if (result.count > 0) {
+      console.log(`[ARENA] Batalha ${battleId} deletada do banco`);
+    } else {
+      console.log(
+        `[ARENA] Batalha ${battleId} não encontrada no banco (já deletada ou nunca persistida)`
+      );
+    }
   } catch (err) {
     console.error("[ARENA] Erro ao deletar batalha do banco:", err);
   }
@@ -343,17 +353,18 @@ export async function loadBattlesFromDB(): Promise<void> {
         actionsLeft: u.actionsLeft,
         isAlive: u.isAlive,
         actionMarks: u.actionMarks,
-        physicalProtection: u.armor * PHYSICAL_PROTECTION_CONFIG.multiplier,
+        physicalProtection:
+          u.protection || u.armor * PHYSICAL_PROTECTION_CONFIG.multiplier,
         maxPhysicalProtection: u.armor * PHYSICAL_PROTECTION_CONFIG.multiplier,
-        physicalProtectionBroken: false,
         magicalProtection: u.focus * MAGICAL_PROTECTION_CONFIG.multiplier,
         maxMagicalProtection: u.focus * MAGICAL_PROTECTION_CONFIG.multiplier,
-        magicalProtectionBroken: false,
-        protection: u.protection,
-        protectionBroken: u.protectionBroken,
         conditions: JSON.parse(u.conditions),
         hasStartedAction: u.hasStartedAction,
         actions: JSON.parse(u.actions),
+        // Campos de tamanho e visão (lidos do banco ou default)
+        size:
+          (u.size as "NORMAL" | "LARGE" | "HUGE" | "GARGANTUAN") || "NORMAL",
+        visionRange: u.visionRange ?? Math.max(10, u.focus),
       }));
 
       const battle: Battle = {
@@ -365,10 +376,8 @@ export async function loadBattlesFromDB(): Promise<void> {
         currentTurnIndex: dbBattle.currentTurnIndex,
         status: dbBattle.status as "ACTIVE" | "ENDED",
         turnTimer: TURN_TIMER_SECONDS,
-        initiativeOrder: JSON.parse(dbBattle.initiativeOrder),
         actionOrder: JSON.parse(dbBattle.actionOrder),
         units,
-        logs: [],
         createdAt: dbBattle.createdAt,
         config: reconstructArenaConfig(dbBattle),
         roundActionsCount: new Map<string, number>([

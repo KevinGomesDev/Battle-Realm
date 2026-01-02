@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useMatch } from "../../match";
 import { useAuth } from "../../auth";
-import { KingdomList } from "../../../components/Dashboard/KingdomList";
+import { KingdomSection } from "../../../components/Dashboard";
 import { MatchStatusDisplay } from "../../match/components/MatchStatusDisplay";
 import { socketService } from "../../../services/socket.service";
 import type { Territory } from "../types/map.types";
@@ -482,7 +482,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 
                   {activeTab === "kingdoms" && (
                     <div>
-                      <KingdomList />
+                      <KingdomSection />
                     </div>
                   )}
                 </div>

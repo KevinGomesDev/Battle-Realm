@@ -6,6 +6,7 @@ export { DiceRollProvider, useDiceRoll } from "./context/DiceRollContext";
 
 // Componentes
 export { DiceRollModal } from "./components/DiceRollModal";
+export { DiceRollPanel } from "./components/DiceRollPanel";
 export { CombatantPanel } from "./components/CombatantPanel";
 export { DiceZone } from "./components/DiceZone";
 export { SuccessVisualizer } from "./components/SuccessVisualizer";

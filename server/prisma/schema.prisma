@@ -279,7 +279,6 @@ model Battle {
   gridHeight       Int      @default(20)
   round            Int      @default(1)
   currentTurnIndex Int      @default(0)        // índice na ordem de iniciativa
-  initiativeOrder  String   @default("[]")      // JSON: [battleUnitId...]
   actionOrder      String   @default("[]")      // JSON: [userId...], ordem de jogadores por iniciativa
   winnerId         String?  // ID do vencedor (userId ou matchPlayerId)
   winReason        String?  // Motivo da vitória
@@ -338,6 +337,9 @@ model BattleUnit {
   corpseRemoved Boolean   @default(false)      // If true, corpse no longer blocks
   hasStartedAction Boolean @default(false)     // If unit already started action this turn
   actions     String      @default("[\"attack\",\"move\",\"dash\",\"dodge\"]") // Available actions (copied from Unit)
+  // Unit size and vision
+  size        String      @default("NORMAL")   // NORMAL | LARGE | HUGE | GARGANTUAN
+  visionRange Int         @default(10)         // Vision range (max(10, focus))
 }
 
 model BattleLog {

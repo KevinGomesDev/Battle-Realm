@@ -11,17 +11,10 @@ import {
   sanitizeString,
 } from "./validators";
 import { getSocketIdentifier } from "./middleware";
-
-interface RegisterData {
-  username: string;
-  email: string;
-  password: string;
-}
-
-interface LoginData {
-  username: string;
-  password: string;
-}
+import type {
+  RegisterData,
+  LoginData,
+} from "../../../../shared/types/auth.types";
 
 async function findActiveMatchId(userId: string): Promise<string | null> {
   const activePlayerEntry = await prisma.matchPlayer.findFirst({

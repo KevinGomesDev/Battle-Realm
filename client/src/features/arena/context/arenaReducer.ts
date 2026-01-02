@@ -6,7 +6,6 @@ export const initialArenaState: ArenaState = {
   battle: null,
   battleResult: null,
   units: [],
-  logs: [],
   isHost: false,
   isLoading: false,
   error: null,
@@ -49,10 +48,6 @@ export function arenaReducer(
           u.id === action.payload.id ? { ...u, ...action.payload } : u
         ),
       };
-    case "ADD_LOG":
-      return { ...state, logs: [...state.logs.slice(-19), action.payload] };
-    case "SET_LOGS":
-      return { ...state, logs: action.payload };
     case "SET_IS_HOST":
       return { ...state, isHost: action.payload };
     case "SET_LOADING":

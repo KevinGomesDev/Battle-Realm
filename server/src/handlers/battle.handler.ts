@@ -19,9 +19,25 @@ import {
   resumeBattleTimer,
 } from "./battle/battle-timer";
 
-bootstrapArenaPersistence().catch((err) =>
-  console.error("[ARENA] Erro ao inicializar estado da batalha:", err)
-);
+// Flag para garantir que o bootstrap foi executado
+let isBootstrapped = false;
+
+/**
+ * Inicializa o estado da arena (lobbies e batalhas) do banco de dados.
+ * DEVE ser chamado e aguardado ANTES de aceitar conexões!
+ */
+export async function initializeArenaState(): Promise<void> {
+  if (isBootstrapped) return;
+
+  try {
+    await bootstrapArenaPersistence();
+    isBootstrapped = true;
+    console.log("[ARENA] ✅ Estado da arena inicializado com sucesso");
+  } catch (err) {
+    console.error("[ARENA] ❌ Erro ao inicializar estado da arena:", err);
+    throw err; // Re-throw para impedir o servidor de iniciar em estado inconsistente
+  }
+}
 
 export {
   battleLobbies,
