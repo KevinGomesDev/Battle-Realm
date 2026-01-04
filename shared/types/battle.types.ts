@@ -118,6 +118,8 @@ export interface BattleUnit {
   grabbedByUnitId?: string;
   size: UnitSize;
   visionRange: number;
-  skillCooldowns: Record<string, number>;
+  unitCooldowns: Record<string, number>;
   isAIControlled: boolean;
+  /** Comportamento de IA para summons/monsters (default: AGGRESSIVE) */
+  aiBehavior?: "AGGRESSIVE" | "TACTICAL" | "DEFENSIVE" | "SUPPORT" | "RANGED";
 }

@@ -28,17 +28,30 @@ interface EventState {
   events: GameEvent[];
   toasts: EventToastData[];
   isLoading: boolean;
+  isLoadingMore: boolean;
   isHistoryOpen: boolean;
   currentContext: EventContextType | null;
   currentContextId: string | null;
   maxEvents: number;
+  /** Cursor para próxima página */
+  nextCursor: string | null;
+  /** Se há mais eventos para carregar */
+  hasMore: boolean;
 }
 
 type EventAction =
   | { type: "ADD_EVENT"; payload: GameEvent }
-  | { type: "SET_EVENTS"; payload: GameEvent[] }
+  | {
+      type: "SET_EVENTS";
+      payload: { events: GameEvent[]; nextCursor?: string; hasMore: boolean };
+    }
+  | {
+      type: "APPEND_EVENTS";
+      payload: { events: GameEvent[]; nextCursor?: string; hasMore: boolean };
+    }
   | { type: "CLEAR_EVENTS" }
   | { type: "SET_LOADING"; payload: boolean }
+  | { type: "SET_LOADING_MORE"; payload: boolean }
   | { type: "SET_HISTORY_OPEN"; payload: boolean }
   | { type: "ADD_TOAST"; payload: EventToastData }
   | { type: "REMOVE_TOAST"; payload: string }
@@ -55,6 +68,8 @@ interface EventContextValue {
     contextId?: string
   ) => void;
   fetchHistory: (filter?: EventFilter) => Promise<void>;
+  /** Carrega mais eventos (paginação) */
+  loadMore: () => Promise<void>;
   clearEvents: () => void;
   showToast: (event: GameEvent) => void;
   dismissToast: (id: string) => void;
@@ -71,10 +86,13 @@ const initialState: EventState = {
   events: [],
   toasts: [],
   isLoading: false,
+  isLoadingMore: false,
   isHistoryOpen: false,
   currentContext: null,
   currentContextId: null,
   maxEvents: 100,
+  nextCursor: null,
+  hasMore: false,
 };
 
 function eventReducer(state: EventState, action: EventAction): EventState {
@@ -88,13 +106,31 @@ function eventReducer(state: EventState, action: EventAction): EventState {
       return { ...state, events: newEvents };
 
     case "SET_EVENTS":
-      return { ...state, events: action.payload.slice(0, state.maxEvents) };
+      return {
+        ...state,
+        events: action.payload.events.slice(0, state.maxEvents),
+        nextCursor: action.payload.nextCursor || null,
+        hasMore: action.payload.hasMore,
+      };
+
+    case "APPEND_EVENTS":
+      // Adicionar ao final (para load more)
+      const appendedEvents = [...state.events, ...action.payload.events];
+      return {
+        ...state,
+        events: appendedEvents,
+        nextCursor: action.payload.nextCursor || null,
+        hasMore: action.payload.hasMore,
+      };
 
     case "CLEAR_EVENTS":
-      return { ...state, events: [] };
+      return { ...state, events: [], nextCursor: null, hasMore: false };
 
     case "SET_LOADING":
       return { ...state, isLoading: action.payload };
+
+    case "SET_LOADING_MORE":
+      return { ...state, isLoadingMore: action.payload };
 
     case "SET_HISTORY_OPEN":
       return { ...state, isHistoryOpen: action.payload };
@@ -207,14 +243,16 @@ export function EventProvider({
     []
   );
 
-  // Buscar histórico de eventos
+  // Buscar histórico de eventos (primeira página)
   const fetchHistory = useCallback(async (filter?: EventFilter) => {
     dispatch({ type: "SET_LOADING", payload: true });
     try {
       const response = await socketService.emitAsync<{
         success: boolean;
         events: GameEvent[];
-      }>("event:fetch", { filter: filter || {} });
+        nextCursor?: string;
+        hasMore: boolean;
+      }>("event:fetch", { filter: { ...filter, limit: 50 } });
 
       if (response.success && response.events) {
         const eventsWithDates = response.events.map((e) => ({
@@ -224,7 +262,14 @@ export function EventProvider({
               ? new Date(e.timestamp)
               : e.timestamp,
         }));
-        dispatch({ type: "SET_EVENTS", payload: eventsWithDates });
+        dispatch({
+          type: "SET_EVENTS",
+          payload: {
+            events: eventsWithDates,
+            nextCursor: response.nextCursor,
+            hasMore: response.hasMore,
+          },
+        });
       }
     } catch (error) {
       console.error("[EventContext] Failed to fetch history:", error);
@@ -232,6 +277,58 @@ export function EventProvider({
       dispatch({ type: "SET_LOADING", payload: false });
     }
   }, []);
+
+  // Carregar mais eventos (paginação)
+  const loadMore = useCallback(async () => {
+    if (!state.hasMore || !state.nextCursor || state.isLoadingMore) return;
+
+    dispatch({ type: "SET_LOADING_MORE", payload: true });
+    try {
+      const filter: EventFilter = {
+        cursor: state.nextCursor,
+        limit: 50,
+      };
+
+      // Manter contexto atual
+      if (state.currentContext) {
+        filter.context = state.currentContext;
+      }
+
+      const response = await socketService.emitAsync<{
+        success: boolean;
+        events: GameEvent[];
+        nextCursor?: string;
+        hasMore: boolean;
+      }>("event:fetch", { filter });
+
+      if (response.success && response.events) {
+        const eventsWithDates = response.events.map((e) => ({
+          ...e,
+          timestamp:
+            typeof e.timestamp === "string"
+              ? new Date(e.timestamp)
+              : e.timestamp,
+        }));
+        dispatch({
+          type: "APPEND_EVENTS",
+          payload: {
+            events: eventsWithDates,
+            nextCursor: response.nextCursor,
+            hasMore: response.hasMore,
+          },
+        });
+      }
+    } catch (error) {
+      console.error("[EventContext] Failed to load more events:", error);
+    } finally {
+      dispatch({ type: "SET_LOADING_MORE", payload: false });
+    }
+  }, [
+    state.hasMore,
+    state.nextCursor,
+    state.isLoadingMore,
+    state.currentContext,
+  ]);
 
   // Limpar eventos
   const clearEvents = useCallback(() => {
@@ -256,6 +353,7 @@ export function EventProvider({
     subscribeToContext,
     unsubscribeFromContext,
     fetchHistory,
+    loadMore,
     clearEvents,
     showToast,
     dismissToast,

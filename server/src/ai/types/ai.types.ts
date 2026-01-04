@@ -51,6 +51,8 @@ export type AIActionType =
   | "MOVE" // Mover para uma posição
   | "ATTACK" // Atacar um alvo
   | "SKILL" // Usar uma skill
+  | "SPELL" // Usar uma magia
+  | "DASH" // Usar corrida para dobrar movimento
   | "PASS"; // Passar turno (sem ações válidas)
 
 /**
@@ -61,12 +63,14 @@ export interface AIDecision {
   type: AIActionType;
   /** ID da unidade que vai agir */
   unitId: string;
-  /** Posição alvo (para MOVE) */
+  /** Posição alvo (para MOVE/SPELL) */
   targetPosition?: { x: number; y: number };
-  /** ID do alvo (para ATTACK/SKILL) */
+  /** ID do alvo (para ATTACK/SKILL/SPELL) */
   targetId?: string;
   /** Código da skill (para SKILL) */
   skillCode?: string;
+  /** Código da spell (para SPELL) */
+  spellCode?: string;
   /** Razão da decisão (para debug/logs) */
   reason: string;
 }

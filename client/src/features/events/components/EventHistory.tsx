@@ -60,7 +60,7 @@ function EventItem({ event }: EventItemProps) {
 // =============================================================================
 
 export function EventHistory() {
-  const { state, closeHistory, clearEvents } = useEvents();
+  const { state, closeHistory, clearEvents, loadMore } = useEvents();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Fechar com ESC
@@ -79,6 +79,23 @@ export function EventHistory() {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [state.isHistoryOpen, closeHistory]);
+
+  // Scroll infinito - carregar mais quando chegar no final
+  useEffect(() => {
+    const scrollElement = scrollRef.current;
+    if (!scrollElement || !state.hasMore) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = scrollElement;
+      // Carregar mais quando estiver a 100px do final
+      if (scrollHeight - scrollTop - clientHeight < 100) {
+        loadMore();
+      }
+    };
+
+    scrollElement.addEventListener("scroll", handleScroll);
+    return () => scrollElement.removeEventListener("scroll", handleScroll);
+  }, [state.hasMore, loadMore]);
 
   if (!state.isHistoryOpen) return null;
 
@@ -102,6 +119,7 @@ export function EventHistory() {
             {state.events.length > 0 && (
               <span className="text-xs text-gray-500 bg-gray-700 px-2 py-0.5 rounded-full">
                 {state.events.length}
+                {state.hasMore ? "+" : ""}
               </span>
             )}
           </div>
@@ -139,9 +157,38 @@ export function EventHistory() {
               <p className="text-sm">Nenhum evento registrado</p>
             </div>
           ) : (
-            state.events.map((event) => (
-              <EventItem key={event.id} event={event} />
-            ))
+            <>
+              {state.events.map((event) => (
+                <EventItem key={event.id} event={event} />
+              ))}
+
+              {/* Indicador de carregando mais */}
+              {state.isLoadingMore && (
+                <div className="flex items-center justify-center py-4">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-amber-500"></div>
+                  <span className="ml-2 text-xs text-gray-500">
+                    Carregando mais...
+                  </span>
+                </div>
+              )}
+
+              {/* Botão manual de carregar mais */}
+              {state.hasMore && !state.isLoadingMore && (
+                <button
+                  onClick={loadMore}
+                  className="w-full py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 rounded-lg transition-colors"
+                >
+                  Carregar mais eventos...
+                </button>
+              )}
+
+              {/* Indicador de fim */}
+              {!state.hasMore && state.events.length > 10 && (
+                <div className="text-center py-2 text-xs text-gray-600">
+                  — Fim do histórico —
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

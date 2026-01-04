@@ -20,6 +20,16 @@ import {
 } from "../core/target-selection";
 import { selectBestSkill } from "../core/skill-evaluator";
 import { BattleUnit } from "../../../../shared/types/battle.types";
+import {
+  tryRetreat,
+  tryDash,
+  passDecision,
+  fallbackDecision,
+  getEffectiveAttackRange,
+  trySupportSpell,
+} from "./shared.behavior";
+
+const BEHAVIOR_NAME = "Defensivo";
 
 /**
  * Comportamento Defensivo
@@ -48,49 +58,37 @@ export function makeDefensiveDecision(
       (u) => u.isAlive && u.ownerId !== unit.ownerId
     );
     const allies = getAllies(unit, units);
-
-    // Verificar se pode atacar (tem ações disponíveis)
     const canAttack = (actionsRemaining ?? unit.actionsLeft ?? 0) > 0;
 
-    // Usar self-assessment se disponível, senão calcular manualmente
     const hpPercentage =
       selfAssessment?.hpPercent ?? unit.currentHp / unit.maxHp;
-    const isCritical = selfAssessment?.isCritical ?? hpPercentage <= 0.25;
     const shouldRetreat =
       selfAssessment?.shouldRetreat ?? hpPercentage <= profile.retreatThreshold;
 
-    // 1. Verificar se HP está crítico - recuar
+    // 1. Recuar se HP crítico
     if (shouldRetreat && movesRemaining > 0) {
-      const retreatPos = findBestRetreatPosition(
-        unit,
-        enemies,
-        movesRemaining,
-        gridSize.width,
-        gridSize.height,
-        units,
-        obstacles
-      );
-
-      if (retreatPos) {
-        return {
-          type: "MOVE",
-          unitId: unit.id,
-          targetPosition: retreatPos,
-          reason: "Defensivo: Recuando - HP crítico",
-        };
-      }
+      const retreatDecision = tryRetreat(unit, context, BEHAVIOR_NAME);
+      if (retreatDecision) return retreatDecision;
     }
 
-    // 2. Priorizar skills defensivas baseado no último tipo de dano
+    // 2. Tentar usar spell de suporte/proteção
+    const spellDecision = trySupportSpell(
+      unit,
+      context,
+      profile,
+      BEHAVIOR_NAME
+    );
+    if (spellDecision) return spellDecision;
+
+    // 3. Skills defensivas baseado no último tipo de dano
     const selfBuffSkills = availableSkills.filter(
       (s) =>
         (s.targetType === "SELF" || s.targetType === "ALLY") &&
         s.conditionApplied
     );
     if (selfBuffSkills.length > 0 && hpPercentage < 0.7) {
-      // Usar self-assessment para escolher a skill certa
       if (selfAssessment) {
-        // Se recebeu dano físico, priorizar proteção física
+        // Proteção física
         if (
           selfAssessment.lastDamageType === "FISICO" &&
           !selfAssessment.hasPhysicalProtection
@@ -107,11 +105,11 @@ export function makeDefensiveDecision(
               unitId: unit.id,
               skillCode: physicalBuffs[0].code,
               targetId: unit.id,
-              reason: "Defensivo: Proteção física (baseado em último dano)",
+              reason: `${BEHAVIOR_NAME}: Proteção física (baseado em último dano)`,
             };
           }
         }
-        // Se recebeu dano mágico, priorizar proteção mágica
+        // Proteção mágica
         if (
           selfAssessment.lastDamageType === "MAGICO" &&
           !selfAssessment.hasMagicalProtection
@@ -128,13 +126,13 @@ export function makeDefensiveDecision(
               unitId: unit.id,
               skillCode: magicalBuffs[0].code,
               targetId: unit.id,
-              reason: "Defensivo: Proteção mágica (baseado em último dano)",
+              reason: `${BEHAVIOR_NAME}: Proteção mágica (baseado em último dano)`,
             };
           }
         }
       }
 
-      // Fallback: usar qualquer buff disponível
+      // Fallback: qualquer buff
       const skillEval = selectBestSkill(unit, selfBuffSkills, units, profile);
       if (skillEval && skillEval.canUse) {
         return {
@@ -142,13 +140,13 @@ export function makeDefensiveDecision(
           unitId: unit.id,
           skillCode: skillEval.skill.code,
           targetId: unit.id,
-          reason: "Defensivo: Usando buff defensivo",
+          reason: `${BEHAVIOR_NAME}: Usando buff defensivo`,
         };
       }
     }
 
     // 3. Contra-atacar inimigos adjacentes
-    const attackRange = 1;
+    const attackRange = getEffectiveAttackRange(unit);
     const adjacentEnemies = enemies.filter(
       (e) =>
         manhattanDistance(
@@ -158,13 +156,11 @@ export function makeDefensiveDecision(
     );
 
     if (adjacentEnemies.length > 0 && canAttack) {
-      // Atacar o inimigo adjacente mais fraco
       adjacentEnemies.sort(
         (a, b) => a.currentHp / a.maxHp - b.currentHp / b.maxHp
       );
       const target = adjacentEnemies[0];
 
-      // Tentar skill primeiro
       const skillEval = selectBestSkill(unit, availableSkills, units, profile);
       if (
         skillEval &&
@@ -176,7 +172,7 @@ export function makeDefensiveDecision(
           unitId: unit.id,
           skillCode: skillEval.skill.code,
           targetId: target.id,
-          reason: `Defensivo: Contra-ataque com skill em ${target.name}`,
+          reason: `${BEHAVIOR_NAME}: Contra-ataque com skill em ${target.name}`,
         };
       }
 
@@ -184,11 +180,11 @@ export function makeDefensiveDecision(
         type: "ATTACK",
         unitId: unit.id,
         targetId: target.id,
-        reason: `Defensivo: Contra-atacando ${target.name}`,
+        reason: `${BEHAVIOR_NAME}: Contra-atacando ${target.name}`,
       };
     }
 
-    // 4. Proteger aliado fraco - mover para perto dele
+    // 4. Proteger aliado fraco
     if (allies.length > 0 && movesRemaining > 0) {
       const weakAlly = allies.find((a) => a.currentHp / a.maxHp < 0.5);
       if (weakAlly) {
@@ -201,7 +197,7 @@ export function makeDefensiveDecision(
           const moveTarget = findBestMoveTowards(
             unit,
             { x: weakAlly.posX, y: weakAlly.posY },
-            Math.min(movesRemaining, 2), // Não avançar muito
+            Math.min(movesRemaining, 2),
             gridSize.width,
             gridSize.height,
             units,
@@ -213,37 +209,33 @@ export function makeDefensiveDecision(
               type: "MOVE",
               unitId: unit.id,
               targetPosition: moveTarget,
-              reason: `Defensivo: Protegendo ${weakAlly.name}`,
+              reason: `${BEHAVIOR_NAME}: Protegendo ${weakAlly.name}`,
             };
           }
         }
       }
     }
 
-    // 5. Se inimigo está se aproximando, preparar posição
+    // 5. Ajustar posição se muitas ameaças
     const nearestEnemy = findNearestEnemy(unit, units);
-    if (nearestEnemy) {
+    if (nearestEnemy && movesRemaining > 0) {
       const distance = manhattanDistance(
         { x: unit.posX, y: unit.posY },
         { x: nearestEnemy.posX, y: nearestEnemy.posY }
       );
 
-      // Inimigo está se aproximando (distância média)
-      // Manter posição ou ajustar levemente
-      if (distance <= 3 && distance > 1 && movesRemaining > 0) {
-        // Verificar se posição atual é boa
+      if (distance <= 3 && distance > 1) {
         const threatsHere = countThreatsAtPosition(
           { x: unit.posX, y: unit.posY },
           enemies,
           2
         );
 
-        // Se muitos inimigos por perto, considerar recuar um pouco
         if (threatsHere >= 2) {
           const retreatPos = findBestRetreatPosition(
             unit,
             enemies,
-            1, // Só um passo
+            1,
             gridSize.width,
             gridSize.height,
             units,
@@ -255,26 +247,21 @@ export function makeDefensiveDecision(
               type: "MOVE",
               unitId: unit.id,
               targetPosition: retreatPos,
-              reason: "Defensivo: Ajustando posição defensiva",
+              reason: `${BEHAVIOR_NAME}: Ajustando posição defensiva`,
             };
           }
         }
       }
     }
 
-    // 6. Manter posição
-    return {
-      type: "PASS",
-      unitId: unit.id,
-      reason: "Defensivo: Mantendo posição defensiva",
-    };
+    // 6. Usar corrida para proteger aliado mais rápido
+    const dashDecision = tryDash(unit, context, BEHAVIOR_NAME);
+    if (dashDecision) return dashDecision;
+
+    // 7. Manter posição
+    return passDecision(unit, BEHAVIOR_NAME);
   } catch (error) {
-    // Fallback seguro em caso de erro
-    console.error(`[AI Defensive] Erro no comportamento: ${error}`);
-    return {
-      type: "PASS",
-      unitId: unit.id,
-      reason: "Defensivo: Fallback por erro",
-    };
+    console.error(`[AI ${BEHAVIOR_NAME}] Erro no comportamento: ${error}`);
+    return fallbackDecision(unit, BEHAVIOR_NAME);
   }
 }

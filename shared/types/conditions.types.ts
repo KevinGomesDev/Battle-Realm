@@ -38,6 +38,7 @@ export interface ConditionEffects {
   currentHpMod?: number;
   protectionMod?: number;
   actionsMod?: number;
+  basicAttackRangeMod?: number; // Modifica alcance do ataque básico (base: 1)
 
   // === EFEITOS DE TURNO ===
   damagePerTurn?: number;

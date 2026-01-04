@@ -244,6 +244,8 @@ export interface UnitAttackedResponse {
   targetIcon: string;
   targetCombat: number;
   targetSpeed: number;
+  // Invocações mortas (quando o invocador morre)
+  killedSummonIds?: string[];
 }
 
 export interface BattleEndedResponse {

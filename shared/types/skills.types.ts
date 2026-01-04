@@ -165,17 +165,20 @@ export function getArchetypeResource(archetype: Archetype): SkillResourceType {
 // HELPERS - ALCANCE E DISTÂNCIA
 // =============================================================================
 
-/**
- * Calcula distância Manhattan entre dois pontos
- */
-export function getManhattanDistance(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number
-): number {
-  return Math.abs(x1 - x2) + Math.abs(y1 - y2);
-}
+// Import para uso local
+import { getManhattanDistance as _getManhattanDistance } from "../utils/spell-validation";
+
+// Re-export das funções de distância do módulo centralizado
+export {
+  getManhattanDistance,
+  isAdjacent,
+  isAdjacentOmnidirectional,
+  getChebyshevDistance,
+  isWithinRange,
+} from "../utils/spell-validation";
+
+// Alias local para uso interno
+const getManhattanDistance = _getManhattanDistance;
 
 /**
  * Obtém o alcance efetivo de uma skill
@@ -223,34 +226,6 @@ export function isInSkillRange(
     default:
       return false;
   }
-}
-
-/**
- * Verifica se um alvo adjacente (1 bloco Manhattan - 4 direções) é válido
- * Apenas cima, baixo, esquerda, direita
- */
-export function isAdjacent(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number
-): boolean {
-  return getManhattanDistance(x1, y1, x2, y2) === 1;
-}
-
-/**
- * Verifica adjacência omnidirecional (8 direções - inclui diagonais)
- * Usa distância Chebyshev (máximo de |dx| e |dy|)
- */
-export function isAdjacentOmnidirectional(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number
-): boolean {
-  const dx = Math.abs(x1 - x2);
-  const dy = Math.abs(y1 - y2);
-  return Math.max(dx, dy) === 1;
 }
 
 /**

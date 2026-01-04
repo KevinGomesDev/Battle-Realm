@@ -5,9 +5,11 @@ import {
   SpellExecutorFn,
 } from "../../../shared/types/spells.types";
 import { scanConditionsForAction } from "../logic/conditions";
+import { processSummonerDeath } from "../logic/summon-logic";
 
 /**
  * 🌀 TELEPORT - Move instantaneamente para uma posição
+ * Nota: Validação de alcance já foi feita em validateSpellUse()
  */
 function executeTeleport(
   caster: BattleUnit,
@@ -25,18 +27,7 @@ function executeTeleport(
 
   const position = target as { x: number; y: number };
 
-  // Validação: verificar se a posição está dentro do alcance
-  // Range RANGED = até speed tiles de distância
-  const distance =
-    Math.abs(caster.posX - position.x) + Math.abs(caster.posY - position.y);
-  if (distance > caster.speed) {
-    return {
-      success: false,
-      error: `Posição fora do alcance (${distance} > ${caster.speed})`,
-    };
-  }
-
-  // Validação: verificar se a posição não está ocupada
+  // Validação específica: verificar se a posição não está ocupada
   const occupied = allUnits.some(
     (u) => u.isAlive && u.posX === position.x && u.posY === position.y
   );
@@ -66,6 +57,7 @@ function executeTeleport(
 
 /**
  * 🔥 FIRE - Causa dano mágico em área 3x3
+ * Nota: Validação de alcance já foi feita em validateSpellUse()
  */
 function executeFire(
   caster: BattleUnit,
@@ -82,16 +74,6 @@ function executeFire(
   }
 
   const position = target as { x: number; y: number };
-
-  // Validação: verificar se a posição está dentro do alcance
-  const distance =
-    Math.abs(caster.posX - position.x) + Math.abs(caster.posY - position.y);
-  if (distance > caster.speed) {
-    return {
-      success: false,
-      error: `Posição fora do alcance (${distance} > ${caster.speed})`,
-    };
-  }
 
   // Encontrar todas as unidades na área 3x3
   const targetsInArea = allUnits.filter((u) => {
@@ -148,6 +130,9 @@ function executeFire(
     if (targetUnit.currentHp <= 0) {
       targetUnit.currentHp = 0;
       targetUnit.isAlive = false;
+
+      // Matar invocações do alvo (summons morrem com o invocador)
+      processSummonerDeath(targetUnit, allUnits, "arena");
     }
 
     targetIds.push(targetUnit.id);
@@ -166,6 +151,7 @@ function executeFire(
 
 /**
  * ⚡ EMPOWER - Potencializa unidade adjacente temporariamente
+ * Nota: Validação de alcance e tipo de alvo já foi feita em validateSpellUse()
  */
 function executeEmpower(
   caster: BattleUnit,
@@ -182,35 +168,6 @@ function executeEmpower(
   }
 
   const targetUnit = target as BattleUnit;
-
-  // Validação: unidade deve estar viva
-  if (!targetUnit.isAlive) {
-    return {
-      success: false,
-      error: "Alvo não está vivo",
-    };
-  }
-
-  // Validação: unidade deve ser adjacente
-  const distance =
-    Math.abs(caster.posX - targetUnit.posX) +
-    Math.abs(caster.posY - targetUnit.posY);
-  if (distance > 1) {
-    return {
-      success: false,
-      error: "Alvo não está adjacente",
-    };
-  }
-
-  // Validação: unidade deve ser aliada
-  if (targetUnit.category === caster.category) {
-    // Same team (simplificado - pode ser refinado)
-  } else {
-    return {
-      success: false,
-      error: "Apenas aliados podem ser potencializados",
-    };
-  }
 
   // Aplicar condição EMPOWERED
   if (!targetUnit.conditions.includes("EMPOWERED")) {

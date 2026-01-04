@@ -8,17 +8,11 @@ import type {
   AIProfile,
   AISelfAssessment,
 } from "../types/ai.types";
-import {
-  manhattanDistance,
-  findBestMoveTowards,
-  findBestRetreatPosition,
-} from "../core/pathfinding";
+import { manhattanDistance, findBestMoveTowards } from "../core/pathfinding";
 import {
   getAllies,
-  findNearestAlly,
   findNearestEnemy,
   selectBestAllyForSupport,
-  isUnitInDanger,
 } from "../core/target-selection";
 import {
   selectBestSkill,
@@ -26,6 +20,15 @@ import {
   getSkillEffectiveRange,
 } from "../core/skill-evaluator";
 import { BattleUnit } from "../../../../shared/types/battle.types";
+import {
+  tryRetreat,
+  tryDash,
+  passDecision,
+  fallbackDecision,
+  trySupportSpell,
+} from "./shared.behavior";
+
+const BEHAVIOR_NAME = "Support";
 
 /**
  * Comportamento Support
@@ -50,15 +53,10 @@ export function makeSupportDecision(
       actionsRemaining,
       selfAssessment,
     } = context;
-    const enemies = units.filter(
-      (u) => u.isAlive && u.ownerId !== unit.ownerId
-    );
     const allies = getAllies(unit, units);
-
-    // Verificar se pode atacar (tem ações disponíveis)
     const canAttack = (actionsRemaining ?? unit.actionsLeft ?? 0) > 0;
 
-    // 1. Verificar se PRÓPRIO HP está baixo - suporte se cura primeiro se puder
+    // 1. Auto-cura se HP baixo
     if (selfAssessment?.isWounded) {
       const selfHealSkills = availableSkills.filter(
         (s) =>
@@ -72,12 +70,12 @@ export function makeSupportDecision(
           unitId: unit.id,
           skillCode: selfHealSkills[0].code,
           targetId: unit.id,
-          reason: "Support: Auto-cura (HP baixo)",
+          reason: `${BEHAVIOR_NAME}: Auto-cura (HP baixo)`,
         };
       }
     }
 
-    // 2. Verificar se está em perigo - suporte SEMPRE foge
+    // 2. Fugir se inimigo próximo
     const nearestEnemy = findNearestEnemy(unit, units);
     if (nearestEnemy) {
       const distanceToEnemy = manhattanDistance(
@@ -85,35 +83,27 @@ export function makeSupportDecision(
         { x: nearestEnemy.posX, y: nearestEnemy.posY }
       );
 
-      // Fugir se inimigo está muito perto ou se está em perigo
       const shouldFlee =
         distanceToEnemy <= 2 ||
         selfAssessment?.shouldRetreat ||
         selfAssessment?.isCritical;
-      if (shouldFlee && movesRemaining > 0) {
-        const retreatPos = findBestRetreatPosition(
-          unit,
-          enemies,
-          movesRemaining,
-          gridSize.width,
-          gridSize.height,
-          units,
-          obstacles
-        );
 
-        if (retreatPos) {
-          return {
-            type: "MOVE",
-            unitId: unit.id,
-            targetPosition: retreatPos,
-            reason: "Support: Fugindo de inimigo próximo",
-          };
-        }
+      if (shouldFlee && movesRemaining > 0) {
+        const retreatDecision = tryRetreat(unit, context, BEHAVIOR_NAME);
+        if (retreatDecision) return retreatDecision;
       }
     }
 
-    // 2. Priorizar skills de cura se aliados precisam
-    // Skills de suporte têm targetType ALLY ou SELF
+    // 3. Tentar usar spell de suporte (curar/buffar)
+    const spellDecision = trySupportSpell(
+      unit,
+      context,
+      profile,
+      BEHAVIOR_NAME
+    );
+    if (spellDecision) return spellDecision;
+
+    // 4. Curar aliados que precisam com skills
     const healSkills = availableSkills.filter(
       (s) => s.targetType === "ALLY" || s.targetType === "SELF"
     );
@@ -125,7 +115,6 @@ export function makeSupportDecision(
         );
 
         if (needsHealing.length > 0) {
-          // Curar o mais necessitado
           needsHealing.sort(
             (a, b) => a.currentHp / a.maxHp - b.currentHp / b.maxHp
           );
@@ -134,13 +123,13 @@ export function makeSupportDecision(
             unitId: unit.id,
             skillCode: healSkill.code,
             targetId: needsHealing[0].id,
-            reason: `Support: Curando ${needsHealing[0].name}`,
+            reason: `${BEHAVIOR_NAME}: Curando ${needsHealing[0].name}`,
           };
         }
       }
     }
 
-    // 3. Usar outras skills de suporte (buffs)
+    // 4. Buffar aliados
     const buffSkills = availableSkills.filter(
       (s) =>
         (s.targetType === "ALLY" || s.targetType === "SELF") &&
@@ -154,12 +143,12 @@ export function makeSupportDecision(
           unitId: unit.id,
           skillCode: skillEval.skill.code,
           targetId: skillEval.bestTarget!.id,
-          reason: `Support: Buffando ${skillEval.bestTarget!.name}`,
+          reason: `${BEHAVIOR_NAME}: Buffando ${skillEval.bestTarget!.name}`,
         };
       }
     }
 
-    // 4. Mover para perto de aliados que podem precisar de suporte
+    // 5. Mover para perto de aliados
     if (allies.length > 0 && movesRemaining > 0) {
       const allyNeedingSupport = selectBestAllyForSupport(unit, units, 99);
       if (allyNeedingSupport) {
@@ -168,7 +157,6 @@ export function makeSupportDecision(
           { x: allyNeedingSupport.posX, y: allyNeedingSupport.posY }
         );
 
-        // Se está longe do aliado que precisa de suporte
         if (distance > 2) {
           const moveTarget = findBestMoveTowards(
             unit,
@@ -185,14 +173,14 @@ export function makeSupportDecision(
               type: "MOVE",
               unitId: unit.id,
               targetPosition: moveTarget,
-              reason: `Support: Aproximando de ${allyNeedingSupport.name}`,
+              reason: `${BEHAVIOR_NAME}: Aproximando de ${allyNeedingSupport.name}`,
             };
           }
         }
       }
     }
 
-    // 5. Se não tem o que fazer de suporte, tentar ataque de oportunidade
+    // 6. Ataque de oportunidade
     if (nearestEnemy && canAttack) {
       const distance = manhattanDistance(
         { x: unit.posX, y: unit.posY },
@@ -204,24 +192,19 @@ export function makeSupportDecision(
           type: "ATTACK",
           unitId: unit.id,
           targetId: nearestEnemy.id,
-          reason: `Support: Ataque de oportunidade em ${nearestEnemy.name}`,
+          reason: `${BEHAVIOR_NAME}: Ataque de oportunidade em ${nearestEnemy.name}`,
         };
       }
     }
 
-    // 7. Passar turno
-    return {
-      type: "PASS",
-      unitId: unit.id,
-      reason: "Support: Aguardando aliados precisarem de ajuda",
-    };
+    // 7. Usar corrida para alcançar aliados mais rápido
+    const dashDecision = tryDash(unit, context, BEHAVIOR_NAME);
+    if (dashDecision) return dashDecision;
+
+    // 8. Passar turno
+    return passDecision(unit, BEHAVIOR_NAME);
   } catch (error) {
-    // Fallback seguro em caso de erro
-    console.error(`[AI Support] Erro no comportamento: ${error}`);
-    return {
-      type: "PASS",
-      unitId: unit.id,
-      reason: "Support: Fallback por erro",
-    };
+    console.error(`[AI ${BEHAVIOR_NAME}] Erro no comportamento: ${error}`);
+    return fallbackDecision(unit, BEHAVIOR_NAME);
   }
 }

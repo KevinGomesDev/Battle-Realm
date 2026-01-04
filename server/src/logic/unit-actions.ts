@@ -1,7 +1,9 @@
-// Ações padrão que toda unidade possui
-export const DEFAULT_UNIT_ACTIONS = ["attack", "move", "dash", "dodge"];
-
+// Ações padrão importadas do shared (fonte de verdade)
+import { DEFAULT_UNIT_ACTIONS } from "../../../shared/data/actions.data";
 import { findSkillByCode } from "../../../shared/data/skills.data";
+
+// Re-exportar para compatibilidade com código existente
+export { DEFAULT_UNIT_ACTIONS };
 
 export interface UnitActionContext {
   battleType?: "arena" | "match";

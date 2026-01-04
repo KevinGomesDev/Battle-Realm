@@ -1,12 +1,13 @@
 import { SkillDefinition, COST_VALUES } from "../types";
-import type { BattleUnit } from "../../../shared/types/battle.types";
-import { calculateEngagementCost } from "../../../shared/utils/engagement.utils";
 
 // Re-exportar do global.config para manter compatibilidade
 export { getMaxMarksByCategory } from "../../../shared/config/global.config";
 
-// Re-exportar para manter compatibilidade
-export { calculateEngagementCost };
+// Re-exportar de engagement.utils para manter compatibilidade
+export {
+  calculateEngagementCost,
+  validateMove,
+} from "../../../shared/utils/engagement.utils";
 
 export function calculateSkillCost(
   skill: SkillDefinition,
@@ -26,66 +27,6 @@ export function rollInitiative<T extends { id: string; initiative: number }>(
   battleUnits: T[]
 ): T[] {
   return [...battleUnits].sort((a, b) => b.initiative - a.initiative);
-}
-
-// Valida movimento no grid 20x20 com distância Manhattan e custo em movesLeft
-// Agora aceita parâmetros opcionais para calcular custo de engajamento
-export function validateGridMove(
-  fromX: number,
-  fromY: number,
-  toX: number,
-  toY: number,
-  gridW: number,
-  gridH: number,
-  movesLeft: number,
-  engagementContext?: {
-    unit: BattleUnit;
-    allUnits: BattleUnit[];
-  }
-): { valid: boolean; reason?: string; cost: number; engagementCost: number } {
-  if (toX < 0 || toX >= gridW || toY < 0 || toY >= gridH) {
-    return {
-      valid: false,
-      reason: "Destino fora do grid",
-      cost: 0,
-      engagementCost: 0,
-    };
-  }
-  const dist = Math.abs(toX - fromX) + Math.abs(toY - fromY);
-  if (dist <= 0) {
-    return {
-      valid: false,
-      reason: "Destino inválido",
-      cost: 0,
-      engagementCost: 0,
-    };
-  }
-
-  // Calcular custo de engajamento se contexto fornecido
-  let engagementCost = 0;
-  if (engagementContext) {
-    engagementCost = calculateEngagementCost(
-      engagementContext.unit,
-      toX,
-      toY,
-      engagementContext.allUnits
-    );
-  }
-
-  const totalCost = dist + engagementCost;
-
-  if (totalCost > movesLeft) {
-    return {
-      valid: false,
-      reason:
-        engagementCost > 0
-          ? `Movimento bloqueado por engajamento inimigo (custo: ${totalCost}, disponível: ${movesLeft})`
-          : "Movimento excede pontos disponíveis",
-      cost: totalCost,
-      engagementCost,
-    };
-  }
-  return { valid: true, cost: totalCost, engagementCost };
 }
 
 // Calcula Velocidade efetiva dada lista de condições

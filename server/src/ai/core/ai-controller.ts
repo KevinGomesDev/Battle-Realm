@@ -19,6 +19,9 @@ import {
   limitArray,
 } from "./safety-guards";
 import { BattleUnit } from "../../../../shared/types/battle.types";
+import { findSkillByCode } from "../../../../shared/data/skills.data";
+import { isBasicAction } from "../../../../shared/data/actions.data";
+import { filterVisibleUnits } from "./target-selection";
 
 // ID especial para o "jogador" IA
 export const AI_PLAYER_ID = "__AI__";
@@ -62,52 +65,6 @@ export function isAITurn(battle: ArenaBattle): boolean {
 // =============================================================================
 
 /**
- * Calcula a distância Manhattan entre duas posições
- */
-function calculateDistance(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number
-): number {
-  return Math.abs(x1 - x2) + Math.abs(y1 - y2);
-}
-
-/**
- * Filtra unidades baseado no campo de visão da unidade observadora
- * - Unidades aliadas: sempre visíveis
- * - Unidades inimigas: somente se dentro do visionRange
- */
-function filterVisibleUnits(
-  observerUnit: BattleUnit,
-  allUnits: BattleUnit[]
-): BattleUnit[] {
-  const visionRange =
-    observerUnit.visionRange ?? Math.max(10, observerUnit.focus);
-
-  return allUnits.filter((u) => {
-    // Sempre ver a si mesmo
-    if (u.id === observerUnit.id) return true;
-
-    // Unidades do mesmo dono são sempre visíveis
-    if (u.ownerId === observerUnit.ownerId) return true;
-
-    // Unidades mortas não são visíveis
-    if (!u.isAlive) return false;
-
-    // Inimigos: verificar se estão dentro do campo de visão
-    const distance = calculateDistance(
-      observerUnit.posX,
-      observerUnit.posY,
-      u.posX,
-      u.posY
-    );
-
-    return distance <= visionRange;
-  });
-}
-
-/**
  * Cria o contexto de batalha para a IA
  * Suporta tanto Battle (servidor) quanto ArenaBattle (client)
  * IMPORTANTE: Filtra unidades baseado no campo de visão (fog of war)
@@ -147,18 +104,30 @@ export function createBattleContext(
 }
 
 // =============================================================================
-// OBTENÇÃO DE SKILLS
+// OBTENÇÃO DE SKILLS E SPELLS
 // =============================================================================
 
 /**
- * Obtém as skills disponíveis para uma unidade
- * Por enquanto retorna array vazio - integrar com sistema de skills
+ * Obtém as skills ativas disponíveis para uma unidade
+ * Busca nas ações da unidade e retorna as definições de skill correspondentes
  */
 export function getUnitSkills(unit: BattleUnit): SkillDefinition[] {
-  // TODO: Integrar com o sistema de skills existente
-  // Por enquanto, unidades IA não usam skills especiais
-  return [];
+  if (!unit.actions || unit.actions.length === 0) {
+    return [];
+  }
+
+  // Filtrar apenas skills ativas (não ações básicas como move, attack, etc)
+  return unit.actions
+    .filter((actionCode) => !isBasicAction(actionCode))
+    .map((skillCode) => findSkillByCode(skillCode))
+    .filter(
+      (skill): skill is SkillDefinition =>
+        skill !== undefined && skill !== null && skill.category === "ACTIVE"
+    );
 }
+
+// Re-exportar getUnitSpells do spell-evaluator
+export { getUnitSpells } from "./spell-evaluator";
 
 // =============================================================================
 // PROCESSAMENTO DO TURNO DA IA
@@ -359,8 +328,33 @@ export async function processBotUnitDecision(
       `[BOT-AI] Unit state: movesLeft=${unit.movesLeft}, actionsLeft=${unit.actionsLeft}, pos=(${unit.posX}, ${unit.posY})`
     );
 
-    // Usar perfil WARRIOR (comportamento TACTICAL) para Regentes BOT
-    const profile = DEFAULT_AI_PROFILES.WARRIOR;
+    // Determinar perfil baseado no aiBehavior da unidade ou categoria/classe
+    let profile = DEFAULT_AI_PROFILES.WARRIOR; // Padrão para Regentes
+
+    // Se a unidade tem aiBehavior definido, usar o perfil correspondente
+    if (unit.aiBehavior) {
+      const behaviorToProfile: Record<
+        string,
+        keyof typeof DEFAULT_AI_PROFILES
+      > = {
+        AGGRESSIVE: "MONSTER",
+        TACTICAL: "WARRIOR",
+        DEFENSIVE: "TANK",
+        SUPPORT: "HEALER",
+        RANGED: "ARCHER",
+      };
+      const profileKey = behaviorToProfile[unit.aiBehavior];
+      if (profileKey) {
+        profile = DEFAULT_AI_PROFILES[profileKey];
+      }
+    } else if (unit.category === "SUMMON") {
+      profile = DEFAULT_AI_PROFILES.SUMMON;
+    } else if (unit.category === "MONSTER") {
+      profile = DEFAULT_AI_PROFILES.MONSTER;
+    } else if (unit.classCode && unit.classCode in DEFAULT_AI_PROFILES) {
+      profile =
+        DEFAULT_AI_PROFILES[unit.classCode as keyof typeof DEFAULT_AI_PROFILES];
+    }
 
     console.log(`[BOT-AI] Perfil: ${profile.behavior}`);
 
@@ -477,6 +471,8 @@ export function logAIDecision(decision: AIDecision, unit: BattleUnit): void {
     MOVE: `mover para (${decision.targetPosition?.x}, ${decision.targetPosition?.y})`,
     ATTACK: `atacar`,
     SKILL: `usar skill ${decision.skillCode}`,
+    SPELL: `usar spell ${decision.spellCode}`,
+    DASH: `usar corrida`,
     PASS: "passar turno",
   }[decision.type];
 

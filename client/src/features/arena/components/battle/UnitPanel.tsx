@@ -2,6 +2,9 @@ import React, { useState, useRef, useMemo } from "react";
 import { getConditionInfo } from "../../constants";
 import { getSkillInfo } from "../../../../../../shared/data/skills.data";
 import { getSpellByCode } from "../../../../../../shared/data/spells.data";
+import {
+  ALL_ACTIONS,
+} from "../../../../../../shared/data/actions.data";
 import type { BattleUnit } from "../../../../../../shared/types/battle.types";
 import { AttributesDisplay } from "@/components/AttributesDisplay/index";
 import { UI_SECTION_COLORS } from "../../../../config/colors.config";
@@ -10,6 +13,7 @@ import {
   AnimatedCharacterSprite,
   parseAvatarToHeroId,
 } from "../../../kingdom/components/CreateKingdom";
+import { isPlayerControllable } from "../../utils/unit-control";
 
 // =============================================================================
 // TIPOS E INTERFACES
@@ -208,40 +212,41 @@ const ConditionBadge: React.FC<{ condition: string }> = ({ condition }) => {
   );
 };
 
-// Actions Info
-const ACTIONS_INFO: Record<string, any> = {
-  attack: {
-    icon: "⚔️",
-    name: "Atacar",
-    description: "Ataque corpo a corpo",
-    requiresTarget: true,
-  },
-  dodge: {
-    icon: "🌀",
-    name: "Esquivar",
-    description: "Aumenta esquiva até o próximo turno",
-    requiresTarget: false,
-  },
-  dash: {
-    icon: "💨",
-    name: "Corrida",
-    description: "Dobra o movimento por um turno",
-    requiresTarget: false,
-  },
-  disengage: {
-    icon: "🏃",
-    name: "Recuar",
-    description: "Move sem provocar ataques de oportunidade",
-    requiresTarget: false,
-  },
-  spell: {
-    icon: "🔮",
-    name: "Magia",
-    description: "Use uma magia",
-    requiresTarget: false,
-    isMenu: true,
-  },
-};
+/**
+ * Obtém informações de uma ação para exibição
+ * Prioriza o shared, mas mantém fallback para ações especiais
+ */
+function getActionInfo(actionKey: string): {
+  icon: string;
+  name: string;
+  description: string;
+  requiresTarget: boolean;
+  isMenu?: boolean;
+} | null {
+  // Ação especial "spell" (menu de magias)
+  if (actionKey === "spell") {
+    return {
+      icon: "🔮",
+      name: "Magia",
+      description: "Use uma magia",
+      requiresTarget: false,
+      isMenu: true,
+    };
+  }
+
+  // Buscar no shared
+  const actionDef = ALL_ACTIONS[actionKey];
+  if (actionDef) {
+    return {
+      icon: actionDef.icon,
+      name: actionDef.name,
+      description: actionDef.description,
+      requiresTarget: actionDef.requiresTarget,
+    };
+  }
+
+  return null;
+}
 
 // =============================================================================
 // COMPONENTE PRINCIPAL
@@ -269,13 +274,53 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
   onEndAction,
 }) => {
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
-  const [hoveredSpell, setHoveredSpell] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"actions" | "skills" | "spells">(
+    "actions"
+  );
 
-  // Se activeUnitId está undefined mas é meu turno e a unidade é minha,
+  // Categorizar ações (fora do render condicional)
+  const categorizedActions = useMemo(() => {
+    const actions: string[] = [];
+    const skills: string[] = [];
+    const spells: string[] = [];
+
+    if (selectedUnit) {
+      selectedUnit.actions
+        ?.filter((actionKey) => actionKey !== "move")
+        .forEach((actionKey) => {
+          if (getActionInfo(actionKey)) {
+            actions.push(actionKey);
+          } else if (getSkillInfo(actionKey)) {
+            skills.push(actionKey);
+          }
+        });
+
+      if (selectedUnit.spells && selectedUnit.spells.length > 0) {
+        selectedUnit.spells.forEach((spellCode) => {
+          spells.push(spellCode);
+        });
+      }
+    }
+
+    return { actions, skills, spells };
+  }, [selectedUnit]);
+
+  // Define aba inicial quando o menu abre
+  React.useEffect(() => {
+    if (actionsMenuOpen) {
+      if (categorizedActions.actions.length > 0) setActiveTab("actions");
+      else if (categorizedActions.skills.length > 0) setActiveTab("skills");
+      else if (categorizedActions.spells.length > 0) setActiveTab("spells");
+    }
+  }, [actionsMenuOpen, categorizedActions]);
+
+  // Se activeUnitId está undefined mas é meu turno e a unidade é minha (e controlável),
   // consideramos que está "aguardando ativação" e tratamos como se fosse ativa
   const isActiveOrPending = activeUnitId
     ? selectedUnit?.id === activeUnitId
-    : isMyTurn && selectedUnit?.ownerId === currentUserId;
+    : isMyTurn &&
+      selectedUnit &&
+      isPlayerControllable(selectedUnit, currentUserId);
 
   if (!selectedUnit) {
     return (
@@ -291,7 +336,10 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
   }
 
   const canAct =
-    isMyTurn && selectedUnit.ownerId === currentUserId && isActiveOrPending;
+    isMyTurn &&
+    selectedUnit &&
+    isPlayerControllable(selectedUnit, currentUserId) &&
+    isActiveOrPending;
 
   return (
     <div className="absolute bottom-0 left-0 right-0 z-20">
@@ -521,142 +569,242 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
 
                 {/* Menu de Ações */}
                 {actionsMenuOpen && (
-                  <div className="absolute bottom-full left-0 mb-6 bg-gray-900/95 backdrop-blur-sm border-2 border-gray-600 rounded-xl shadow-2xl p-3 min-w-[220px] max-w-[300px]">
-                    {/* Título */}
-                    <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-2 pb-2 border-b border-gray-700">
-                      Selecione uma Ação
+                  <div className="absolute bottom-full left-0 mb-[32px] bg-gray-900/95 backdrop-blur-sm border-2 border-gray-600 rounded-xl shadow-2xl min-w-[280px] max-w-[400px]">
+                    {/* Abas */}
+                    <div className="flex border-b border-gray-700">
+                      {categorizedActions.actions.length > 0 && (
+                        <button
+                          onClick={() => setActiveTab("actions")}
+                          className={`flex-1 px-3 py-2.5 text-xs font-bold uppercase tracking-wider transition-all ${
+                            activeTab === "actions"
+                              ? "bg-blue-600/20 text-blue-400 border-b-2 border-blue-500"
+                              : "text-gray-500 hover:text-gray-300 hover:bg-gray-800/50"
+                          }`}
+                        >
+                          <span className="mr-1.5">⚔️</span>
+                          Ações
+                        </button>
+                      )}
+                      {categorizedActions.skills.length > 0 && (
+                        <button
+                          onClick={() => setActiveTab("skills")}
+                          className={`flex-1 px-3 py-2.5 text-xs font-bold uppercase tracking-wider transition-all ${
+                            activeTab === "skills"
+                              ? "bg-amber-600/20 text-amber-400 border-b-2 border-amber-500"
+                              : "text-gray-500 hover:text-gray-300 hover:bg-gray-800/50"
+                          }`}
+                        >
+                          <span className="mr-1.5">✨</span>
+                          Habilidades
+                        </button>
+                      )}
+                      {categorizedActions.spells.length > 0 && (
+                        <button
+                          onClick={() => setActiveTab("spells")}
+                          className={`flex-1 px-3 py-2.5 text-xs font-bold uppercase tracking-wider transition-all ${
+                            activeTab === "spells"
+                              ? "bg-purple-600/20 text-purple-400 border-b-2 border-purple-500"
+                              : "text-gray-500 hover:text-gray-300 hover:bg-gray-800/50"
+                          }`}
+                        >
+                          <span className="mr-1.5">🔮</span>
+                          Magias
+                        </button>
+                      )}
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                      {selectedUnit.actions
-                        ?.filter((actionKey) => actionKey !== "move")
-                        .map((actionKey) => {
-                          let actionInfo = ACTIONS_INFO[actionKey];
-                          if (!actionInfo) {
-                            const skillInfo = getSkillInfo(actionKey);
-                            if (!skillInfo) return null;
-                            actionInfo = skillInfo;
-                          }
 
-                          const isAttackAction = actionKey === "attack";
-                          const hasExtraAttacks =
-                            (selectedUnit.attacksLeftThisTurn ?? 0) > 0;
-                          const canExecute = isAttackAction
-                            ? selectedUnit.actionsLeft > 0 || hasExtraAttacks
-                            : selectedUnit.actionsLeft > 0;
+                    {/* Conteúdo das Abas */}
+                    <div className="p-3">
+                      {/* Aba de Ações */}
+                      {activeTab === "actions" &&
+                        categorizedActions.actions.length > 0 && (
+                          <div className="flex flex-col gap-1.5">
+                            {categorizedActions.actions.map((actionKey) => {
+                              const actionInfo = getActionInfo(actionKey);
+                              if (!actionInfo) return null;
+                              
+                              const isAttackAction = actionKey === "attack";
+                              const hasExtraAttacks =
+                                (selectedUnit.attacksLeftThisTurn ?? 0) > 0;
+                              const canExecute = isAttackAction
+                                ? selectedUnit.actionsLeft > 0 ||
+                                  hasExtraAttacks
+                                : selectedUnit.actionsLeft > 0;
 
-                          return (
-                            <div key={actionKey} className="relative group">
-                              <button
-                                onClick={() => {
-                                  if (!canExecute) return;
-                                  if (actionInfo.requiresTarget) {
-                                    onSetPendingAction(actionKey);
+                              return (
+                                <button
+                                  key={actionKey}
+                                  onClick={() => {
+                                    if (!canExecute) return;
+                                    if (actionInfo.requiresTarget) {
+                                      onSetPendingAction(actionKey);
+                                      setActionsMenuOpen(false);
+                                    } else {
+                                      onExecuteAction(
+                                        actionKey,
+                                        selectedUnit.id
+                                      );
+                                      setActionsMenuOpen(false);
+                                    }
+                                  }}
+                                  disabled={!canExecute}
+                                  className={`w-full px-3 py-2.5 rounded-lg border text-left transition-all flex items-center gap-3 ${
+                                    canExecute
+                                      ? "bg-gray-800 hover:bg-gray-700 border-gray-600 hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/20"
+                                      : "bg-gray-800/40 border-gray-700/50 opacity-40 cursor-not-allowed"
+                                  }`}
+                                >
+                                  <span className="text-xl w-6 text-center">
+                                    {actionInfo.icon}
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-gray-100 text-sm font-semibold block">
+                                      {actionInfo.name}
+                                    </span>
+                                    <span className="text-gray-500 text-[9px] block truncate">
+                                      {actionInfo.description}
+                                    </span>
+                                  </div>
+                                  {actionInfo.requiresTarget && (
+                                    <span className="text-gray-500 text-[10px]">
+                                      🎯
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                      {/* Aba de Skills */}
+                      {activeTab === "skills" &&
+                        categorizedActions.skills.length > 0 && (
+                          <div className="flex flex-col gap-1.5">
+                            {categorizedActions.skills.map((skillCode) => {
+                              const skillInfo = getSkillInfo(skillCode);
+                              if (!skillInfo) return null;
+
+                              // Verificar cooldown
+                              const cooldownLeft =
+                                selectedUnit.unitCooldowns?.[skillCode] ?? 0;
+                              const isOnCooldown = cooldownLeft > 0;
+                              const canExecute =
+                                selectedUnit.actionsLeft > 0 && !isOnCooldown;
+
+                              return (
+                                <button
+                                  key={skillCode}
+                                  onClick={() => {
+                                    if (!canExecute) return;
+                                    if (skillInfo.requiresTarget) {
+                                      onSetPendingAction(skillCode);
+                                      setActionsMenuOpen(false);
+                                    } else {
+                                      onExecuteAction(
+                                        skillCode,
+                                        selectedUnit.id
+                                      );
+                                      setActionsMenuOpen(false);
+                                    }
+                                  }}
+                                  disabled={!canExecute}
+                                  className={`w-full px-3 py-2.5 rounded-lg border text-left transition-all flex items-center gap-3 ${
+                                    isOnCooldown
+                                      ? "bg-gray-900/60 border-gray-700/50 opacity-60 cursor-not-allowed"
+                                      : canExecute
+                                      ? "bg-gray-800 hover:bg-gray-700 border-gray-600 hover:border-amber-500 hover:shadow-lg hover:shadow-amber-500/20"
+                                      : "bg-gray-800/40 border-gray-700/50 opacity-40 cursor-not-allowed"
+                                  }`}
+                                >
+                                  <span className="text-xl w-6 text-center relative">
+                                    {skillInfo.icon}
+                                    {isOnCooldown && (
+                                      <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-red-400">
+                                        {cooldownLeft}
+                                      </span>
+                                    )}
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <span className={`text-sm font-semibold block ${isOnCooldown ? "text-gray-400" : "text-gray-100"}`}>
+                                      {skillInfo.name}
+                                    </span>
+                                    <span className="text-gray-500 text-[9px] block truncate">
+                                      {isOnCooldown
+                                        ? `⏳ Cooldown: ${cooldownLeft} rodada${cooldownLeft > 1 ? "s" : ""}`
+                                        : skillInfo.description}
+                                    </span>
+                                  </div>
+                                  {skillInfo.requiresTarget && !isOnCooldown && (
+                                    <span className="text-gray-500 text-[10px]">
+                                      🎯
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                      {/* Aba de Magias */}
+                      {activeTab === "spells" &&
+                        categorizedActions.spells.length > 0 && (
+                          <div className="flex flex-col gap-1.5">
+                            {categorizedActions.spells.map((spellCode) => {
+                              const spellInfo = getSpellByCode(spellCode);
+                              if (!spellInfo) return null;
+
+                              // Verificar cooldown da spell
+                              const cooldownLeft =
+                                selectedUnit.unitCooldowns?.[spellCode] ?? 0;
+                              const isOnCooldown = cooldownLeft > 0;
+                              const canExecute =
+                                selectedUnit.actionsLeft > 0 && !isOnCooldown;
+
+                              return (
+                                <button
+                                  key={spellCode}
+                                  onClick={() => {
+                                    if (!canExecute) return;
+                                    onSetPendingAction(`spell:${spellCode}`);
                                     setActionsMenuOpen(false);
-                                  } else {
-                                    onExecuteAction(actionKey, selectedUnit.id);
-                                    setActionsMenuOpen(false);
-                                  }
-                                }}
-                                disabled={!canExecute}
-                                className={`w-full px-3 py-2.5 rounded-lg border text-left transition-all flex items-center gap-3 ${
-                                  canExecute
-                                    ? "bg-gray-800 hover:bg-gray-700 border-gray-600 hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/20"
-                                    : "bg-gray-800/40 border-gray-700/50 opacity-40 cursor-not-allowed"
-                                }`}
-                              >
-                                <span className="text-xl w-6 text-center">
-                                  {actionInfo.icon}
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  <span className="text-gray-100 text-sm font-semibold block">
-                                    {actionInfo.name}
-                                  </span>
-                                  <span className="text-gray-500 text-[9px] block truncate">
-                                    {actionInfo.description}
-                                  </span>
-                                </div>
-                                {actionInfo.requiresTarget && (
-                                  <span className="text-gray-500 text-[10px]">
-                                    🎯
-                                  </span>
-                                )}
-                              </button>
-                            </div>
-                          );
-                        })}
-
-                      {/* Magia (se tiver spells) */}
-                      {selectedUnit.spells &&
-                        selectedUnit.spells.length > 0 && (
-                          <div className="relative">
-                            <button
-                              onMouseEnter={() => setHoveredSpell("spell")}
-                              onMouseLeave={() => setHoveredSpell(null)}
-                              className="w-full px-3 py-2.5 rounded-lg border text-left transition-all flex items-center gap-3 bg-purple-900/30 hover:bg-purple-800/40 border-purple-600/50 hover:border-purple-500"
-                            >
-                              <span className="text-xl w-6 text-center">
-                                🔮
-                              </span>
-                              <div className="flex-1 min-w-0">
-                                <span className="text-gray-100 text-sm font-semibold block">
-                                  Magia
-                                </span>
-                                <span className="text-purple-400 text-[9px] block">
-                                  {selectedUnit.spells.length} disponível(is)
-                                </span>
-                              </div>
-                              <span className="text-purple-400 text-xs">▶</span>
-                            </button>
-
-                            {/* Submenu */}
-                            {hoveredSpell === "spell" && (
-                              <div
-                                className="absolute right-full top-0 mr-2 bg-gray-900/95 backdrop-blur-sm border-2 border-purple-600/50 rounded-xl shadow-2xl p-2.5 min-w-[200px] z-[99999]"
-                                onMouseEnter={() => setHoveredSpell("spell")}
-                                onMouseLeave={() => setHoveredSpell(null)}
-                              >
-                                <div className="text-purple-400 text-[10px] font-bold uppercase tracking-wider mb-2 pb-1.5 border-b border-purple-600/30">
-                                  🔮 Magias Disponíveis
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                  {selectedUnit.spells.map((spellCode) => {
-                                    const spellInfo = getSpellByCode(spellCode);
-                                    return (
-                                      <button
-                                        key={spellCode}
-                                        onClick={() => {
-                                          if (selectedUnit.actionsLeft > 0) {
-                                            onSetPendingAction(
-                                              `spell:${spellCode}`
-                                            );
-                                            setActionsMenuOpen(false);
-                                            setHoveredSpell(null);
-                                          }
-                                        }}
-                                        disabled={selectedUnit.actionsLeft <= 0}
-                                        className={`w-full px-3 py-2 rounded-lg text-left transition-all flex items-center gap-2 ${
-                                          selectedUnit.actionsLeft > 0
-                                            ? "hover:bg-purple-800/30 hover:border-purple-500"
-                                            : "opacity-40 cursor-not-allowed"
-                                        } border border-transparent`}
-                                      >
-                                        <span className="text-base">
-                                          {spellInfo?.icon || "✨"}
-                                        </span>
-                                        <div className="flex-1 min-w-0">
-                                          <span className="text-gray-100 text-sm block">
-                                            {spellInfo?.name || spellCode}
-                                          </span>
-                                          <span className="text-purple-400 text-[9px] block truncate">
-                                            {spellInfo?.description || ""}
-                                          </span>
-                                        </div>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
+                                  }}
+                                  disabled={!canExecute}
+                                  className={`w-full px-3 py-2.5 rounded-lg border text-left transition-all flex items-center gap-3 ${
+                                    canExecute
+                                      ? "bg-gray-800 hover:bg-gray-700 border-gray-600 hover:border-purple-500 hover:shadow-lg hover:shadow-purple-500/20"
+                                      : "bg-gray-800/40 border-gray-700/50 opacity-40 cursor-not-allowed"
+                                  }`}
+                                >
+                                  <div className="relative">
+                                    <span className="text-xl w-6 text-center">
+                                      {spellInfo.icon}
+                                    </span>
+                                    {isOnCooldown && (
+                                      <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                                        {cooldownLeft}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-gray-100 text-sm font-semibold block">
+                                      {spellInfo.name}
+                                    </span>
+                                    <span
+                                      className={`text-[9px] block truncate ${isOnCooldown ? "text-red-400" : "text-purple-400"}`}
+                                    >
+                                      {isOnCooldown
+                                        ? `⏳ Cooldown: ${cooldownLeft} rodadas`
+                                        : spellInfo.description}
+                                    </span>
+                                  </div>
+                                  {!isOnCooldown && (
+                                    <span className="text-purple-400 text-[10px]">
+                                      🎯
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
                           </div>
                         )}
                     </div>
@@ -677,7 +825,8 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
 
           {/* Mensagem de visualização */}
           {isMyTurn &&
-            selectedUnit.ownerId === currentUserId &&
+            selectedUnit &&
+            isPlayerControllable(selectedUnit, currentUserId) &&
             !isActiveOrPending && (
               <div className="px-4 py-2 bg-amber-900/40 border border-amber-600/50 rounded-lg">
                 <p className="text-amber-400 text-xs font-semibold flex items-center gap-1">

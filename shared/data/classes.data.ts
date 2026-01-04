@@ -11,7 +11,7 @@ import {
 } from "./skills.data";
 
 // =============================================================================
-// CLASSES (Apenas 3 classes principais)
+// CLASSES
 // =============================================================================
 
 export const HERO_CLASSES: HeroClassDefinition[] = [

@@ -9,6 +9,7 @@ import { registerWorldMapHandlers } from "./worldmap/handlers/worldmap.handler";
 import { registerTurnHandlers } from "./handlers/turn.handler";
 import { registerRegentHandlers } from "./handlers/regent.handler";
 import { registerHeroHandlers } from "./handlers/hero.handler";
+import { registerUnitHandlers } from "./handlers/unit.handler";
 import { registerTroopHandlers } from "./handlers/troop.handler";
 import {
   registerBattleHandlers,
@@ -28,7 +29,7 @@ import { registerActionHandlers } from "./handlers/action.handler";
 import { registerRankingHandlers } from "./handlers/ranking.handler";
 import { registerEventHandlers } from "./handlers/event.handler";
 import { registerChatHandlers } from "./handlers/chat.handler";
-import { initEventService } from "./services/event.service";
+import { initEventService, startAutoCleanup } from "./services/event.service";
 import {
   registerSessionHandlers,
   injectArenaRefs,
@@ -83,6 +84,7 @@ async function bootstrap() {
     registerTurnHandlers(io, socket);
     registerRegentHandlers(io, socket);
     registerHeroHandlers(io, socket);
+    registerUnitHandlers(io, socket);
     registerTroopHandlers(io, socket);
     registerBattleHandlers(io, socket);
     registerItemsHandlers(io, socket);
@@ -109,6 +111,9 @@ async function bootstrap() {
   const PORT = 3000;
   server.listen(PORT, () => {
     console.log(`Servidor Modular rodando na porta ${PORT}`);
+
+    // 5. Iniciar limpeza automática de eventos (a cada 24h)
+    startAutoCleanup(24);
   });
 }
 

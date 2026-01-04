@@ -1,9 +1,60 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, createContext, useContext } from "react";
 import { useArena } from "../../features/arena";
 import { useKingdom } from "../../features/kingdom";
 import { useSession } from "../../core";
 import { useAuth } from "../../features/auth";
 import type { ArenaLobby } from "../../features/arena/types/arena.types";
+
+// === CONTEXTO PARA ESTADO COMPARTILHADO ===
+interface ArenaSelectionContextValue {
+  selectedKingdom: string;
+  setSelectedKingdom: (id: string) => void;
+  vsBot: boolean;
+  setVsBot: (value: boolean) => void;
+}
+
+const ArenaSelectionContext = createContext<ArenaSelectionContextValue | null>(
+  null
+);
+
+/**
+ * Provider para compartilhar estado de seleção entre ArenaSection e o botão de criar
+ */
+export const ArenaSelectionProvider: React.FC<{
+  children: React.ReactNode;
+}> = ({ children }) => {
+  const {
+    state: { kingdoms },
+  } = useKingdom();
+
+  const [selectedKingdom, setSelectedKingdom] = useState<string>("");
+  const [vsBot, setVsBot] = useState(false);
+
+  // Auto-selecionar primeiro reino quando carrega
+  useEffect(() => {
+    if (kingdoms.length > 0 && !selectedKingdom) {
+      setSelectedKingdom(kingdoms[0].id);
+    }
+  }, [kingdoms, selectedKingdom]);
+
+  return (
+    <ArenaSelectionContext.Provider
+      value={{ selectedKingdom, setSelectedKingdom, vsBot, setVsBot }}
+    >
+      {children}
+    </ArenaSelectionContext.Provider>
+  );
+};
+
+const useArenaSelection = () => {
+  const ctx = useContext(ArenaSelectionContext);
+  if (!ctx) {
+    throw new Error(
+      "useArenaSelection must be used within ArenaSelectionProvider"
+    );
+  }
+  return ctx;
+};
 
 interface ArenaSectionProps {
   onLobbyCreated?: (lobbyId: string) => void;
@@ -29,19 +80,14 @@ export const ArenaSection: React.FC<ArenaSectionProps> = () => {
   const { canJoinSession, state: sessionState } = useSession();
   const { state: authState } = useAuth();
 
-  const [selectedKingdom, setSelectedKingdom] = useState<string>("");
+  // Usar contexto compartilhado para o reino selecionado
+  const { selectedKingdom, setSelectedKingdom } = useArenaSelection();
   const [joiningLobbyId, setJoiningLobbyId] = useState<string | null>(null);
 
   useEffect(() => {
     loadKingdoms().catch(console.error);
     listLobbies();
   }, [loadKingdoms, listLobbies]);
-
-  useEffect(() => {
-    if (kingdoms.length > 0 && !selectedKingdom) {
-      setSelectedKingdom(kingdoms[0].id);
-    }
-  }, [kingdoms, selectedKingdom]);
 
   const handleJoinLobby = async (lobbyId: string) => {
     if (!selectedKingdom || !authState.user?.id) return;
@@ -173,6 +219,7 @@ export const ArenaSection: React.FC<ArenaSectionProps> = () => {
 
 /**
  * Hook para expor a função de criar arena para o header
+ * DEVE ser usado dentro do ArenaSelectionProvider
  */
 export const useArenaSectionActions = () => {
   const {
@@ -182,15 +229,9 @@ export const useArenaSectionActions = () => {
   const { canJoinSession, state: sessionState } = useSession();
   const { state: authState } = useAuth();
 
-  const [selectedKingdom, setSelectedKingdom] = useState<string>("");
+  // Usar contexto compartilhado para o reino selecionado e vsBot
+  const { selectedKingdom, vsBot, setVsBot } = useArenaSelection();
   const [isCreating, setIsCreating] = useState(false);
-  const [vsBot, setVsBot] = useState(false);
-
-  useEffect(() => {
-    if (kingdoms.length > 0 && !selectedKingdom) {
-      setSelectedKingdom(kingdoms[0].id);
-    }
-  }, [kingdoms, selectedKingdom]);
 
   const handleCreate = async () => {
     console.log("[ArenaSection] handleCreate called", {

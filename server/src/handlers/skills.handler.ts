@@ -8,6 +8,8 @@ import {
 } from "../utils/skills.utils";
 import { getSpellByCode } from "../../../shared/data/spells.data";
 import { executeSpell } from "../spells/executors";
+import { ARENA_COOLDOWN_MULTIPLIER } from "../logic/skill-executors";
+import { validateSpellUse } from "../../../shared/utils/spell-validation";
 import { prisma } from "../lib/prisma";
 import type { BattleUnit } from "../../../shared/types/battle.types";
 
@@ -242,7 +244,7 @@ export const registerSkillsHandlers = (io: Server, socket: Socket) => {
           grabbedByUnitId: u.grabbedByBattleUnitId || undefined,
           size: (u.size as any) || "NORMAL",
           visionRange: u.visionRange,
-          skillCooldowns: JSON.parse(u.skillCooldowns || "{}"),
+          unitCooldowns: JSON.parse(u.unitCooldowns || "{}"),
           isAIControlled: u.isAIControlled,
         }));
 
@@ -263,24 +265,19 @@ export const registerSkillsHandlers = (io: Server, socket: Socket) => {
           return;
         }
 
-        // Validar que a unidade tem a spell
-        if (!caster.spells?.includes(spellCode)) {
-          socket.emit("error", { message: "Unidade não possui esta spell" });
-          return;
-        }
-
-        // Validar que a unidade tem ações disponíveis
-        if (caster.actionsLeft <= 0) {
-          socket.emit("error", { message: "Sem ações disponíveis" });
-          return;
-        }
-
         // Resolver o alvo
         let target: BattleUnit | { x: number; y: number } | null = null;
         if (spell.targetType === "POSITION" || spell.targetType === "GROUND") {
           target = targetPosition || null;
         } else if (targetId) {
           target = units.find((u) => u.id === targetId) || null;
+        }
+
+        // Validação centralizada de spell
+        const validation = validateSpellUse(caster, spell, target);
+        if (!validation.valid) {
+          socket.emit("error", { message: validation.error });
+          return;
         }
 
         // Executar a spell
@@ -296,6 +293,17 @@ export const registerSkillsHandlers = (io: Server, socket: Socket) => {
         // Consumir ação
         caster.actionsLeft -= 1;
 
+        // Aplicar cooldown da spell (dobrado em Arena)
+        if (spell.cooldown && spell.cooldown > 0) {
+          if (!caster.unitCooldowns) {
+            caster.unitCooldowns = {};
+          }
+          const cooldownValue = battle.isArena
+            ? spell.cooldown * ARENA_COOLDOWN_MULTIPLIER
+            : spell.cooldown;
+          caster.unitCooldowns[spellCode] = cooldownValue;
+        }
+
         // Atualizar unidades no banco
         for (const unit of units) {
           await prisma.battleUnit.update({
@@ -307,6 +315,7 @@ export const registerSkillsHandlers = (io: Server, socket: Socket) => {
               posX: unit.posX,
               posY: unit.posY,
               conditions: JSON.stringify(unit.conditions),
+              unitCooldowns: JSON.stringify(unit.unitCooldowns || {}),
             },
           });
         }
@@ -330,6 +339,7 @@ export const registerSkillsHandlers = (io: Server, socket: Socket) => {
             posX: u.posX,
             posY: u.posY,
             conditions: u.conditions,
+            unitCooldowns: u.unitCooldowns,
           })),
         });
 

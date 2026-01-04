@@ -231,6 +231,18 @@ async function processBotUnitDecisions(
     ) {
       await processBotUnitDecisions(battle, unitId, iteration + 1);
     }
+  } else {
+    // Decisão falhou (ex: caminho bloqueado) - tentar continuar com próxima decisão
+    console.log(`[BOT] Decisão ${decision.type} falhou, tentando novamente...`);
+    const unitAfter = battle.units.find((u) => u.id === unitId);
+    if (
+      unitAfter &&
+      unitAfter.isAlive &&
+      (unitAfter.movesLeft > 0 || unitAfter.actionsLeft > 0)
+    ) {
+      await aiActionDelay(200);
+      await processBotUnitDecisions(battle, unitId, iteration + 1);
+    }
   }
 }
 
@@ -482,6 +494,7 @@ async function passBotTurn(battle: Battle): Promise<void> {
         conditions: u.conditions,
         currentHp: u.currentHp,
         isAlive: u.isAlive,
+        unitCooldowns: u.unitCooldowns,
       })),
     });
 
@@ -513,6 +526,316 @@ async function passBotTurn(battle: Battle): Promise<void> {
 export async function checkAndProcessBotTurn(battle: Battle): Promise<void> {
   if (hasBotPlayer(battle) && isBotTurn(battle)) {
     await processBotTurn(battle);
+  }
+}
+
+// =============================================================================
+// PROCESSAMENTO DE SUMMONS/MONSTERS DO JOGADOR
+// =============================================================================
+
+/**
+ * Processa todas as invocações (SUMMON/MONSTER) de um jogador via IA
+ * Chamado após o turno do jogador terminar, antes de passar para o próximo
+ */
+export async function processPlayerSummons(
+  battle: Battle,
+  playerId: string
+): Promise<void> {
+  const io = getBattleIo();
+  if (!io) return;
+
+  const lobby = battleLobbies.get(battle.lobbyId);
+  if (!lobby) return;
+
+  // Encontrar summons/monsters do jogador que ainda não agiram
+  const playerSummons = battle.units.filter(
+    (u) =>
+      u.isAlive &&
+      u.ownerId === playerId &&
+      (u.category === "SUMMON" || u.category === "MONSTER") &&
+      !u.hasStartedAction
+  );
+
+  if (playerSummons.length === 0) {
+    return;
+  }
+
+  console.log(
+    `[SUMMON-AI] 🎭 Processando ${playerSummons.length} invocação(ões) de ${playerId}`
+  );
+
+  for (const summon of playerSummons) {
+    if ((battle.status as string) === "ENDED") break;
+
+    console.log(`[SUMMON-AI] Processando invocação: ${summon.name}`);
+
+    // Iniciar ação da unidade
+    const effectiveSpeed = getEffectiveSpeedWithConditions(
+      summon.speed,
+      summon.conditions
+    );
+    summon.hasStartedAction = true;
+    summon.movesLeft = effectiveSpeed;
+    summon.actionsLeft = 1;
+    battle.activeUnitId = summon.id;
+
+    // Emitir que a ação foi iniciada
+    io.to(lobby.lobbyId).emit("battle:action_started", {
+      battleId: battle.id,
+      unitId: summon.id,
+      movesLeft: summon.movesLeft,
+      actionsLeft: summon.actionsLeft,
+    });
+
+    await aiActionDelay(500);
+
+    // Processar decisões da IA para esta invocação
+    await processSummonDecisions(battle, summon.id);
+
+    // Se a batalha terminou, não continuar
+    if ((battle.status as string) === "ENDED") {
+      console.log(
+        `[SUMMON-AI] Batalha terminou, parando processamento de invocações`
+      );
+      break;
+    }
+
+    // Finalizar turno da invocação
+    const turnEndResult = processUnitTurnEndConditions(summon);
+    battle.activeUnitId = undefined;
+
+    io.to(lobby.lobbyId).emit("battle:unit_turn_ended", {
+      battleId: battle.id,
+      unitId: summon.id,
+      actionMarks: summon.actionMarks,
+      currentHp: summon.currentHp,
+      isAlive: summon.isAlive,
+      conditions: summon.conditions,
+      damageFromConditions: turnEndResult.damageFromConditions,
+      conditionsRemoved: turnEndResult.conditionsRemoved,
+      hasStartedAction: summon.hasStartedAction,
+      movesLeft: summon.movesLeft,
+      actionsLeft: summon.actionsLeft,
+      attacksLeftThisTurn: summon.attacksLeftThisTurn,
+    });
+
+    await aiActionDelay(300);
+    await saveBattleToDB(battle);
+  }
+}
+
+/**
+ * Processa decisões da IA para uma invocação específica
+ * Similar a processBotUnitDecisions mas para summons do jogador
+ */
+async function processSummonDecisions(
+  battle: Battle,
+  unitId: string,
+  iteration: number = 0
+): Promise<void> {
+  const MAX_ITERATIONS = 20;
+
+  if (iteration >= MAX_ITERATIONS) {
+    console.log(`[SUMMON-AI] Limite de iterações atingido para ${unitId}`);
+    return;
+  }
+
+  const io = getBattleIo();
+  if (!io) return;
+
+  const lobby = battleLobbies.get(battle.lobbyId);
+  if (!lobby) return;
+
+  const unit = battle.units.find((u) => u.id === unitId);
+  if (!unit || !unit.isAlive) return;
+
+  const canMove = unit.movesLeft > 0;
+  const canAct = unit.actionsLeft > 0;
+
+  if (!canMove && !canAct) {
+    console.log(`[SUMMON-AI] Invocação ${unit.name} sem recursos, finalizando`);
+    return;
+  }
+
+  console.log(
+    `[SUMMON-AI] Invocação ${unit.name} - movesLeft=${unit.movesLeft}, actionsLeft=${unit.actionsLeft}, pos=(${unit.posX}, ${unit.posY})`
+  );
+
+  // Processar decisão usando o mesmo sistema do BOT
+  const decision = await processBotUnitDecision(battle as any, unit as any);
+
+  console.log(
+    `[SUMMON-AI] Decisão:`,
+    decision
+      ? {
+          type: decision.type,
+          reason: decision.reason,
+          targetPosition: decision.targetPosition,
+          targetId: decision.targetId,
+        }
+      : "null"
+  );
+
+  if (!decision || decision.type === "PASS") {
+    console.log(`[SUMMON-AI] IA decidiu passar`);
+    return;
+  }
+
+  console.log(
+    `[SUMMON-AI] Executando decisão: ${decision.type} - ${decision.reason}`
+  );
+
+  // Executar a decisão
+  const executeResult = executeAIDecisionCore(decision, battle as any);
+
+  if (!executeResult.success) {
+    console.log(
+      `[SUMMON-AI] Falha ao executar decisão: ${executeResult.error}`
+    );
+    // Tentar novamente com próxima decisão
+    console.log(`[SUMMON-AI] Tentando próxima decisão...`);
+    if (unit.isAlive && (unit.movesLeft > 0 || unit.actionsLeft > 0)) {
+      await aiActionDelay(200);
+      await processSummonDecisions(battle, unitId, iteration + 1);
+    }
+    return;
+  }
+
+  // Emitir evento apropriado baseado no tipo de ação
+  await emitDecisionEvents(battle, unit, decision, executeResult);
+
+  await saveBattleToDB(battle);
+
+  // Continuar processando se ainda pode fazer algo
+  if (unit.isAlive && (unit.movesLeft > 0 || unit.actionsLeft > 0)) {
+    await aiActionDelay(400);
+    await processSummonDecisions(battle, unitId, iteration + 1);
+  }
+}
+
+/**
+ * Emite eventos de socket baseado no tipo de decisão executada
+ */
+async function emitDecisionEvents(
+  battle: Battle,
+  unit: any,
+  decision: AIDecision,
+  executeResult: any
+): Promise<void> {
+  const io = getBattleIo();
+  if (!io) return;
+
+  const lobby = battleLobbies.get(battle.lobbyId);
+  if (!lobby) return;
+
+  switch (decision.type) {
+    case "MOVE":
+      io.to(lobby.lobbyId).emit("battle:unit_moved", {
+        battleId: battle.id,
+        unitId: unit.id,
+        fromX: executeResult.fromX,
+        fromY: executeResult.toX !== undefined ? unit.posX : undefined,
+        toX: unit.posX,
+        toY: unit.posY,
+        movesLeft: unit.movesLeft,
+      });
+      await aiActionDelay(300);
+      break;
+
+    case "ATTACK":
+      if (executeResult.stateChanges?.unitAttacked) {
+        const attack = executeResult.stateChanges.unitAttacked;
+        const target = battle.units.find((u) => u.id === attack.targetId);
+
+        console.log(`[SUMMON-AI] Ataque executado:`, {
+          attackerId: attack.attackerId,
+          targetId: attack.targetId,
+          finalDamage: attack.finalDamage,
+          targetHpAfter: attack.targetHpAfter,
+          defeated: attack.defeated,
+        });
+
+        io.to(lobby.lobbyId).emit("battle:unit_attacked", {
+          battleId: battle.id,
+          attackerUnitId: attack.attackerId,
+          targetUnitId: attack.targetId,
+          damage: attack.finalDamage,
+          finalDamage: attack.finalDamage,
+          targetHpAfter: attack.targetHpAfter,
+          targetPhysicalProtection: attack.targetPhysicalProtection,
+          targetMagicalProtection: attack.targetMagicalProtection,
+          targetDefeated: attack.defeated,
+          damageType: attack.damageType ?? "FISICO",
+          attackerActionsLeft: unit.actionsLeft,
+          attackerAttacksLeftThisTurn: unit.attacksLeftThisTurn,
+          missed: attack.missed ?? false,
+          rawDamage: attack.rawDamage ?? attack.finalDamage,
+          damageReduction: attack.damageReduction ?? 0,
+          attackerName: attack.attackerName ?? unit.name,
+          targetName: attack.targetName ?? target?.name ?? "Alvo",
+          dodgeChance: attack.dodgeChance ?? 0,
+          dodgeRoll: attack.dodgeRoll ?? 0,
+        });
+
+        // Toast de ataque
+        if (!attack.missed && attack.finalDamage > 0) {
+          io.to(lobby.lobbyId).emit("battle:toast", {
+            battleId: battle.id,
+            type: "error",
+            title: "⚔️ Ataque!",
+            message: `${attack.attackerName ?? unit.name} causou ${
+              attack.finalDamage
+            } de dano em ${attack.targetName ?? "alvo"}!`,
+            duration: 2000,
+          });
+        }
+
+        // Se derrotou o alvo
+        if (attack.defeated) {
+          io.to(lobby.lobbyId).emit("battle:toast", {
+            battleId: battle.id,
+            type: "error",
+            title: "💀 Derrotado!",
+            message: `${attack.targetName ?? "Alvo"} foi derrotado por ${
+              attack.attackerName ?? unit.name
+            }!`,
+            duration: 3000,
+          });
+
+          io.to(lobby.lobbyId).emit("battle:unit_defeated", {
+            battleId: battle.id,
+            unitId: attack.targetId,
+          });
+
+          // Verificar vitória
+          const victoryCheck = checkVictoryCondition(battle);
+          if (victoryCheck.battleEnded) {
+            battle.status = "ENDED";
+            stopBattleTurnTimer(battle.id);
+
+            io.to(lobby.lobbyId).emit("battle:battle_ended", {
+              battleId: battle.id,
+              winnerId: victoryCheck.winnerId,
+              winnerKingdomId: victoryCheck.winnerKingdomId,
+              reason: victoryCheck.reason,
+              finalUnits: battle.units,
+            });
+          }
+        }
+      }
+      await aiActionDelay(500);
+      break;
+
+    case "SKILL":
+      io.to(lobby.lobbyId).emit("battle:skill_used", {
+        battleId: battle.id,
+        unitId: unit.id,
+        skillCode: decision.skillCode,
+        targetId: decision.targetId,
+        result: executeResult,
+      });
+      await aiActionDelay(500);
+      break;
   }
 }
 

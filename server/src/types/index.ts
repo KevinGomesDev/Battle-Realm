@@ -12,15 +12,10 @@ import {
 import {
   REGENT_LEVELUP_BASE_COST,
   REGENT_LEVELUP_INCREMENT,
-  HERO_LEVELUP_BASE_COST,
-  HERO_LEVELUP_INCREMENT,
-  HERO_RECRUITMENT_COSTS,
-  MAX_HEROES_PER_PLAYER,
+  MAX_HEROES_PER_KINGDOM,
   MAX_HERO_LEVEL,
   REGENT_ATTRIBUTE_POINTS_PER_LEVEL,
-  HERO_ATTRIBUTE_POINTS_PER_LEVEL,
   REGENT_INITIAL_ATTRIBUTE_POINTS,
-  HERO_INITIAL_ATTRIBUTE_POINTS,
   TROOP_RECRUITMENT_BASE_COST,
   TROOP_LEVELUP_COSTS,
   MAX_TROOP_LEVEL,
@@ -118,32 +113,17 @@ export interface StartMatchData {
   }[];
 }
 
-export enum UnitCategory {
-  TROOP = "TROOP",
-  HERO = "HERO",
-  REGENT = "REGENT",
-  PRISONER = "PRISONER",
-  SUMMON = "SUMMON",
-  MONSTER = "MONSTER",
-}
-
-export interface UnitStats {
-  combat: number;
-  speed: number;
-  focus: number;
-  armor: number;
-  vitality: number;
-}
-
-// Interface para o "Molde" de uma unidade (o que fica no arquivo estático)
-export interface UnitDefinition {
-  id: string; // ex: "ARCHER"
-  name: string;
-  category: UnitCategory;
-  baseStats: UnitStats;
-  moveRange: number; // Quantos quadrados anda
-  passive?: string; // Descrição ou ID da passiva
-}
+// Re-export tipos de unidades do shared
+export type {
+  UnitCategory,
+  UnitStats,
+  UnitDefinition,
+  TroopTemplateData,
+} from "../../../shared/types/units.types";
+export {
+  TROOP_INITIAL_ATTRIBUTE_POINTS,
+  TROOP_MAX_ATTRIBUTE_VALUE,
+} from "../../../shared/types/units.types";
 
 // --- RECURSOS ---
 // Re-exporta ResourceKey do config global como ResourceType para compatibilidade
@@ -213,20 +193,25 @@ export {
 export {
   REGENT_LEVELUP_BASE_COST,
   REGENT_LEVELUP_INCREMENT,
-  HERO_LEVELUP_BASE_COST,
-  HERO_LEVELUP_INCREMENT,
-  HERO_RECRUITMENT_COSTS,
-  MAX_HEROES_PER_PLAYER,
+  MAX_HEROES_PER_KINGDOM,
   MAX_HERO_LEVEL,
   REGENT_ATTRIBUTE_POINTS_PER_LEVEL,
-  HERO_ATTRIBUTE_POINTS_PER_LEVEL,
   REGENT_INITIAL_ATTRIBUTE_POINTS,
-  HERO_INITIAL_ATTRIBUTE_POINTS,
   TROOP_RECRUITMENT_BASE_COST,
   TROOP_LEVELUP_COSTS,
   MAX_TROOP_LEVEL,
   TROOP_ATTRIBUTE_POINTS_PER_LEVEL,
 } from "../../../shared/data/units";
+export {
+  HERO_TEMPLATES,
+  getHeroTemplate,
+  XP_THRESHOLDS,
+  XP_REWARDS,
+  ATTRIBUTE_POINTS_PER_LEVEL,
+  calculateLevelFromXP,
+  getXPToNextLevel,
+  shouldLevelUp,
+} from "../../../shared/data/heroes.data";
 export {
   TributeDecision,
   CRISIS_METER_START,

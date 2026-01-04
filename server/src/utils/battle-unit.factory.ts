@@ -21,7 +21,7 @@ import type {
 // Re-exportar BattleUnit para compatibilidade com imports existentes
 export type { BattleUnit } from "../../../shared/types/battle.types";
 
-// Tipo para unidade do banco de dados
+// Tipo para unidade do banco de dados (Nexus - fonte de verdade)
 interface DBUnit {
   id: string;
   name: string | null;
@@ -30,9 +30,11 @@ interface DBUnit {
   troopSlot: number | null;
   level: number;
   classCode: string | null;
-  classFeatures: string | null;
+  classFeatures: string | null; // Skills aprendidas (JSON array)
   equipment: string | null;
-  spells: string | null;
+  spells: string | null; // Magias disponíveis (JSON array)
+  conditions: string | null; // Condições permanentes (JSON array) - NOVO
+  unitCooldowns: string | null; // Cooldowns entre batalhas (JSON object) - NOVO
   combat: number;
   speed: number;
   focus: number;
@@ -60,6 +62,7 @@ function generateUnitId(): string {
 
 /**
  * Cria uma BattleUnit a partir de uma unidade do banco de dados
+ * O Unit é o Nexus (fonte de verdade) - BattleUnit é uma instância de batalha
  */
 export function createBattleUnit(
   dbUnit: DBUnit,
@@ -73,6 +76,13 @@ export function createBattleUnit(
 
   // Parse spells do JSON
   const spells: string[] = JSON.parse(dbUnit.spells || "[]");
+
+  // Parse conditions permanentes do Unit (Nexus)
+  const unitConditions: string[] = JSON.parse(dbUnit.conditions || "[]");
+
+  // NOTA: Cooldowns NÃO passam entre batalhas - sempre iniciam zerados
+  // O campo unitCooldowns do Unit é reservado para efeitos de longa duração (ex: skills com cooldown em turnos de partida)
+  // Cooldowns de batalha são por batalha, não persistem
 
   // Determinar ações dinamicamente baseado nos stats e skills
   const unitActions = determineUnitActions(
@@ -88,12 +98,13 @@ export function createBattleUnit(
     { battleType }
   );
 
-  // Coletar condições iniciais de skills passivas
-  const initialConditions: string[] = [];
+  // Começar com as condições permanentes do Unit
+  const initialConditions: string[] = [...unitConditions];
+
+  // Adicionar condições de skills passivas (se ainda não estiverem)
   for (const skillCode of classFeatures) {
     const skill = findSkillByCode(skillCode);
     if (skill && skill.category === "PASSIVE" && skill.conditionApplied) {
-      // Adicionar condição permanente da passiva
       if (!initialConditions.includes(skill.conditionApplied)) {
         initialConditions.push(skill.conditionApplied);
       }
@@ -145,7 +156,7 @@ export function createBattleUnit(
       (dbUnit.focus || 0) * MAGICAL_PROTECTION_CONFIG.multiplier,
     maxMagicalProtection:
       (dbUnit.focus || 0) * MAGICAL_PROTECTION_CONFIG.multiplier,
-    conditions: initialConditions, // Condições iniciais de passivas
+    conditions: initialConditions, // Condições do Unit + passivas de skills/raça
     spells, // Lista de spells da unidade (copiada do DB)
     hasStartedAction: false,
     actions: unitActions,
@@ -153,10 +164,11 @@ export function createBattleUnit(
     size: dbUnit.size || "NORMAL",
     // Alcance de visão = max(10, focus)
     visionRange: calculateUnitVision(dbUnit.focus),
-    // Cooldowns de skills inicializam vazios
-    skillCooldowns: {},
-    // Controle IA desabilitado por padrão
-    isAIControlled: false,
+    // Cooldowns de skills/spells sempre iniciam zerados (não passam entre batalhas)
+    unitCooldowns: {},
+    // Summons e Monsters são controlados por IA
+    isAIControlled:
+      dbUnit.category === "SUMMON" || dbUnit.category === "MONSTER",
   };
 }
 
@@ -368,6 +380,8 @@ export function createBotUnitsFromTemplate(
       : "[]",
     equipment: "[]",
     spells: "[]",
+    conditions: "[]",
+    unitCooldowns: "{}",
     combat: regent.combat,
     speed: regent.speed,
     focus: regent.focus,
@@ -378,4 +392,90 @@ export function createBotUnitsFromTemplate(
   };
 
   return [regentUnit];
+}
+
+// =============================================================================
+// SINCRONIZAÇÃO: BattleUnit → Unit (após batalha)
+// =============================================================================
+
+/**
+ * Interface para dados que devem ser sincronizados de volta ao Unit
+ * Apenas campos que podem mudar durante uma batalha/partida e persistem
+ * NOTA: unitCooldowns NÃO são sincronizados - cooldowns são por batalha
+ */
+export interface UnitSyncData {
+  sourceUnitId: string;
+  // Estado de vida
+  currentHp: number;
+  isAlive: boolean;
+  // Condições permanentes (filtra as temporárias)
+  conditions: string[];
+  // Spells (podem ser adicionadas/removidas durante batalha)
+  spells: string[];
+  // Stats que podem mudar (level up, buffs permanentes)
+  level: number;
+  // Equipment pode mudar (loot, perda)
+  equipment: string[];
+}
+
+/**
+ * Extrai os dados que devem ser sincronizados do BattleUnit para o Unit
+ * Filtra condições temporárias, mantendo apenas as permanentes
+ */
+export function extractSyncData(battleUnit: BattleUnit): UnitSyncData {
+  // Filtrar apenas condições permanentes (não temporárias de batalha)
+  // Condições temporárias têm expiry !== "permanent"
+  // Como não temos acesso direto à definição aqui, confiamos que
+  // condições de raça e skills passivas já estão no Unit
+  // Outras condições adicionadas durante partida são mantidas
+  const permanentConditions = battleUnit.conditions.filter((condCode) => {
+    // Condições de passivas de skills são recalculadas ao criar BattleUnit
+    // Então não precisamos sincronizar de volta
+    // Aqui mantemos apenas condições "extras" que foram adicionadas
+    return true; // Por enquanto, sincroniza todas (a ser refinado)
+  });
+
+  return {
+    sourceUnitId: battleUnit.sourceUnitId,
+    currentHp: battleUnit.currentHp,
+    isAlive: battleUnit.isAlive,
+    conditions: permanentConditions,
+    // NOTA: unitCooldowns NÃO são sincronizados - cooldowns são por batalha
+    spells: battleUnit.spells,
+    level: battleUnit.level,
+    equipment: battleUnit.equipment,
+  };
+}
+
+/**
+ * Gera os dados para atualizar o Unit no banco de dados
+ * Retorna objeto pronto para usar com prisma.unit.update()
+ * NOTA: unitCooldowns NÃO são sincronizados - cooldowns são por batalha
+ */
+export function getSyncUpdateData(syncData: UnitSyncData): {
+  currentHp: number;
+  isAlive: boolean;
+  conditions: string;
+  spells: string;
+  level: number;
+  equipment: string;
+} {
+  return {
+    currentHp: syncData.currentHp,
+    isAlive: syncData.isAlive,
+    conditions: JSON.stringify(syncData.conditions),
+    spells: JSON.stringify(syncData.spells),
+    level: syncData.level,
+    equipment: JSON.stringify(syncData.equipment),
+  };
+}
+
+/**
+ * Extrai dados de sincronização de múltiplas BattleUnits
+ * Útil para sincronizar todas as unidades de uma batalha de uma vez
+ */
+export function extractAllSyncData(battleUnits: BattleUnit[]): UnitSyncData[] {
+  return battleUnits
+    .filter((unit) => unit.sourceUnitId) // Só unidades que vieram do banco
+    .map((unit) => extractSyncData(unit));
 }

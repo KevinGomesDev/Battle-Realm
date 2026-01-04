@@ -47,7 +47,9 @@ import {
   checkAndProcessBotTurn,
   checkAndProcessAIControlledUnit,
   clearAIControlForBattle,
+  processPlayerSummons,
 } from "./battle-bot";
+import { processSummonerDeath } from "../../logic/summon-logic";
 
 export function registerBattleActionHandlers(io: Server, socket: Socket): void {
   socket.on("battle:dice_modal_open", ({ battleId }) => {
@@ -145,6 +147,19 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
 
         if (unit.currentHp <= 0) {
           unit.isAlive = false;
+
+          // Processar morte de invocações vinculadas
+          const killedSummons = processSummonerDeath(
+            unit,
+            battle.units,
+            "arena"
+          );
+          if (killedSummons.length > 0) {
+            console.log(
+              `[ARENA] Invocações mortas junto com ${unit.name} (exaustão):`,
+              killedSummons.map((s) => s.name)
+            );
+          }
         }
       }
 
@@ -257,6 +272,49 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
         return;
       }
 
+      // 3.5 Processar invocações do jogador (SUMMON/MONSTER) via IA
+      // Antes de passar o turno, as invocações do jogador atual agem automaticamente
+      await processPlayerSummons(battle, currentPlayerId);
+
+      // Verificar vitória novamente (invocações podem ter matado inimigos)
+      const victoryAfterSummons = checkVictoryCondition(battle);
+      if (victoryAfterSummons.battleEnded) {
+        battle.status = "ENDED";
+        stopBattleTurnTimer(battle.id);
+        await clearAIControlForBattle(battle);
+
+        emitBattleEndEvents(
+          io,
+          lobby.lobbyId,
+          battle.id,
+          victoryAfterSummons,
+          battle.units
+        );
+
+        const loserId =
+          victoryAfterSummons.winnerId === lobby.hostUserId
+            ? lobby.guestUserId
+            : lobby.hostUserId;
+        await updateUserStats(
+          victoryAfterSummons.winnerId,
+          loserId,
+          battle.isArena
+        );
+
+        userToLobby.delete(lobby.hostUserId);
+        if (lobby.guestUserId) {
+          userToLobby.delete(lobby.guestUserId);
+        }
+
+        lobby.status = "ENDED";
+        await deleteBattleFromDB(battleId);
+        await deleteLobbyFromDB(lobby.lobbyId);
+        console.log(
+          `[BATTLE] Batalha ${battleId} finalizada após invocações. Vencedor: ${victoryAfterSummons.winnerId}`
+        );
+        return;
+      }
+
       // 4. Avançar para próximo jogador usando RoundControl
       const oldTurnIndex = battle.currentTurnIndex;
       const turnTransition = advanceToNextPlayer(battle);
@@ -288,6 +346,16 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
           unitId,
           reason: "condition_damage",
         });
+
+        // Matar invocações do jogador que morreu por condições
+        const killedSummons = processSummonerDeath(unit, battle.units, "arena");
+        for (const summon of killedSummons) {
+          io.to(lobby.lobbyId).emit("battle:unit_defeated", {
+            battleId,
+            unitId: summon.id,
+            reason: "summoner_death",
+          });
+        }
       }
 
       io.to(lobby.lobbyId).emit("battle:next_player", {
@@ -316,6 +384,7 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
           conditions: u.conditions,
           currentHp: u.currentHp,
           isAlive: u.isAlive,
+          unitCooldowns: u.unitCooldowns,
         }));
 
         io.to(lobby.lobbyId).emit("battle:new_round", {
@@ -528,6 +597,7 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
             targetSpeed: target?.speed ?? 0,
             dodgeChance: result.dodgeChance ?? 0,
             dodgeRoll: result.dodgeRoll ?? 0,
+            killedSummonIds: result.killedSummonIds ?? [],
           });
 
           // === COMBAT TOASTS ===
@@ -895,6 +965,7 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
               actionsGained: result.actionsGained,
             },
             casterActionsLeft: result.casterActionsLeft,
+            casterUnitCooldowns: caster.unitCooldowns,
             targetHpAfter: result.targetHpAfter,
             targetDefeated: result.targetDefeated,
             casterName: caster.name,

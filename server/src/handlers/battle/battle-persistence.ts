@@ -103,7 +103,7 @@ export async function saveBattleToDB(battle: Battle): Promise<void> {
           protectionBroken: false,
           conditions: JSON.stringify(unit.conditions),
           hasStartedAction: unit.hasStartedAction,
-          skillCooldowns: JSON.stringify(unit.skillCooldowns || {}),
+          unitCooldowns: JSON.stringify(unit.unitCooldowns || {}),
           isAIControlled: unit.isAIControlled ?? false,
         },
         create: {
@@ -139,7 +139,7 @@ export async function saveBattleToDB(battle: Battle): Promise<void> {
           actions: JSON.stringify(unit.actions),
           size: unit.size || "NORMAL",
           visionRange: unit.visionRange || 10,
-          skillCooldowns: JSON.stringify(unit.skillCooldowns || {}),
+          unitCooldowns: JSON.stringify(unit.unitCooldowns || {}),
           isAIControlled: unit.isAIControlled ?? false,
         },
       });
@@ -380,8 +380,8 @@ export async function loadBattlesFromDB(): Promise<void> {
         size:
           (u.size as "NORMAL" | "LARGE" | "HUGE" | "GARGANTUAN") || "NORMAL",
         visionRange: u.visionRange ?? Math.max(10, u.focus),
-        // Cooldowns de skills (lidos do banco ou default vazio)
-        skillCooldowns: JSON.parse(u.skillCooldowns || "{}"),
+        // Cooldowns de skills/spells (lidos do banco ou default vazio)
+        unitCooldowns: JSON.parse(u.unitCooldowns || "{}"),
         // Flag de controle IA (funil)
         isAIControlled: u.isAIControlled ?? false,
       }));

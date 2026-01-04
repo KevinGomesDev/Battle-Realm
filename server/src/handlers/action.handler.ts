@@ -1,7 +1,7 @@
 // src/handlers/action.handler.ts
 import { Socket, Server } from "socket.io";
 import { prisma } from "../lib/prisma";
-import { TurnType, UnitCategory } from "../types";
+import { TurnType } from "../types";
 import {
   calculateConquestCost,
   validateConquestRequirements,
@@ -80,9 +80,7 @@ export const registerActionHandlers = (io: Server, socket: Socket) => {
 
         const unitCount = unitsInTerritory.length;
         const hasHeroOrRegent = unitsInTerritory.some(
-          (u) =>
-            u.category === UnitCategory.HERO ||
-            u.category === UnitCategory.REGENT
+          (u) => u.category === "HERO" || u.category === "REGENT"
         );
 
         // 6. Calcular custo (quantidade de territórios já dominados)
@@ -138,9 +136,7 @@ export const registerActionHandlers = (io: Server, socket: Socket) => {
 
         // 10. Encontrar líder (Herói ou Regente) para os testes
         const leader = unitsInTerritory.find(
-          (u) =>
-            u.category === UnitCategory.HERO ||
-            u.category === UnitCategory.REGENT
+          (u) => u.category === "HERO" || u.category === "REGENT"
         );
 
         // Pegar atributos do líder para os testes
@@ -274,9 +270,7 @@ export const registerActionHandlers = (io: Server, socket: Socket) => {
 
             const unitCount = unitsInTerritory.length;
             const hasLeader = unitsInTerritory.some(
-              (u) =>
-                u.category === UnitCategory.HERO ||
-                u.category === UnitCategory.REGENT
+              (u) => u.category === "HERO" || u.category === "REGENT"
             );
 
             return {

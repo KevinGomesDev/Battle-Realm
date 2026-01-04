@@ -266,8 +266,9 @@ export function createEidolon(
     actions: template.actions,
     size: initialSize,
     visionRange: Math.max(10, stats.focus),
-    skillCooldowns: {},
-    isAIControlled: false,
+    unitCooldowns: {},
+    isAIControlled: true, // Summons são controlados por IA
+    aiBehavior: template.aiBehavior || "AGGRESSIVE", // Comportamento de IA do template
   };
 
   // Log de criação
@@ -497,4 +498,80 @@ export function processEidolonSummonsOnBattleStart(
   }
 
   return summonedUnits;
+}
+
+// =============================================================================
+// MORTE DO INVOCADOR - MATA SUAS INVOCAÇÕES
+// =============================================================================
+
+/**
+ * Encontra todas as invocações de uma unidade
+ * Identificação: Eidolons têm ID no formato `eidolon_${summonerId}_timestamp`
+ * Ou são SUMMON com mesmo ownerId
+ */
+export function findSummonsOfUnit(
+  summonerUnit: BattleUnit,
+  allUnits: BattleUnit[]
+): BattleUnit[] {
+  const summons: BattleUnit[] = [];
+
+  for (const unit of allUnits) {
+    if (!unit.isAlive) continue;
+    if (unit.id === summonerUnit.id) continue;
+
+    // Verificar se é um Eidolon desta unidade pelo padrão de ID
+    if (unit.id.startsWith(`eidolon_${summonerUnit.id}_`)) {
+      summons.push(unit);
+      continue;
+    }
+
+    // Verificar pelo sourceUnitId (outros tipos de summon)
+    if (unit.sourceUnitId?.includes(summonerUnit.id)) {
+      summons.push(unit);
+      continue;
+    }
+  }
+
+  return summons;
+}
+
+/**
+ * Processa a morte do invocador - mata todas as suas invocações
+ * Deve ser chamado quando uma unidade morre
+ * @returns Lista de invocações que foram mortas
+ */
+export function processSummonerDeath(
+  deadUnit: BattleUnit,
+  allUnits: BattleUnit[],
+  matchId: string = "arena"
+): BattleUnit[] {
+  // Encontrar todos os summons desta unidade
+  const summons = findSummonsOfUnit(deadUnit, allUnits);
+
+  if (summons.length === 0) {
+    return [];
+  }
+
+  console.log(
+    `[SUMMON] 💀 Invocador ${deadUnit.name} morreu - matando ${summons.length} invocação(ões)`
+  );
+
+  const killedSummons: BattleUnit[] = [];
+
+  for (const summon of summons) {
+    console.log(`[SUMMON] ❌ Matando invocação: ${summon.name}`);
+
+    // Marcar como morto
+    summon.currentHp = 0;
+    summon.isAlive = false;
+
+    // Se for Eidolon, processar lógica de morte específica
+    if (summon.conditions.includes("EIDOLON_GROWTH")) {
+      processEidolonDeath(summon, matchId);
+    }
+
+    killedSummons.push(summon);
+  }
+
+  return killedSummons;
 }

@@ -117,6 +117,23 @@ export interface EventFilter {
   userId?: string;
   category?: EventCategory;
   limit?: number;
+  /** Cursor para paginação - ID do último evento carregado */
+  cursor?: string;
+  /** Buscar eventos antes deste timestamp */
+  before?: Date | string;
+}
+
+/**
+ * Resposta paginada de eventos
+ */
+export interface EventsPageResponse {
+  events: GameEvent[];
+  /** Cursor para próxima página (ID do último evento) */
+  nextCursor?: string;
+  /** Se há mais eventos para carregar */
+  hasMore: boolean;
+  /** Total de eventos (aproximado, para contexto) */
+  totalCount?: number;
 }
 
 // =============================================================================

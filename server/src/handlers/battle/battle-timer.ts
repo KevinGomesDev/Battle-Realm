@@ -272,6 +272,7 @@ async function handleTimerExpired(battle: Battle): Promise<void> {
       conditions: u.conditions,
       currentHp: u.currentHp,
       isAlive: u.isAlive,
+      unitCooldowns: u.unitCooldowns,
     }));
 
     io.to(lobby.lobbyId).emit("battle:new_round", {

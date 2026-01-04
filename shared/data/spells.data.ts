@@ -1,4 +1,4 @@
-import { SpellDefinition } from "../types/spells.types";
+import type { SpellDefinition } from "../types/spells.types";
 
 /**
  * 🌀 TELEPORT
@@ -14,6 +14,7 @@ export const TELEPORT: SpellDefinition = {
   functionName: "executeTeleport",
   icon: "🌀",
   color: "cyan",
+  cooldown: 3,
 };
 
 /**
@@ -30,6 +31,7 @@ export const FIRE: SpellDefinition = {
   functionName: "executeFire",
   icon: "🔥",
   color: "red",
+  cooldown: 2,
 };
 
 /**
@@ -46,6 +48,7 @@ export const EMPOWER: SpellDefinition = {
   functionName: "executeEmpower",
   icon: "⚡",
   color: "yellow",
+  cooldown: 4,
 };
 
 /**

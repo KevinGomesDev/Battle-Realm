@@ -1,6 +1,120 @@
 import type { BattleUnit } from "../types/battle.types";
 
 /**
+ * Interface para obstáculos usados na validação de movimento
+ */
+export interface ObstaclePosition {
+  posX: number;
+  posY: number;
+  destroyed?: boolean;
+}
+
+/**
+ * Resultado da validação de movimento
+ */
+export interface MoveValidationResult {
+  valid: boolean;
+  error?: string;
+  baseCost: number;
+  engagementCost: number;
+  totalCost: number;
+}
+
+/**
+ * Valida completamente um movimento de unidade.
+ * Esta função centraliza toda a lógica de validação usada pelo cliente e servidor.
+ *
+ * @param unit A unidade que está se movendo
+ * @param toX Posição X de destino
+ * @param toY Posição Y de destino
+ * @param allUnits Todas as unidades na batalha
+ * @param obstacles Lista de obstáculos
+ * @param gridWidth Largura do grid
+ * @param gridHeight Altura do grid
+ * @returns Resultado da validação com custo de movimento
+ */
+export function validateMove(
+  unit: BattleUnit,
+  toX: number,
+  toY: number,
+  allUnits: BattleUnit[],
+  obstacles: ObstaclePosition[],
+  gridWidth: number,
+  gridHeight: number
+): MoveValidationResult {
+  // Verificar limites do grid
+  if (toX < 0 || toX >= gridWidth || toY < 0 || toY >= gridHeight) {
+    return {
+      valid: false,
+      error: "Destino fora do grid",
+      baseCost: 0,
+      engagementCost: 0,
+      totalCost: 0,
+    };
+  }
+
+  // Verificar se não é a mesma posição
+  if (toX === unit.posX && toY === unit.posY) {
+    return {
+      valid: false,
+      error: "Destino inválido",
+      baseCost: 0,
+      engagementCost: 0,
+      totalCost: 0,
+    };
+  }
+
+  // Calcular custos
+  const baseCost = Math.abs(toX - unit.posX) + Math.abs(toY - unit.posY);
+  const engagementCost = calculateEngagementCost(unit, toX, toY, allUnits);
+  const totalCost = baseCost + engagementCost;
+
+  // Verificar se a unidade tem movimento suficiente
+  if (totalCost > unit.movesLeft) {
+    return {
+      valid: false,
+      error:
+        engagementCost > 0
+          ? `Movimento bloqueado por engajamento inimigo (custo: ${totalCost}, disponível: ${unit.movesLeft})`
+          : "Movimento excede pontos disponíveis",
+      baseCost,
+      engagementCost,
+      totalCost,
+    };
+  }
+
+  // Verificar se há caminho livre (inclui verificação de ocupação, cadáveres e obstáculos)
+  const pathFree = hasFreePath(
+    unit.posX,
+    unit.posY,
+    toX,
+    toY,
+    allUnits,
+    obstacles,
+    unit.id,
+    gridWidth,
+    gridHeight
+  );
+
+  if (!pathFree) {
+    return {
+      valid: false,
+      error: "Caminho bloqueado",
+      baseCost,
+      engagementCost,
+      totalCost,
+    };
+  }
+
+  return {
+    valid: true,
+    baseCost,
+    engagementCost,
+    totalCost,
+  };
+}
+
+/**
  * Verifica se duas posições são adjacentes (distância Manhattan = 1)
  */
 export function isAdjacentPosition(
@@ -89,15 +203,6 @@ export function getMovementCostInfo(
 }
 
 /**
- * Interface para obstáculos (simplificada para verificação de caminho)
- */
-interface ObstaclePosition {
-  posX: number;
-  posY: number;
-  destroyed?: boolean;
-}
-
-/**
  * Verifica se existe um caminho em LINHA RETA entre duas posições.
  * Movimento é feito primeiro na horizontal, depois na vertical (ou vice-versa).
  * Considera unidades vivas, cadáveres e obstáculos não destruídos como bloqueios.
@@ -177,9 +282,9 @@ export function hasFreePath(
     "vertical-first"
   );
 
-  // AMBOS os caminhos em L devem estar livres para permitir movimento
-  // Se qualquer caminho está bloqueado, a célula está inacessível
-  return path1Free && path2Free;
+  // PELO MENOS UM caminho em L deve estar livre para permitir movimento
+  // A unidade pode escolher qualquer caminho que esteja disponível
+  return path1Free || path2Free;
 }
 
 /**

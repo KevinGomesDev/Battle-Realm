@@ -12,6 +12,7 @@ import {
 } from "../../../shared/types/skills.types";
 import { findSkillByCode } from "../../../shared/data/skills.data";
 import type { BattleUnit } from "../../../shared/types/battle.types";
+import { processSummonerDeath } from "./summon-logic";
 
 // =============================================================================
 // TIPOS LOCAIS
@@ -101,12 +102,12 @@ export function executeSkill(
 
   // Verificar cooldown
   if (
-    caster.skillCooldowns?.[skillCode] &&
-    caster.skillCooldowns[skillCode] > 0
+    caster.unitCooldowns?.[skillCode] &&
+    caster.unitCooldowns[skillCode] > 0
   ) {
     return {
       success: false,
-      error: `Skill em cooldown (${caster.skillCooldowns[skillCode]} rodadas)`,
+      error: `Skill em cooldown (${caster.unitCooldowns[skillCode]} rodadas)`,
     };
   }
 
@@ -123,13 +124,13 @@ export function executeSkill(
 
     // Aplicar cooldown (dobrado em Arena)
     if (skill.cooldown && skill.cooldown > 0) {
-      if (!caster.skillCooldowns) {
-        caster.skillCooldowns = {};
+      if (!caster.unitCooldowns) {
+        caster.unitCooldowns = {};
       }
       const cooldownValue = isArena
         ? skill.cooldown * ARENA_COOLDOWN_MULTIPLIER
         : skill.cooldown;
-      caster.skillCooldowns[skillCode] = cooldownValue;
+      caster.unitCooldowns[skillCode] = cooldownValue;
     }
 
     result.skillCode = skillCode;
@@ -141,31 +142,28 @@ export function executeSkill(
 /**
  * Reduz todos os cooldowns de uma unidade em 1 (chamado no início de cada rodada)
  */
-export function tickSkillCooldowns(unit: BattleUnit): void {
-  if (!unit.skillCooldowns) return;
+export function tickUnitCooldowns(unit: BattleUnit): void {
+  if (!unit.unitCooldowns) return;
 
-  for (const skillCode of Object.keys(unit.skillCooldowns)) {
-    if (unit.skillCooldowns[skillCode] > 0) {
-      unit.skillCooldowns[skillCode]--;
+  for (const code of Object.keys(unit.unitCooldowns)) {
+    if (unit.unitCooldowns[code] > 0) {
+      unit.unitCooldowns[code]--;
     }
   }
 }
 
 /**
- * Verifica se uma skill está em cooldown
+ * Verifica se uma skill/spell está em cooldown
  */
-export function isSkillOnCooldown(
-  unit: BattleUnit,
-  skillCode: string
-): boolean {
-  return (unit.skillCooldowns?.[skillCode] ?? 0) > 0;
+export function isOnCooldown(unit: BattleUnit, code: string): boolean {
+  return (unit.unitCooldowns?.[code] ?? 0) > 0;
 }
 
 /**
- * Obtém o cooldown restante de uma skill
+ * Obtém o cooldown restante de uma skill/spell
  */
-export function getSkillCooldown(unit: BattleUnit, skillCode: string): number {
-  return unit.skillCooldowns?.[skillCode] ?? 0;
+export function getCooldown(unit: BattleUnit, code: string): number {
+  return unit.unitCooldowns?.[code] ?? 0;
 }
 
 // =============================================================================
@@ -223,7 +221,7 @@ function executeActionSurge(
 function executeTotalDestruction(
   caster: BattleUnit,
   target: BattleUnit | null,
-  _allUnits: BattleUnit[],
+  allUnits: BattleUnit[],
   _skill: SkillDefinition
 ): SkillExecutionResult {
   if (!target) {
@@ -237,12 +235,16 @@ function executeTotalDestruction(
   const targetDefeated = target.currentHp <= 0;
   if (targetDefeated) {
     target.isAlive = false;
+    // Matar invocações do alvo
+    processSummonerDeath(target, allUnits, "arena");
   }
 
   // Aplicar mesmo dano no caster
   caster.currentHp = Math.max(0, caster.currentHp - damage);
   if (caster.currentHp <= 0) {
     caster.isAlive = false;
+    // Matar invocações do caster
+    processSummonerDeath(caster, allUnits, "arena");
   }
 
   return {
@@ -596,6 +598,8 @@ function executeVolley(
 
     if (unit.currentHp <= 0) {
       unit.isAlive = false;
+      // Matar invocações da unidade
+      processSummonerDeath(unit, allUnits, "arena");
     }
 
     unitsHit++;

@@ -8,9 +8,13 @@ import type { AIDecision } from "../types/ai.types";
 import {
   executeMoveAction,
   executeAttackAction,
+  executeDashAction,
 } from "../../logic/combat-actions";
+import { executeSkill as executeSkillLogic } from "../../logic/skill-executors";
+import { executeSpell as executeSpellLogic } from "../../spells/executors";
+import { getSpellByCode } from "../../../../shared/data/spells.data";
 import {
-  processAITurn,
+  processAIUnit,
   aiActionDelay,
   logAIDecision,
   getAIUnits,
@@ -18,52 +22,6 @@ import {
 
 // Delay padrão entre ações da IA (ms)
 const AI_ACTION_DELAY = 600;
-
-function toBattleUnit(unit: BattleUnit): BattleUnit {
-  return {
-    id: unit.id,
-    sourceUnitId: unit.sourceUnitId || unit.id,
-    ownerId: unit.ownerId,
-    ownerKingdomId: unit.ownerKingdomId,
-    name: unit.name,
-    avatar: unit.avatar,
-    category: unit.category,
-    troopSlot: unit.troopSlot,
-    level: unit.level || 1,
-    race: unit.race || "HUMANOIDE",
-    classCode: unit.classCode,
-    classFeatures: unit.classFeatures || [],
-    equipment: unit.equipment || [],
-    spells: unit.spells || [],
-    combat: unit.combat,
-    speed: unit.speed,
-    focus: unit.focus,
-    armor: unit.armor,
-    vitality: unit.vitality,
-    damageReduction: unit.damageReduction,
-    currentHp: unit.currentHp,
-    maxHp: unit.maxHp,
-    posX: unit.posX,
-    posY: unit.posY,
-    movesLeft: unit.movesLeft,
-    actionsLeft: unit.actionsLeft,
-    attacksLeftThisTurn: unit.attacksLeftThisTurn,
-    isAlive: unit.isAlive,
-    actionMarks: unit.actionMarks || 0,
-    physicalProtection: unit.physicalProtection,
-    maxPhysicalProtection: unit.maxPhysicalProtection,
-    magicalProtection: unit.magicalProtection,
-    maxMagicalProtection: unit.maxMagicalProtection,
-    conditions: unit.conditions,
-    hasStartedAction: unit.hasStartedAction || false,
-    actions: unit.actions || ["move", "attack", "dash", "dodge", "disengage"],
-    grabbedByUnitId: unit.grabbedByUnitId,
-    size: unit.size || "NORMAL",
-    visionRange: unit.visionRange || 10,
-    skillCooldowns: unit.skillCooldowns || {},
-    isAIControlled: unit.isAIControlled || false,
-  };
-}
 
 /**
  * Interface para resultado de execução
@@ -126,17 +84,15 @@ function executeMove(
     };
   }
 
-  const battleUnits = battle.units.map(toBattleUnit);
-  const battleUnit = battleUnits.find((u) => u.id === unit.id)!;
   const obstacles = battle.config.map.obstacles || [];
 
   const result = executeMoveAction(
-    battleUnit,
+    unit,
     decision.targetPosition.x,
     decision.targetPosition.y,
     battle.config.grid.width,
     battle.config.grid.height,
-    battleUnits,
+    battle.units,
     obstacles
   );
 
@@ -185,17 +141,12 @@ function executeAttack(
     return { decision, success: false, error: "Alvo não encontrado ou morto" };
   }
 
-  const battleUnits = battle.units.map(toBattleUnit);
-  const attackerBattle = battleUnits.find((u) => u.id === attacker.id)!;
-  const targetBattle = battleUnits.find((u) => u.id === target.id)!;
-  const obstacles = battle.config.map.obstacles || [];
-
   const result = executeAttackAction(
-    attackerBattle,
-    targetBattle,
+    attacker,
+    target,
     "FISICO",
     undefined,
-    battleUnits
+    battle.units
   );
 
   if (result.success) {
@@ -246,18 +197,148 @@ function executeAttack(
 
 /**
  * Executa uma decisão de skill
- * TODO: Integrar com sistema de skills quando implementado
+ * Reutiliza o sistema de skills existente
  */
 function executeSkill(
   decision: AIDecision,
   battle: ArenaBattle
 ): AIExecutionResult {
-  // Por enquanto, skills não estão implementadas para IA
-  return {
-    decision,
-    success: false,
-    error: "Sistema de skills da IA ainda não implementado",
-  };
+  const caster = battle.units.find((u) => u.id === decision.unitId);
+  if (!caster || !caster.isAlive) {
+    return {
+      decision,
+      success: false,
+      error: "Caster não encontrado ou morto",
+    };
+  }
+
+  if (!decision.skillCode) {
+    return {
+      decision,
+      success: false,
+      error: "Código da skill não especificado",
+    };
+  }
+
+  // Encontrar alvo se especificado
+  const target = decision.targetId
+    ? battle.units.find((u) => u.id === decision.targetId) || null
+    : null;
+
+  // Executar skill usando o sistema existente
+  // Nota: executeSkillLogic já gerencia consumo de ação e cooldown automaticamente
+  const result = executeSkillLogic(
+    caster,
+    decision.skillCode,
+    target,
+    battle.units,
+    true // isArena - sempre true para batalhas de arena
+  );
+
+  if (result.success) {
+    return {
+      decision,
+      success: true,
+      stateChanges: {
+        skillUsed: {
+          casterId: caster.id,
+          skillCode: decision.skillCode,
+          targetId: decision.targetId || caster.id,
+        },
+      },
+    };
+  }
+
+  return { decision, success: false, error: result.error };
+}
+
+/**
+ * Executa uma decisão de dash (corrida)
+ */
+function executeDash(
+  decision: AIDecision,
+  battle: ArenaBattle
+): AIExecutionResult {
+  const unit = battle.units.find((u) => u.id === decision.unitId);
+  if (!unit || !unit.isAlive) {
+    return {
+      decision,
+      success: false,
+      error: "Unidade não encontrada ou morta",
+    };
+  }
+
+  const result = executeDashAction(unit);
+
+  if (result.success) {
+    // Atualizar movimentos da unidade
+    unit.movesLeft = result.newMovesLeft ?? unit.movesLeft;
+
+    return {
+      decision,
+      success: true,
+    };
+  }
+
+  return { decision, success: false, error: result.error };
+}
+
+/**
+ * Executa uma decisão de spell (magia)
+ */
+function executeSpellAction(
+  decision: AIDecision,
+  battle: ArenaBattle
+): AIExecutionResult {
+  const caster = battle.units.find((u) => u.id === decision.unitId);
+  if (!caster || !caster.isAlive) {
+    return {
+      decision,
+      success: false,
+      error: "Caster não encontrado ou morto",
+    };
+  }
+
+  if (!decision.spellCode) {
+    return {
+      decision,
+      success: false,
+      error: "Código da spell não especificado",
+    };
+  }
+
+  const spell = getSpellByCode(decision.spellCode);
+  if (!spell) {
+    return {
+      decision,
+      success: false,
+      error: `Spell não encontrada: ${decision.spellCode}`,
+    };
+  }
+
+  // Determinar o alvo (pode ser unidade ou posição)
+  let target: BattleUnit | { x: number; y: number } | null = null;
+
+  if (decision.targetId) {
+    target = battle.units.find((u) => u.id === decision.targetId) || null;
+  } else if (decision.targetPosition) {
+    target = decision.targetPosition;
+  }
+
+  // Executar spell
+  const result = executeSpellLogic(spell, caster, target, battle.units);
+
+  if (result.success) {
+    // Consumir ação
+    caster.actionsLeft = Math.max(0, caster.actionsLeft - 1);
+
+    return {
+      decision,
+      success: true,
+    };
+  }
+
+  return { decision, success: false, error: result.error };
 }
 
 /**
@@ -274,6 +355,10 @@ export function executeAIDecision(
       return executeAttack(decision, battle);
     case "SKILL":
       return executeSkill(decision, battle);
+    case "SPELL":
+      return executeSpellAction(decision, battle);
+    case "DASH":
+      return executeDash(decision, battle);
     case "PASS":
       return { decision, success: true };
     default:
@@ -326,9 +411,8 @@ export async function executeFullAITurn(
     const maxActions = 10; // Limite de segurança
 
     while (actionCount < maxActions) {
-      // Processar decisão
-      const turnResult = await processAITurn(battle);
-      const decision = turnResult.decisions.find((d) => d.unitId === unit.id);
+      // Processar decisão para esta unidade específica (O(1) ao invés de O(n))
+      const decision = await processAIUnit(battle, unit.id);
 
       if (!decision || decision.type === "PASS") {
         break;

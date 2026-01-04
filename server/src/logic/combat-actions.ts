@@ -1,7 +1,4 @@
-import {
-  validateGridMove,
-  applyDualProtectionDamage,
-} from "../utils/battle.utils";
+import { applyDualProtectionDamage } from "../utils/battle.utils";
 import {
   scanConditionsForAction,
   applyConditionScanResult,
@@ -9,8 +6,8 @@ import {
 } from "./conditions";
 import {
   isAdjacent,
-  isAdjacentOmnidirectional,
-} from "../../../shared/types/skills.types";
+  isWithinRange,
+} from "../../../shared/utils/spell-validation";
 import type {
   BattleObstacle,
   BattleUnit,
@@ -24,8 +21,9 @@ import {
   transferDamageToEidolon,
   processUnitDeathForEidolon,
   processEidolonDeath,
+  processSummonerDeath,
 } from "./summon-logic";
-import { hasFreePath } from "../../../shared/utils/engagement.utils";
+import { validateMove } from "../../../shared/utils/engagement.utils";
 
 export interface MoveActionResult {
   success: boolean;
@@ -60,6 +58,8 @@ export interface AttackActionResult {
   // Eidolon (Invocador)
   damageTransferredToEidolon?: boolean; // Dano foi transferido para Eidolon
   eidolonDefeated?: boolean; // Eidolon morreu ao receber dano transferido
+  // Invocações mortas quando o invocador morre
+  killedSummonIds?: string[]; // IDs dos summons que morreram com o invocador
 }
 
 export interface DashActionResult {
@@ -100,67 +100,19 @@ export function executeMoveAction(
     return { success: false, error: scan.blockReason };
   }
 
-  const moveValidation = validateGridMove(
-    unit.posX,
-    unit.posY,
-    toX,
-    toY,
-    gridWidth,
-    gridHeight,
-    unit.movesLeft,
-    { unit, allUnits } // Contexto de engajamento para calcular custo extra
-  );
-
-  if (!moveValidation.valid) {
-    return { success: false, error: moveValidation.reason };
-  }
-
-  // Verificar se há unidade viva ocupando a célula
-  const isOccupied = allUnits.some(
-    (u) => u.posX === toX && u.posY === toY && u.isAlive && u.id !== unit.id
-  );
-
-  if (isOccupied) {
-    return { success: false, error: "Target cell is occupied" };
-  }
-
-  // Verificar se há cadáver bloqueando (se configurado para bloquear)
-  const hasCorpse = allUnits.some(
-    (u) =>
-      u.posX === toX &&
-      u.posY === toY &&
-      !u.isAlive &&
-      !u.conditions.includes("CORPSE_REMOVED")
-  );
-
-  if (hasCorpse) {
-    return { success: false, error: "Target cell is blocked by corpse" };
-  }
-
-  // Verificar se há obstáculo bloqueando (não destruído)
-  const hasObstacle = obstacles.some(
-    (obs) => obs.posX === toX && obs.posY === toY && !obs.destroyed
-  );
-
-  if (hasObstacle) {
-    return { success: false, error: "Target cell is blocked by obstacle" };
-  }
-
-  // Verificar se há um caminho livre até o destino (BFS)
-  const pathFree = hasFreePath(
-    unit.posX,
-    unit.posY,
+  // Validação centralizada de movimento (custo, caminho, ocupação, obstáculos)
+  const moveValidation = validateMove(
+    unit,
     toX,
     toY,
     allUnits,
     obstacles,
-    unit.id,
     gridWidth,
     gridHeight
   );
 
-  if (!pathFree) {
-    return { success: false, error: "Path is blocked" };
+  if (!moveValidation.valid) {
+    return { success: false, error: moveValidation.error };
   }
 
   const fromX = unit.posX;
@@ -168,7 +120,7 @@ export function executeMoveAction(
 
   unit.posX = toX;
   unit.posY = toY;
-  unit.movesLeft -= moveValidation.cost;
+  unit.movesLeft -= moveValidation.totalCost;
 
   // Aplicar expiração de condições
   unit.conditions = applyConditionScanResult(unit.conditions, scan);
@@ -180,7 +132,7 @@ export function executeMoveAction(
     toX,
     toY,
     movesLeft: unit.movesLeft,
-    moveCost: moveValidation.cost,
+    moveCost: moveValidation.totalCost,
   };
 }
 
@@ -259,11 +211,28 @@ export function executeAttackAction(
     return { success: false, error: "No target specified" };
   }
 
-  // Verificar adjacência omnidirecional (8 direções incluindo diagonais)
+  // Calcula alcance de ataque dinâmico (base 1 + modificadores de condições)
+  const baseAttackRange = 1;
+  const attackRangeMod = attackerScan.modifiers.basicAttackRangeMod || 0;
+  const effectiveAttackRange = baseAttackRange + attackRangeMod;
+
+  // Verificar se o alvo está dentro do alcance de ataque (8 direções)
   if (
-    !isAdjacentOmnidirectional(attacker.posX, attacker.posY, targetX, targetY)
+    !isWithinRange(
+      attacker.posX,
+      attacker.posY,
+      targetX,
+      targetY,
+      effectiveAttackRange
+    )
   ) {
-    return { success: false, error: "Target must be adjacent" };
+    return {
+      success: false,
+      error:
+        effectiveAttackRange === 1
+          ? "Target must be adjacent"
+          : `Target must be within ${effectiveAttackRange} tiles`,
+    };
   }
 
   // === CONSUMO DE AÇÃO E ATAQUES EXTRAS ===
@@ -473,6 +442,7 @@ export function executeAttackAction(
   target.conditions = applyConditionScanResult(target.conditions, targetScan);
 
   let targetDefeated = false;
+  let killedSummons: BattleUnit[] = [];
   if (target.currentHp <= 0) {
     targetDefeated = true;
     target.isAlive = false;
@@ -484,6 +454,9 @@ export function executeAttackAction(
     if (target.conditions.includes("EIDOLON_GROWTH")) {
       processEidolonDeath(target, "arena");
     }
+
+    // Matar todas as invocações do alvo (summons morrem com o invocador)
+    killedSummons = processSummonerDeath(target, allUnits, "arena");
   }
 
   return {
@@ -500,6 +473,7 @@ export function executeAttackAction(
     attacksLeftThisTurn: attacker.attacksLeftThisTurn,
     dodgeChance,
     dodgeRoll,
+    killedSummonIds: killedSummons.map((s) => s.id),
   };
 }
 
@@ -558,30 +532,14 @@ export function executeDodgeAction(unit: BattleUnit): DodgeActionResult {
   return { success: true };
 }
 
-export const COMBAT_ACTIONS = {
-  move: {
-    id: "move",
-    name: "Move",
-    costType: "movement",
-  },
-  attack: {
-    id: "attack",
-    name: "Attack",
-    costType: "action",
-  },
-  dash: {
-    id: "dash",
-    name: "Dash",
-    costType: "action",
-  },
-  dodge: {
-    id: "dodge",
-    name: "Dodge",
-    costType: "action",
-  },
-} as const;
-
-export { DEFAULT_UNIT_ACTIONS } from "./unit-actions";
+// Re-exportar do shared para compatibilidade
+export {
+  ALL_ACTIONS as COMBAT_ACTIONS,
+  DEFAULT_UNIT_ACTIONS,
+  findActionByCode,
+  getActionCostType,
+  isBasicAction,
+} from "../../../shared/data/actions.data";
 
 export function canUnitPerformAction(
   unit: BattleUnit,
@@ -998,122 +956,51 @@ export function executeCastAction(
 // =============================================================================
 
 import { findSkillByCode } from "../../../shared/data/skills.data";
-import {
-  getManhattanDistance as getSkillManhattanDistance,
-  DEFAULT_RANGE_VALUES,
-  type SkillExecutionResult,
-} from "../../../shared/types/skills.types";
+import { type SkillExecutionResult } from "../../../shared/types/skills.types";
+import { validateSkillUse as sharedValidateSkillUse } from "../../../shared/utils/skill-validation";
 
 // Re-exportar tipos e funções do skill-executors
 export {
   executeSkill,
-  tickSkillCooldowns,
-  isSkillOnCooldown,
-  getSkillCooldown,
+  tickUnitCooldowns,
+  isOnCooldown,
+  getCooldown,
   SKILL_EXECUTORS,
 } from "./skill-executors";
 
-// Re-exportar condições de skills
+// Re-exportar condições de skills do shared
 export {
   SKILL_CONDITIONS,
   getSkillCondition,
   isSkillCondition,
-} from "./skill-conditions";
+} from "../../../shared/data/conditions.data";
 
 // Alias para compatibilidade
 export type SkillActionResult = SkillExecutionResult;
 
 /**
  * Valida se a unidade pode usar uma skill
+ * Wrapper que usa a validação centralizada do shared
  */
 export function validateSkillUse(
   caster: BattleUnit,
   skillCode: string,
   target: BattleUnit | null,
-  isArena: boolean
+  _isArena: boolean
 ): { valid: boolean; error?: string } {
-  // Verificar se a skill existe
+  // Buscar a skill para passar à validação centralizada
   const skill = findSkillByCode(skillCode);
   if (!skill) {
     return { valid: false, error: "Skill não encontrada" };
   }
 
-  // Verificar se é uma skill ativa
-  if (skill.category !== "ACTIVE") {
-    return { valid: false, error: "Apenas skills ativas podem ser usadas" };
-  }
+  // Usar validação centralizada do shared/utils/skill-validation.ts
+  const result = sharedValidateSkillUse(caster, skill, target, {
+    checkCooldown: true,
+    checkActions: true,
+  });
 
-  // Verificar se a unidade tem essa skill nas ações
-  if (!caster.actions.includes(skillCode)) {
-    return { valid: false, error: "Unidade não possui esta skill" };
-  }
-
-  // Verificar se está vivo
-  if (!caster.isAlive) {
-    return { valid: false, error: "Unidade morta não pode usar skills" };
-  }
-
-  // Verificar se tem ações disponíveis (Arena não tem custo de recurso, mas consome ação)
-  if (caster.actionsLeft <= 0) {
-    return { valid: false, error: "Sem ações restantes neste turno" };
-  }
-
-  // Validar range e alvo
-  if (skill.range === "SELF") {
-    // Skills SELF não precisam de alvo ou o alvo é o próprio caster
-    if (target && target.id !== caster.id) {
-      return {
-        valid: false,
-        error: "Esta skill só pode ser usada em si mesmo",
-      };
-    }
-  } else if (skill.range === "ADJACENT") {
-    if (!target) {
-      return { valid: false, error: "Skill requer um alvo" };
-    }
-    if (
-      !isAdjacentOmnidirectional(
-        caster.posX,
-        caster.posY,
-        target.posX,
-        target.posY
-      )
-    ) {
-      return { valid: false, error: "Alvo não está adjacente" };
-    }
-  } else if (skill.range === "RANGED" || skill.range === "AREA") {
-    if (!target && skill.targetType !== "SELF") {
-      return { valid: false, error: "Skill requer um alvo" };
-    }
-    if (target) {
-      const rangeValue = skill.rangeValue ?? DEFAULT_RANGE_VALUES[skill.range];
-      const distance = getSkillManhattanDistance(
-        caster.posX,
-        caster.posY,
-        target.posX,
-        target.posY
-      );
-      if (distance > rangeValue) {
-        return {
-          valid: false,
-          error: `Alvo fora de alcance (máx: ${rangeValue})`,
-        };
-      }
-    }
-  }
-
-  // Validar tipo de alvo
-  if (target && skill.targetType) {
-    const isSameOwner = caster.ownerId === target.ownerId;
-    if (skill.targetType === "ALLY" && !isSameOwner) {
-      return { valid: false, error: "Skill só pode ser usada em aliados" };
-    }
-    if (skill.targetType === "ENEMY" && isSameOwner) {
-      return { valid: false, error: "Skill só pode ser usada em inimigos" };
-    }
-  }
-
-  return { valid: true };
+  return { valid: result.valid, error: result.error };
 }
 
 /**

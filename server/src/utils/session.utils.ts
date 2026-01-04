@@ -108,10 +108,34 @@ export async function getUserActiveSession(
           }
         }
 
-        // Se o lobby está em BATTLING mas não encontrou batalha, algo está errado
+        // Se o lobby está em BATTLING mas não encontrou batalha, limpar estado órfão
         console.warn(
           `[SESSION] ⚠️ Lobby ${lobbyId} está BATTLING mas nenhuma batalha ativa foi encontrada!`
         );
+        console.log(
+          `[SESSION] 🧹 Limpando lobby órfão ${lobbyId} e referências de usuários...`
+        );
+
+        // Limpar referências de usuários para este lobby
+        if (lobby.hostUserId) {
+          userToLobbyRef.delete(lobby.hostUserId);
+        }
+        if (lobby.guestUserId) {
+          userToLobbyRef.delete(lobby.guestUserId);
+        }
+
+        // Deletar o lobby órfão
+        arenaLobbiesRef?.delete(lobbyId);
+
+        console.log(
+          `[SESSION] ✅ Lobby órfão ${lobbyId} foi limpo com sucesso`
+        );
+
+        // Retornar sessão vazia - usuário está livre
+        return {
+          type: null,
+          sessionId: null,
+        };
       } else {
         // Lobby está em WAITING ou READY - retornar como sessão ativa
         return {

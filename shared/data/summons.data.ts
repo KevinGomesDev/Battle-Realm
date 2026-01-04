@@ -1,9 +1,19 @@
 // shared/data/summons.data.ts
 // Templates de Invocações (Summons) - Criaturas invocadas por classes
 
+import { DEFAULT_UNIT_ACTIONS } from "./actions.data";
+
 // =============================================================================
 // TIPOS
 // =============================================================================
+
+/** Tipos de comportamento de IA para summons */
+export type SummonAIBehavior =
+  | "AGGRESSIVE"
+  | "TACTICAL"
+  | "DEFENSIVE"
+  | "SUPPORT"
+  | "RANGED";
 
 export interface SummonTemplate {
   /** Código único da invocação */
@@ -30,6 +40,8 @@ export interface SummonTemplate {
   actions: string[];
   /** Skill passiva especial (se houver) */
   passiveCode?: string;
+  /** Comportamento de IA (padrão: AGGRESSIVE) */
+  aiBehavior?: SummonAIBehavior;
   /** Metadados extras (para lógicas específicas) */
   metadata?: Record<string, unknown>;
 }
@@ -59,8 +71,9 @@ export const EIDOLON: SummonTemplate = {
   damageReduction: 0,
   category: "SUMMON",
   avatar: undefined, // TODO: Definir sprite
-  actions: ["attack", "move", "dash", "dodge"],
+  actions: [...DEFAULT_UNIT_ACTIONS],
   passiveCode: "EIDOLON_GROWTH", // Skill de crescimento ao matar
+  aiBehavior: "AGGRESSIVE", // Ataca diretamente sem avaliar perigo
   metadata: {
     // Acúmulos são armazenados no estado da partida, não aqui
     growthPerKill: 1, // +1 em todos atributos por kill

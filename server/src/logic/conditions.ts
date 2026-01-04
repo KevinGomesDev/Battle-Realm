@@ -1,5 +1,6 @@
 // src/logic/conditions.ts
-// FONTE DE VERDADE para todas as definições de condições do jogo
+// Lógica de condições do jogo (processamento e varredura)
+// As DEFINIÇÕES de condições estão em shared/data/conditions.data.ts
 
 import type {
   ConditionEffects,
@@ -7,8 +8,20 @@ import type {
   ConditionExpiry,
   ConditionInfo,
 } from "../../../shared/types/conditions.types";
-import { SKILL_CONDITIONS } from "./skill-conditions";
-import { RACE_CONDITIONS } from "./race-conditions";
+
+// Importar definições centralizadas do shared
+import {
+  CONDITIONS,
+  COMBAT_CONDITIONS,
+  SKILL_CONDITIONS,
+  SPELL_CONDITIONS,
+  RACE_CONDITIONS,
+  getConditionsInfo,
+  getConditionInfo,
+  getConditionColorsMap,
+  getCondition,
+  hasConditionDefinition,
+} from "../../../shared/data/conditions.data";
 
 // Re-exportar tipos para uso em outros arquivos do server
 export type {
@@ -18,149 +31,22 @@ export type {
   ConditionInfo,
 };
 
+// Re-exportar definições e funções do shared
+export {
+  CONDITIONS,
+  COMBAT_CONDITIONS,
+  SKILL_CONDITIONS,
+  SPELL_CONDITIONS,
+  RACE_CONDITIONS,
+  getConditionsInfo,
+  getConditionInfo,
+  getConditionColorsMap,
+  getCondition,
+  hasConditionDefinition,
+};
+
 // Alias para manter compatibilidade com código existente
 export type ConditionEffect = ConditionDefinition;
-
-// Condições de combate gerais
-const COMBAT_CONDITIONS: Record<string, ConditionDefinition> = {
-  GRAPPLED: {
-    id: "GRAPPLED",
-    name: "Grappled",
-    description: "Unit cannot move while grappled",
-    expiry: "manual",
-    icon: "🤼",
-    color: "#845ef7",
-    effects: {
-      blockMove: true,
-      blockDash: true,
-    },
-  },
-
-  DODGING: {
-    id: "DODGING",
-    name: "Dodging",
-    description:
-      "Unit is in defensive stance. Attacks have 50% chance to miss.",
-    expiry: "next_turn",
-    icon: "🌀",
-    color: "#60a5fa",
-    effects: {
-      dodgeChance: 50,
-    },
-  },
-
-  PROTECTED: {
-    id: "PROTECTED",
-    name: "Protected",
-    description: "Next damage received is reduced by 5",
-    expiry: "on_action",
-    icon: "🛡️",
-    color: "#60a5fa",
-    effects: {
-      damageReduction: 5,
-    },
-  },
-
-  STUNNED: {
-    id: "STUNNED",
-    name: "Stunned",
-    description: "Unit has reduced movement",
-    expiry: "end_of_turn",
-    icon: "💫",
-    color: "#ffd43b",
-    effects: {
-      movementReduction: 2,
-    },
-  },
-
-  FROZEN: {
-    id: "FROZEN",
-    name: "Frozen",
-    description: "Unit cannot perform any actions",
-    expiry: "end_of_turn",
-    icon: "❄️",
-    color: "#74c0fc",
-    effects: {
-      blockMove: true,
-      blockAttack: true,
-      blockDash: true,
-      blockDodge: true,
-    },
-  },
-
-  BURNING: {
-    id: "BURNING",
-    name: "Burning",
-    description: "Unit takes damage at the start of its turn",
-    expiry: "end_of_turn",
-    icon: "🔥",
-    color: "#ff6b35",
-    effects: {
-      damagePerTurn: 3,
-    },
-  },
-
-  SLOWED: {
-    id: "SLOWED",
-    name: "Slowed",
-    description: "Unit movement is halved",
-    expiry: "end_of_turn",
-    icon: "🐌",
-    color: "#6b7280",
-    effects: {
-      movementMultiplier: 0.5,
-    },
-  },
-};
-
-// CONDITIONS unifica condições de combate, skills e raça
-export const CONDITIONS: Record<string, ConditionDefinition> = {
-  ...COMBAT_CONDITIONS,
-  ...SKILL_CONDITIONS,
-  ...RACE_CONDITIONS,
-};
-
-// Helper para obter mapa de cores das condições (usado pelo arena-config)
-export function getConditionColorsMap(): Record<string, string> {
-  const map: Record<string, string> = {};
-  for (const [key, value] of Object.entries(CONDITIONS)) {
-    if (value.color) {
-      map[key] = value.color;
-    }
-  }
-  return map;
-}
-
-/**
- * Gera as informações visuais de todas as condições para o frontend
- * Esta é a ÚNICA fonte de verdade para informações de condições
- */
-export function getConditionsInfo(): Record<string, ConditionInfo> {
-  const info: Record<string, ConditionInfo> = {};
-  for (const [key, value] of Object.entries(CONDITIONS)) {
-    info[key] = {
-      icon: value.icon || "❓",
-      name: value.name,
-      description: value.description,
-      color: value.color || "#6b7280",
-    };
-  }
-  return info;
-}
-
-/**
- * Obtém informação de uma condição específica
- */
-export function getConditionInfo(conditionId: string): ConditionInfo | null {
-  const cond = CONDITIONS[conditionId];
-  if (!cond) return null;
-  return {
-    icon: cond.icon || "❓",
-    name: cond.name,
-    description: cond.description,
-    color: cond.color || "#6b7280",
-  };
-}
 
 export interface ConditionModifiers {
   // Chances
@@ -185,6 +71,7 @@ export interface ConditionModifiers {
   currentHpMod: number;
   protectionMod: number;
   actionsMod: number;
+  basicAttackRangeMod: number; // Modifica alcance do ataque básico (base: 1)
   // Turno
   damagePerTurn: number;
   healPerTurn: number;
@@ -217,6 +104,7 @@ function createEmptyModifiers(): ConditionModifiers {
     currentHpMod: 0,
     protectionMod: 0,
     actionsMod: 0,
+    basicAttackRangeMod: 0,
     damagePerTurn: 0,
     healPerTurn: 0,
   };
@@ -271,6 +159,7 @@ export function scanConditionsForAction(
       "currentHpMod",
       "protectionMod",
       "actionsMod",
+      "basicAttackRangeMod",
       "damagePerTurn",
       "healPerTurn",
     ];

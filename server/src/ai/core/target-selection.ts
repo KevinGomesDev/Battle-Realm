@@ -42,6 +42,31 @@ export function isInVision(unit: BattleUnit, target: BattleUnit): boolean {
 }
 
 /**
+ * Filtra unidades baseado no campo de visão da unidade observadora
+ * - Unidades aliadas: sempre visíveis
+ * - Unidades inimigas: somente se dentro do visionRange
+ * - Unidades mortas: não visíveis
+ */
+export function filterVisibleUnits(
+  observerUnit: BattleUnit,
+  allUnits: BattleUnit[]
+): BattleUnit[] {
+  return allUnits.filter((u) => {
+    // Sempre ver a si mesmo
+    if (u.id === observerUnit.id) return true;
+
+    // Unidades do mesmo dono são sempre visíveis
+    if (u.ownerId === observerUnit.ownerId) return true;
+
+    // Unidades mortas não são visíveis
+    if (!u.isAlive) return false;
+
+    // Inimigos: verificar se estão dentro do campo de visão
+    return isInVision(observerUnit, u);
+  });
+}
+
+/**
  * Obtém todos os inimigos vivos de uma unidade
  */
 export function getEnemies(

@@ -504,7 +504,21 @@ export interface SkillInfo {
   name: string;
   description: string;
   color: string;
-  requiresTarget?: boolean;
+  requiresTarget: boolean;
+  // Novas propriedades para melhorar UX
+  targetType?: "SELF" | "ALLY" | "ENEMY" | "ALL";
+  range?: "SELF" | "ADJACENT" | "RANGED" | "AREA";
+  cooldown?: number;
+  consumesAction?: boolean;
+}
+
+/**
+ * Informações completas de uma skill com estado atual da unidade
+ */
+export interface SkillInfoWithState extends SkillInfo {
+  canUse: boolean;
+  reason?: string;
+  cooldownRemaining: number;
 }
 
 /**
@@ -527,5 +541,61 @@ export function getSkillInfo(skillCode: string): SkillInfo | null {
     description: skill.description,
     color: SKILL_COLORS[skillCode] || "purple",
     requiresTarget,
+    targetType: skill.targetType,
+    range: skill.range,
+    cooldown: skill.cooldown,
+    consumesAction: skill.consumesAction !== false,
+  };
+}
+
+/**
+ * Obtém informações de uma skill COM estado atual da unidade
+ * Útil para UI que precisa saber se a skill pode ser usada
+ * @note Usa a mesma lógica de canUseSkill() para consistência
+ */
+export function getSkillInfoWithState(
+  skillCode: string,
+  unit: {
+    actionsLeft: number;
+    isAlive: boolean;
+    actions: string[];
+    unitCooldowns?: Record<string, number>;
+  }
+): SkillInfoWithState | null {
+  const baseInfo = getSkillInfo(skillCode);
+  if (!baseInfo) return null;
+
+  const skill = findSkillByCode(skillCode);
+  if (!skill) return null;
+
+  const cooldownRemaining = unit.unitCooldowns?.[skillCode] ?? 0;
+
+  // Usar lógica inline equivalente a canUseSkill para evitar dependência circular
+  // A lógica aqui é identica à de canUseSkill() em skill-validation.ts
+  let canUse = true;
+  let reason: string | undefined;
+
+  if (skill.category !== "ACTIVE") {
+    canUse = false;
+    reason = "Passiva";
+  } else if (!unit.actions.includes(skill.code)) {
+    canUse = false;
+    reason = "Não possui";
+  } else if (!unit.isAlive) {
+    canUse = false;
+    reason = "Morto";
+  } else if (unit.actionsLeft <= 0 && skill.consumesAction !== false) {
+    canUse = false;
+    reason = "Sem ações";
+  } else if (cooldownRemaining > 0) {
+    canUse = false;
+    reason = `CD: ${cooldownRemaining}`;
+  }
+
+  return {
+    ...baseInfo,
+    canUse,
+    reason,
+    cooldownRemaining,
   };
 }

@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useArena } from "../hooks/useArena";
 import { useAuth } from "../../auth";
 import {
@@ -18,8 +24,21 @@ import { ChatProvider, useChat } from "../../chat";
 import { ChatBox } from "../../chat/components/ChatBox";
 import type { BattleUnit } from "../../../../../shared/types/battle.types";
 import { getSpellByCode } from "../../../../../shared/data/spells.data";
+import { findSkillByCode } from "../../../../../shared/data/skills.data";
 import { getFullMovementInfo } from "../../../../../shared/utils/engagement.utils";
+import {
+  getValidSkillTargets,
+  isValidSkillTarget,
+} from "../../../../../shared/utils/skill-validation";
+import {
+  isValidSpellTarget,
+  isValidSpellPosition,
+} from "../../../../../shared/utils/spell-validation";
 import { socketService } from "../../../services/socket.service";
+import {
+  isPlayerControllable,
+  getControllableUnits,
+} from "../utils/unit-control";
 
 /**
  * ArenaBattleView - Wrapper com ChatProvider
@@ -147,7 +166,9 @@ const ArenaBattleViewInner: React.FC = () => {
       if (e.key === " " && battle && user && !isTyping) {
         e.preventDefault(); // Evitar scroll da página
         const isMyTurn = battle.currentPlayerId === user.id;
-        const myUnit = units.find((u) => u.ownerId === user.id && u.isAlive);
+        const myUnit = units.find(
+          (u) => isPlayerControllable(u, user.id) && u.isAlive
+        );
         if (isMyTurn && myUnit && myUnit.hasStartedAction) {
           console.log(
             "%c[ArenaBattleView] ⌨️ Espaço pressionado - Finalizando turno",
@@ -236,10 +257,8 @@ const ArenaBattleViewInner: React.FC = () => {
     const isMyTurnNow = battle.currentPlayerId === user.id;
     const turnKey = `${battle.currentPlayerId}-${battle.round}`;
 
-    // Encontrar minhas unidades vivas
-    const myAliveUnits = units.filter(
-      (u) => u.ownerId === user.id && u.isAlive
-    );
+    // Encontrar minhas unidades vivas (exceto SUMMON/MONSTER)
+    const myAliveUnits = getControllableUnits(units, user.id);
 
     // Se não é meu turno, limpar seleção (a não ser que queira ver info da unidade)
     if (!isMyTurnNow) {
@@ -326,7 +345,9 @@ const ArenaBattleViewInner: React.FC = () => {
     const isMyTurnNow = battle.currentPlayerId === user.id;
     if (!isMyTurnNow) return;
 
-    const myUnit = units.find((u) => u.ownerId === user.id && u.isAlive);
+    const myUnit = units.find(
+      (u) => isPlayerControllable(u, user.id) && u.isAlive
+    );
     if (!myUnit) return;
 
     // Só verificar se a unidade já começou a ação (tem hasStartedAction)
@@ -341,7 +362,7 @@ const ArenaBattleViewInner: React.FC = () => {
         // Verificar novamente após o delay usando ref para estado atualizado
         const currentUnits = unitsRef.current;
         const currentUnit = currentUnits.find(
-          (u) => u.ownerId === user.id && u.isAlive
+          (u) => isPlayerControllable(u, user.id) && u.isAlive
         );
         if (
           currentUnit &&
@@ -413,7 +434,37 @@ const ArenaBattleViewInner: React.FC = () => {
 
   const isMyTurn = battle.currentPlayerId === user.id;
   const selectedUnit = units.find((u) => u.id === selectedUnitId);
-  const myUnits = units.filter((u) => u.ownerId === user.id && u.isAlive);
+  const myUnits = getControllableUnits(units, user.id);
+
+  // Calcular unidades destacadas como alvos válidos para skill/spell pendente
+  const highlightedUnitIds = useMemo(() => {
+    const highlighted = new Set<string>();
+
+    if (!selectedUnit || !pendingAction) return highlighted;
+
+    // Verificar se é uma skill (não é ação básica nem spell)
+    const isBasicAction = ["attack", "move", "dash", "dodge"].includes(
+      pendingAction
+    );
+    const isSpell = pendingAction.startsWith("spell:");
+
+    if (isBasicAction || isSpell) return highlighted;
+
+    // É uma skill - buscar definição
+    const skill = findSkillByCode(pendingAction);
+    if (!skill) return highlighted;
+
+    // Obter alvos válidos
+    const validTargets = getValidSkillTargets(selectedUnit, skill, units);
+    validTargets.forEach((target) => highlighted.add(target.id));
+
+    // Incluir self se skill permite
+    if (skill.targetType === "ALLY" || skill.targetType === "SELF") {
+      highlighted.add(selectedUnit.id);
+    }
+
+    return highlighted;
+  }, [selectedUnit, pendingAction, units]);
 
   // Determinar o oponente
   const isHost = battle.hostKingdom.ownerId === user.id;
@@ -429,7 +480,11 @@ const ArenaBattleViewInner: React.FC = () => {
       // Bloquear se já há movimento em andamento
       if (isMovingRef.current) return;
 
-      if (!selectedUnit || !isMyTurn || selectedUnit.ownerId !== user.id)
+      if (
+        !selectedUnit ||
+        !isMyTurn ||
+        !isPlayerControllable(selectedUnit, user.id)
+      )
         return;
       if (selectedUnit.movesLeft <= 0) return;
 
@@ -601,14 +656,8 @@ const ArenaBattleViewInner: React.FC = () => {
           spell.targetType === "ENEMY" ||
           spell.targetType === "ALL")
       ) {
-        // Validar alcance
-        const dx = Math.abs(unit.posX - selectedUnit.posX);
-        const dy = Math.abs(unit.posY - selectedUnit.posY);
-        const distance = dx + dy; // Manhattan distance
-
-        const maxRange = spell.range === "ADJACENT" ? 1 : selectedUnit.speed;
-
-        if (distance <= maxRange) {
+        // Usar validação centralizada
+        if (isValidSpellTarget(selectedUnit, spell, unit)) {
           console.log(
             "%c[ArenaBattleView] 🔮 Conjurando spell em unidade!",
             "color: #a855f7; font-weight: bold;",
@@ -618,9 +667,48 @@ const ArenaBattleViewInner: React.FC = () => {
           setPendingAction(null);
         } else {
           console.log(
-            "%c[ArenaBattleView] ❌ Alvo fora de alcance da spell",
+            "%c[ArenaBattleView] ❌ Alvo inválido para spell",
             "color: #ef4444;",
-            { distance, maxRange }
+            { spell: spellCode, target: unit.name }
+          );
+        }
+        return;
+      }
+    }
+
+    // Se há uma skill pendente aguardando alvo (ex: HEAL)
+    if (
+      pendingAction &&
+      !pendingAction.startsWith("spell:") &&
+      pendingAction !== "attack" &&
+      selectedUnit &&
+      isMyTurn
+    ) {
+      const skillDef = findSkillByCode(pendingAction);
+
+      if (skillDef && skillDef.targetType && skillDef.targetType !== "SELF") {
+        // Usar validação centralizada ao invés de cálculo manual
+        if (isValidSkillTarget(selectedUnit, skillDef, unit)) {
+          console.log(
+            "%c[ArenaBattleView] ✨ Executando skill em unidade!",
+            "color: #fbbf24; font-weight: bold;",
+            {
+              skillCode: pendingAction,
+              targetId: unit.id,
+              targetName: unit.name,
+            }
+          );
+          executeAction("use_skill", selectedUnit.id, {
+            skillCode: pendingAction,
+            casterUnitId: selectedUnit.id,
+            targetUnitId: unit.id,
+          });
+          setPendingAction(null);
+        } else {
+          console.log(
+            "%c[ArenaBattleView] ❌ Alvo inválido para skill",
+            "color: #ef4444;",
+            { skill: pendingAction, target: unit.name }
           );
         }
         return;
@@ -628,8 +716,58 @@ const ArenaBattleViewInner: React.FC = () => {
     }
 
     // Comportamento padrão: selecionar unidade
-    if (unit.ownerId === user.id) {
-      // Toggle: clicar na mesma unidade desseleciona
+    // Só permite selecionar unidades controláveis (não SUMMON/MONSTER)
+    if (isPlayerControllable(unit, user.id)) {
+      // Se clicar na mesma unidade E há uma ação pendente do tipo ALLY → self-cast
+      if (selectedUnitId === unit.id && pendingAction && isMyTurn) {
+        // Verificar se é spell ALLY
+        if (pendingAction?.startsWith("spell:")) {
+          const spellCode = pendingAction.replace("spell:", "");
+          const spell = getSpellByCode(spellCode);
+
+          if (spell && spell.targetType === "ALLY") {
+            console.log(
+              "%c[ArenaBattleView] 🔮 Conjurando spell em si mesmo!",
+              "color: #a855f7; font-weight: bold;",
+              { spellCode, unitId: unit.id, unitName: unit.name }
+            );
+            castSpell(unit.id, spellCode, unit.id);
+            setPendingAction(null);
+            return;
+          }
+        }
+        // Verificar se é skill ALLY
+        else if (pendingAction !== "attack") {
+          const skillDef = findSkillByCode(pendingAction);
+
+          if (skillDef && skillDef.targetType === "ALLY") {
+            console.log(
+              "%c[ArenaBattleView] ✨ Executando skill em si mesmo!",
+              "color: #fbbf24; font-weight: bold;",
+              { skillCode: pendingAction, unitId: unit.id, unitName: unit.name }
+            );
+            executeAction("use_skill", unit.id, {
+              skillCode: pendingAction,
+              casterUnitId: unit.id,
+              targetUnitId: unit.id,
+            });
+            setPendingAction(null);
+            return;
+          }
+        }
+
+        // Se não era skill/spell ALLY, faz toggle normal
+        console.log(
+          "%c[ArenaBattleView] 🔄 Desselecionando unidade (toggle)",
+          "color: #f59e0b;",
+          { unitId: unit.id }
+        );
+        setSelectedUnitId(null);
+        setPendingAction(null);
+        return;
+      }
+
+      // Toggle: clicar na mesma unidade desseleciona (quando não há pendingAction)
       if (selectedUnitId === unit.id) {
         console.log(
           "%c[ArenaBattleView] 🔄 Desselecionando unidade (toggle)",
@@ -747,14 +885,17 @@ const ArenaBattleViewInner: React.FC = () => {
         spell &&
         (spell.targetType === "POSITION" || spell.targetType === "GROUND")
       ) {
-        // Validar alcance
-        const dx = Math.abs(x - selectedUnit.posX);
-        const dy = Math.abs(y - selectedUnit.posY);
-        const distance = dx + dy; // Manhattan distance
+        // Usar validação centralizada
+        const isValidPosition = isValidSpellPosition(
+          selectedUnit,
+          spell,
+          { x, y },
+          units,
+          battle.config.grid.width,
+          battle.config.grid.height
+        );
 
-        const maxRange = spell.range === "ADJACENT" ? 1 : selectedUnit.speed;
-
-        if (distance <= maxRange) {
+        if (isValidPosition) {
           console.log(
             "%c[ArenaBattleView] 🔮 Conjurando spell em posição!",
             "color: #a855f7; font-weight: bold;",
@@ -764,9 +905,9 @@ const ArenaBattleViewInner: React.FC = () => {
           setPendingAction(null);
         } else {
           console.log(
-            "%c[ArenaBattleView] ❌ Posição fora de alcance da spell",
+            "%c[ArenaBattleView] ❌ Posição inválida para spell",
             "color: #ef4444;",
-            { distance, maxRange }
+            { spellCode, position: { x, y } }
           );
         }
         return;
@@ -846,6 +987,23 @@ const ArenaBattleViewInner: React.FC = () => {
       );
     }
   };
+
+  // Wrapper para executar skills/ações do UnitPanel
+  const handleExecuteSkillAction = useCallback(
+    (skillCode: string, unitId: string) => {
+      console.log(
+        "%c[ArenaBattleView] 🎯 Executando skill sem alvo (SELF)",
+        "color: #fbbf24; font-weight: bold;",
+        { skillCode, unitId }
+      );
+      executeAction("use_skill", unitId, {
+        skillCode,
+        casterUnitId: unitId,
+        // targetUnitId omitido = self-cast
+      });
+    },
+    [executeAction]
+  );
 
   // Handler para clique em obstáculo
   const handleObstacleClick = (obstacle: {
@@ -940,6 +1098,7 @@ const ArenaBattleViewInner: React.FC = () => {
               unitDirection={unitDirection}
               pendingAction={pendingAction}
               activeBubbles={chatState.activeBubbles}
+              highlightedUnitIds={highlightedUnitIds}
             />
 
             {/* BattleHeader - Overlay na parte superior (dentro do Canvas) */}
@@ -959,7 +1118,7 @@ const ArenaBattleViewInner: React.FC = () => {
               currentUserId={user.id}
               pendingAction={pendingAction}
               onSetPendingAction={setPendingAction}
-              onExecuteAction={executeAction}
+              onExecuteAction={handleExecuteSkillAction}
               onEndAction={handleEndAction}
             />
           </div>

@@ -7,6 +7,7 @@ import {
   AnimatedCharacterSprite,
   parseAvatarToHeroId,
 } from "../../../kingdom/components/CreateKingdom";
+import { BattleEventLogButton } from "./BattleEventLog";
 
 // =============================================================================
 // CORES DOS JOGADORES (suporte a múltiplos)
@@ -410,6 +411,9 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
               >
                 {isMyTurn ? "🗡️ Sua Vez" : "⏳ Aguarde"}
               </div>
+
+              {/* Log de Eventos */}
+              <BattleEventLogButton battleId={battle.battleId} />
             </div>
           </div>
 

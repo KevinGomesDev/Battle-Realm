@@ -13,6 +13,7 @@ import {
 import { RACE_DEFINITIONS } from "../../../shared/data/races";
 import { ALIGNMENT_DEFINITIONS } from "../../../shared/data/alignments";
 import { getTroopSkills } from "../../../shared/data/skills.data";
+import { MAX_KINGDOMS_PER_USER } from "../../../shared/data/units";
 import {
   createTroopTemplatesForKingdom,
   TroopTemplateData,
@@ -72,6 +73,19 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
       if (!validated) return;
 
       try {
+        // Verificar limite de reinos por usuário
+        const kingdomCount = await prisma.kingdom.count({
+          where: { ownerId: userId },
+        });
+        if (kingdomCount >= MAX_KINGDOMS_PER_USER) {
+          emitError(
+            socket,
+            `Limite de ${MAX_KINGDOMS_PER_USER} reinos atingido. Delete um reino existente para criar um novo.`,
+            "VALIDATION_ERROR"
+          );
+          return;
+        }
+
         const result = await prisma.$transaction(async (tx) => {
           const randomLocation = Math.floor(Math.random() * MAP_SIZE) + 1;
 
@@ -359,6 +373,19 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
         ERROR_EVENT
       );
       if (!validated) return;
+
+      // Verificar limite de reinos por usuário
+      const kingdomCount = await prisma.kingdom.count({
+        where: { ownerId: userId },
+      });
+      if (kingdomCount >= MAX_KINGDOMS_PER_USER) {
+        emitError(
+          socket,
+          `Limite de ${MAX_KINGDOMS_PER_USER} reinos atingido. Delete um reino existente para criar um novo.`,
+          "VALIDATION_ERROR"
+        );
+        return;
+      }
 
       const template = getKingdomTemplateById(validated.templateId);
       if (!template) {

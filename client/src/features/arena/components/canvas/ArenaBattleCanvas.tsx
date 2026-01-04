@@ -26,6 +26,7 @@ import {
   CameraController,
   type CameraControllerRef,
 } from "../../../../components/CameraController";
+import { isPlayerControllable } from "../../utils/unit-control";
 
 // Re-export SpriteDirection for external use
 export type { SpriteDirection };
@@ -59,6 +60,8 @@ interface ArenaBattleCanvasProps {
   pendingAction?: string | null;
   /** Balões de fala ativos (unitId -> mensagem) */
   activeBubbles?: Map<string, ActiveBubble>;
+  /** IDs de unidades para destacar como alvos válidos */
+  highlightedUnitIds?: Set<string>;
 }
 
 /**
@@ -80,6 +83,7 @@ export const ArenaBattleCanvas = memo(
         unitDirection,
         pendingAction,
         activeBubbles,
+        highlightedUnitIds,
       },
       ref
     ) => {
@@ -298,10 +302,10 @@ export const ArenaBattleCanvas = memo(
       const movableCellsMap = useMemo((): Map<string, MovementCellInfo> => {
         if (!isMyTurn) return new Map();
         if (!selectedUnit || selectedUnit.movesLeft <= 0) return new Map();
-        // Verificar se é a unidade ativa OU se activeUnitId está indefinido e é minha unidade
+        // Verificar se é a unidade ativa OU se activeUnitId está indefinido e é minha unidade controlável
         const isActiveOrPending = activeUnitId
           ? selectedUnit.id === activeUnitId
-          : selectedUnit.ownerId === currentUserId;
+          : isPlayerControllable(selectedUnit, currentUserId);
         if (!isActiveOrPending) return new Map();
 
         const movable = new Map<string, MovementCellInfo>();
@@ -386,10 +390,10 @@ export const ArenaBattleCanvas = memo(
         // Só mostrar células atacáveis quando ação de ataque estiver selecionada
         if (pendingAction !== "attack") return new Set();
         if (!selectedUnit) return new Set();
-        // Verificar se é a unidade ativa OU se activeUnitId está indefinido e é minha unidade
+        // Verificar se é a unidade ativa OU se activeUnitId está indefinido e é minha unidade controlável
         const isActiveOrPending = activeUnitId
           ? selectedUnit.id === activeUnitId
-          : selectedUnit.ownerId === currentUserId;
+          : isPlayerControllable(selectedUnit, currentUserId);
         if (!isActiveOrPending) return new Set();
         // Pode atacar se tem ações OU ataques extras restantes
         const hasExtraAttacks = (selectedUnit.attacksLeftThisTurn ?? 0) > 0;
@@ -437,7 +441,8 @@ export const ArenaBattleCanvas = memo(
           y: number,
           size: number,
           unit: BattleUnit,
-          isOwned: boolean
+          isOwned: boolean,
+          isHighlighted: boolean = false
         ) => {
           // Determinar animação baseada no estado da unidade
           // Prioridade: animação de sprite ativa > movimento > estado (morto/vivo)
@@ -615,6 +620,35 @@ export const ArenaBattleCanvas = memo(
             ctx.lineWidth = 2;
             const gap = 2;
             ctx.strokeRect(x + gap, y + gap, size - gap * 2, size - gap * 2);
+          }
+
+          // Highlight de alvo válido - círculo verde pulsante
+          if (isHighlighted && unit.isAlive) {
+            ctx.save();
+            // Animação de pulso suave
+            const pulse = Math.sin(animationTimeRef.current / 200) * 0.2 + 0.8;
+            ctx.strokeStyle = `rgba(34, 197, 94, ${pulse})`; // Verde (green-500)
+            ctx.lineWidth = 3;
+            const gap = 1;
+            // Desenhar retângulo arredondado
+            const radius = 6;
+            const rx = x + gap;
+            const ry = y + gap;
+            const rw = size - gap * 2;
+            const rh = size - gap * 2;
+            ctx.beginPath();
+            ctx.moveTo(rx + radius, ry);
+            ctx.lineTo(rx + rw - radius, ry);
+            ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + radius);
+            ctx.lineTo(rx + rw, ry + rh - radius);
+            ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - radius, ry + rh);
+            ctx.lineTo(rx + radius, ry + rh);
+            ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - radius);
+            ctx.lineTo(rx, ry + radius);
+            ctx.quadraticCurveTo(rx, ry, rx + radius, ry);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.restore();
           }
         },
         [
@@ -958,7 +992,10 @@ export const ArenaBattleCanvas = memo(
           const cellX = visualPos.x * cellSize;
           const cellY = visualPos.y * cellSize;
 
-          drawUnit(ctx, cellX, cellY, cellSize, unit, isOwned);
+          // Verificar se unidade está destacada como alvo válido
+          const isHighlighted = highlightedUnitIds?.has(unit.id) ?? false;
+
+          drawUnit(ctx, cellX, cellY, cellSize, unit, isOwned, isHighlighted);
 
           if (unit.isAlive) {
             drawConditions(ctx, cellX, cellY, unit.conditions);
@@ -1072,6 +1109,7 @@ export const ArenaBattleCanvas = memo(
         OBSTACLES,
         getVisualPosition,
         drawStaticGrid,
+        highlightedUnitIds,
       ]);
 
       // === MARCAR PARA REDESENHO ===
@@ -1087,6 +1125,7 @@ export const ArenaBattleCanvas = memo(
         visibleCells,
         spritesLoaded,
         activeBubbles,
+        highlightedUnitIds,
         // frameIndex removido - agora controlado pelo loop de animação
       ]);
 

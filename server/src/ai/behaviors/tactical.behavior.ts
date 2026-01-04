@@ -8,19 +8,25 @@ import type {
   AIProfile,
   AISelfAssessment,
 } from "../types/ai.types";
-import {
-  manhattanDistance,
-  findBestMoveTowards,
-  findBestRetreatPosition,
-} from "../core/pathfinding";
+import { manhattanDistance, findBestMoveTowards } from "../core/pathfinding";
 import {
   selectBestTarget,
-  findNearestEnemy,
   isUnitInDanger,
   countThreatsAtPosition,
 } from "../core/target-selection";
-import { selectBestSkill } from "../core/skill-evaluator";
 import { BattleUnit } from "../../../../shared/types/battle.types";
+import {
+  tryExplore,
+  tryAnySkill,
+  tryRetreat,
+  tryDash,
+  passDecision,
+  fallbackDecision,
+  getEffectiveAttackRange,
+  tryAnySpell,
+} from "./shared.behavior";
+
+const BEHAVIOR_NAME = "Tático";
 
 /**
  * Comportamento Tático
@@ -49,110 +55,83 @@ export function makeTacticalDecision(
       (u) => u.isAlive && u.ownerId !== unit.ownerId
     );
 
-    // Verificar se pode atacar (tem ações disponíveis)
     const canAttack = (actionsRemaining ?? unit.actionsLeft ?? 0) > 0;
+    const attackRange = getEffectiveAttackRange(unit);
+    const bestTarget = selectBestTarget(unit, units, profile, attackRange);
+    const hasTargetInRange = bestTarget
+      ? manhattanDistance(
+          { x: unit.posX, y: unit.posY },
+          { x: bestTarget.posX, y: bestTarget.posY }
+        ) <= attackRange
+      : false;
 
-    console.log(
-      `[AI Tactical] ${unit.name} em (${unit.posX}, ${
-        unit.posY
-      }), movesRemaining=${movesRemaining}, actionsRemaining=${
-        actionsRemaining ?? unit.actionsLeft
-      }, enemies=${enemies.length}`
-    );
-
-    // 1. Verificar se está em perigo (usando self-assessment se disponível)
+    // 1. Verificar se está em perigo
     const inDanger =
       selfAssessment?.shouldRetreat ||
       isUnitInDanger(unit, units, profile.retreatThreshold);
 
-    if (inDanger && movesRemaining > 0) {
-      console.log(`[AI Tactical] ${unit.name} está em perigo, tentando recuar`);
-      // Tentar recuar
-      const retreatPos = findBestRetreatPosition(
-        unit,
-        enemies,
-        movesRemaining,
-        gridSize.width,
-        gridSize.height,
-        units,
-        obstacles
-      );
-
-      if (retreatPos) {
+    if (inDanger) {
+      // Atacar antes de recuar se possível
+      if (canAttack && hasTargetInRange && bestTarget) {
         return {
-          type: "MOVE",
+          type: "ATTACK",
           unitId: unit.id,
-          targetPosition: retreatPos,
-          reason: "Tático: Recuando - HP baixo ou cercado",
+          targetId: bestTarget.id,
+          reason: `${BEHAVIOR_NAME}: Atacar ${bestTarget.name} (último recurso)`,
         };
       }
+
+      // Tentar recuar
+      const retreatDecision = tryRetreat(unit, context, BEHAVIOR_NAME);
+      if (retreatDecision) return retreatDecision;
     }
 
-    // 2. Tentar usar skill (priorizando utilidade)
-    const skillEval = selectBestSkill(unit, availableSkills, units, profile);
-    if (skillEval && skillEval.canUse) {
-      return {
-        type: "SKILL",
-        unitId: unit.id,
-        skillCode: skillEval.skill.code,
-        targetId: skillEval.bestTarget!.id,
-        reason: `Tático: ${skillEval.reason}`,
-      };
-    }
+    // 2. Tentar usar spell (magias podem ser mais poderosas)
+    const spellDecision = tryAnySpell(unit, context, profile, BEHAVIOR_NAME);
+    if (spellDecision) return spellDecision;
 
-    // 3. Avaliar se vale a pena atacar
-    const attackRange = 1;
-    const bestTarget = selectBestTarget(unit, units, profile, attackRange);
+    // 3. Tentar usar skill
+    const skillDecision = tryAnySkill(
+      unit,
+      context,
+      profile,
+      availableSkills,
+      BEHAVIOR_NAME
+    );
+    if (skillDecision) return skillDecision;
 
-    console.log(`[AI Tactical] bestTarget: ${bestTarget?.name || "null"}`);
-
+    // 3. Avaliar ataque considerando ameaças
     if (bestTarget) {
       const distance = manhattanDistance(
         { x: unit.posX, y: unit.posY },
         { x: bestTarget.posX, y: bestTarget.posY }
       );
 
-      console.log(
-        `[AI Tactical] Distância para ${bestTarget.name}: ${distance}, attackRange=${attackRange}`
-      );
-
-      // Se está ao alcance, avaliar se é seguro atacar
-      if (distance <= attackRange) {
-        // Verificar quantos inimigos podem contra-atacar
+      if (distance <= attackRange && canAttack) {
         const threatsNearby = countThreatsAtPosition(
           { x: unit.posX, y: unit.posY },
           enemies,
           attackRange
         );
-
-        // Usar self-assessment para decisão mais informada
         const hpPercent =
           selfAssessment?.hpPercent ?? unit.currentHp / unit.maxHp;
         const hasProtection =
           selfAssessment?.hasPhysicalProtection ||
           selfAssessment?.hasMagicalProtection;
 
-        console.log(
-          `[AI Tactical] Ao alcance! threatsNearby=${threatsNearby}, hpPercent=${hpPercent}, hasProtection=${hasProtection}`
-        );
-
-        // Só atacar se tem ações disponíveis
-        if (!canAttack) {
-          console.log(`[AI Tactical] Não tem ações disponíveis para atacar`);
-        } else if (threatsNearby <= 2 || hpPercent > 0.5 || hasProtection) {
+        // Só atacar em situação favorável
+        if (threatsNearby <= 2 || hpPercent > 0.5 || hasProtection) {
           return {
             type: "ATTACK",
             unitId: unit.id,
             targetId: bestTarget.id,
-            reason: `Tático: Atacar ${bestTarget.name} (situação favorável)`,
+            reason: `${BEHAVIOR_NAME}: Atacar ${bestTarget.name} (situação favorável)`,
           };
         }
       }
 
-      // Se não está ao alcance mas é seguro aproximar
+      // Mover se seguro
       if (movesRemaining > 0) {
-        console.log(`[AI Tactical] Não ao alcance, tentando aproximar...`);
-        // Avaliar posição destino
         const moveTarget = findBestMoveTowards(
           unit,
           { x: bestTarget.posX, y: bestTarget.posY },
@@ -170,107 +149,30 @@ export function makeTacticalDecision(
             attackRange
           );
 
-          console.log(
-            `[AI Tactical] moveTarget=(${moveTarget.x}, ${moveTarget.y}), threatsAtDestination=${threatsAtDestination}`
-          );
-
-          // Só mover se destino não for muito perigoso
           if (threatsAtDestination <= 2) {
             return {
               type: "MOVE",
               unitId: unit.id,
               targetPosition: moveTarget,
-              reason: `Tático: Aproximar de ${bestTarget.name}`,
+              reason: `${BEHAVIOR_NAME}: Aproximar de ${bestTarget.name}`,
             };
-          } else {
-            console.log(`[AI Tactical] Destino muito perigoso, não movendo`);
           }
-        } else {
-          console.log(`[AI Tactical] findBestMoveTowards retornou null`);
         }
       }
     }
 
-    // 4. Se não há boas opções ofensivas, manter posição ou reposicionar
-    const nearestEnemy = findNearestEnemy(unit, units);
-    console.log(
-      `[AI Tactical] Seção 4: nearestEnemy=${
-        nearestEnemy?.name || "null"
-      }, movesRemaining=${movesRemaining}`
-    );
+    // 4. Explorar se não há inimigos
+    const exploreDecision = tryExplore(unit, context, BEHAVIOR_NAME);
+    if (exploreDecision) return exploreDecision;
 
-    if (nearestEnemy && movesRemaining > 0) {
-      const currentDistance = manhattanDistance(
-        { x: unit.posX, y: unit.posY },
-        { x: nearestEnemy.posX, y: nearestEnemy.posY }
-      );
+    // 5. Usar corrida se ainda tem ações e está longe do alvo
+    const dashDecision = tryDash(unit, context, BEHAVIOR_NAME);
+    if (dashDecision) return dashDecision;
 
-      console.log(`[AI Tactical] currentDistance=${currentDistance}`);
-
-      // Se muito longe, aproximar um pouco
-      if (currentDistance > 3) {
-        const moveTarget = findBestMoveTowards(
-          unit,
-          { x: nearestEnemy.posX, y: nearestEnemy.posY },
-          Math.min(movesRemaining, 2), // Mover com cautela
-          gridSize.width,
-          gridSize.height,
-          units,
-          obstacles
-        );
-
-        if (moveTarget) {
-          return {
-            type: "MOVE",
-            unitId: unit.id,
-            targetPosition: moveTarget,
-            reason: "Tático: Reposicionando cautelosamente",
-          };
-        }
-      }
-    }
-
-    // 5. Nenhum inimigo visível - EXPLORAR o mapa
-    if (enemies.length === 0 && movesRemaining > 0) {
-      console.log(`[AI Tactical] Nenhum inimigo visível - explorando mapa`);
-
-      // Mover em direção ao centro do mapa para aumentar chances de encontrar inimigos
-      const centerX = Math.floor(gridSize.width / 2);
-      const centerY = Math.floor(gridSize.height / 2);
-
-      const moveTarget = findBestMoveTowards(
-        unit,
-        { x: centerX, y: centerY },
-        movesRemaining,
-        gridSize.width,
-        gridSize.height,
-        units,
-        obstacles
-      );
-
-      if (moveTarget) {
-        return {
-          type: "MOVE",
-          unitId: unit.id,
-          targetPosition: moveTarget,
-          reason: "Tático: Explorando - buscando inimigos",
-        };
-      }
-    }
-
-    // 6. Passar turno se não há boa ação
-    return {
-      type: "PASS",
-      unitId: unit.id,
-      reason: "Tático: Esperando melhor oportunidade",
-    };
+    // 6. Passar turno
+    return passDecision(unit, BEHAVIOR_NAME);
   } catch (error) {
-    // Fallback seguro em caso de erro
-    console.error(`[AI Tactical] Erro no comportamento: ${error}`);
-    return {
-      type: "PASS",
-      unitId: unit.id,
-      reason: "Tático: Fallback por erro",
-    };
+    console.error(`[AI ${BEHAVIOR_NAME}] Erro no comportamento: ${error}`);
+    return fallbackDecision(unit, BEHAVIOR_NAME);
   }
 }

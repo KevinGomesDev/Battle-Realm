@@ -6,7 +6,16 @@
 export {
   CONDITIONS_INFO,
   getConditionInfo,
-} from "../../../../../shared/types/conditions.data";
+} from "../../../../../shared/data/conditions.data";
+
+// Re-exportar ações do shared (fonte de verdade)
+export {
+  ALL_ACTIONS,
+  DEFAULT_UNIT_ACTIONS,
+  findActionByCode,
+  getActionDisplayInfo,
+  isBasicAction,
+} from "../../../../../shared/data/actions.data";
 
 // Importar cores centralizadas
 import {
@@ -15,84 +24,29 @@ import {
   PROTECTION_COLORS,
 } from "../../../config/colors.config";
 
+import { ALL_ACTIONS } from "../../../../../shared/data/actions.data";
+
 /**
- * Informações sobre ações disponíveis
+ * Informações sobre ações disponíveis (formato legado para compatibilidade)
+ * @deprecated Use getActionDisplayInfo() do shared/data/actions.data
  */
 export const ACTIONS_INFO: Record<
   string,
   { icon: string; name: string; description: string }
-> = {
-  MOVE: {
-    icon: "🚶",
-    name: "Mover",
-    description: "Move a unidade pelo campo de batalha",
-  },
-  ATTACK: {
-    icon: "⚔️",
-    name: "Atacar",
-    description: "Ataca um inimigo adjacente",
-  },
-  DASH: {
-    icon: "🏃",
-    name: "Correr",
-    description: "Move o dobro da distância normal",
-  },
-  DODGE: {
-    icon: "💨",
-    name: "Esquivar",
-    description: "Ganha +2 de AC até o próximo turno",
-  },
-  HELP: {
-    icon: "🤝",
-    name: "Ajudar",
-    description: "Dá vantagem a um aliado adjacente",
-  },
-  PROTECT: {
-    icon: "🛡️",
-    name: "Proteger",
-    description: "Protege um aliado adjacente",
-  },
-  KNOCKDOWN: {
-    icon: "⬇️",
-    name: "Derrubar",
-    description: "Tenta derrubar o inimigo",
-  },
-  DISARM: {
-    icon: "🔓",
-    name: "Desarmar",
-    description: "Tenta desarmar o inimigo",
-  },
-  GRAB: {
-    icon: "✊",
-    name: "Agarrar",
-    description: "Agarra um inimigo adjacente",
-  },
-  THROW: {
-    icon: "🪨",
-    name: "Arremessar",
-    description: "Arremessa um inimigo agarrado",
-  },
-  FLEE: {
-    icon: "🏃‍♂️",
-    name: "Fugir",
-    description: "Tenta escapar de uma agarrada",
-  },
-  CAST: {
-    icon: "✨",
-    name: "Lançar",
-    description: "Usa uma habilidade mágica",
-  },
-  END_TURN: {
-    icon: "⏭️",
-    name: "Passar",
-    description: "Termina o turno sem agir",
-  },
-  SURRENDER: {
-    icon: "🏳️",
-    name: "Render",
-    description: "Desiste da batalha",
-  },
-};
+> = Object.fromEntries(
+  Object.entries(ALL_ACTIONS).flatMap(([code, action]) => [
+    // Manter lowercase (padrão)
+    [
+      code,
+      { icon: action.icon, name: action.name, description: action.description },
+    ],
+    // Manter uppercase para compatibilidade com código legado
+    [
+      code.toUpperCase(),
+      { icon: action.icon, name: action.name, description: action.description },
+    ],
+  ])
+);
 
 /**
  * Tooltips para atributos

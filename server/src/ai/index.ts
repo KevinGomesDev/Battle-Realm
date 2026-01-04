@@ -70,6 +70,7 @@ export {
   getEnemies,
   getVisibleEnemies,
   getAllies,
+  filterVisibleUnits,
   evaluateThreatLevel,
   canDefeatTarget,
   calculateTargetScore,

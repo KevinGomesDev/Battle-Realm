@@ -5,6 +5,7 @@ import type {
   BattleObstacle,
   BattleUnit,
 } from "../../../../shared/types/battle.types";
+import { getManhattanDistance } from "../../../../shared/types/skills.types";
 
 interface Position {
   x: number;
@@ -20,9 +21,10 @@ interface PathNode extends Position {
 
 /**
  * Calcula distância Manhattan entre dois pontos
+ * Wrapper para manter interface Position usada pela IA
  */
 export function manhattanDistance(a: Position, b: Position): number {
-  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+  return getManhattanDistance(a.x, a.y, b.x, b.y);
 }
 
 /**
@@ -63,7 +65,17 @@ export function isCellBlocked(
     (u) =>
       u.isAlive && u.posX === pos.x && u.posY === pos.y && u.id !== ignoreUnitId
   );
-  return hasUnit;
+  if (hasUnit) return true;
+
+  // Verificar cadáveres (unidades mortas sem CORPSE_REMOVED)
+  const hasCorpse = units.some(
+    (u) =>
+      !u.isAlive &&
+      u.posX === pos.x &&
+      u.posY === pos.y &&
+      !u.conditions?.includes("CORPSE_REMOVED")
+  );
+  return hasCorpse;
 }
 
 /**

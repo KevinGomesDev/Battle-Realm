@@ -1,6 +1,6 @@
 // src/utils/army/troop.utils.ts
 
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { TROOP_SKILLS_MAP } from "../../../../shared/data/skills.data";
 import {
@@ -11,6 +11,14 @@ import {
   PlayerResources,
 } from "../../types";
 import { getResourceName } from "../../../../shared/config/global.config";
+import {
+  TroopTemplateData,
+  TROOP_INITIAL_ATTRIBUTE_POINTS,
+  TROOP_MAX_ATTRIBUTE_VALUE,
+} from "../../../../shared/types/units.types";
+
+// Re-export para compatibilidade
+export type { TroopTemplateData } from "../../../../shared/types/units.types";
 
 // Tipo para transação Prisma
 type PrismaTransaction = Omit<
@@ -19,22 +27,7 @@ type PrismaTransaction = Omit<
 >;
 type PrismaClientOrTransaction = PrismaClient | PrismaTransaction;
 
-// Interface para dados de criação de template de tropa
-export interface TroopTemplateData {
-  slotIndex: number; // 0-4
-  name: string;
-  description?: string; // História/descrição opcional da tropa
-  avatar?: string; // ID do sprite (ex: "1")
-  passiveId: string;
-  resourceType: keyof PlayerResources;
-  combat: number;
-  speed: number;
-  focus: number;
-  armor: number;
-  vitality: number;
-}
-
-// Validar que os 10 pontos foram distribuídos corretamente
+// Validar que os pontos foram distribuídos corretamente
 export function validateTroopAttributes(data: TroopTemplateData): {
   valid: boolean;
   message?: string;
@@ -42,10 +35,10 @@ export function validateTroopAttributes(data: TroopTemplateData): {
   const total =
     data.combat + data.speed + data.focus + data.armor + data.vitality;
 
-  if (total !== 10) {
+  if (total !== TROOP_INITIAL_ATTRIBUTE_POINTS) {
     return {
       valid: false,
-      message: `A soma dos atributos deve ser 10. Atual: ${total}`,
+      message: `A soma dos atributos deve ser ${TROOP_INITIAL_ATTRIBUTE_POINTS}. Atual: ${total}`,
     };
   }
 
@@ -60,8 +53,11 @@ export function validateTroopAttributes(data: TroopTemplateData): {
     if (attr < 0) {
       return { valid: false, message: "Atributos não podem ser negativos." };
     }
-    if (attr > 10) {
-      return { valid: false, message: "Atributos não podem exceder 10." };
+    if (attr > TROOP_MAX_ATTRIBUTE_VALUE) {
+      return {
+        valid: false,
+        message: `Atributos não podem exceder ${TROOP_MAX_ATTRIBUTE_VALUE}.`,
+      };
     }
   }
 
@@ -461,7 +457,7 @@ export async function upgradeTroopCategory(
       };
     }
 
-    // Deduzir recursos e aumentar nível
+    // Deduzir recursos e aumentar nível do TEMPLATE
     resources.experience -= cost;
     troopLevels[String(troopSlotIndex)] = currentLevel + 1;
 
@@ -473,31 +469,20 @@ export async function upgradeTroopCategory(
       },
     });
 
-    // Atualizar todas as tropas existentes desse tipo
+    // Obter novos stats para futuras tropas
     const info = await getTroopCategoryInfo(playerId, troopSlotIndex);
 
-    // Atualizar unidades existentes com novos stats
-    await prisma.unit.updateMany({
-      where: {
-        matchId,
-        ownerId: playerId,
-        category: "TROOP",
-        troopSlot: troopSlotIndex,
-      },
-      data: {
-        level: currentLevel + 1,
-        combat: info.stats.combat,
-        speed: info.stats.speed,
-        focus: info.stats.focus,
-        armor: info.stats.armor,
-        vitality: info.stats.vitality,
-      },
-    });
+    // NOTA: NÃO atualizamos tropas existentes!
+    // Cada tropa é uma Unit única que pode ter modificações individuais.
+    // O upgrade do template só afeta NOVAS tropas recrutadas.
 
     return {
       success: true,
       newLevel: currentLevel + 1,
       newStats: info.stats,
+      message: `Template de tropa evoluído para nível ${
+        currentLevel + 1
+      }! Novas tropas recrutadas terão stats melhores.`,
     };
   } catch (error: any) {
     return {

@@ -19,7 +19,8 @@ import {
   emitConditionRemovedEvent,
 } from "./combat-events";
 import { getMaxMarksByCategory } from "../utils/battle.utils";
-import { tickSkillCooldowns } from "./skill-executors";
+import { tickUnitCooldowns } from "./skill-executors";
+import { clearBattleEventsCache } from "../services/event.service";
 
 // =============================================================================
 // TIPOS
@@ -278,8 +279,8 @@ export async function processNewRound(
     // Resetar ataques extras
     unit.attacksLeftThisTurn = 0;
 
-    // Reduzir cooldowns de skills em 1 a cada rodada
-    tickSkillCooldowns(unit);
+    // Reduzir cooldowns de skills/spells em 1 a cada rodada
+    tickUnitCooldowns(unit);
   }
 
   // Processar condições de início de turno para todas as unidades vivas
@@ -514,6 +515,9 @@ export function emitBattleEndEvents(
     reason: victoryCheck.reason,
     finalUnits: units,
   });
+
+  // Limpar cache de eventos da batalha (são mantidos apenas em memória)
+  clearBattleEventsCache(battleId);
 }
 
 /**
@@ -533,4 +537,7 @@ export function emitExhaustionEndEvents(
     reason: "Todas as unidades estão exaustas (Action Marks máximos)",
     finalUnits: units,
   });
+
+  // Limpar cache de eventos da batalha (são mantidos apenas em memória)
+  clearBattleEventsCache(battleId);
 }

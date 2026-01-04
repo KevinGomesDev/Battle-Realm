@@ -11,6 +11,7 @@ import {
   useMatchSectionActions,
   ArenaSection,
   useArenaSectionActions,
+  ArenaSelectionProvider,
   MatchLobby,
   ArenaLobby,
 } from "../components/Dashboard";
@@ -18,22 +19,32 @@ import { ArenaBattleView } from "../features/arena";
 import { SessionGuard } from "../components/SessionGuard";
 import { Topbar } from "../components/Topbar";
 import MapPage from "./MapPage";
-import { CreateKingdomModal } from "../features/kingdom";
+import { CreateKingdomModal, useKingdom } from "../features/kingdom";
 import { GlobalChat } from "../features/chat";
+import { MAX_KINGDOMS_PER_USER } from "../../../shared/data/units";
 
 // =============================================================================
 // BOTÕES DE HEADER
 // =============================================================================
 
 /** Botão compacto para header - Fundar Reino */
-const FundarReinoBtn: React.FC<{ onClick: () => void }> = ({ onClick }) => (
+const FundarReinoBtn: React.FC<{
+  onClick: () => void;
+  disabled?: boolean;
+  tooltip?: string;
+}> = ({ onClick, disabled, tooltip }) => (
   <button
     onClick={onClick}
-    className="px-2 py-0.5 text-[10px] font-semibold
-               bg-gradient-to-b from-metal-bronze to-metal-copper
+    disabled={disabled}
+    title={tooltip}
+    className={`px-2 py-0.5 text-[10px] font-semibold
                border border-metal-iron/50 rounded
-               hover:from-metal-gold hover:to-metal-bronze
-               text-citadel-obsidian transition-all"
+               text-citadel-obsidian transition-all
+               ${
+                 disabled
+                   ? "bg-gradient-to-b from-citadel-slate to-citadel-granite cursor-not-allowed opacity-60"
+                   : "bg-gradient-to-b from-metal-bronze to-metal-copper hover:from-metal-gold hover:to-metal-bronze"
+               }`}
   >
     ⚒️ Fundar
   </button>
@@ -98,19 +109,61 @@ const CriarArenaBtn: React.FC<{
 // =============================================================================
 
 /**
+ * Componente interno da Arena que usa o Provider
+ */
+const ArenaSectionWrapper: React.FC = () => {
+  const { state: arenaState } = useArena();
+  const arenaActions = useArenaSectionActions();
+
+  return (
+    <SectionCard
+      title="Arena"
+      icon="🏟️"
+      accentColor="purple"
+      headerAction={
+        !arenaState.currentLobby && (
+          <div className="flex items-center gap-2">
+            {/* Checkbox BOT */}
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={arenaActions.vsBot}
+                onChange={(e) => arenaActions.setVsBot(e.target.checked)}
+                className="w-3 h-3 accent-purple-500 cursor-pointer"
+              />
+              <span className="text-[10px] text-parchment-dark">BOT?</span>
+            </label>
+            <CriarArenaBtn
+              onClick={arenaActions.handleCreate}
+              disabled={!arenaActions.hasKingdoms || arenaActions.isCreating}
+              isLoading={arenaActions.isCreating}
+            />
+          </div>
+        )
+      }
+    >
+      {arenaState.currentLobby ? <ArenaLobby /> : <ArenaSection />}
+    </SectionCard>
+  );
+};
+
+/**
  * Dashboard Page - A CIDADELA DE PEDRA
  * Visão única com todas as seções lado a lado
  */
 const DashboardPage: React.FC = () => {
   const { currentMatch } = useMatch();
   const { state: arenaState } = useArena();
+  const { kingdoms } = useKingdom();
 
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
 
   // Hooks para ações dos headers
   const kingdomActions = useKingdomSectionActions();
   const matchActions = useMatchSectionActions();
-  const arenaActions = useArenaSectionActions();
+
+  // Verificar limite de reinos
+  const isKingdomLimitReached = kingdoms.length >= MAX_KINGDOMS_PER_USER;
 
   // Se há uma partida ativa, vai direto para o mapa
   if (currentMatch) {
@@ -144,7 +197,15 @@ const DashboardPage: React.FC = () => {
               icon="🏰"
               accentColor="bronze"
               headerAction={
-                <FundarReinoBtn onClick={kingdomActions.openModal} />
+                <FundarReinoBtn
+                  onClick={kingdomActions.openModal}
+                  disabled={isKingdomLimitReached}
+                  tooltip={
+                    isKingdomLimitReached
+                      ? `Limite de ${MAX_KINGDOMS_PER_USER} reinos atingido`
+                      : undefined
+                  }
+                />
               }
             >
               <KingdomSection />
@@ -182,41 +243,10 @@ const DashboardPage: React.FC = () => {
               )}
             </SectionCard>
 
-            {/* 3. Arena de Combate */}
-            <SectionCard
-              title="Arena"
-              icon="🏟️"
-              accentColor="purple"
-              headerAction={
-                !arenaState.currentLobby && (
-                  <div className="flex items-center gap-2">
-                    {/* Checkbox BOT */}
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={arenaActions.vsBot}
-                        onChange={(e) =>
-                          arenaActions.setVsBot(e.target.checked)
-                        }
-                        className="w-3 h-3 accent-purple-500 cursor-pointer"
-                      />
-                      <span className="text-[10px] text-parchment-dark">
-                        BOT?
-                      </span>
-                    </label>
-                    <CriarArenaBtn
-                      onClick={arenaActions.handleCreate}
-                      disabled={
-                        !arenaActions.hasKingdoms || arenaActions.isCreating
-                      }
-                      isLoading={arenaActions.isCreating}
-                    />
-                  </div>
-                )
-              }
-            >
-              {arenaState.currentLobby ? <ArenaLobby /> : <ArenaSection />}
-            </SectionCard>
+            {/* 3. Arena de Combate - envolvido pelo Provider */}
+            <ArenaSelectionProvider>
+              <ArenaSectionWrapper />
+            </ArenaSelectionProvider>
 
             {/* 4. Ranking */}
             <SectionCard title="Ranking" icon="🏆" accentColor="gold">

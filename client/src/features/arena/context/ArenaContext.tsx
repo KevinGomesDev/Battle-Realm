@@ -27,6 +27,7 @@ import type {
   ArenaLobbyStatus,
 } from "../types/arena.types";
 import type { BattleUnit } from "../../../../../shared/types/battle.types";
+import { findSkillByCode } from "../../../../../shared/data/skills.data";
 
 export const ArenaContext = createContext<ArenaContextType | null>(null);
 
@@ -293,6 +294,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         targetHpAfter: data.targetHpAfter,
         targetDefeated: data.targetDefeated,
         finalDamage: data.finalDamage,
+        killedSummonIds: data.killedSummonIds,
       });
 
       battleLog("⚔️", "ATAQUE!", {
@@ -326,6 +328,20 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
           attacksLeftThisTurn: data.attackerAttacksLeftThisTurn,
         },
       });
+
+      // Matar invocações do alvo derrotado (summons morrem com o invocador)
+      if (data.killedSummonIds && data.killedSummonIds.length > 0) {
+        console.log(
+          "[ARENA-CLIENT] 💀 Matando invocações do invocador:",
+          data.killedSummonIds
+        );
+        for (const summonId of data.killedSummonIds) {
+          dispatch({
+            type: "UPDATE_UNIT",
+            payload: { id: summonId, currentHp: 0, isAlive: false },
+          });
+        }
+      }
     };
 
     const handleUnitDefeated = (data: { battleId: string; unitId: string }) => {
@@ -374,6 +390,73 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
           conditions: data.conditions,
         },
       });
+    };
+
+    // Handler para Skill Usada
+    const handleSkillUsed = (data: {
+      battleId: string;
+      casterUnitId: string;
+      skillCode: string;
+      skillName: string;
+      targetUnitId: string | null;
+      result: {
+        healAmount?: number;
+        damageDealt?: number;
+        conditionApplied?: string;
+        conditionRemoved?: string;
+        actionsGained?: number;
+      };
+      casterActionsLeft: number;
+      casterUnitCooldowns?: Record<string, number>;
+      targetHpAfter?: number;
+      targetDefeated?: boolean;
+      casterName: string;
+      targetName: string | null;
+    }) => {
+      battleLog("✨", "SKILL USADA!", {
+        casterUnitId: data.casterUnitId,
+        skillCode: data.skillCode,
+        skillName: data.skillName,
+        targetUnitId: data.targetUnitId,
+        healAmount: data.result.healAmount,
+        damageDealt: data.result.damageDealt,
+        casterActionsLeft: data.casterActionsLeft,
+      });
+
+      // Atualizar ações e cooldowns do caster
+      dispatch({
+        type: "UPDATE_UNIT",
+        payload: {
+          id: data.casterUnitId,
+          actionsLeft: data.casterActionsLeft,
+          ...(data.casterUnitCooldowns && {
+            unitCooldowns: data.casterUnitCooldowns,
+          }),
+        },
+      });
+
+      // Se há target e mudança de HP
+      if (data.targetUnitId && data.targetHpAfter !== undefined) {
+        dispatch({
+          type: "UPDATE_UNIT",
+          payload: {
+            id: data.targetUnitId,
+            currentHp: data.targetHpAfter,
+            ...(data.targetDefeated ? { isAlive: false } : {}),
+          },
+        });
+      }
+
+      // Se ganhou ações (ACTION_SURGE, etc)
+      if (data.result.actionsGained && data.result.actionsGained > 0) {
+        dispatch({
+          type: "UPDATE_UNIT",
+          payload: {
+            id: data.casterUnitId,
+            actionsLeft: data.casterActionsLeft,
+          },
+        });
+      }
     };
 
     const handleProtectionRecovered = (data: {
@@ -454,6 +537,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         posX?: number;
         posY?: number;
         conditions?: string[];
+        unitCooldowns?: Record<string, number>;
       }>;
     }) => {
       battleLog("📦", "UNIDADES ATUALIZADAS", {
@@ -518,6 +602,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         conditions: string[];
         currentHp: number;
         isAlive: boolean;
+        unitCooldowns?: Record<string, number>;
       }>;
     }) => {
       battleLog("🔔", "NOVA RODADA", {
@@ -551,6 +636,9 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
               conditions: serverUnit.conditions,
               currentHp: serverUnit.currentHp,
               isAlive: serverUnit.isAlive,
+              ...(serverUnit.unitCooldowns && {
+                unitCooldowns: serverUnit.unitCooldowns,
+              }),
             };
           }
           return u;
@@ -870,6 +958,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
     socketService.on("battle:battle_ended", handleBattleEnded);
     socketService.on("battle:unit_dashed", handleUnitDashed);
     socketService.on("battle:unit_dodged", handleUnitDodged);
+    socketService.on("battle:skill_used", handleSkillUsed);
     socketService.on("battle:error", handleError);
     socketService.on("battle:session_restored", handleSessionRestored);
     socketService.on("battle:battle_restored", handleBattleRestored);
@@ -906,6 +995,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
       socketService.off("battle:battle_ended", handleBattleEnded);
       socketService.off("battle:unit_dashed", handleUnitDashed);
       socketService.off("battle:unit_dodged", handleUnitDodged);
+      socketService.off("battle:skill_used", handleSkillUsed);
       socketService.off("battle:error", handleError);
       socketService.off("battle:session_restored", handleSessionRestored);
       socketService.off("battle:battle_restored", handleBattleRestored);
@@ -1106,16 +1196,35 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
     (actionName: string, unitId: string, params?: Record<string, unknown>) => {
       if (!state.battle) return;
 
-      // Ações que consomem actionsLeft
-      const actionsThatConsumeActions = ["dash", "dodge", "skill"];
+      const unit = state.units.find((u) => u.id === unitId);
+      if (!unit) {
+        battleLog("⚠️", `${actionName} bloqueado: unidade não encontrada`, {
+          unitId,
+        });
+        return;
+      }
+
+      // Determinar se a ação consome actionsLeft
+      let consumesAction = false;
+
+      if (actionName === "dash" || actionName === "dodge") {
+        consumesAction = true;
+      } else if (actionName === "use_skill" || actionName === "skill") {
+        // Buscar skill para verificar consumesAction
+        const skillCode = params?.skillCode as string | undefined;
+        if (skillCode) {
+          const skill = findSkillByCode(skillCode);
+          // Só consome ação se a skill existir E consumesAction !== false
+          consumesAction = skill ? skill.consumesAction !== false : true;
+        }
+      }
 
       // Validação e update otimista para ações que consomem actionsLeft
-      if (actionsThatConsumeActions.includes(actionName)) {
-        const unit = state.units.find((u) => u.id === unitId);
-        if (!unit || unit.actionsLeft <= 0) {
+      if (consumesAction) {
+        if (unit.actionsLeft <= 0) {
           battleLog("⚠️", `${actionName} bloqueado: sem ações disponíveis`, {
             unitId,
-            actionsLeft: unit?.actionsLeft ?? 0,
+            actionsLeft: unit.actionsLeft,
           });
           return;
         }

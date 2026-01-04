@@ -19,6 +19,8 @@ import {
   makeDefensiveDecision,
 } from "../behaviors";
 
+import { getUnitSpells } from "./spell-evaluator";
+
 import {
   assessSelf,
   getAggressionModifier,
@@ -81,10 +83,18 @@ export function makeDecision(
     "assessSelf"
   );
 
-  // Contexto enriquecido com self-assessment
+  // Obter spells disponíveis da unidade
+  const availableSpells = safeExecute(
+    () => getUnitSpells(unit),
+    [],
+    `getUnitSpells-${unit.name}`
+  );
+
+  // Contexto enriquecido com self-assessment e spells
   const enrichedContext = {
     ...context,
     selfAssessment: selfState,
+    availableSpells,
   };
 
   // Se deve recuar (HP muito baixo), comportamento defensivo
@@ -227,6 +237,50 @@ export function validateDecision(
           valid: false,
           reason: "Alvo de skill não encontrado ou morto",
         };
+      }
+      return { valid: true };
+
+    case "SPELL":
+      if (!decision.spellCode) {
+        return { valid: false, reason: "Spell não especificada" };
+      }
+      // Spells podem ter targetId OU targetPosition
+      if (!decision.targetId && !decision.targetPosition) {
+        return {
+          valid: false,
+          reason: "Alvo ou posição de spell não especificado",
+        };
+      }
+      // Se tem targetId, verificar se é válido
+      if (decision.targetId) {
+        const spellTarget = context.units.find(
+          (u) => u.id === decision.targetId && u.isAlive
+        );
+        if (!spellTarget) {
+          return {
+            valid: false,
+            reason: "Alvo de spell não encontrado ou morto",
+          };
+        }
+      }
+      // Se tem targetPosition, verificar se está dentro do grid
+      if (decision.targetPosition) {
+        const { x, y } = decision.targetPosition;
+        if (
+          x < 0 ||
+          x >= context.gridSize.width ||
+          y < 0 ||
+          y >= context.gridSize.height
+        ) {
+          return { valid: false, reason: "Posição de spell fora do grid" };
+        }
+      }
+      return { valid: true };
+
+    case "DASH":
+      // DASH não precisa de alvo, só verificar se tem ações
+      if ((context.actionsRemaining ?? 0) <= 0) {
+        return { valid: false, reason: "Sem ações restantes para dash" };
       }
       return { valid: true };
 

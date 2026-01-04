@@ -8,14 +8,20 @@ import type {
   AIProfile,
   AISelfAssessment,
 } from "../types/ai.types";
-import {
-  manhattanDistance,
-  findBestRetreatPosition,
-  findPositionAtRange,
-} from "../core/pathfinding";
+import { manhattanDistance, findPositionAtRange } from "../core/pathfinding";
 import { selectBestTarget, findNearestEnemy } from "../core/target-selection";
 import { selectBestSkill } from "../core/skill-evaluator";
 import { BattleUnit } from "../../../../shared/types/battle.types";
+import {
+  tryRetreat,
+  tryDash,
+  passDecision,
+  fallbackDecision,
+  getEffectiveAttackRange,
+  tryOffensiveSpell,
+} from "./shared.behavior";
+
+const BEHAVIOR_NAME = "Ranged";
 
 /**
  * Comportamento Ranged
@@ -40,12 +46,7 @@ export function makeRangedDecision(
       actionsRemaining,
       selfAssessment,
     } = context;
-    const enemies = units.filter(
-      (u) => u.isAlive && u.ownerId !== unit.ownerId
-    );
     const preferredRange = profile.preferredRange ?? 3;
-
-    // Verificar se pode atacar (tem ações disponíveis)
     const canAttack = (actionsRemaining ?? unit.actionsLeft ?? 0) > 0;
 
     // 1. Verificar se inimigos estão muito perto
@@ -56,32 +57,27 @@ export function makeRangedDecision(
         { x: nearestEnemy.posX, y: nearestEnemy.posY }
       );
 
-      // Se inimigo está muito perto ou em perigo, recuar primeiro
       const shouldRetreat =
-        selfAssessment?.shouldRetreat || selfAssessment?.isCritical;
-      if ((distance < preferredRange || shouldRetreat) && movesRemaining > 0) {
-        const retreatPos = findBestRetreatPosition(
-          unit,
-          enemies,
-          movesRemaining,
-          gridSize.width,
-          gridSize.height,
-          units,
-          obstacles
-        );
+        selfAssessment?.shouldRetreat ||
+        selfAssessment?.isCritical ||
+        distance < preferredRange;
 
-        if (retreatPos) {
-          return {
-            type: "MOVE",
-            unitId: unit.id,
-            targetPosition: retreatPos,
-            reason: "Ranged: Recuando para manter distância",
-          };
-        }
+      if (shouldRetreat && movesRemaining > 0) {
+        const retreatDecision = tryRetreat(unit, context, BEHAVIOR_NAME);
+        if (retreatDecision) return retreatDecision;
       }
     }
 
-    // 2. Tentar usar skill ranged
+    // 2. Tentar usar spell ofensiva (prioridade para ranged)
+    const spellDecision = tryOffensiveSpell(
+      unit,
+      context,
+      profile,
+      BEHAVIOR_NAME
+    );
+    if (spellDecision) return spellDecision;
+
+    // 3. Tentar usar skill ranged
     const rangedSkills = availableSkills.filter(
       (s) => s.range === "RANGED" || (s.rangeValue && s.rangeValue > 1)
     );
@@ -94,7 +90,7 @@ export function makeRangedDecision(
           unitId: unit.id,
           skillCode: skillEval.skill.code,
           targetId: skillEval.bestTarget!.id,
-          reason: `Ranged: ${skillEval.reason}`,
+          reason: `${BEHAVIOR_NAME}: ${skillEval.reason}`,
         };
       }
     }
@@ -107,12 +103,12 @@ export function makeRangedDecision(
         unitId: unit.id,
         skillCode: skillEval.skill.code,
         targetId: skillEval.bestTarget!.id,
-        reason: `Ranged: ${skillEval.reason}`,
+        reason: `${BEHAVIOR_NAME}: ${skillEval.reason}`,
       };
     }
 
-    // 4. Se não tem skills ranged, verificar ataque básico
-    const attackRange = 1;
+    // 4. Ataque básico se ao alcance
+    const attackRange = getEffectiveAttackRange(unit);
     const bestTarget = selectBestTarget(unit, units, profile, attackRange);
 
     if (bestTarget) {
@@ -121,13 +117,12 @@ export function makeRangedDecision(
         { x: bestTarget.posX, y: bestTarget.posY }
       );
 
-      // Atacar se está ao alcance e tem ações
       if (distance <= attackRange && canAttack) {
         return {
           type: "ATTACK",
           unitId: unit.id,
           targetId: bestTarget.id,
-          reason: `Ranged: Atacar ${bestTarget.name} (sem opção ranged)`,
+          reason: `${BEHAVIOR_NAME}: Atacar ${bestTarget.name} (sem opção ranged)`,
         };
       }
     }
@@ -150,24 +145,19 @@ export function makeRangedDecision(
           type: "MOVE",
           unitId: unit.id,
           targetPosition: idealPos,
-          reason: "Ranged: Posicionando para ataque à distância",
+          reason: `${BEHAVIOR_NAME}: Posicionando para ataque à distância`,
         };
       }
     }
 
-    // 6. Passar turno
-    return {
-      type: "PASS",
-      unitId: unit.id,
-      reason: "Ranged: Mantendo posição",
-    };
+    // 6. Usar corrida para alcançar posição ideal mais rápido
+    const dashDecision = tryDash(unit, context, BEHAVIOR_NAME);
+    if (dashDecision) return dashDecision;
+
+    // 7. Passar turno
+    return passDecision(unit, BEHAVIOR_NAME);
   } catch (error) {
-    // Fallback seguro em caso de erro
-    console.error(`[AI Ranged] Erro no comportamento: ${error}`);
-    return {
-      type: "PASS",
-      unitId: unit.id,
-      reason: "Ranged: Fallback por erro",
-    };
+    console.error(`[AI ${BEHAVIOR_NAME}] Erro no comportamento: ${error}`);
+    return fallbackDecision(unit, BEHAVIOR_NAME);
   }
 }

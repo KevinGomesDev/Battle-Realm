@@ -212,7 +212,7 @@ export function validateDecision(
   }
 
   // Validar tipos de decisão conhecidos
-  const validTypes = ["ATTACK", "MOVE", "SKILL", "PASS"];
+  const validTypes = ["ATTACK", "MOVE", "SKILL", "SPELL", "DASH", "PASS"];
   if (!validTypes.includes(decision.type)) {
     return getFallbackDecision(`invalid decision type: ${decision.type}`);
   }

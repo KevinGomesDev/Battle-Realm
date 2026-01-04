@@ -8,9 +8,14 @@ import type {
   SkillTargetType,
   DEFAULT_RANGE_VALUES,
 } from "../../../../shared/types/skills.types";
+import { getSkillEffectiveRange as getSkillRangeShared } from "../../../../shared/types/skills.types";
 import type { AISkillPriority, AIProfile } from "../types/ai.types";
 import { manhattanDistance } from "./pathfinding";
 import { getEnemies, getAllies } from "./target-selection";
+import {
+  isValidSkillTarget,
+  getValidSkillTargets,
+} from "../../../../shared/utils/skill-validation";
 
 interface SkillEvaluation {
   skill: SkillDefinition;
@@ -23,24 +28,15 @@ interface SkillEvaluation {
 
 /**
  * Obtém o range efetivo de uma skill
+ * Wrapper para manter compatibilidade com código existente
  */
 export function getSkillEffectiveRange(skill: SkillDefinition): number {
-  switch (skill.range) {
-    case "SELF":
-      return 0;
-    case "ADJACENT":
-      return 1;
-    case "RANGED":
-      return skill.rangeValue ?? 4;
-    case "AREA":
-      return skill.rangeValue ?? 2;
-    default:
-      return 1;
-  }
+  return getSkillRangeShared(skill);
 }
 
 /**
  * Verifica se uma skill pode ser usada em um alvo específico
+ * @deprecated Use isValidSkillTarget de shared/utils/skill-validation
  */
 export function canUseSkillOnTarget(
   caster: BattleUnit,
@@ -48,32 +44,7 @@ export function canUseSkillOnTarget(
   skill: SkillDefinition,
   allUnits: BattleUnit[]
 ): boolean {
-  const distance = manhattanDistance(
-    { x: caster.posX, y: caster.posY },
-    { x: target.posX, y: target.posY }
-  );
-  const range = getSkillEffectiveRange(skill);
-
-  // Verificar distância
-  if (distance > range) return false;
-
-  // Verificar tipo de alvo
-  const isAlly = target.ownerId === caster.ownerId;
-  const isSelf = target.id === caster.id;
-
-  switch (skill.targetType) {
-    case "SELF":
-      return isSelf;
-    case "ALLY":
-      return isAlly && !isSelf;
-    case "ENEMY":
-      return !isAlly;
-    case "ALL":
-      return true;
-    default:
-      // Se targetType não especificado, assumir ENEMY para skills ativas
-      return !isAlly;
-  }
+  return isValidSkillTarget(caster, skill, target);
 }
 
 /**
@@ -84,11 +55,7 @@ export function getValidTargetsForSkill(
   skill: SkillDefinition,
   allUnits: BattleUnit[]
 ): BattleUnit[] {
-  const aliveUnits = allUnits.filter((u) => u.isAlive);
-
-  return aliveUnits.filter((unit) =>
-    canUseSkillOnTarget(caster, unit, skill, allUnits)
-  );
+  return getValidSkillTargets(caster, skill, allUnits);
 }
 
 /**

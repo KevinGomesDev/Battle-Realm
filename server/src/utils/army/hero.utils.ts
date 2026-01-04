@@ -1,313 +1,315 @@
 // src/utils/army/hero.utils.ts
+// Utilitários ESPECÍFICOS para heróis
+// Heróis são templates pré-definidos, ÚNICOS por partida
+
 import { prisma } from "../../lib/prisma";
-import {
-  HERO_LEVELUP_BASE_COST,
-  HERO_LEVELUP_INCREMENT,
-  HERO_RECRUITMENT_COSTS,
-  MAX_HEROES_PER_PLAYER,
-  MAX_HERO_LEVEL,
-  HERO_ATTRIBUTE_POINTS_PER_LEVEL,
-} from "../../types";
-import { spendResources } from "../turn.utils";
-import { getClassByCode } from "../../../../shared/data/classes.data";
 import { getResourceName } from "../../../../shared/config/global.config";
+import {
+  HERO_TEMPLATES,
+  getHeroTemplate,
+  HeroTemplate,
+} from "../../../../shared/data/heroes.data";
+import { MAX_HEROES_PER_KINGDOM } from "../../../../shared/data/units";
 
-// ... (calculateHeroLevelUpCost, calculateHeroRecruitmentCost, canHeroLevelUp e levelUpHero permanecem iguais) ...
+// Re-export funções genéricas de unit.utils.ts para compatibilidade
+export {
+  addExperience,
+  canLevelUp,
+  processLevelUp,
+  getXPForAction,
+  grantBattleXP,
+  grantKillXP,
+  addUnitFeature,
+  removeUnitFeature,
+  XP_THRESHOLDS,
+  XP_REWARDS,
+  ATTRIBUTE_POINTS_PER_LEVEL,
+  calculateLevelFromXP,
+  getXPToNextLevel,
+} from "./unit.utils";
+
+// Aliases para compatibilidade (DEPRECATED - usar addUnitFeature)
+import { addUnitFeature } from "./unit.utils";
+export const addHeroSkill = (unitId: string, skillCode: string) =>
+  addUnitFeature(unitId, skillCode, "classFeatures", true);
+export const addHeroClassFeature = (unitId: string, featureCode: string) =>
+  addUnitFeature(unitId, featureCode, "classFeatures", false);
+
+// =============================================================================
+// CONSTANTES DE RECRUTAMENTO
+// =============================================================================
+
+/** Custo base em recursos para revelar heróis */
+export const HERO_REVEAL_COST = 10;
+
+/** Número de heróis revelados por pagamento */
+export const HEROES_PER_REVEAL = 1;
+
+// =============================================================================
+// HERÓIS DISPONÍVEIS NA PARTIDA (Verificação de unicidade)
+// =============================================================================
 
 /**
- * Calcula o custo de experiência para herói subir de nível
- * Fórmula: 4 + (nível_atual × 2)
+ * Obtém heróis já recrutados na partida
  */
-export function calculateHeroLevelUpCost(currentLevel: number): number {
-  return HERO_LEVELUP_BASE_COST + currentLevel * HERO_LEVELUP_INCREMENT;
+export async function getRecruitedHeroesInMatch(
+  matchId: string
+): Promise<string[]> {
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: { recruitedHeroes: true },
+  });
+
+  if (!match) return [];
+  return JSON.parse(match.recruitedHeroes || "[]");
 }
 
 /**
- * Calcula o custo de recrutamento de um herói
+ * Marca um herói como recrutado na partida
  */
-export async function calculateHeroRecruitmentCost(
-  playerId: string
-): Promise<number> {
-  const heroCount = await prisma.unit.count({
-    where: {
-      ownerId: playerId,
-      category: "HERO",
-    },
-  });
+export async function markHeroAsRecruited(
+  matchId: string,
+  heroCode: string
+): Promise<void> {
+  const recruited = await getRecruitedHeroesInMatch(matchId);
 
-  return HERO_RECRUITMENT_COSTS[heroCount] || 0;
+  if (!recruited.includes(heroCode)) {
+    recruited.push(heroCode);
+    await prisma.match.update({
+      where: { id: matchId },
+      data: { recruitedHeroes: JSON.stringify(recruited) },
+    });
+  }
 }
 
 /**
- * Verifica se um herói pode fazer level up
+ * Lista heróis disponíveis para recrutamento (não recrutados por ninguém na partida)
  */
-export async function canHeroLevelUp(
-  unitId: string,
-  playerId: string
-): Promise<{ canLevel: boolean; reason?: string; cost?: number }> {
-  const unit = await prisma.unit.findUnique({
-    where: { id: unitId },
-  });
-
-  if (!unit) {
-    return { canLevel: false, reason: "Unidade não encontrada" };
-  }
-
-  if (unit.ownerId !== playerId) {
-    return { canLevel: false, reason: "Você não é dono desta unidade" };
-  }
-
-  if (unit.category !== "HERO") {
-    return { canLevel: false, reason: "Esta não é uma unidade Herói" };
-  }
-
-  if (unit.level >= MAX_HERO_LEVEL) {
-    return {
-      canLevel: false,
-      reason: `Heróis não podem passar do nível ${MAX_HERO_LEVEL}`,
-    };
-  }
-
-  // Verifica se está em território adequado
-  if (!unit.matchId || !unit.locationIndex) {
-    return {
-      canLevel: false,
-      reason: "Herói deve estar em uma partida e em um território",
-    };
-  }
-
-  const territory = await prisma.territory.findFirst({
-    where: {
-      matchId: unit.matchId,
-      mapIndex: unit.locationIndex,
-    },
-  });
-
-  if (!territory) {
-    return { canLevel: false, reason: "Território não encontrado" };
-  }
-
-  const isInCapital = territory.isCapital && territory.ownerId === playerId;
-
-  const hasArena = await prisma.structure.findFirst({
-    where: {
-      matchId: unit.matchId,
-      locationIndex: unit.locationIndex,
-      resourceType: "EXPERIENCE",
-      ownerId: playerId,
-    },
-  });
-
-  if (!isInCapital && !hasArena) {
-    return {
-      canLevel: false,
-      reason: `Herói precisa estar na Capital ou em território com Produtor de ${getResourceName(
-        "experience"
-      )} (Arena)`,
-    };
-  }
-
-  const cost = calculateHeroLevelUpCost(unit.level);
-
-  return { canLevel: true, cost };
+export async function getAvailableHeroesInMatch(
+  matchId: string
+): Promise<HeroTemplate[]> {
+  const recruited = await getRecruitedHeroesInMatch(matchId);
+  return HERO_TEMPLATES.filter((h) => !recruited.includes(h.code));
 }
 
 /**
- * Realiza o level up de um herói
+ * Revela heróis aleatórios para o jogador baseado em quanto recurso pagou
+ * @param matchId ID da partida
+ * @param resourceAmount Quantidade de recurso pago
+ * @returns Lista de heróis revelados (únicos, ainda não recrutados)
  */
-export async function levelUpHero(
-  unitId: string,
-  playerId: string,
-  attributeDistribution: {
-    combat: number;
-    speed: number;
-    focus: number;
-    armor: number;
-    vitality: number;
-  }
-): Promise<{ success: boolean; message: string; unit?: any }> {
-  const validation = await canHeroLevelUp(unitId, playerId);
+export async function revealHeroesForRecruitment(
+  matchId: string,
+  resourceAmount: number
+): Promise<{ heroes: HeroTemplate[]; count: number }> {
+  // Calcula quantos heróis revelar (1 por cada 10 recursos)
+  const heroCount = Math.floor(resourceAmount / HERO_REVEAL_COST);
 
-  if (!validation.canLevel) {
-    return {
-      success: false,
-      message: validation.reason || "Não pode fazer level up",
-    };
+  if (heroCount <= 0) {
+    return { heroes: [], count: 0 };
   }
 
-  const cost = validation.cost || 0;
+  // Pega heróis disponíveis (não recrutados)
+  const available = await getAvailableHeroesInMatch(matchId);
 
-  // Gasta experiência
-  try {
-    await spendResources(playerId, { experience: cost } as any);
-  } catch (error) {
-    return {
-      success: false,
-      message: `${getResourceName("experience")} insuficiente. Custo: ${cost}`,
-    };
+  if (available.length === 0) {
+    return { heroes: [], count: 0 };
   }
 
-  const unit = await prisma.unit.findUnique({
-    where: { id: unitId },
-  });
+  // Embaralha e pega os primeiros N
+  const shuffled = [...available].sort(() => Math.random() - 0.5);
+  const revealed = shuffled.slice(0, Math.min(heroCount, available.length));
 
-  if (!unit) {
-    return { success: false, message: "Unidade não encontrada" };
-  }
-
-  // Valida distribuição de pontos (4 para Herói)
-  const totalDistributed =
-    attributeDistribution.combat +
-    attributeDistribution.speed +
-    attributeDistribution.focus +
-    attributeDistribution.armor +
-    attributeDistribution.vitality;
-
-  if (totalDistributed !== HERO_ATTRIBUTE_POINTS_PER_LEVEL) {
-    return {
-      success: false,
-      message: `Você deve distribuir exatamente ${HERO_ATTRIBUTE_POINTS_PER_LEVEL} pontos`,
-    };
-  }
-
-  const newLevel = unit.level + 1;
-  const updatedUnit = await prisma.unit.update({
-    where: { id: unitId },
-    data: {
-      level: newLevel,
-      combat: unit.combat + attributeDistribution.combat,
-      speed: unit.speed + attributeDistribution.speed,
-      focus: unit.focus + attributeDistribution.focus,
-      armor: unit.armor + attributeDistribution.armor,
-      vitality: unit.vitality + attributeDistribution.vitality,
-      currentHp: unit.currentHp + attributeDistribution.vitality,
-    },
-  });
-
-  return {
-    success: true,
-    message: `Herói subiu para nível ${newLevel}! Custo: ${cost} ${getResourceName(
-      "experience"
-    )}`,
-    unit: updatedUnit,
-  };
+  return { heroes: revealed, count: revealed.length };
 }
 
+// =============================================================================
+// RECRUTAMENTO DE HERÓIS
+// =============================================================================
+
 /**
- * Recruta um novo herói
+ * Verifica se um jogador pode recrutar um herói específico
  */
-export async function recruitHero(
+export async function canRecruitHero(
   matchId: string,
   playerId: string,
-  heroData: {
-    name?: string;
-    heroClass: string; // Código da classe (ex: "CLERIC", "WIZARD")
-    attributeDistribution: {
-      combat: number;
-      speed: number;
-      focus: number;
-      armor: number;
-      vitality: number;
+  heroCode: string
+): Promise<{ canRecruit: boolean; reason?: string }> {
+  // Verifica se o template existe
+  const template = getHeroTemplate(heroCode);
+  if (!template) {
+    return { canRecruit: false, reason: "Herói não encontrado" };
+  }
+
+  // Verifica se já foi recrutado na partida
+  const recruited = await getRecruitedHeroesInMatch(matchId);
+  if (recruited.includes(heroCode)) {
+    return {
+      canRecruit: false,
+      reason: `${template.name} já foi recrutado por outro jogador`,
     };
   }
-): Promise<{ success: boolean; message: string; hero?: any }> {
-  // Obtém o Kingdom através do MatchPlayer
+
+  // Obtém o MatchPlayer
   const matchPlayer = await prisma.matchPlayer.findUnique({
     where: { id: playerId },
   });
 
   if (!matchPlayer) {
-    return {
-      success: false,
-      message: "MatchPlayer não encontrado",
-    };
+    return { canRecruit: false, reason: "Jogador não encontrado" };
   }
 
-  const kingdomId = matchPlayer.kingdomId;
-
-  // Verifica quantidade de heróis
+  // Conta heróis atuais do reino
   const heroCount = await prisma.unit.count({
     where: {
-      kingdomId,
+      kingdomId: matchPlayer.kingdomId,
       category: "HERO",
     },
   });
 
-  if (heroCount >= MAX_HEROES_PER_PLAYER) {
+  if (heroCount >= MAX_HEROES_PER_KINGDOM) {
     return {
-      success: false,
-      message: `Você já possui o máximo de ${MAX_HEROES_PER_PLAYER} heróis`,
+      canRecruit: false,
+      reason: `Limite de ${MAX_HEROES_PER_KINGDOM} heróis atingido`,
     };
   }
 
-  const cost = HERO_RECRUITMENT_COSTS[heroCount] || 0;
+  // Verifica se já tem esse herói no reino (de partidas anteriores)
+  const existingHero = await prisma.unit.findFirst({
+    where: {
+      kingdomId: matchPlayer.kingdomId,
+      category: "HERO",
+      name: template.name,
+    },
+  });
 
-  // Tenta gastar minério
-  try {
-    await spendResources(playerId, { minerio: cost } as any);
-  } catch (error) {
+  if (existingHero) {
     return {
-      success: false,
-      message: `${getResourceName("ore")} insuficiente. Custo: ${cost}`,
+      canRecruit: false,
+      reason: `Você já possui ${template.name} no seu reino`,
     };
   }
 
-  // Valida distribuição de pontos (15 pontos iniciais)
-  const { combat, speed, focus, armor, vitality } =
-    heroData.attributeDistribution;
-  const totalPoints = combat + speed + focus + armor + vitality;
+  return { canRecruit: true };
+}
 
-  if (totalPoints !== 15) {
+/**
+ * Recruta um herói de template durante uma partida
+ * O herói é marcado como recrutado na partida (único)
+ */
+export async function recruitHeroFromTemplate(
+  matchId: string,
+  playerId: string,
+  heroCode: string
+): Promise<{ success: boolean; message: string; hero?: any }> {
+  // Verifica se pode recrutar
+  const validation = await canRecruitHero(matchId, playerId, heroCode);
+  if (!validation.canRecruit) {
     return {
       success: false,
-      message: "Heróis devem ter exatamente 15 pontos de atributo iniciais",
+      message: validation.reason || "Não pode recrutar",
+    };
+  }
+
+  const template = getHeroTemplate(heroCode)!;
+
+  // Obtém o MatchPlayer
+  const matchPlayer = await prisma.matchPlayer.findUnique({
+    where: { id: playerId },
+    include: { kingdom: true },
+  });
+
+  if (!matchPlayer || !matchPlayer.kingdom) {
+    return { success: false, message: "Reino não encontrado" };
+  }
+
+  // Verifica recursos
+  const resources = JSON.parse(matchPlayer.resources || "{}");
+  const cost = template.recruitCost;
+
+  if (cost.ore && (resources.minerio || 0) < cost.ore) {
+    return {
+      success: false,
+      message: `${getResourceName("ore")} insuficiente. Precisa: ${cost.ore}`,
+    };
+  }
+  if (cost.supplies && (resources.suprimentos || 0) < cost.supplies) {
+    return {
+      success: false,
+      message: `${getResourceName("supplies")} insuficiente. Precisa: ${
+        cost.supplies
+      }`,
+    };
+  }
+  if (cost.arcane && (resources.arcana || 0) < cost.arcane) {
+    return {
+      success: false,
+      message: `${getResourceName("arcane")} insuficiente. Precisa: ${
+        cost.arcane
+      }`,
+    };
+  }
+  if (cost.devotion && (resources.devocao || 0) < cost.devotion) {
+    return {
+      success: false,
+      message: `${getResourceName("devotion")} insuficiente. Precisa: ${
+        cost.devotion
+      }`,
     };
   }
 
   // Busca a capital do jogador
-  const player = await prisma.matchPlayer.findUnique({
-    where: { id: playerId },
-  });
-
-  if (!player || !player.capitalTerritoryId) {
+  if (!matchPlayer.capitalTerritoryId) {
     return { success: false, message: "Capital não encontrada" };
   }
 
   const capital = await prisma.territory.findUnique({
-    where: { id: player.capitalTerritoryId },
+    where: { id: matchPlayer.capitalTerritoryId },
   });
 
   if (!capital) {
     return { success: false, message: "Território da capital não encontrado" };
   }
 
-  // Busca a classe nos dados estáticos pelo código
-  const heroClass = getClassByCode(heroData.heroClass);
+  // Gasta recursos
+  const newResources = { ...resources };
+  if (cost.ore) newResources.minerio = (newResources.minerio || 0) - cost.ore;
+  if (cost.supplies)
+    newResources.suprimentos = (newResources.suprimentos || 0) - cost.supplies;
+  if (cost.arcane)
+    newResources.arcana = (newResources.arcana || 0) - cost.arcane;
+  if (cost.devotion)
+    newResources.devocao = (newResources.devocao || 0) - cost.devotion;
 
-  if (!heroClass) {
-    return {
-      success: false,
-      message: `Classe ${heroData.heroClass} não encontrada`,
-    };
-  }
+  await prisma.matchPlayer.update({
+    where: { id: playerId },
+    data: { resources: JSON.stringify(newResources) },
+  });
 
-  // Cria o herói
+  // Marca o herói como recrutado na partida (unicidade)
+  await markHeroAsRecruited(matchId, heroCode);
+
+  // Cria o herói baseado no template
   const hero = await prisma.unit.create({
     data: {
-      kingdomId, // Vinculado ao Reino (proprietário permanente)
+      kingdomId: matchPlayer.kingdomId,
       matchId,
       ownerId: playerId,
       category: "HERO",
-      name: heroData.name || heroClass.name, // Usa o nome ou o nome da classe como fallback
-      level: 1,
-      classCode: heroClass.code, // Código da classe (dados em data/classes.data.ts)
-      classFeatures: "[]",
-      combat,
-      speed,
-      focus,
-      armor,
-      vitality,
-      currentHp: vitality,
+      name: template.name,
+      description: template.description,
+      avatar: template.avatar,
+      level: template.level,
+      experience: 0,
+      classCode: template.classCode,
+      classFeatures: JSON.stringify(template.initialSkills),
+      spells: JSON.stringify(template.initialSpells),
+      combat: template.combat,
+      speed: template.speed,
+      focus: template.focus,
+      armor: template.armor,
+      vitality: template.vitality,
+      currentHp: template.vitality * 2,
       movesLeft: 0,
       actionsLeft: 0,
       locationIndex: capital.mapIndex,
@@ -316,10 +318,14 @@ export async function recruitHero(
 
   return {
     success: true,
-    message: `Herói ${hero.name} recrutado com sucesso! Custo: ${cost} Minério`,
+    message: `${template.icon} ${template.name} recrutado com sucesso!`,
     hero,
   };
 }
+
+// =============================================================================
+// SKILLS DE HERÓI (Específico)
+// =============================================================================
 
 /**
  * Verifica se um herói pode escolher característica de classe
@@ -329,42 +335,8 @@ export function canHeroChooseFeature(level: number): boolean {
   return level === 1 || level === 4 || level === 8;
 }
 
-/**
- * Adiciona uma característica de classe a um herói
- */
-export async function addHeroClassFeature(
-  unitId: string,
-  featureId: string
-): Promise<{ success: boolean; message: string }> {
-  const unit = await prisma.unit.findUnique({
-    where: { id: unitId },
-  });
+// =============================================================================
+// RE-EXPORTS de dados de heróis
+// =============================================================================
 
-  if (!unit) {
-    return { success: false, message: "Unidade não encontrada" };
-  }
-
-  if (unit.category !== "HERO") {
-    return { success: false, message: "Esta não é uma unidade Herói" };
-  }
-
-  const currentFeatures = JSON.parse(unit.classFeatures) as string[];
-
-  if (currentFeatures.includes(featureId)) {
-    return { success: false, message: "Esta característica já foi adquirida" };
-  }
-
-  currentFeatures.push(featureId);
-
-  await prisma.unit.update({
-    where: { id: unitId },
-    data: {
-      classFeatures: JSON.stringify(currentFeatures),
-    },
-  });
-
-  return {
-    success: true,
-    message: `Característica adicionada com sucesso`,
-  };
-}
+export { HERO_TEMPLATES, getHeroTemplate };
