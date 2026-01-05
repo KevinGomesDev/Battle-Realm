@@ -74,8 +74,8 @@ export function validateSkillUse(
     };
   }
 
-  // Verificar se a unidade tem essa skill nas ações
-  if (!caster.actions.includes(skill.code)) {
+  // Verificar se a unidade tem essa skill nas features
+  if (!caster.features.includes(skill.code)) {
     return {
       valid: false,
       error: "Unidade não possui esta skill",
@@ -288,7 +288,7 @@ export function canUseSkill(
     return { canUse: false, reason: "Skill passiva" };
   }
 
-  if (!caster.actions.includes(skill.code)) {
+  if (!caster.features.includes(skill.code)) {
     return { canUse: false, reason: "Não possui skill" };
   }
 

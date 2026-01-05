@@ -21,6 +21,7 @@ import {
 import {
   getKingdomTemplateById,
   getKingdomTemplatesSummary,
+  resolveKingdomTemplate,
 } from "../../../shared/data/kingdom-templates";
 
 const MAP_SIZE = 100;
@@ -107,7 +108,7 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
               currentHp: regentAttrs.vitality * 5, // HP = vitalidade * 5
               movesLeft: 0, // Sem moves fora de partida
               actionsLeft: 0,
-              classFeatures: JSON.stringify(initialSkills),
+              features: JSON.stringify(initialSkills),
             },
           });
 
@@ -350,7 +351,37 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
           "TEMPLATE_NOT_FOUND"
         );
       }
-      socket.emit("kingdom:template_details", { template });
+      const resolved = resolveKingdomTemplate(template);
+      if (!resolved) {
+        return emitError(
+          socket,
+          "Regente do template não encontrado",
+          "TEMPLATE_NOT_FOUND"
+        );
+      }
+      // Converter RegentTemplate para RegentData (compatível com KingdomTemplateDetails)
+      const templateDetails = {
+        id: resolved.id,
+        name: resolved.name,
+        description: resolved.description,
+        alignment: resolved.alignment,
+        race: resolved.race,
+        regent: {
+          name: resolved.regent.name,
+          description: resolved.regent.description,
+          avatar: resolved.regent.avatar,
+          combat: resolved.regent.combat,
+          speed: resolved.regent.speed,
+          focus: resolved.regent.focus,
+          armor: resolved.regent.armor,
+          vitality: resolved.regent.vitality,
+          skills: resolved.regent.initialSkillCode
+            ? [resolved.regent.initialSkillCode]
+            : [],
+        },
+        troopTemplates: resolved.troopTemplates,
+      };
+      socket.emit("kingdom:template_details", { template: templateDetails });
     } catch (error) {
       handleError(socket, error, "Falha ao obter template");
     }
@@ -392,26 +423,35 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
         );
       }
 
+      const resolved = resolveKingdomTemplate(template);
+      if (!resolved) {
+        return emitError(
+          socket,
+          "Regente do template não encontrado",
+          "TEMPLATE_NOT_FOUND"
+        );
+      }
+
       try {
         const result = await prisma.$transaction(async (tx) => {
           // 1. Criar Regente primeiro
           const newRegent = await tx.unit.create({
             data: {
-              name: template.regent.name,
-              description: template.regent.description,
-              avatar: template.regent.avatar || null,
+              name: resolved.regent.name,
+              description: resolved.regent.description,
+              avatar: resolved.regent.avatar || null,
               category: "REGENT",
               level: 1,
-              combat: template.regent.combat,
-              speed: template.regent.speed,
-              focus: template.regent.focus,
-              armor: template.regent.armor,
-              vitality: template.regent.vitality,
-              currentHp: template.regent.vitality * 5, // HP = vitality * 5
+              combat: resolved.regent.combat,
+              speed: resolved.regent.speed,
+              focus: resolved.regent.focus,
+              armor: resolved.regent.armor,
+              vitality: resolved.regent.vitality,
+              currentHp: resolved.regent.vitality * 5, // HP = vitality * 5
               movesLeft: 0, // Sem moves fora de partida
               actionsLeft: 0,
-              classFeatures: template.regent.initialSkillId
-                ? JSON.stringify([template.regent.initialSkillId])
+              features: resolved.regent.initialSkillCode
+                ? JSON.stringify([resolved.regent.initialSkillCode])
                 : "[]",
             },
           });

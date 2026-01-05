@@ -24,6 +24,11 @@ export const ArenaLobbyView: React.FC<ArenaLobbyViewProps> = ({
   const isReady = currentLobby.status === "READY";
   const canStart = isHost && isReady;
 
+  // Separar host e outros jogadores
+  const hostPlayer = currentLobby.players.find((p) => p.playerIndex === 0);
+  const otherPlayers = currentLobby.players.filter((p) => p.playerIndex > 0);
+  const waitingSlots = currentLobby.maxPlayers - currentLobby.players.length;
+
   const handleLeave = () => {
     console.log(
       "%c[ArenaLobbyView] 🚪 Saindo do lobby...",
@@ -43,8 +48,7 @@ export const ArenaLobbyView: React.FC<ArenaLobbyViewProps> = ({
       "color: #ef4444; font-weight: bold; font-size: 14px;",
       {
         lobbyId: currentLobby?.lobbyId,
-        host: currentLobby?.hostUsername,
-        guest: currentLobby?.guestUsername,
+        players: currentLobby?.players.map((p) => p.username),
         status: currentLobby?.status,
       }
     );
@@ -63,7 +67,10 @@ export const ArenaLobbyView: React.FC<ArenaLobbyViewProps> = ({
           🏟️ ARENA DE COMBATE
         </h3>
         <p className="text-parchment-dark text-sm mt-1">
-          {isHost ? "Aguardando desafiante..." : "Preparando para batalha..."}
+          {isHost ? "Aguardando desafiantes..." : "Preparando para batalha..."}
+        </p>
+        <p className="text-parchment-aged text-xs mt-1">
+          {currentLobby.players.length}/{currentLobby.maxPlayers} jogadores
         </p>
       </div>
 
@@ -90,69 +97,78 @@ export const ArenaLobbyView: React.FC<ArenaLobbyViewProps> = ({
       {/* Jogadores */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Host */}
-        <div
-          className={`p-4 rounded-xl border-2 ${
-            isHost
-              ? "border-purple-600 bg-purple-900/20"
-              : "border-metal-iron bg-citadel-slate/30"
-          }`}
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-12 h-12 bg-gradient-to-b from-metal-bronze to-metal-copper rounded-lg border-2 border-metal-iron flex items-center justify-center">
-              <span className="text-2xl">👑</span>
-            </div>
-            <div>
-              <p className="text-xs text-parchment-dark uppercase tracking-wider">
-                Anfitrião
-              </p>
-              <p
-                className="text-parchment-light font-bold"
-                style={{ fontFamily: "'Cinzel', serif" }}
-              >
-                {currentLobby.hostUsername}
-              </p>
-            </div>
-          </div>
-          <div className="bg-citadel-obsidian/50 rounded-lg p-3">
-            <p className="text-parchment-aged text-sm">
-              🏰 {currentLobby.hostKingdomName}
-            </p>
-          </div>
-        </div>
-
-        {/* Guest */}
-        <div
-          className={`p-4 rounded-xl border-2 ${
-            !isHost && currentLobby.guestUserId
-              ? "border-purple-600 bg-purple-900/20"
-              : "border-metal-iron bg-citadel-slate/30"
-          } ${!currentLobby.guestUserId ? "border-dashed" : ""}`}
-        >
-          {currentLobby.guestUserId ? (
-            <>
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-12 h-12 bg-gradient-to-b from-war-crimson to-war-blood rounded-lg border-2 border-metal-iron flex items-center justify-center">
-                  <span className="text-2xl">⚔️</span>
-                </div>
-                <div>
-                  <p className="text-xs text-parchment-dark uppercase tracking-wider">
-                    Desafiante
-                  </p>
-                  <p
-                    className="text-parchment-light font-bold"
-                    style={{ fontFamily: "'Cinzel', serif" }}
-                  >
-                    {currentLobby.guestUsername}
-                  </p>
-                </div>
+        {hostPlayer && (
+          <div
+            className={`p-4 rounded-xl border-2 ${
+              isHost
+                ? "border-purple-600 bg-purple-900/20"
+                : "border-metal-iron bg-citadel-slate/30"
+            }`}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-12 h-12 bg-gradient-to-b from-metal-bronze to-metal-copper rounded-lg border-2 border-metal-iron flex items-center justify-center">
+                <span className="text-2xl">👑</span>
               </div>
-              <div className="bg-citadel-obsidian/50 rounded-lg p-3">
-                <p className="text-parchment-aged text-sm">
-                  🏰 {currentLobby.guestKingdomName}
+              <div>
+                <p className="text-xs text-parchment-dark uppercase tracking-wider">
+                  Anfitrião
+                </p>
+                <p
+                  className="text-parchment-light font-bold"
+                  style={{ fontFamily: "'Cinzel', serif" }}
+                >
+                  {hostPlayer.username}
                 </p>
               </div>
-            </>
-          ) : (
+            </div>
+            <div className="bg-citadel-obsidian/50 rounded-lg p-3">
+              <p className="text-parchment-aged text-sm">
+                🏰 {hostPlayer.kingdomName}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Outros jogadores */}
+        {otherPlayers.map((player) => (
+          <div
+            key={player.userId}
+            className={`p-4 rounded-xl border-2 ${
+              player.userId === currentLobby.hostUserId
+                ? "border-purple-600 bg-purple-900/20"
+                : "border-metal-iron bg-citadel-slate/30"
+            }`}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-12 h-12 bg-gradient-to-b from-war-crimson to-war-blood rounded-lg border-2 border-metal-iron flex items-center justify-center">
+                <span className="text-2xl">⚔️</span>
+              </div>
+              <div>
+                <p className="text-xs text-parchment-dark uppercase tracking-wider">
+                  Desafiante {player.playerIndex}
+                </p>
+                <p
+                  className="text-parchment-light font-bold"
+                  style={{ fontFamily: "'Cinzel', serif" }}
+                >
+                  {player.username}
+                </p>
+              </div>
+            </div>
+            <div className="bg-citadel-obsidian/50 rounded-lg p-3">
+              <p className="text-parchment-aged text-sm">
+                🏰 {player.kingdomName}
+              </p>
+            </div>
+          </div>
+        ))}
+
+        {/* Slots vazios */}
+        {Array.from({ length: waitingSlots }).map((_, idx) => (
+          <div
+            key={`waiting-${idx}`}
+            className="p-4 rounded-xl border-2 border-dashed border-metal-iron bg-citadel-slate/30"
+          >
             <div className="flex flex-col items-center justify-center h-full py-6">
               <div className="w-12 h-12 border-2 border-dashed border-metal-iron/50 rounded-lg flex items-center justify-center mb-3">
                 <span className="text-2xl opacity-50">❓</span>
@@ -172,8 +188,8 @@ export const ArenaLobbyView: React.FC<ArenaLobbyViewProps> = ({
                 ></div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        ))}
       </div>
 
       {/* Ações */}

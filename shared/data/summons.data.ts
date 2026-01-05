@@ -1,7 +1,7 @@
 // shared/data/summons.data.ts
 // Templates de Invocações (Summons) - Criaturas invocadas por classes
 
-import { DEFAULT_UNIT_ACTIONS } from "./actions.data";
+import { getCommonActionCodes } from "./skills.data";
 
 // =============================================================================
 // TIPOS
@@ -71,7 +71,7 @@ export const EIDOLON: SummonTemplate = {
   damageReduction: 0,
   category: "SUMMON",
   avatar: undefined, // TODO: Definir sprite
-  actions: [...DEFAULT_UNIT_ACTIONS],
+  actions: getCommonActionCodes(),
   passiveCode: "EIDOLON_GROWTH", // Skill de crescimento ao matar
   aiBehavior: "AGGRESSIVE", // Ataca diretamente sem avaliar perigo
   metadata: {

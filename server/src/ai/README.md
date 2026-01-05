@@ -16,7 +16,7 @@ server/src/ai/
 │   ├── skill-evaluator.ts  # Avaliação e seleção de skills
 │   ├── decision-maker.ts   # Tomador de decisões principal
 │   ├── ai-controller.ts    # Controller principal, identificação de unidades IA
-│   └── action-executor.ts  # Executor de ações (integra com combat-actions)
+│   └── action-executor.ts  # Executor de ações (integra com skill-executors)
 └── behaviors/
     ├── index.ts          # Barrel exports behaviors
     ├── aggressive.behavior.ts  # Comportamento agressivo

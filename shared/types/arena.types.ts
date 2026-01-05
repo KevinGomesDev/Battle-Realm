@@ -8,16 +8,22 @@ import type { ArenaLobbyStatus } from "./session.types";
 // =============================================================================
 
 // ArenaLobbyStatus é importado de session.types.ts para evitar duplicação
-export type { ArenaLobbyStatus } from "./session.types";
+export type { ArenaLobbyStatus, ArenaLobbyPlayer } from "./session.types";
+
+export interface ArenaLobbyPlayerInfo {
+  userId: string;
+  username: string;
+  kingdomId: string;
+  kingdomName: string;
+  playerIndex: number;
+  isReady: boolean;
+}
 
 export interface ArenaLobby {
   lobbyId: string;
   hostUserId: string;
-  hostUsername: string;
-  hostKingdomName: string;
-  guestUserId?: string;
-  guestUsername?: string;
-  guestKingdomName?: string;
+  maxPlayers: number;
+  players: ArenaLobbyPlayerInfo[];
   status: ArenaLobbyStatus;
   createdAt: Date;
 }
@@ -67,11 +73,8 @@ export interface ArenaConfig {
     cellMovableEngagementBorder: string;
     cellMovableBlocked: string;
     cellMovableBlockedBorder: string;
-    // Jogadores
-    hostPrimary: string;
-    hostSecondary: string;
-    guestPrimary: string;
-    guestSecondary: string;
+    // Cores dos jogadores (até 8)
+    playerColors: { primary: string; secondary: string }[];
   };
   conditionColors: Record<string, string>;
 }
@@ -84,12 +87,16 @@ export interface ArenaKingdom {
   id: string;
   name: string;
   ownerId: string;
+  playerIndex: number;
+  playerColor: string;
 }
 
 export interface ArenaBattle {
   battleId: string;
   lobbyId: string;
   config: ArenaConfig;
+  maxPlayers: number;
+  kingdoms: ArenaKingdom[];
   round: number;
   status: "ACTIVE" | "ENDED";
   currentTurnIndex: number;
@@ -97,8 +104,6 @@ export interface ArenaBattle {
   activeUnitId?: string; // Unidade ativa escolhida pelo jogador neste turno
   actionOrder: string[];
   units: BattleUnit[];
-  hostKingdom: ArenaKingdom;
-  guestKingdom: ArenaKingdom;
   turnTimer: number;
 }
 
@@ -177,6 +182,7 @@ export interface LobbyCreatedResponse {
   lobbyId: string;
   hostUserId: string;
   hostKingdomName: string;
+  maxPlayers?: number;
   status: ArenaLobbyStatus;
 }
 
@@ -186,9 +192,7 @@ export interface LobbiesListResponse {
 
 export interface PlayerJoinedResponse {
   lobbyId: string;
-  guestUserId: string;
-  guestUsername: string;
-  guestKingdomName: string;
+  players: ArenaLobbyPlayerInfo[];
   status: ArenaLobbyStatus;
 }
 
@@ -196,10 +200,10 @@ export interface BattleStartedResponse {
   battleId: string;
   lobbyId: string;
   config: ArenaConfig;
+  maxPlayers?: number;
+  kingdoms: ArenaKingdom[];
   units: BattleUnit[];
   actionOrder: string[];
-  hostKingdom: ArenaKingdom;
-  guestKingdom: ArenaKingdom;
 }
 
 export interface UnitMovedResponse {

@@ -235,7 +235,7 @@ export const SKILL_CONDITIONS: Record<string, ConditionDefinition> = {
     icon: "🎭",
     color: "#8b5cf6",
     effects: {
-      bonusActionSkills: ["dash", "disengage", "hide"],
+      bonusActionSkills: ["DASH", "DISENGAGE", "HIDE"],
     },
   },
 

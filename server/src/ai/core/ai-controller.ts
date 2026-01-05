@@ -19,8 +19,10 @@ import {
   limitArray,
 } from "./safety-guards";
 import { BattleUnit } from "../../../../shared/types/battle.types";
-import { findSkillByCode } from "../../../../shared/data/skills.data";
-import { isBasicAction } from "../../../../shared/data/actions.data";
+import {
+  findSkillByCode,
+  isCommonAction,
+} from "../../../../shared/data/skills.data";
 import { filterVisibleUnits } from "./target-selection";
 
 // ID especial para o "jogador" IA
@@ -109,17 +111,17 @@ export function createBattleContext(
 
 /**
  * Obtém as skills ativas disponíveis para uma unidade
- * Busca nas ações da unidade e retorna as definições de skill correspondentes
+ * Busca nas features da unidade e retorna as definições de skill correspondentes
  */
 export function getUnitSkills(unit: BattleUnit): SkillDefinition[] {
-  if (!unit.actions || unit.actions.length === 0) {
+  if (!unit.features || unit.features.length === 0) {
     return [];
   }
 
-  // Filtrar apenas skills ativas (não ações básicas como move, attack, etc)
-  return unit.actions
-    .filter((actionCode) => !isBasicAction(actionCode))
-    .map((skillCode) => findSkillByCode(skillCode))
+  // Filtrar apenas skills ativas (não ações comuns como ATTACK, DASH, DODGE)
+  return unit.features
+    .filter((featureCode: string) => !isCommonAction(featureCode))
+    .map((skillCode: string) => findSkillByCode(skillCode))
     .filter(
       (skill): skill is SkillDefinition =>
         skill !== undefined && skill !== null && skill.category === "ACTIVE"

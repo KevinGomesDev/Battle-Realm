@@ -1,9 +1,14 @@
 // Ações padrão importadas do shared (fonte de verdade)
-import { DEFAULT_UNIT_ACTIONS } from "../../../shared/data/actions.data";
-import { findSkillByCode } from "../../../shared/data/skills.data";
+import {
+  findSkillByCode,
+  getCommonActionCodes,
+} from "../../../shared/data/skills.data";
+
+// Ações comuns disponíveis para todas unidades
+const COMMON_ACTION_CODES = getCommonActionCodes();
 
 // Re-exportar para compatibilidade com código existente
-export { DEFAULT_UNIT_ACTIONS };
+export { COMMON_ACTION_CODES as DEFAULT_UNIT_ACTIONS };
 
 export interface UnitActionContext {
   battleType?: "arena" | "match";
@@ -17,37 +22,36 @@ export interface UnitStats {
   armor: number;
   vitality: number;
   category?: string;
-  classFeatures?: string[]; // IDs das skills aprendidas
+  features?: string[]; // IDs das skills aprendidas (do DB)
 }
 
 /**
- * Determina as ações disponíveis para uma unidade
- * Inclui ações padrão + skills ativas do classFeatures
+ * Determina as features (skills) disponíveis para uma unidade
+ * Inclui ações padrão (ATTACK, DASH, DODGE) + skills de classe
  */
-export function determineUnitActions(
+export function determineUnitFeatures(
   unit: UnitStats,
   context?: UnitActionContext
 ): string[] {
-  const actions = [...DEFAULT_UNIT_ACTIONS];
+  const features = [...COMMON_ACTION_CODES];
 
-  // Adicionar skills ativas como ações disponíveis
-  if (unit.classFeatures && unit.classFeatures.length > 0) {
-    for (const skillCode of unit.classFeatures) {
-      const skill = findSkillByCode(skillCode);
-      if (skill && skill.category === "ACTIVE") {
-        // Adicionar o código da skill como ação
-        if (!actions.includes(skill.code)) {
-          actions.push(skill.code);
-        }
+  // Adicionar skills de classe (ativas e passivas)
+  if (unit.features && unit.features.length > 0) {
+    for (const skillCode of unit.features) {
+      if (!features.includes(skillCode)) {
+        features.push(skillCode);
       }
     }
   }
 
-  // Futuro: Modificadores podem adicionar ou remover ações
+  // Futuro: Modificadores podem adicionar ou remover features
   // Exemplo:
   // if (context?.modifiers?.includes("IMOBILIZADO")) {
-  //   actions = actions.filter(a => a !== "move" && a !== "dash");
+  //   features = features.filter(a => a !== "DASH");
   // }
 
-  return actions;
+  return features;
 }
+
+// Alias para compatibilidade
+export const determineUnitActions = determineUnitFeatures;

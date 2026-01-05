@@ -7,6 +7,7 @@ import { saveBattleToDB } from "./battle-persistence";
 import { prisma } from "../../lib/prisma";
 import { startBattleTurnTimer, stopBattleTurnTimer } from "./battle-timer";
 import type { Battle } from "./battle-types";
+import { BOT_USER_ID, BOT_KINGDOM_ID } from "./battle-creation";
 import {
   processBotUnitDecision,
   aiActionDelay,
@@ -22,8 +23,6 @@ import {
 } from "../../logic/round-control";
 import { getEffectiveSpeedWithConditions } from "../../utils/battle.utils";
 
-const BOT_USER_ID = "__BOT__";
-
 /**
  * Verifica se é o turno do BOT
  */
@@ -36,9 +35,7 @@ export function isBotTurn(battle: Battle): boolean {
  * Verifica se a batalha tem um BOT
  */
 export function hasBotPlayer(battle: Battle): boolean {
-  return (
-    battle.guestUserId === BOT_USER_ID || battle.hostUserId === BOT_USER_ID
-  );
+  return battle.players.some((p) => p.userId === BOT_USER_ID);
 }
 
 /**
@@ -423,25 +420,30 @@ async function passBotTurn(battle: Battle): Promise<void> {
   const lobby = battleLobbies.get(battle.lobbyId);
   if (!lobby) return;
 
+  // Encontrar jogador humano (não-BOT)
+  const humanPlayer = battle.players.find((p) => p.userId !== BOT_USER_ID);
+  const humanUserId = humanPlayer?.userId || "";
+  const humanKingdomId = humanPlayer?.kingdomId || "";
+
   // Verificar vitória com logs
-  const hostAlive = battle.units.some(
-    (u) => u.ownerId === battle.hostUserId && u.isAlive
+  const humanAlive = battle.units.some(
+    (u) => u.ownerId === humanUserId && u.isAlive
   );
   const botAlive = battle.units.some(
     (u) => u.ownerId === BOT_USER_ID && u.isAlive
   );
 
   console.log(`[BOT passBotTurn] Verificando vitória:`, {
-    hostUserId: battle.hostUserId,
-    hostAlive,
+    humanUserId,
+    humanAlive,
     botAlive,
     unitsAlive: battle.units
       .filter((u) => u.isAlive)
       .map((u) => ({ id: u.id, ownerId: u.ownerId, name: u.name })),
   });
 
-  if (!hostAlive || !botAlive) {
-    const winnerId = hostAlive ? battle.hostUserId : BOT_USER_ID;
+  if (!humanAlive || !botAlive) {
+    const winnerId = humanAlive ? humanUserId : BOT_USER_ID;
     battle.status = "ENDED";
     stopBattleTurnTimer(battle.id);
 
@@ -449,7 +451,7 @@ async function passBotTurn(battle: Battle): Promise<void> {
       battleId: battle.id,
       winnerId,
       winnerKingdomId:
-        winnerId === battle.hostUserId ? battle.hostKingdomId : "__BOT__",
+        winnerId === humanUserId ? humanKingdomId : BOT_KINGDOM_ID,
       reason:
         winnerId === BOT_USER_ID ? "🤖 O BOT venceu!" : "Você derrotou o BOT!",
       finalUnits: battle.units,

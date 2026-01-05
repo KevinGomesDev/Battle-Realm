@@ -1,5 +1,5 @@
 // server/src/ai/core/action-executor.ts
-// Executor de ações da IA - integra com combat-actions
+// Executor de ações da IA - integra com movement-actions e skill-executors
 
 import type { Server } from "socket.io";
 import type { ArenaBattle } from "../../../../shared/types/arena.types";
@@ -7,10 +7,12 @@ import type { BattleUnit } from "../../../../shared/types/battle.types";
 import type { AIDecision } from "../types/ai.types";
 import {
   executeMoveAction,
-  executeAttackAction,
-  executeDashAction,
-} from "../../logic/combat-actions";
-import { executeSkill as executeSkillLogic } from "../../logic/skill-executors";
+  calculateBaseMovement,
+} from "../../logic/movement-actions";
+import {
+  executeSkill as executeSkillLogic,
+  executeAttack as executeAttackLogic,
+} from "../../logic/skill-executors";
 import { executeSpell as executeSpellLogic } from "../../spells/executors";
 import { getSpellByCode } from "../../../../shared/data/spells.data";
 import {
@@ -23,9 +25,6 @@ import {
 // Delay padrão entre ações da IA (ms)
 const AI_ACTION_DELAY = 600;
 
-/**
- * Interface para resultado de execução
- */
 export interface AIExecutionResult {
   decision: AIDecision;
   success: boolean;
@@ -141,12 +140,18 @@ function executeAttack(
     return { decision, success: false, error: "Alvo não encontrado ou morto" };
   }
 
-  const result = executeAttackAction(
+  const result = executeAttackLogic(
     attacker,
     target,
+    battle.units,
+    {
+      code: "ATTACK",
+      name: "Atacar",
+      category: "ACTIVE",
+      commonAction: true,
+    } as any,
     "FISICO",
-    undefined,
-    battle.units
+    undefined
   );
 
   if (result.success) {
@@ -254,6 +259,7 @@ function executeSkill(
 
 /**
  * Executa uma decisão de dash (corrida)
+ * Agora usa o sistema de skills com código "DASH"
  */
 function executeDash(
   decision: AIDecision,
@@ -268,12 +274,10 @@ function executeDash(
     };
   }
 
-  const result = executeDashAction(unit);
+  // Usar o executor de skill DASH (Arena sempre tem isArena = true)
+  const result = executeSkillLogic(unit, "DASH", null, battle.units, true);
 
   if (result.success) {
-    // Atualizar movimentos da unidade
-    unit.movesLeft = result.newMovesLeft ?? unit.movesLeft;
-
     return {
       decision,
       success: true,

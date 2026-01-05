@@ -8,14 +8,13 @@ export {
   getConditionInfo,
 } from "../../../../../shared/data/conditions.data";
 
-// Re-exportar ações do shared (fonte de verdade)
+// Re-exportar funções de skills/ações do shared (fonte de verdade)
 export {
-  ALL_ACTIONS,
-  DEFAULT_UNIT_ACTIONS,
-  findActionByCode,
-  getActionDisplayInfo,
-  isBasicAction,
-} from "../../../../../shared/data/actions.data";
+  isCommonAction,
+  getCommonActions,
+  getCommonActionCodes,
+  getSkillInfo,
+} from "../../../../../shared/data/skills.data";
 
 // Importar cores centralizadas
 import {
@@ -24,28 +23,30 @@ import {
   PROTECTION_COLORS,
 } from "../../../config/colors.config";
 
-import { ALL_ACTIONS } from "../../../../../shared/data/actions.data";
+import {
+  COMMON_ACTIONS,
+  getSkillInfo,
+} from "../../../../../shared/data/skills.data";
 
 /**
  * Informações sobre ações disponíveis (formato legado para compatibilidade)
- * @deprecated Use getActionDisplayInfo() do shared/data/actions.data
+ * @deprecated Use getSkillInfo() do shared/data/skills.data
  */
 export const ACTIONS_INFO: Record<
   string,
   { icon: string; name: string; description: string }
 > = Object.fromEntries(
-  Object.entries(ALL_ACTIONS).flatMap(([code, action]) => [
-    // Manter lowercase (padrão)
-    [
-      code,
-      { icon: action.icon, name: action.name, description: action.description },
-    ],
-    // Manter uppercase para compatibilidade com código legado
-    [
-      code.toUpperCase(),
-      { icon: action.icon, name: action.name, description: action.description },
-    ],
-  ])
+  COMMON_ACTIONS.map((action) => {
+    const info = getSkillInfo(action.code);
+    return [
+      action.code,
+      {
+        icon: info?.icon || "❓",
+        name: info?.name || action.name,
+        description: info?.description || action.description,
+      },
+    ];
+  })
 );
 
 /**

@@ -33,30 +33,52 @@ export interface ActiveSession {
 }
 
 /**
+ * Jogador em um lobby de arena
+ */
+export interface ArenaLobbyPlayer {
+  userId: string;
+  socketId: string;
+  kingdomId: string;
+  playerIndex: number;
+  isReady: boolean;
+}
+
+/**
  * Dados do lobby de arena em memória (Backend)
+ * Suporta de 2 a 8 jogadores
  */
 export interface ArenaLobbyData {
   lobbyId: string;
-  hostUserId: string;
-  hostSocketId: string;
-  hostKingdomId: string;
-  guestUserId?: string;
-  guestSocketId?: string;
-  guestKingdomId?: string;
+  hostUserId: string; // Criador do lobby (sempre players[0])
+  maxPlayers: number; // Máximo de jogadores (2-8)
+  players: ArenaLobbyPlayer[];
   status: ArenaLobbyStatus;
   createdAt: Date;
-  /** Se true, o guest é um BOT controlado por IA */
+  /** Se true, preenche vagas restantes com BOTs */
   vsBot?: boolean;
 }
 
 /**
+ * Jogador em uma batalha
+ */
+export interface BattlePlayer {
+  userId: string;
+  kingdomId: string;
+  kingdomName: string;
+  playerIndex: number;
+  playerColor: string;
+}
+
+/**
  * Dados da batalha de arena em memória (Backend)
- * Campos mínimos necessários para verificação de sessão
+ * Suporta de 2 a 8 jogadores
  */
 export interface ArenaBattleData {
   id: string; // battleId
   lobbyId: string;
   status: string; // "ACTIVE" | "ENDED"
+  maxPlayers: number;
+  players: BattlePlayer[];
   round: number;
   currentTurnIndex: number;
   activeUnitId?: string; // Unidade ativa escolhida pelo jogador neste turno
@@ -66,13 +88,8 @@ export interface ArenaBattleData {
   actionOrder: string[];
   turnTimer: number;
   config: any; // ArenaConfig com mapa, clima e obstáculos
-  // Campos opcionais que podem existir na implementação completa
   isArena?: boolean;
   matchId?: string;
-  hostUserId?: string;
-  guestUserId?: string;
-  hostKingdomId?: string;
-  guestKingdomId?: string;
   logs?: any[];
   createdAt?: Date;
   ransomPrice?: number;
@@ -119,7 +136,15 @@ export interface SessionActiveLobbyResponse {
   lobbyStatus: ArenaLobbyStatus;
   isHost: boolean;
   hostUserId: string;
-  guestUserId?: string;
+  maxPlayers: number;
+  players: {
+    userId: string;
+    username: string;
+    kingdomId: string;
+    kingdomName: string;
+    playerIndex: number;
+    isReady: boolean;
+  }[];
 }
 
 /**
@@ -167,11 +192,15 @@ export interface SessionCanJoinResponse {
 export interface BattleSessionRestoredResponse {
   lobbyId: string;
   hostUserId: string;
-  hostUsername: string;
-  hostKingdomName: string;
-  guestUserId?: string;
-  guestUsername?: string;
-  guestKingdomName?: string;
+  maxPlayers: number;
+  players: {
+    userId: string;
+    username: string;
+    kingdomId: string;
+    kingdomName: string;
+    playerIndex: number;
+    isReady: boolean;
+  }[];
   status: ArenaLobbyStatus;
   isHost: boolean;
   createdAt: string;
@@ -192,8 +221,14 @@ export interface BattleBattleRestoredResponse {
   turnTimer?: number;
   units: any[];
   actionOrder: string[];
-  hostKingdom: { id: string; name: string; ownerId: string } | null;
-  guestKingdom: { id: string; name: string; ownerId: string } | null;
+  maxPlayers: number;
+  kingdoms: {
+    id: string;
+    name: string;
+    ownerId: string;
+    playerIndex: number;
+    playerColor: string;
+  }[];
 }
 
 // ============================================

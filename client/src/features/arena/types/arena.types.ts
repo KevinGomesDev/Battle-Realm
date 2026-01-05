@@ -4,6 +4,7 @@
 export type {
   ArenaLobby,
   ArenaLobbyStatus,
+  ArenaLobbyPlayerInfo,
   ArenaGrid,
   ArenaMapConfig,
   ArenaConfig,

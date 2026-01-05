@@ -187,8 +187,13 @@ export function useSkillExecution(
     (unit: BattleUnit): SkillInfoWithState[] => {
       const skillInfos: SkillInfoWithState[] = [];
 
-      for (const actionCode of unit.actions) {
-        const skillInfo = getSkillInfoWithState(actionCode, unit);
+      for (const featureCode of unit.features) {
+        const skillInfo = getSkillInfoWithState(featureCode, {
+          actionsLeft: unit.actionsLeft,
+          isAlive: unit.isAlive,
+          features: unit.features,
+          unitCooldowns: unit.unitCooldowns,
+        });
         if (skillInfo) {
           skillInfos.push(skillInfo);
         }

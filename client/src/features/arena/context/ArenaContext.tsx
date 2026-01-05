@@ -66,8 +66,17 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
       const lobby: ArenaLobby = {
         lobbyId: data.lobbyId,
         hostUserId: data.hostUserId,
-        hostUsername: user.username,
-        hostKingdomName: data.hostKingdomName,
+        maxPlayers: data.maxPlayers ?? 2,
+        players: [
+          {
+            userId: data.hostUserId,
+            username: user.username,
+            kingdomId: "", // Will be updated when server sends full data
+            kingdomName: data.hostKingdomName,
+            playerIndex: 0,
+            isReady: false,
+          },
+        ],
         status: data.status,
         createdAt: new Date(),
       };
@@ -80,7 +89,10 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         count: data.lobbies.length,
         lobbies: data.lobbies.map((l) => ({
           id: l.lobbyId,
-          host: l.hostUsername,
+          host:
+            l.players.find((p) => p.playerIndex === 0)?.username ?? "Unknown",
+          playersCount: l.players.length,
+          maxPlayers: l.maxPlayers,
           status: l.status,
         })),
       });
@@ -91,29 +103,15 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
     const handleLobbiesUpdated = (data: {
       action: "created" | "removed";
       lobbyId?: string;
-      lobby?: {
-        lobbyId: string;
-        hostUserId: string;
-        hostUsername: string;
-        hostKingdomName: string;
-        createdAt: Date;
-      };
+      lobby?: ArenaLobby;
     }) => {
       lobbyLog("🔄", "LOBBIES ATUALIZADOS", data);
 
       if (data.action === "created" && data.lobby) {
-        // Adicionar novo lobby à lista
-        const newLobby: ArenaLobby = {
-          lobbyId: data.lobby.lobbyId,
-          hostUserId: data.lobby.hostUserId,
-          hostUsername: data.lobby.hostUsername,
-          hostKingdomName: data.lobby.hostKingdomName,
-          createdAt: data.lobby.createdAt,
-          status: "WAITING", // Lobbies recém-criados estão em WAITING
-        };
+        // Adicionar novo lobby à lista (já vem no formato correto do servidor)
         dispatch({
           type: "SET_LOBBIES",
-          payload: [...stateRef.current.lobbies, newLobby],
+          payload: [...stateRef.current.lobbies, data.lobby],
         });
       } else if (data.action === "removed" && data.lobbyId) {
         // Remover lobby da lista
@@ -128,21 +126,18 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
 
     const handlePlayerJoined = (data: PlayerJoinedResponse) => {
       lobbyLog("👤", "JOGADOR ENTROU NO LOBBY", {
-        guestUserId: data.guestUserId,
-        guestUsername: data.guestUsername,
-        guestKingdomName: data.guestKingdomName,
+        lobbyId: data.lobbyId,
+        players: data.players,
         status: data.status,
       });
-      // Só atualiza se já estiver em um lobby (para o host)
-      // O guest recebe arena:lobby_joined separadamente
+      // Só atualiza se já estiver em um lobby (para o host e outros jogadores)
+      // O jogador que entrou recebe arena:lobby_joined separadamente
       if (stateRef.current.currentLobby) {
         dispatch({
           type: "SET_CURRENT_LOBBY",
           payload: {
             ...stateRef.current.currentLobby,
-            guestUserId: data.guestUserId,
-            guestUsername: data.guestUsername,
-            guestKingdomName: data.guestKingdomName,
+            players: data.players,
             status: data.status,
           },
         });
@@ -150,13 +145,16 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
     };
 
     const handleLobbyJoined = (data: ArenaLobby) => {
+      const host = data.players.find((p) => p.playerIndex === 0);
       lobbyLog("🚪", "ENTROU NO LOBBY", {
         lobbyId: data.lobbyId,
-        hostUsername: data.hostUsername,
-        hostKingdomName: data.hostKingdomName,
+        hostUsername: host?.username,
+        hostKingdomName: host?.kingdomName,
+        playersCount: data.players.length,
+        maxPlayers: data.maxPlayers,
       });
       dispatch({ type: "SET_CURRENT_LOBBY", payload: data });
-      dispatch({ type: "SET_IS_HOST", payload: false });
+      dispatch({ type: "SET_IS_HOST", payload: data.hostUserId === user.id });
     };
 
     const handleLobbyClosed = (data: { lobbyId: string; reason: string }) => {
@@ -173,20 +171,20 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
       lobbyId: string;
       userId: string;
       status: ArenaLobbyStatus;
+      players: import("../../../../../shared/types/arena.types").ArenaLobbyPlayerInfo[];
     }) => {
       lobbyLog("🚶", "JOGADOR SAIU DO LOBBY", {
         lobbyId: data.lobbyId,
         userId: data.userId,
         status: data.status,
+        remainingPlayers: data.players.length,
       });
       if (stateRef.current.currentLobby?.lobbyId === data.lobbyId) {
         dispatch({
           type: "SET_CURRENT_LOBBY",
           payload: {
             ...stateRef.current.currentLobby,
-            guestUserId: undefined,
-            guestUsername: undefined,
-            guestKingdomName: undefined,
+            players: data.players,
             status: data.status,
           },
         });
@@ -198,8 +196,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         battleId: data.battleId,
         gridSize: `${data.config.grid.width}x${data.config.grid.height}`,
         unitsCount: data.units.length,
-        hostKingdom: data.hostKingdom.name,
-        guestKingdom: data.guestKingdom.name,
+        kingdoms: data.kingdoms.map((k) => k.name),
         actionOrder: data.actionOrder,
       });
       battleLog(
@@ -223,14 +220,14 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         battleId: data.battleId,
         lobbyId: data.lobbyId, // Salvar lobbyId para revanche
         config: data.config, // Configuração visual completa do servidor
+        maxPlayers: data.maxPlayers ?? data.kingdoms.length,
+        kingdoms: data.kingdoms,
         round: 1,
         status: "ACTIVE",
         currentTurnIndex: 0,
         currentPlayerId: data.actionOrder[0],
         actionOrder: data.actionOrder,
         units: data.units,
-        hostKingdom: data.hostKingdom,
-        guestKingdom: data.guestKingdom,
         turnTimer: 30, // Timer inicial (será sincronizado pelo servidor)
       };
       dispatch({ type: "SET_BATTLE", payload: battle });
@@ -242,12 +239,17 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
       unitId: string;
       movesLeft: number;
       actionsLeft: number;
+      currentHp?: number;
+      isAlive?: boolean;
+      actionMarks?: number;
     }) => {
       battleLog("🎬", "AÇÃO INICIADA", {
         battleId: data.battleId,
         unitId: data.unitId,
         movesLeft: data.movesLeft,
         actionsLeft: data.actionsLeft,
+        currentHp: data.currentHp,
+        isAlive: data.isAlive,
       });
       dispatch({
         type: "UPDATE_UNIT",
@@ -256,6 +258,11 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
           movesLeft: data.movesLeft,
           actionsLeft: data.actionsLeft,
           hasStartedAction: true,
+          ...(data.currentHp !== undefined && { currentHp: data.currentHp }),
+          ...(data.isAlive !== undefined && { isAlive: data.isAlive }),
+          ...(data.actionMarks !== undefined && {
+            actionMarks: data.actionMarks,
+          }),
         },
       });
       // Definir unidade ativa no turno
@@ -656,6 +663,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         winnerId: data.winnerId,
         reason: data.reason,
         finalUnitsCount: data.finalUnits?.length,
+        vsBot: data.vsBot,
       });
 
       battleLog("🏆", "BATALHA FINALIZADA!", {
@@ -675,6 +683,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
           surrenderedBy: data.surrenderedBy,
           disconnectedBy: data.disconnectedBy,
           finalUnits: data.finalUnits || [...stateRef.current.units], // Preferir do servidor
+          vsBot: data.vsBot,
         },
       });
       // Atualizar status da batalha
@@ -854,30 +863,25 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
     const handleSessionRestored = (data: {
       lobbyId: string;
       hostUserId: string;
-      hostUsername: string;
-      hostKingdomName: string;
-      guestUserId?: string;
-      guestUsername?: string;
-      guestKingdomName?: string;
+      maxPlayers: number;
+      players: import("../../../../../shared/types/arena.types").ArenaLobbyPlayerInfo[];
       status: ArenaLobbyStatus;
       isHost: boolean;
       createdAt: string;
     }) => {
+      const host = data.players.find((p) => p.playerIndex === 0);
       lobbyLog("🔄", "SESSÃO RESTAURADA (LOBBY)", {
         lobbyId: data.lobbyId,
         isHost: data.isHost,
         status: data.status,
-        hostUsername: data.hostUsername,
-        guestUsername: data.guestUsername,
+        hostUsername: host?.username,
+        playersCount: data.players.length,
       });
       const lobby: ArenaLobby = {
         lobbyId: data.lobbyId,
         hostUserId: data.hostUserId,
-        hostUsername: data.hostUsername,
-        hostKingdomName: data.hostKingdomName,
-        guestUserId: data.guestUserId,
-        guestUsername: data.guestUsername,
-        guestKingdomName: data.guestKingdomName,
+        maxPlayers: data.maxPlayers,
+        players: data.players,
         status: data.status,
         createdAt: new Date(data.createdAt),
       };
@@ -890,6 +894,8 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
       battleId: string;
       lobbyId: string;
       config: ArenaConfig;
+      maxPlayers: number;
+      kingdoms: import("../../../../../shared/types/arena.types").ArenaKingdom[];
       round: number;
       status: "ACTIVE" | "ENDED";
       currentTurnIndex: number;
@@ -898,8 +904,6 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
       activeUnitId?: string; // Unidade ativa no momento da reconexão
       units: any[];
       actionOrder: string[];
-      hostKingdom: { id: string; name: string; ownerId: string } | null;
-      guestKingdom: { id: string; name: string; ownerId: string } | null;
     }) => {
       battleLog("🔄", "SESSÃO RESTAURADA (BATALHA)", {
         battleId: data.battleId,
@@ -907,6 +911,7 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         round: data.round,
         status: data.status,
         unitsCount: data.units.length,
+        kingdomsCount: data.kingdoms.length,
         turnTimer: data.turnTimer,
         activeUnitId: data.activeUnitId,
       });
@@ -914,6 +919,8 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         battleId: data.battleId,
         lobbyId: data.lobbyId, // Salvar lobbyId para revanche
         config: data.config, // Configuração visual completa do servidor
+        maxPlayers: data.maxPlayers,
+        kingdoms: data.kingdoms,
         round: data.round,
         status: data.status,
         currentTurnIndex: data.currentTurnIndex,
@@ -921,16 +928,6 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         actionOrder: data.actionOrder,
         units: data.units,
         activeUnitId: data.activeUnitId, // Restaurar unidade ativa
-        hostKingdom: data.hostKingdom || {
-          id: "",
-          name: "Unknown",
-          ownerId: "",
-        },
-        guestKingdom: data.guestKingdom || {
-          id: "",
-          name: "Unknown",
-          ownerId: "",
-        },
         turnTimer: data.turnTimer ?? 30, // Usar timer do servidor ou 30 como fallback
       };
       dispatch({ type: "SET_BATTLE", payload: battle });
@@ -1160,15 +1157,18 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
         },
       });
 
-      battleLog("⬆️", "EMIT: arena:attack", {
+      // Todos os ataques agora via battle:use_skill
+      battleLog("⬆️", "EMIT: battle:use_skill (ATTACK)", {
         battleId: state.battle.battleId,
-        attackerUnitId,
+        casterUnitId: attackerUnitId,
+        skillCode: "ATTACK",
         targetUnitId,
         targetObstacleId,
       });
-      socketService.emit("battle:attack", {
+      socketService.emit("battle:use_skill", {
         battleId: state.battle.battleId,
-        attackerUnitId,
+        casterUnitId: attackerUnitId,
+        skillCode: "ATTACK",
         targetUnitId,
         targetObstacleId,
       });
@@ -1206,6 +1206,9 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
 
       // Determinar se a ação consome actionsLeft
       let consumesAction = false;
+      // Dash não faz update otimista porque também altera movesLeft
+      // O servidor responderá com ambos valores atualizados
+      const skipOptimisticUpdate = actionName === "dash";
 
       if (actionName === "dash" || actionName === "dodge") {
         consumesAction = true;
@@ -1220,7 +1223,8 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
       }
 
       // Validação e update otimista para ações que consomem actionsLeft
-      if (consumesAction) {
+      // (exceto dash que altera movesLeft e precisa esperar resposta do servidor)
+      if (consumesAction && !skipOptimisticUpdate) {
         if (unit.actionsLeft <= 0) {
           battleLog("⚠️", `${actionName} bloqueado: sem ações disponíveis`, {
             unitId,
@@ -1237,6 +1241,15 @@ export const ArenaProvider: React.FC<ArenaProviderProps> = ({ children }) => {
             actionsLeft: unit.actionsLeft - 1,
           },
         });
+      } else if (consumesAction && skipOptimisticUpdate) {
+        // Apenas validar sem update otimista
+        if (unit.actionsLeft <= 0) {
+          battleLog("⚠️", `${actionName} bloqueado: sem ações disponíveis`, {
+            unitId,
+            actionsLeft: unit.actionsLeft,
+          });
+          return;
+        }
       }
 
       const eventName = `battle:${actionName}`;

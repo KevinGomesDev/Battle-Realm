@@ -11,14 +11,20 @@ import {
   calculateLevelFromXP,
   getXPToNextLevel,
 } from "../../../../shared/data/heroes.data";
-import { MAX_HERO_LEVEL } from "../../../../shared/data/units";
+import {
+  MAX_HERO_LEVEL,
+  calculateLevelUpCost,
+} from "../../../../shared/data/units";
+import { spendResources } from "../turn.utils";
+import { getResourceName } from "../../../../shared/config/global.config";
 
 // =============================================================================
 // SISTEMA DE XP
 // =============================================================================
 
 /**
- * Adiciona XP a uma unidade (qualquer categoria: TROOP, HERO, REGENT)
+ * Adiciona XP a uma unidade (TROOP, HERO, REGENT)
+ * SUMMON não ganha XP - o XP é redirecionado para o invocador
  */
 export async function addExperience(
   unitId: string,
@@ -28,6 +34,7 @@ export async function addExperience(
   leveledUp: boolean;
   newLevel?: number;
   message: string;
+  redirectedTo?: string;
 }> {
   const unit = await prisma.unit.findUnique({
     where: { id: unitId },
@@ -38,6 +45,23 @@ export async function addExperience(
       success: false,
       leveledUp: false,
       message: "Unidade não encontrada",
+    };
+  }
+
+  // SUMMON não ganha XP - redireciona para o invocador
+  if (unit.category === "SUMMON") {
+    if (unit.summonerId) {
+      const result = await addExperience(unit.summonerId, xpAmount);
+      return {
+        ...result,
+        redirectedTo: unit.summonerId,
+        message: `XP redirecionado para invocador: ${result.message}`,
+      };
+    }
+    return {
+      success: false,
+      leveledUp: false,
+      message: "Invocação sem invocador - XP perdido",
     };
   }
 
@@ -70,6 +94,7 @@ export async function addExperience(
 
 /**
  * Verifica se uma unidade pode subir de nível
+ * SUMMON não pode subir de nível (XP vai para o invocador)
  */
 export async function canLevelUp(
   unitId: string
@@ -80,6 +105,14 @@ export async function canLevelUp(
 
   if (!unit) {
     return { canLevel: false, reason: "Unidade não encontrada" };
+  }
+
+  // SUMMON não pode fazer level up
+  if (unit.category === "SUMMON") {
+    return {
+      canLevel: false,
+      reason: "Invocações não podem subir de nível",
+    };
   }
 
   if (unit.level >= MAX_HERO_LEVEL) {
@@ -263,19 +296,19 @@ export async function grantKillXP(
 // ADICIONAR/REMOVER SKILLS E SPELLS
 // =============================================================================
 
-type FeatureTarget = "classFeatures" | "spells";
+type FeatureTarget = "features" | "spells";
 
 /**
  * Adiciona uma skill, spell ou feature a qualquer unidade
  * @param unitId - ID da unidade
  * @param featureCode - Código da skill/spell/feature
- * @param target - Onde adicionar: "classFeatures" (skills) ou "spells"
+ * @param target - Onde adicionar: "features" (skills) ou "spells"
  * @param validateClass - Se true, valida se pertence à classe da unidade
  */
 export async function addUnitFeature(
   unitId: string,
   featureCode: string,
-  target: FeatureTarget = "classFeatures",
+  target: FeatureTarget = "features",
   validateClass: boolean = false
 ): Promise<{ success: boolean; message: string }> {
   const unit = await prisma.unit.findUnique({
@@ -287,7 +320,7 @@ export async function addUnitFeature(
   }
 
   // Validação opcional de classe (só para skills, não spells)
-  if (validateClass && unit.classCode && target === "classFeatures") {
+  if (validateClass && unit.classCode && target === "features") {
     const unitClass = getClassByCode(unit.classCode);
     if (unitClass) {
       const isValidSkill = unitClass.skills.some((s) => s.code === featureCode);
@@ -302,7 +335,7 @@ export async function addUnitFeature(
   }
 
   const currentList = JSON.parse(
-    (target === "spells" ? unit.spells : unit.classFeatures) || "[]"
+    (target === "spells" ? unit.spells : unit.features) || "[]"
   ) as string[];
 
   if (currentList.includes(featureCode)) {
@@ -326,7 +359,7 @@ export async function addUnitFeature(
 export async function removeUnitFeature(
   unitId: string,
   featureCode: string,
-  target: FeatureTarget = "classFeatures"
+  target: FeatureTarget = "features"
 ): Promise<{ success: boolean; message: string }> {
   const unit = await prisma.unit.findUnique({
     where: { id: unitId },
@@ -337,7 +370,7 @@ export async function removeUnitFeature(
   }
 
   const currentList = JSON.parse(
-    (target === "spells" ? unit.spells : unit.classFeatures) || "[]"
+    (target === "spells" ? unit.spells : unit.features) || "[]"
   ) as string[];
 
   const index = currentList.indexOf(featureCode);
@@ -357,6 +390,184 @@ export async function removeUnitFeature(
 }
 
 // =============================================================================
+// COMPRAR LEVEL UP (RECURSO → XP)
+// =============================================================================
+
+/**
+ * Verifica se uma unidade pode comprar level up com recursos
+ * Requer estar em território com Arena (produtora de experiência) ou Capital
+ */
+export async function canPurchaseLevelUp(
+  unitId: string,
+  playerId: string
+): Promise<{ canLevel: boolean; reason?: string; cost?: number }> {
+  const unit = await prisma.unit.findUnique({
+    where: { id: unitId },
+  });
+
+  if (!unit) {
+    return { canLevel: false, reason: "Unidade não encontrada" };
+  }
+
+  // SUMMON não pode fazer level up
+  if (unit.category === "SUMMON") {
+    return {
+      canLevel: false,
+      reason: "Invocações não podem subir de nível",
+    };
+  }
+
+  if (unit.ownerId !== playerId) {
+    return { canLevel: false, reason: "Você não é dono desta unidade" };
+  }
+
+  if (unit.level >= MAX_HERO_LEVEL) {
+    return {
+      canLevel: false,
+      reason: `Nível máximo (${MAX_HERO_LEVEL}) atingido`,
+    };
+  }
+
+  // Verifica se está em território adequado (com Arena ou Capital)
+  if (!unit.matchId || unit.locationIndex === null) {
+    return {
+      canLevel: false,
+      reason: "Unidade deve estar em uma partida e em um território",
+    };
+  }
+
+  const territory = await prisma.territory.findFirst({
+    where: {
+      matchId: unit.matchId,
+      mapIndex: unit.locationIndex,
+    },
+  });
+
+  if (!territory) {
+    return { canLevel: false, reason: "Território não encontrado" };
+  }
+
+  const isInCapital = territory.isCapital && territory.ownerId === playerId;
+
+  const hasArena = await prisma.structure.findFirst({
+    where: {
+      matchId: unit.matchId,
+      locationIndex: unit.locationIndex,
+      resourceType: "EXPERIENCE",
+      ownerId: playerId,
+    },
+  });
+
+  if (!isInCapital && !hasArena) {
+    return {
+      canLevel: false,
+      reason: `Unidade precisa estar na Capital ou em território com Produtor de ${getResourceName(
+        "experience"
+      )} (Arena)`,
+    };
+  }
+
+  const cost = calculateLevelUpCost(unit.category, unit.level);
+
+  return { canLevel: true, cost };
+}
+
+/**
+ * Compra level up de uma unidade com recursos (experience)
+ * Qualquer unidade pode usar este sistema
+ */
+export async function purchaseLevelUp(
+  unitId: string,
+  playerId: string,
+  attributeDistribution: {
+    combat: number;
+    speed: number;
+    focus: number;
+    armor: number;
+    vitality: number;
+  }
+): Promise<{ success: boolean; message: string; unit?: any }> {
+  const validation = await canPurchaseLevelUp(unitId, playerId);
+
+  if (!validation.canLevel) {
+    return {
+      success: false,
+      message: validation.reason || "Não pode fazer level up",
+    };
+  }
+
+  const cost = validation.cost || 0;
+
+  const unit = await prisma.unit.findUnique({
+    where: { id: unitId },
+  });
+
+  if (!unit) {
+    return { success: false, message: "Unidade não encontrada" };
+  }
+
+  // Determina pontos por nível baseado na categoria
+  const pointsPerLevel = ATTRIBUTE_POINTS_PER_LEVEL[unit.category] || 2;
+
+  // Valida distribuição de pontos
+  const totalDistributed =
+    attributeDistribution.combat +
+    attributeDistribution.speed +
+    attributeDistribution.focus +
+    attributeDistribution.armor +
+    attributeDistribution.vitality;
+
+  if (totalDistributed !== pointsPerLevel) {
+    return {
+      success: false,
+      message: `Distribua exatamente ${pointsPerLevel} pontos (${unit.category})`,
+    };
+  }
+
+  // Valida que não há valores negativos
+  if (Object.values(attributeDistribution).some((v) => v < 0)) {
+    return {
+      success: false,
+      message: "Valores de atributo não podem ser negativos",
+    };
+  }
+
+  // Gasta experiência
+  try {
+    await spendResources(playerId, { experience: cost } as any);
+  } catch (error) {
+    return {
+      success: false,
+      message: `${getResourceName("experience")} insuficiente. Custo: ${cost}`,
+    };
+  }
+
+  const newLevel = unit.level + 1;
+  const updatedUnit = await prisma.unit.update({
+    where: { id: unitId },
+    data: {
+      level: newLevel,
+      combat: unit.combat + attributeDistribution.combat,
+      speed: unit.speed + attributeDistribution.speed,
+      focus: unit.focus + attributeDistribution.focus,
+      armor: unit.armor + attributeDistribution.armor,
+      vitality: unit.vitality + attributeDistribution.vitality,
+      currentHp: unit.currentHp + attributeDistribution.vitality,
+    },
+  });
+
+  return {
+    success: true,
+    message: `${
+      unit.name || unit.category
+    } subiu para nível ${newLevel}! Custo: ${cost} ${getResourceName(
+      "experience"
+    )}`,
+    unit: updatedUnit,
+  };
+}
+
+// =============================================================================
 // RE-EXPORTS de constantes do shared
 // =============================================================================
 
@@ -366,4 +577,5 @@ export {
   ATTRIBUTE_POINTS_PER_LEVEL,
   calculateLevelFromXP,
   getXPToNextLevel,
+  calculateLevelUpCost,
 };

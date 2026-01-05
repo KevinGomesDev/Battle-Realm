@@ -60,7 +60,7 @@ export async function createSummonedCreature(params: {
         level,
         name: params.name || null,
         classCode: null, // Summons não têm classe
-        classFeatures: JSON.stringify(
+        features: JSON.stringify(
           [randomPassive.code, randomSkill ? randomSkill.code : null].filter(
             Boolean
           )

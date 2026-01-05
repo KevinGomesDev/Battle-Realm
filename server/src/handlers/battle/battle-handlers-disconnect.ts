@@ -8,6 +8,7 @@ import {
   userToLobby,
 } from "./battle-state";
 import { pauseBattleTimerIfNoPlayers } from "./battle-timer";
+import { BOT_USER_ID } from "./battle-creation";
 
 export function registerBattleDisconnectHandler(
   io: Server,
@@ -51,7 +52,7 @@ export function registerBattleDisconnectHandler(
             }
           }
 
-          // Notificar o outro jogador
+          // Notificar os outros jogadores
           io.to(lobbyId).emit("battle:rematch_declined", {
             lobbyId,
             userId,
@@ -60,9 +61,12 @@ export function registerBattleDisconnectHandler(
 
           userToLobby.delete(userId);
 
-          // Se ambos saíram, limpar lobby
-          const remainingPlayers = [lobby.hostUserId, lobby.guestUserId].filter(
-            (id) => id && id !== userId && userToLobby.has(id)
+          // Se todos os jogadores humanos saíram, limpar lobby
+          const remainingPlayers = lobby.players.filter(
+            (p) =>
+              p.userId !== userId &&
+              p.userId !== BOT_USER_ID &&
+              userToLobby.has(p.userId)
           );
           if (remainingPlayers.length === 0) {
             console.log(
@@ -73,8 +77,11 @@ export function registerBattleDisconnectHandler(
           }
         } else if (lobby && lobby.status !== "BATTLING") {
           if (lobby.hostUserId === userId) {
-            if (lobby.guestUserId) {
-              userToLobby.delete(lobby.guestUserId);
+            // Host desconectou - fechar lobby e limpar todos os jogadores
+            for (const player of lobby.players) {
+              if (player.userId !== userId) {
+                userToLobby.delete(player.userId);
+              }
             }
             battleLobbies.delete(lobbyId);
             io.to(lobbyId).emit("battle:lobby_closed", {
@@ -82,14 +89,23 @@ export function registerBattleDisconnectHandler(
               reason: "Host desconectou",
             });
           } else {
-            lobby.guestUserId = undefined;
-            lobby.guestSocketId = undefined;
-            lobby.guestKingdomId = undefined;
+            // Outro jogador desconectou - remover do lobby
+            const playerIndex = lobby.players.findIndex(
+              (p) => p.userId === userId
+            );
+            if (playerIndex > 0) {
+              lobby.players.splice(playerIndex, 1);
+              // Reindexar jogadores restantes
+              lobby.players.forEach((p, idx) => {
+                p.playerIndex = idx;
+              });
+            }
             lobby.status = "WAITING";
             io.to(lobbyId).emit("battle:player_left", {
               lobbyId,
               userId,
               status: "WAITING",
+              players: lobby.players,
             });
           }
           userToLobby.delete(userId);

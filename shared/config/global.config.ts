@@ -866,11 +866,17 @@ export const ARENA_COLORS = {
   cellMovableEngagementBorder: "rgba(251, 146, 60, 0.8)",
   cellMovableBlocked: "rgba(239, 68, 68, 0.4)", // Vermelho - caminho bloqueado
   cellMovableBlockedBorder: "rgba(239, 68, 68, 0.8)",
-  // Jogadores
-  hostPrimary: "#4a90d9",
-  hostSecondary: "#2d5a8a",
-  guestPrimary: "#d94a4a",
-  guestSecondary: "#8a2d2d",
+  // Cores dos jogadores (até 8)
+  playerColors: [
+    { primary: "#4a90d9", secondary: "#2d5a8a" }, // Azul
+    { primary: "#d94a4a", secondary: "#8a2d2d" }, // Vermelho
+    { primary: "#2a9d8f", secondary: "#1d6b62" }, // Verde
+    { primary: "#f4a261", secondary: "#c47a3f" }, // Laranja
+    { primary: "#9b59b6", secondary: "#6c3483" }, // Roxo
+    { primary: "#1abc9c", secondary: "#138d75" }, // Turquesa
+    { primary: "#e74c3c", secondary: "#b03a2e" }, // Vermelho escuro
+    { primary: "#3498db", secondary: "#2471a3" }, // Azul claro
+  ],
 } as const;
 
 // =============================================================================

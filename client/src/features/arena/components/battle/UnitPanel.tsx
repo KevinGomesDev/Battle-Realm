@@ -1,10 +1,10 @@
 import React, { useState, useRef, useMemo } from "react";
 import { getConditionInfo } from "../../constants";
-import { getSkillInfo } from "../../../../../../shared/data/skills.data";
-import { getSpellByCode } from "../../../../../../shared/data/spells.data";
 import {
-  ALL_ACTIONS,
-} from "../../../../../../shared/data/actions.data";
+  getSkillInfo,
+  isCommonAction,
+} from "../../../../../../shared/data/skills.data";
+import { getSpellByCode } from "../../../../../../shared/data/spells.data";
 import type { BattleUnit } from "../../../../../../shared/types/battle.types";
 import { AttributesDisplay } from "@/components/AttributesDisplay/index";
 import { UI_SECTION_COLORS } from "../../../../config/colors.config";
@@ -212,42 +212,6 @@ const ConditionBadge: React.FC<{ condition: string }> = ({ condition }) => {
   );
 };
 
-/**
- * Obtém informações de uma ação para exibição
- * Prioriza o shared, mas mantém fallback para ações especiais
- */
-function getActionInfo(actionKey: string): {
-  icon: string;
-  name: string;
-  description: string;
-  requiresTarget: boolean;
-  isMenu?: boolean;
-} | null {
-  // Ação especial "spell" (menu de magias)
-  if (actionKey === "spell") {
-    return {
-      icon: "🔮",
-      name: "Magia",
-      description: "Use uma magia",
-      requiresTarget: false,
-      isMenu: true,
-    };
-  }
-
-  // Buscar no shared
-  const actionDef = ALL_ACTIONS[actionKey];
-  if (actionDef) {
-    return {
-      icon: actionDef.icon,
-      name: actionDef.name,
-      description: actionDef.description,
-      requiresTarget: actionDef.requiresTarget,
-    };
-  }
-
-  return null;
-}
-
 // =============================================================================
 // COMPONENTE PRINCIPAL
 // =============================================================================
@@ -279,22 +243,25 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
   );
 
   // Categorizar ações (fora do render condicional)
+  // Ações comuns são skills com commonAction: true
   const categorizedActions = useMemo(() => {
-    const actions: string[] = [];
+    const commonActions: string[] = [];
     const skills: string[] = [];
     const spells: string[] = [];
 
     if (selectedUnit) {
-      selectedUnit.actions
-        ?.filter((actionKey) => actionKey !== "move")
-        .forEach((actionKey) => {
-          if (getActionInfo(actionKey)) {
-            actions.push(actionKey);
-          } else if (getSkillInfo(actionKey)) {
-            skills.push(actionKey);
-          }
-        });
+      // Features da unidade (ações comuns + skills de classe)
+      selectedUnit.features?.forEach((featureCode) => {
+        // Ações comuns (ATTACK, DASH, DODGE) vão para a aba de ações
+        if (isCommonAction(featureCode)) {
+          commonActions.push(featureCode);
+        } else if (getSkillInfo(featureCode)) {
+          // Skills de classe
+          skills.push(featureCode);
+        }
+      });
 
+      // Spells (magias)
       if (selectedUnit.spells && selectedUnit.spells.length > 0) {
         selectedUnit.spells.forEach((spellCode) => {
           spells.push(spellCode);
@@ -302,7 +269,7 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
       }
     }
 
-    return { actions, skills, spells };
+    return { actions: commonActions, skills, spells };
   }, [selectedUnit]);
 
   // Define aba inicial quando o menu abre
@@ -615,15 +582,15 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
 
                     {/* Conteúdo das Abas */}
                     <div className="p-3">
-                      {/* Aba de Ações */}
+                      {/* Aba de Ações (Ações Comuns) */}
                       {activeTab === "actions" &&
                         categorizedActions.actions.length > 0 && (
                           <div className="flex flex-col gap-1.5">
                             {categorizedActions.actions.map((actionKey) => {
-                              const actionInfo = getActionInfo(actionKey);
-                              if (!actionInfo) return null;
-                              
-                              const isAttackAction = actionKey === "attack";
+                              const skillInfo = getSkillInfo(actionKey);
+                              if (!skillInfo) return null;
+
+                              const isAttackAction = actionKey === "ATTACK";
                               const hasExtraAttacks =
                                 (selectedUnit.attacksLeftThisTurn ?? 0) > 0;
                               const canExecute = isAttackAction
@@ -636,7 +603,7 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
                                   key={actionKey}
                                   onClick={() => {
                                     if (!canExecute) return;
-                                    if (actionInfo.requiresTarget) {
+                                    if (skillInfo.requiresTarget) {
                                       onSetPendingAction(actionKey);
                                       setActionsMenuOpen(false);
                                     } else {
@@ -655,17 +622,17 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
                                   }`}
                                 >
                                   <span className="text-xl w-6 text-center">
-                                    {actionInfo.icon}
+                                    {skillInfo.icon}
                                   </span>
                                   <div className="flex-1 min-w-0">
                                     <span className="text-gray-100 text-sm font-semibold block">
-                                      {actionInfo.name}
+                                      {skillInfo.name}
                                     </span>
                                     <span className="text-gray-500 text-[9px] block truncate">
-                                      {actionInfo.description}
+                                      {skillInfo.description}
                                     </span>
                                   </div>
-                                  {actionInfo.requiresTarget && (
+                                  {skillInfo.requiresTarget && (
                                     <span className="text-gray-500 text-[10px]">
                                       🎯
                                     </span>
@@ -725,20 +692,29 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
                                     )}
                                   </span>
                                   <div className="flex-1 min-w-0">
-                                    <span className={`text-sm font-semibold block ${isOnCooldown ? "text-gray-400" : "text-gray-100"}`}>
+                                    <span
+                                      className={`text-sm font-semibold block ${
+                                        isOnCooldown
+                                          ? "text-gray-400"
+                                          : "text-gray-100"
+                                      }`}
+                                    >
                                       {skillInfo.name}
                                     </span>
                                     <span className="text-gray-500 text-[9px] block truncate">
                                       {isOnCooldown
-                                        ? `⏳ Cooldown: ${cooldownLeft} rodada${cooldownLeft > 1 ? "s" : ""}`
+                                        ? `⏳ Cooldown: ${cooldownLeft} rodada${
+                                            cooldownLeft > 1 ? "s" : ""
+                                          }`
                                         : skillInfo.description}
                                     </span>
                                   </div>
-                                  {skillInfo.requiresTarget && !isOnCooldown && (
-                                    <span className="text-gray-500 text-[10px]">
-                                      🎯
-                                    </span>
-                                  )}
+                                  {skillInfo.requiresTarget &&
+                                    !isOnCooldown && (
+                                      <span className="text-gray-500 text-[10px]">
+                                        🎯
+                                      </span>
+                                    )}
                                 </button>
                               );
                             })}
@@ -790,7 +766,11 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
                                       {spellInfo.name}
                                     </span>
                                     <span
-                                      className={`text-[9px] block truncate ${isOnCooldown ? "text-red-400" : "text-purple-400"}`}
+                                      className={`text-[9px] block truncate ${
+                                        isOnCooldown
+                                          ? "text-red-400"
+                                          : "text-purple-400"
+                                      }`}
                                     >
                                       {isOnCooldown
                                         ? `⏳ Cooldown: ${cooldownLeft} rodadas`

@@ -56,7 +56,6 @@ client/src/
 | Executor de skill  | `server/src/logic/skill-executors.ts`     |
 | Executor de spell  | `server/src/spells/executors.ts`          |
 | Utilitários spell  | `server/src/spells/utils.ts`              |
-| Lógica de combate  | `server/src/logic/combat-actions.ts`      |
 | Turnos/Rodadas     | `server/src/logic/round-control.ts`       |
 | Socket handler     | `server/src/handlers/{domain}.handler.ts` |
 | Feature client     | `client/src/features/{feature}/`          |
@@ -241,7 +240,7 @@ export const CONDITIONS_INFO: Record<string, ConditionInfo> = {
 8. Aplica dano final no HP
 ```
 
-**Arquivo:** `server/src/logic/combat-actions.ts`
+**Arquivo:** `server/src/logic/skill-executors.ts` (função `executeAttack`)
 
 ---
 

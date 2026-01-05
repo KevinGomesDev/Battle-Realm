@@ -174,29 +174,30 @@ export const registerSessionHandlers = (io: Server, socket: Socket): void => {
         }
 
         // Atualizar socketId do usuário reconectado
-        if (lobby.hostUserId === userId) {
-          lobby.hostSocketId = socket.id;
-        } else if (lobby.guestUserId === userId) {
-          lobby.guestSocketId = socket.id;
+        const playerInLobby = lobby.players.find((p) => p.userId === userId);
+        if (playerInLobby) {
+          playerInLobby.socketId = socket.id;
         }
 
         // Buscar dados completos para restauração
-        const hostKingdom = await prisma.kingdom.findUnique({
-          where: { id: lobby.hostKingdomId },
-        });
-        const hostUser = await prisma.user.findUnique({
-          where: { id: lobby.hostUserId },
-        });
-        let guestKingdom = null;
-        let guestUser = null;
-        if (lobby.guestUserId && lobby.guestKingdomId) {
-          guestKingdom = await prisma.kingdom.findUnique({
-            where: { id: lobby.guestKingdomId },
-          });
-          guestUser = await prisma.user.findUnique({
-            where: { id: lobby.guestUserId },
-          });
-        }
+        const playersInfo = await Promise.all(
+          lobby.players.map(async (p) => {
+            const user = await prisma.user.findUnique({
+              where: { id: p.userId },
+            });
+            const kingdom = await prisma.kingdom.findUnique({
+              where: { id: p.kingdomId },
+            });
+            return {
+              userId: p.userId,
+              username: user?.username || "Unknown",
+              kingdomId: p.kingdomId,
+              kingdomName: kingdom?.name || "Unknown",
+              playerIndex: p.playerIndex,
+              isReady: p.isReady,
+            };
+          })
+        );
 
         const isHost = lobby.hostUserId === userId;
 
@@ -204,11 +205,8 @@ export const registerSessionHandlers = (io: Server, socket: Socket): void => {
         socket.emit("battle:session_restored", {
           lobbyId: session.lobbyId,
           hostUserId: lobby.hostUserId,
-          hostUsername: hostUser?.username || "Unknown",
-          hostKingdomName: hostKingdom?.name || "Unknown",
-          guestUserId: lobby.guestUserId,
-          guestUsername: guestUser?.username,
-          guestKingdomName: guestKingdom?.name,
+          maxPlayers: lobby.maxPlayers,
+          players: playersInfo,
           status: lobby.status,
           isHost,
           createdAt: lobby.createdAt,
@@ -220,7 +218,8 @@ export const registerSessionHandlers = (io: Server, socket: Socket): void => {
           lobbyStatus: lobby.status,
           isHost,
           hostUserId: lobby.hostUserId,
-          guestUserId: lobby.guestUserId,
+          maxPlayers: lobby.maxPlayers,
+          players: playersInfo,
         });
 
         console.log(
@@ -274,27 +273,22 @@ export const registerSessionHandlers = (io: Server, socket: Socket): void => {
           // ===== LIMPEZA COMPLETA =====
           // 1. Limpar mapas em memória
           if (lobby) {
-            userToLobbyRef?.delete(lobby.hostUserId);
-            if (lobby.guestUserId) {
-              userToLobbyRef?.delete(lobby.guestUserId);
-            }
-            disconnectedPlayersRef?.delete(lobby.hostUserId);
-            if (lobby.guestUserId) {
-              disconnectedPlayersRef?.delete(lobby.guestUserId);
+            for (const player of lobby.players) {
+              userToLobbyRef?.delete(player.userId);
+              disconnectedPlayersRef?.delete(player.userId);
             }
             lobby.status = "ENDED";
           }
           socketToUserRef?.delete(socket.id);
 
           // 2. Atualizar estatísticas dos jogadores
-          if (lobby) {
-            const loserId =
-              victoryCheck.winnerId === lobby.hostUserId
-                ? lobby.guestUserId
-                : lobby.hostUserId;
+          if (lobby && lobby.players.length >= 2) {
+            const loser = lobby.players.find(
+              (p) => p.userId !== victoryCheck.winnerId
+            );
             await updateUserStats(
               victoryCheck.winnerId,
-              loserId,
+              loser?.userId,
               battle.isArena ?? true
             );
           }
@@ -325,24 +319,29 @@ export const registerSessionHandlers = (io: Server, socket: Socket): void => {
 
         // Atualizar socketId se reconectando durante batalha
         if (lobby) {
-          if (lobby.hostUserId === userId) {
-            lobby.hostSocketId = socket.id;
-          } else if (lobby.guestUserId === userId) {
-            lobby.guestSocketId = socket.id;
+          const playerInLobby = lobby.players.find((p) => p.userId === userId);
+          if (playerInLobby) {
+            playerInLobby.socketId = socket.id;
           }
         }
 
-        // Buscar dados dos reinos para a batalha
-        const hostKingdom = lobby?.hostKingdomId
-          ? await prisma.kingdom.findUnique({
-              where: { id: lobby.hostKingdomId },
-            })
-          : null;
-        const guestKingdom = lobby?.guestKingdomId
-          ? await prisma.kingdom.findUnique({
-              where: { id: lobby.guestKingdomId },
-            })
-          : null;
+        // Buscar dados dos reinos para a batalha (usando battle.players)
+        const kingdomsInfo = await Promise.all(
+          (battle.players || []).map(async (player) => {
+            const kingdom = await prisma.kingdom.findUnique({
+              where: { id: player.kingdomId },
+            });
+            return kingdom
+              ? {
+                  id: kingdom.id,
+                  name: kingdom.name,
+                  ownerId: player.userId,
+                  playerIndex: player.playerIndex,
+                  playerColor: player.playerColor,
+                }
+              : null;
+          })
+        );
 
         // Emitir evento específico para restauração de batalha
         socket.emit("battle:battle_restored", {
@@ -357,20 +356,8 @@ export const registerSessionHandlers = (io: Server, socket: Socket): void => {
           activeUnitId: battle.activeUnitId, // Unidade ativa (se houver)
           units: battle.units,
           actionOrder: battle.actionOrder,
-          hostKingdom: hostKingdom
-            ? {
-                id: hostKingdom.id,
-                name: hostKingdom.name,
-                ownerId: lobby?.hostUserId,
-              }
-            : null,
-          guestKingdom: guestKingdom
-            ? {
-                id: guestKingdom.id,
-                name: guestKingdom.name,
-                ownerId: lobby?.guestUserId,
-              }
-            : null,
+          maxPlayers: battle.maxPlayers,
+          kingdoms: kingdomsInfo.filter((k) => k !== null),
         });
 
         socket.emit("session:active", {

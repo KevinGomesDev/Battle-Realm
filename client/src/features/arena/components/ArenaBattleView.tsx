@@ -24,7 +24,10 @@ import { ChatProvider, useChat } from "../../chat";
 import { ChatBox } from "../../chat/components/ChatBox";
 import type { BattleUnit } from "../../../../../shared/types/battle.types";
 import { getSpellByCode } from "../../../../../shared/data/spells.data";
-import { findSkillByCode } from "../../../../../shared/data/skills.data";
+import {
+  findSkillByCode,
+  isCommonAction,
+} from "../../../../../shared/data/skills.data";
 import { getFullMovementInfo } from "../../../../../shared/utils/engagement.utils";
 import {
   getValidSkillTargets,
@@ -351,13 +354,14 @@ const ArenaBattleViewInner: React.FC = () => {
     if (!myUnit) return;
 
     // Só verificar se a unidade já começou a ação (tem hasStartedAction)
+    // NÃO auto-encerrar se a unidade ainda tem ações (pode usar Dash para recuperar movimento)
     if (
       myUnit.hasStartedAction &&
       myUnit.movesLeft === 0 &&
       myUnit.actionsLeft === 0 &&
       (myUnit.attacksLeftThisTurn ?? 0) === 0
     ) {
-      // Usar debounce para dar tempo de respostas do servidor (ex: Disparada restaura movimento)
+      // Usar debounce maior para dar tempo de respostas do servidor (ex: Disparada restaura movimento)
       autoEndTimerRef.current = setTimeout(() => {
         // Verificar novamente após o delay usando ref para estado atualizado
         const currentUnits = unitsRef.current;
@@ -377,8 +381,18 @@ const ArenaBattleViewInner: React.FC = () => {
           );
           autoEndTriggeredRef.current = true;
           endAction(currentUnit.id);
+        } else {
+          console.log(
+            "%c[ArenaBattleView] ⏳ Auto-encerrar cancelado - unidade ainda tem recursos",
+            "color: #f59e0b; font-weight: bold;",
+            {
+              movesLeft: currentUnit?.movesLeft,
+              actionsLeft: currentUnit?.actionsLeft,
+              attacksLeftThisTurn: currentUnit?.attacksLeftThisTurn,
+            }
+          );
         }
-      }, 600); // 600ms de debounce para dar tempo do servidor responder
+      }, 1000); // 1 segundo de debounce para dar tempo do servidor responder
     }
 
     // Cleanup
@@ -443,10 +457,8 @@ const ArenaBattleViewInner: React.FC = () => {
 
     if (!selectedUnit || !pendingAction) return highlighted;
 
-    // Verificar se é uma skill (não é ação básica nem spell)
-    const isBasicAction = ["attack", "move", "dash", "dodge"].includes(
-      pendingAction
-    );
+    // Verificar se é uma skill (não é ação comum nem spell)
+    const isBasicAction = isCommonAction(pendingAction);
     const isSpell = pendingAction.startsWith("spell:");
 
     if (isBasicAction || isSpell) return highlighted;
@@ -467,10 +479,11 @@ const ArenaBattleViewInner: React.FC = () => {
     return highlighted;
   }, [selectedUnit, pendingAction, units]);
 
-  // Determinar o oponente
-  const isHost = battle.hostKingdom.ownerId === user.id;
-  const opponentKingdom = isHost ? battle.guestKingdom : battle.hostKingdom;
-  const myKingdom = isHost ? battle.hostKingdom : battle.guestKingdom;
+  // Determinar meu kingdom e oponentes (suporta múltiplos jogadores)
+  const myKingdom = battle.kingdoms.find((k) => k.ownerId === user.id);
+  const opponentKingdoms = battle.kingdoms.filter((k) => k.ownerId !== user.id);
+  // Para compatibilidade com UI existente, pegar primeiro oponente
+  const opponentKingdom = opponentKingdoms[0];
 
   // === MOVIMENTAÇÃO COM WASD ===
   const handleKeyboardMove = useCallback(
@@ -624,7 +637,7 @@ const ArenaBattleViewInner: React.FC = () => {
     );
 
     // Se há uma ação pendente aguardando alvo
-    if (pendingAction === "attack" && selectedUnit && isMyTurn) {
+    if (pendingAction === "ATTACK" && selectedUnit && isMyTurn) {
       const dx = Math.abs(unit.posX - selectedUnit.posX);
       const dy = Math.abs(unit.posY - selectedUnit.posY);
 
@@ -681,7 +694,7 @@ const ArenaBattleViewInner: React.FC = () => {
     if (
       pendingAction &&
       !pendingAction.startsWith("spell:") &&
-      pendingAction !== "attack" &&
+      pendingAction !== "ATTACK" &&
       selectedUnit &&
       isMyTurn
     ) {
@@ -738,7 +751,7 @@ const ArenaBattleViewInner: React.FC = () => {
           }
         }
         // Verificar se é skill ALLY
-        else if (pendingAction !== "attack") {
+        else if (pendingAction !== "ATTACK") {
           const skillDef = findSkillByCode(pendingAction);
 
           if (skillDef && skillDef.targetType === "ALLY") {
@@ -990,13 +1003,20 @@ const ArenaBattleViewInner: React.FC = () => {
   };
 
   // Wrapper para executar skills/ações do UnitPanel
+  // Agora tudo é tratado como skill (incluindo ações comuns)
   const handleExecuteSkillAction = useCallback(
     (skillCode: string, unitId: string) => {
+      const isCommon = isCommonAction(skillCode);
+
       console.log(
-        "%c[ArenaBattleView] 🎯 Executando skill sem alvo (SELF)",
-        "color: #fbbf24; font-weight: bold;",
-        { skillCode, unitId }
+        `%c[ArenaBattleView] 🎯 Executando ${
+          isCommon ? "ação comum" : "skill"
+        } sem alvo`,
+        `color: ${isCommon ? "#10b981" : "#fbbf24"}; font-weight: bold;`,
+        { skillCode, unitId, isCommonAction: isCommon }
       );
+
+      // Tudo é enviado como use_skill agora
       executeAction("use_skill", unitId, {
         skillCode,
         casterUnitId: unitId,
@@ -1026,7 +1046,7 @@ const ArenaBattleViewInner: React.FC = () => {
     );
 
     // Se há ação de ataque pendente e estou adjacente (8 direções)
-    if (pendingAction === "attack" && selectedUnit && isMyTurn) {
+    if (pendingAction === "ATTACK" && selectedUnit && isMyTurn) {
       const dx = Math.abs(obstacle.posX - selectedUnit.posX);
       const dy = Math.abs(obstacle.posY - selectedUnit.posY);
 
@@ -1132,8 +1152,8 @@ const ArenaBattleViewInner: React.FC = () => {
           result={battleResult}
           units={battleResult.finalUnits}
           isWinner={battleResult.winnerId === user.id}
-          myKingdomName={myKingdom.name}
-          opponentKingdomName={opponentKingdom.name}
+          myKingdomName={myKingdom?.name ?? "Meu Reino"}
+          opponentKingdomName={opponentKingdom?.name ?? "Oponente"}
           myUserId={user.id}
           onRematch={requestRematch}
           onLeave={dismissBattleResult}
@@ -1154,7 +1174,9 @@ const ArenaBattleViewInner: React.FC = () => {
         isMyTurn={isMyTurn}
         isRoundStart={isRoundStart}
         currentPlayerKingdomName={
-          isMyTurn ? myKingdom.name : opponentKingdom.name
+          isMyTurn
+            ? myKingdom?.name ?? "Meu Reino"
+            : opponentKingdom?.name ?? "Oponente"
         }
       />
 

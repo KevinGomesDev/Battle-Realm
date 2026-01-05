@@ -212,7 +212,17 @@ export function validateDecision(
   }
 
   // Validar tipos de decisão conhecidos
-  const validTypes = ["ATTACK", "MOVE", "SKILL", "SPELL", "DASH", "PASS"];
+  // NOTA: ATTACK, DASH, DODGE agora são skills (commonAction: true)
+  // Mas a IA ainda pode usar ATTACK/DASH/DODGE como type ou SKILL para todas
+  const validTypes = [
+    "ATTACK",
+    "MOVE",
+    "SKILL",
+    "SPELL",
+    "DASH",
+    "DODGE",
+    "PASS",
+  ];
   if (!validTypes.includes(decision.type)) {
     return getFallbackDecision(`invalid decision type: ${decision.type}`);
   }

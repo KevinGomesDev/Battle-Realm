@@ -377,10 +377,59 @@ export const TROOP_SKILLS: SkillDefinition[] = [
 ];
 
 // =============================================================================
-// TODAS AS SKILLS (para busca rápida) - Todas as classes + Tropas
+// AÇÕES COMUNS (disponíveis para todas as unidades)
+// =============================================================================
+
+export const COMMON_ACTION_ATTACK: SkillDefinition = {
+  code: "ATTACK",
+  name: "Atacar",
+  description: "Ataca um inimigo adjacente",
+  category: "ACTIVE",
+  commonAction: true,
+  range: "ADJACENT",
+  targetType: "ENEMY",
+  functionName: "executeAttackSkill",
+  consumesAction: true,
+  cooldown: 0,
+};
+
+export const COMMON_ACTION_DASH: SkillDefinition = {
+  code: "DASH",
+  name: "Disparada",
+  description: "Gasta uma ação para dobrar o movimento neste turno",
+  category: "ACTIVE",
+  commonAction: true,
+  range: "SELF",
+  functionName: "executeDash",
+  consumesAction: true,
+  cooldown: 0,
+};
+
+export const COMMON_ACTION_DODGE: SkillDefinition = {
+  code: "DODGE",
+  name: "Esquiva",
+  description: "Aumenta a chance de esquiva até o próximo turno",
+  category: "ACTIVE",
+  commonAction: true,
+  range: "SELF",
+  functionName: "executeDodge",
+  consumesAction: true,
+  cooldown: 0,
+  conditionApplied: "DODGING",
+};
+
+export const COMMON_ACTIONS: SkillDefinition[] = [
+  COMMON_ACTION_ATTACK,
+  COMMON_ACTION_DASH,
+  COMMON_ACTION_DODGE,
+];
+
+// =============================================================================
+// TODAS AS SKILLS (para busca rápida) - Todas as classes + Tropas + Ações Comuns
 // =============================================================================
 
 export const ALL_SKILLS: SkillDefinition[] = [
+  ...COMMON_ACTIONS,
   ...BARBARIAN_SKILLS,
   ...WARRIOR_SKILLS,
   ...ROGUE_SKILLS,
@@ -401,6 +450,27 @@ for (const skill of TROOP_SKILLS) {
  */
 export function findSkillByCode(code: string): SkillDefinition | undefined {
   return ALL_SKILLS.find((s) => s.code === code);
+}
+
+/**
+ * Verifica se é uma ação comum (disponível para todas as unidades)
+ */
+export function isCommonAction(code: string): boolean {
+  return COMMON_ACTIONS.some((s) => s.code === code.toUpperCase());
+}
+
+/**
+ * Retorna todas as ações comuns
+ */
+export function getCommonActions(): SkillDefinition[] {
+  return COMMON_ACTIONS;
+}
+
+/**
+ * Retorna códigos das ações comuns (para inicialização de unidades)
+ */
+export function getCommonActionCodes(): string[] {
+  return COMMON_ACTIONS.map((s) => s.code);
 }
 
 /**
@@ -432,6 +502,10 @@ export function getTroopSkills(): SkillDefinition[] {
  * Mapeamento de ícones para cada skill (baseado no tipo/range)
  */
 const SKILL_ICONS: Record<string, string> = {
+  // Ações Comuns
+  ATTACK: "⚔️",
+  DASH: "💨",
+  DODGE: "🌀",
   // Warrior
   EXTRA_ATTACK: "⚔️",
   SECOND_WIND: "💨",
@@ -466,6 +540,10 @@ const SKILL_ICONS: Record<string, string> = {
  * Mapeamento de cores para cada tipo de skill
  */
 const SKILL_COLORS: Record<string, string> = {
+  // Ações Comuns
+  ATTACK: "red",
+  DASH: "blue",
+  DODGE: "cyan",
   // Warrior - amber
   EXTRA_ATTACK: "amber",
   SECOND_WIND: "emerald",
@@ -558,7 +636,7 @@ export function getSkillInfoWithState(
   unit: {
     actionsLeft: number;
     isAlive: boolean;
-    actions: string[];
+    features: string[];
     unitCooldowns?: Record<string, number>;
   }
 ): SkillInfoWithState | null {
@@ -578,7 +656,7 @@ export function getSkillInfoWithState(
   if (skill.category !== "ACTIVE") {
     canUse = false;
     reason = "Passiva";
-  } else if (!unit.actions.includes(skill.code)) {
+  } else if (!unit.features.includes(skill.code)) {
     canUse = false;
     reason = "Não possui";
   } else if (!unit.isAlive) {

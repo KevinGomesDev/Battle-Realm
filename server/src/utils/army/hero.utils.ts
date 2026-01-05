@@ -28,17 +28,6 @@ export {
   getXPToNextLevel,
 } from "./unit.utils";
 
-// Aliases para compatibilidade (DEPRECATED - usar addUnitFeature)
-import { addUnitFeature } from "./unit.utils";
-export const addHeroSkill = (unitId: string, skillCode: string) =>
-  addUnitFeature(unitId, skillCode, "classFeatures", true);
-export const addHeroClassFeature = (unitId: string, featureCode: string) =>
-  addUnitFeature(unitId, featureCode, "classFeatures", false);
-
-// =============================================================================
-// CONSTANTES DE RECRUTAMENTO
-// =============================================================================
-
 /** Custo base em recursos para revelar heróis */
 export const HERO_REVEAL_COST = 10;
 
@@ -300,7 +289,7 @@ export async function recruitHeroFromTemplate(
       level: template.level,
       experience: 0,
       classCode: template.classCode,
-      classFeatures: JSON.stringify(template.initialSkills),
+      features: JSON.stringify(template.initialSkills),
       spells: JSON.stringify(template.initialSpells),
       combat: template.combat,
       speed: template.speed,

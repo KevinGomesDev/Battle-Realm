@@ -33,10 +33,10 @@ function hasConnectedPlayers(battle: Battle): boolean {
   const lobby = battleLobbies.get(battle.lobbyId);
   if (!lobby) return false;
 
-  const hostDisconnected = disconnectedPlayers.has(battle.hostUserId);
-  const guestDisconnected = disconnectedPlayers.has(battle.guestUserId);
-
-  return !hostDisconnected || !guestDisconnected;
+  // Verificar se pelo menos um jogador está conectado
+  return battle.players.some(
+    (player) => !disconnectedPlayers.has(player.userId)
+  );
 }
 
 export function startBattleTurnTimer(battle: Battle): void {
@@ -227,15 +227,21 @@ async function handleTimerExpired(battle: Battle): Promise<void> {
       lobby.vsBot
     );
 
-    const loserId =
-      victoryCheck.winnerId === lobby.hostUserId
-        ? lobby.guestUserId
-        : lobby.hostUserId;
-    await updateUserStats(victoryCheck.winnerId, loserId, battle.isArena);
+    // Encontrar perdedores (todos que não são o vencedor)
+    const losers = battle.players.filter(
+      (p) => p.userId !== victoryCheck.winnerId
+    );
+    for (const loser of losers) {
+      await updateUserStats(
+        victoryCheck.winnerId,
+        loser.userId,
+        battle.isArena
+      );
+    }
 
-    userToLobby.delete(lobby.hostUserId);
-    if (lobby.guestUserId) {
-      userToLobby.delete(lobby.guestUserId);
+    // Limpar todos os jogadores do mapeamento
+    for (const player of battle.players) {
+      userToLobby.delete(player.userId);
     }
 
     lobby.status = "ENDED";

@@ -11,6 +11,13 @@ import {
   addHeroSkill,
   addExperience,
 } from "../utils/army/hero.utils";
+import {
+  canPurchaseLevelUp,
+  purchaseLevelUp,
+  calculateLevelUpCost,
+} from "../utils/army/unit.utils";
+import { canRegentChooseFeature } from "../utils/army/regent.utils";
+import { TurnType } from "../types";
 
 export const registerUnitHandlers = (io: Server, socket: Socket) => {
   // ==========================================================================
@@ -128,13 +135,13 @@ export const registerUnitHandlers = (io: Server, socket: Socket) => {
       }
 
       const levelUpStatus = await canLevelUp(unitId);
-      const features = JSON.parse(unit.classFeatures || "[]");
+      const features = JSON.parse(unit.features || "[]");
       const spells = JSON.parse(unit.spells || "[]");
       const conditions = JSON.parse(unit.conditions || "[]");
 
       socket.emit("unit:details", {
         unit,
-        classFeatures: features,
+        features,
         spells,
         conditions,
         canLevelUp: levelUpStatus.canLevel,
@@ -170,6 +177,128 @@ export const registerUnitHandlers = (io: Server, socket: Socket) => {
     } catch (error) {
       console.error("[UNIT] Erro ao listar unidades:", error);
       socket.emit("unit:error", { message: "Erro ao listar unidades" });
+    }
+  });
+
+  // ==========================================================================
+  // COMPRAR LEVEL UP (Gasta recurso experience)
+  // Qualquer unidade pode usar este sistema em Arena ou Capital
+  // ==========================================================================
+  socket.on(
+    "unit:purchase_levelup",
+    async ({
+      matchId,
+      playerId,
+      unitId,
+      attributeDistribution,
+      classFeature,
+    }) => {
+      try {
+        const match = await prisma.match.findUnique({
+          where: { id: matchId },
+        });
+
+        if (!match) {
+          socket.emit("unit:error", { message: "Partida não encontrada" });
+          return;
+        }
+
+        if (match.currentTurn !== TurnType.EXERCITOS) {
+          socket.emit("unit:error", {
+            message: "Level up só pode ser feito no Turno de Exércitos",
+          });
+          return;
+        }
+
+        const result = await purchaseLevelUp(
+          unitId,
+          playerId,
+          attributeDistribution
+        );
+
+        if (!result.success) {
+          socket.emit("unit:purchase_levelup_failed", {
+            message: result.message,
+          });
+          return;
+        }
+
+        const unit = result.unit;
+
+        // Regente pode escolher feature em níveis específicos
+        if (unit.category === "REGENT" && classFeature) {
+          if (canRegentChooseFeature(unit.level)) {
+            await prisma.unit.update({
+              where: { id: unitId },
+              data: {
+                features: JSON.stringify([
+                  ...JSON.parse(unit.features || "[]"),
+                  classFeature,
+                ]),
+              },
+            });
+          }
+        }
+
+        // Herói pode escolher skill em níveis específicos
+        if (unit.category === "HERO" && classFeature) {
+          if (canHeroChooseFeature(unit.level)) {
+            await addHeroSkill(unitId, classFeature);
+          }
+        }
+
+        const player = await prisma.matchKingdom.findUnique({
+          where: { id: playerId },
+        });
+        const resources = JSON.parse(player!.resources);
+
+        socket.emit("unit:purchase_levelup_success", {
+          message: result.message,
+          unit: result.unit,
+          resources,
+          canChooseFeature:
+            unit.category === "REGENT"
+              ? canRegentChooseFeature(unit.level)
+              : unit.category === "HERO"
+              ? canHeroChooseFeature(unit.level)
+              : false,
+        });
+
+        io.to(matchId).emit("unit:updated", {
+          unit: result.unit,
+          playerId,
+        });
+      } catch (error) {
+        console.error("[UNIT] Erro ao comprar level up:", error);
+        socket.emit("unit:error", { message: "Erro ao comprar level up" });
+      }
+    }
+  );
+
+  // ==========================================================================
+  // VERIFICAR CUSTO DE COMPRAR LEVEL UP
+  // ==========================================================================
+  socket.on("unit:check_purchase_levelup", async ({ unitId, playerId }) => {
+    try {
+      const result = await canPurchaseLevelUp(unitId, playerId);
+
+      const unit = await prisma.unit.findUnique({
+        where: { id: unitId },
+      });
+
+      socket.emit("unit:purchase_levelup_status", {
+        unitId,
+        canPurchase: result.canLevel,
+        cost: result.cost || 0,
+        reason: result.reason,
+        currentLevel: unit?.level || 0,
+        category: unit?.category,
+      });
+    } catch (error) {
+      console.error("[UNIT] Erro ao verificar compra de level up:", error);
+      socket.emit("unit:error", {
+        message: "Erro ao verificar compra de level up",
+      });
     }
   });
 };

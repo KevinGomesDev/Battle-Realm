@@ -136,7 +136,7 @@ export interface Unit {
   category: UnitCategory;
   level: number;
   classCode?: string; // Heróis possuem classe, Regentes NÃO
-  classFeatures?: string[]; // Skills aprendidas (Regentes escolhem de qualquer classe)
+  features?: string[]; // Skills aprendidas
   combat: number;
   speed: number;
   focus: number;

@@ -8,7 +8,8 @@ import {
   createConditionEvent,
 } from "../services/event.service";
 import { EVENT_CODES } from "../../../shared/types/events.types";
-import type { AttackActionResult, MoveActionResult } from "./combat-actions";
+import type { AttackActionResult } from "./skill-executors";
+import type { MoveActionResult } from "./movement-actions";
 import { BattleUnit } from "../../../shared/types/battle.types";
 
 // =============================================================================

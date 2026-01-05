@@ -20,6 +20,8 @@ import {
   TROOP_LEVELUP_COSTS,
   MAX_TROOP_LEVEL,
   TROOP_ATTRIBUTE_POINTS_PER_LEVEL,
+  LEVELUP_COSTS,
+  calculateLevelUpCost,
 } from "../../../shared/data/units";
 import {
   TributeDecision,
@@ -200,6 +202,8 @@ export {
   TROOP_LEVELUP_COSTS,
   MAX_TROOP_LEVEL,
   TROOP_ATTRIBUTE_POINTS_PER_LEVEL,
+  LEVELUP_COSTS,
+  calculateLevelUpCost,
 } from "../../../shared/data/units";
 export {
   HERO_TEMPLATES,

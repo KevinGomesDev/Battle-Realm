@@ -295,21 +295,19 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
   onUnitClick,
 }) => {
   // Agrupar unidades por reino e calcular estatísticas
-  const { kingdoms, sortedUnits, kingdomColorMap } = useMemo(() => {
+  const { kingdomStats, sortedUnits, kingdomColorMap } = useMemo(() => {
     // Coletar todos os reinos únicos
     const kingdomsMap = new Map<
       string,
       { kingdom: ArenaKingdom; units: BattleUnit[] }
     >();
 
-    // Adicionar host e guest
-    kingdomsMap.set(battle.hostKingdom.ownerId, {
-      kingdom: battle.hostKingdom,
-      units: [],
-    });
-    kingdomsMap.set(battle.guestKingdom.ownerId, {
-      kingdom: battle.guestKingdom,
-      units: [],
+    // Adicionar todos os reinos da batalha
+    battle.kingdoms.forEach((kingdom) => {
+      kingdomsMap.set(kingdom.ownerId, {
+        kingdom,
+        units: [],
+      });
     });
 
     // Distribuir unidades por reino
@@ -321,7 +319,7 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
     });
 
     // Converter para array com estatísticas
-    const kingdoms = Array.from(kingdomsMap.entries()).map(
+    const kingdomStats = Array.from(kingdomsMap.entries()).map(
       ([ownerId, data]) => ({
         ownerId,
         kingdom: data.kingdom,
@@ -336,20 +334,25 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
 
     // Criar mapa de cores por ownerId
     const kingdomColorMap = new Map<string, number>();
-    kingdoms.forEach((k, i) => kingdomColorMap.set(k.ownerId, i));
+    kingdomStats.forEach((k, i) => kingdomColorMap.set(k.ownerId, i));
 
-    // Ordenar unidades por ordem de ação
+    // Ordenar unidades por ordem de ação do jogador dono
+    // actionOrder contém userIds, não unit IDs
     const sortedUnits = [...units].sort((a, b) => {
-      const indexA = battle.actionOrder.indexOf(a.id);
-      const indexB = battle.actionOrder.indexOf(b.id);
+      const indexA = battle.actionOrder.indexOf(a.ownerId);
+      const indexB = battle.actionOrder.indexOf(b.ownerId);
       if (indexA === -1 && indexB === -1) return 0;
       if (indexA === -1) return 1;
       if (indexB === -1) return -1;
+      // Se mesmo dono, ordenar por speed (maior primeiro)
+      if (indexA === indexB) {
+        return b.speed - a.speed;
+      }
       return indexA - indexB;
     });
 
-    return { kingdoms, sortedUnits, kingdomColorMap };
-  }, [units, battle.hostKingdom, battle.guestKingdom, battle.actionOrder]);
+    return { kingdomStats, sortedUnits, kingdomColorMap };
+  }, [units, battle.kingdoms, battle.actionOrder]);
 
   const isMyTurn = battle.currentPlayerId === currentUserId;
 
@@ -368,7 +371,7 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
           <div className="flex items-center justify-between gap-4 mb-2">
             {/* Reinos à esquerda */}
             <div className="flex items-center gap-2 flex-wrap">
-              {kingdoms.map((k, index) => (
+              {kingdomStats.map((k, index) => (
                 <KingdomBadge
                   key={k.ownerId}
                   kingdom={k.kingdom}

@@ -75,6 +75,9 @@ export interface SkillDefinition {
   description: string;
   category: SkillCategory;
 
+  // Ação comum disponível para todas unidades por padrão
+  commonAction?: boolean;
+
   // Disponível para tropas (criação de templates). Default: false/undefined
   availableForTroops?: boolean;
 

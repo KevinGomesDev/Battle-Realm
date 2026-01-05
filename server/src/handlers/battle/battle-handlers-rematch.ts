@@ -9,7 +9,7 @@ import {
 } from "./battle-state";
 import { cleanupBattle } from "./battle-timer";
 import { deleteBattleFromDB } from "./battle-persistence";
-import { createAndStartBattle } from "./battle-creation";
+import { createAndStartBattle, BOT_USER_ID } from "./battle-creation";
 
 export function registerBattleRematchHandlers(
   io: Server,
@@ -31,11 +31,15 @@ export function registerBattleRematchHandlers(
         return socket.emit("battle:error", { message: "Lobby não encontrado" });
       }
 
+      const playerIds = lobby.players.map((p) => p.userId);
       console.log(
-        `[ARENA] request_rematch: lobby encontrado com status=${lobby.status}, host=${lobby.hostUserId}, guest=${lobby.guestUserId}`
+        `[ARENA] request_rematch: lobby encontrado com status=${
+          lobby.status
+        }, players=${playerIds.join(", ")}`
       );
 
-      if (lobby.hostUserId !== userId && lobby.guestUserId !== userId) {
+      // Verificar se o usuário está no lobby
+      if (!playerIds.includes(userId)) {
         return socket.emit("battle:error", {
           message: "Você não está neste lobby",
         });
@@ -50,12 +54,14 @@ export function registerBattleRematchHandlers(
         });
       }
 
-      // Verificar se ambos os jogadores ainda estão presentes no lobby
-      const opponentId =
-        userId === lobby.hostUserId ? lobby.guestUserId : lobby.hostUserId;
-      if (!opponentId || !userToLobby.has(opponentId)) {
+      // Verificar se os outros jogadores ainda estão presentes
+      const otherPlayers = playerIds.filter(
+        (id) => id !== userId && id !== BOT_USER_ID
+      );
+      const missingPlayer = otherPlayers.find((id) => !userToLobby.has(id));
+      if (missingPlayer) {
         console.log(
-          `[ARENA] request_rematch ERRO: oponente ${opponentId} já saiu do lobby`
+          `[ARENA] request_rematch ERRO: oponente ${missingPlayer} já saiu do lobby`
         );
         return socket.emit("battle:error", {
           message: "O oponente já saiu. Não é possível pedir revanche.",
@@ -70,17 +76,21 @@ export function registerBattleRematchHandlers(
       console.log(
         `[ARENA] ${userId} solicitou revanche no lobby ${lobbyId}. Pedidos: ${
           rematchRequests.get(lobbyId)!.size
-        }/2`
+        }/${lobby.players.filter((p) => p.userId !== BOT_USER_ID).length}`
       );
 
       io.to(lobbyId).emit("battle:rematch_requested", { lobbyId, userId });
 
+      // Verificar se todos os jogadores humanos querem revanche
       const requests = rematchRequests.get(lobbyId)!;
-      if (
-        requests.has(lobby.hostUserId) &&
-        lobby.guestUserId &&
-        requests.has(lobby.guestUserId)
-      ) {
+      const humanPlayers = lobby.players.filter(
+        (p) => p.userId !== BOT_USER_ID
+      );
+      const allHumansWantRematch = humanPlayers.every((p) =>
+        requests.has(p.userId)
+      );
+
+      if (allHumansWantRematch) {
         if (rematchLocks.has(lobbyId)) {
           console.log(
             `[ARENA] Rematch já em processamento para lobby ${lobbyId}`
@@ -91,22 +101,38 @@ export function registerBattleRematchHandlers(
 
         try {
           console.log(
-            `[ARENA] Ambos jogadores querem revanche! Iniciando nova batalha...`
+            `[ARENA] Todos jogadores querem revanche! Iniciando nova batalha...`
           );
 
           rematchRequests.delete(lobbyId);
 
-          const hostKingdom = await prisma.kingdom.findUnique({
-            where: { id: lobby.hostKingdomId },
-            include: { regent: true },
-          });
+          // Buscar todos os kingdoms dos jogadores
+          const kingdomsData = await Promise.all(
+            lobby.players.map(async (player) => {
+              if (player.userId === BOT_USER_ID) {
+                // Para bot, criar kingdom virtual (será tratado em createAndStartBattle)
+                const { createBotKingdom } = await import("./battle-creation");
+                return createBotKingdom();
+              }
+              const kingdom = await prisma.kingdom.findUnique({
+                where: { id: player.kingdomId },
+                include: { regent: true },
+              });
+              return kingdom;
+            })
+          );
 
-          const guestKingdom = await prisma.kingdom.findUnique({
-            where: { id: lobby.guestKingdomId },
-            include: { regent: true },
-          });
-
-          if (!hostKingdom?.regent || !guestKingdom?.regent) {
+          // Verificar se todos os jogadores humanos têm regentes
+          const invalidKingdom = kingdomsData.find(
+            (k, idx) => lobby.players[idx].userId !== BOT_USER_ID && !k?.regent
+          );
+          if (
+            invalidKingdom !== undefined &&
+            kingdomsData.some(
+              (k, idx) =>
+                lobby.players[idx].userId !== BOT_USER_ID && !k?.regent
+            )
+          ) {
             io.to(lobbyId).emit("battle:error", {
               message:
                 "Não foi possível iniciar revanche - regentes não encontrados",
@@ -120,11 +146,13 @@ export function registerBattleRematchHandlers(
           );
           const oldBattleId = oldBattle?.id;
 
-          // Criar nova batalha PRIMEIRO (para não haver gap na sessão)
+          // Resetar status do lobby para permitir nova batalha
+          lobby.status = "READY";
+
+          // Criar nova batalha
           await createAndStartBattle({
             lobby,
-            hostKingdom,
-            guestKingdom,
+            kingdoms: kingdomsData.filter((k) => k !== null),
             io,
           });
 
@@ -180,8 +208,12 @@ export function registerBattleRematchHandlers(
 
       userToLobby.delete(userId);
 
-      const remainingPlayers = [lobby.hostUserId, lobby.guestUserId].filter(
-        (id) => id && id !== userId && userToLobby.has(id)
+      // Verificar se todos os jogadores humanos saíram
+      const remainingPlayers = lobby.players.filter(
+        (p) =>
+          p.userId !== userId &&
+          p.userId !== BOT_USER_ID &&
+          userToLobby.has(p.userId)
       );
       if (remainingPlayers.length === 0) {
         console.log(

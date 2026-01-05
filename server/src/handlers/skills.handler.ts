@@ -217,7 +217,7 @@ export const registerSkillsHandlers = (io: Server, socket: Socket) => {
           level: u.level,
           race: "HUMANOIDE", // TODO: obter do banco
           classCode: u.classCode || undefined,
-          classFeatures: JSON.parse(u.classFeatures || "[]"),
+          features: JSON.parse(u.features || "[]"),
           equipment: JSON.parse(u.equipment || "[]"),
           spells: JSON.parse(u.spells || "[]"),
           combat: u.combat,
@@ -241,7 +241,6 @@ export const registerSkillsHandlers = (io: Server, socket: Socket) => {
           maxMagicalProtection: u.focus * 2,
           conditions: JSON.parse(u.conditions || "[]"),
           hasStartedAction: u.hasStartedAction,
-          actions: JSON.parse(u.actions || "[]"),
           grabbedByUnitId: u.grabbedByBattleUnitId || undefined,
           size: (u.size as any) || "NORMAL",
           visionRange: u.visionRange,

@@ -44,7 +44,7 @@ export interface BehaviorContext extends AIBattleContext {
  */
 export function getEffectiveAttackRange(unit: BattleUnit): number {
   const baseRange = 1;
-  const scan = scanConditionsForAction(unit.conditions || [], "attack");
+  const scan = scanConditionsForAction(unit.conditions || [], "ATTACK");
   return baseRange + (scan.modifiers.basicAttackRangeMod || 0);
 }
 
@@ -465,10 +465,10 @@ function canUseDash(unit: BattleUnit, context: BehaviorContext): boolean {
   if (actionsLeft <= 0) return false;
 
   // Precisa ter a ação dash
-  if (!unit.actions?.includes("dash")) return false;
+  if (!unit.features?.includes("DASH")) return false;
 
   // Verificar se está bloqueado por condições
-  const scan = scanConditionsForAction(unit.conditions || [], "dash");
+  const scan = scanConditionsForAction(unit.conditions || [], "DASH");
   if (!scan.canPerform) return false;
 
   return true;

@@ -90,7 +90,8 @@ export interface BattleUnit {
   level: number;
   race: string;
   classCode?: string;
-  classFeatures: string[];
+  /** Skills disponíveis: ações comuns (ATTACK, DASH, DODGE) + skills de classe */
+  features: string[];
   equipment: string[];
   combat: number;
   speed: number;
@@ -114,7 +115,6 @@ export interface BattleUnit {
   conditions: string[];
   spells: string[]; // Lista de códigos de spells disponíveis
   hasStartedAction: boolean;
-  actions: string[];
   grabbedByUnitId?: string;
   size: UnitSize;
   visionRange: number;

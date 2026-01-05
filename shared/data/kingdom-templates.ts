@@ -2,6 +2,7 @@
 // Templates de Reinos pré-definidos com Regente e Exércitos
 
 import type { Alignment, Race } from "../types/kingdom.types";
+import { getRegentTemplate, type RegentTemplate } from "./regents.data";
 
 export interface TroopTemplateDefinition {
   slotIndex: number;
@@ -17,26 +18,23 @@ export interface TroopTemplateDefinition {
   vitality: number;
 }
 
-export interface RegentDefinition {
-  name: string;
-  description?: string;
-  avatar?: string; // ID do sprite (ex: "[1].png")
-  initialSkillId?: string; // Skill inicial escolhida no nível 1
-  combat: number;
-  speed: number;
-  focus: number;
-  armor: number;
-  vitality: number;
-}
-
 export interface KingdomTemplateDefinition {
   id: string;
   name: string;
   description: string;
   alignment: Alignment;
   race: Race;
-  regent: RegentDefinition;
+  /** Código do regente (referência ao regents.data.ts) */
+  regentCode: string;
   troopTemplates: TroopTemplateDefinition[];
+}
+
+/**
+ * Interface expandida com o regente já resolvido
+ */
+export interface KingdomTemplateResolved
+  extends Omit<KingdomTemplateDefinition, "regentCode"> {
+  regent: RegentTemplate;
 }
 
 // ============================================
@@ -53,21 +51,7 @@ Os valdorianos acreditam que foram escolhidos para trazer civilização e justi�
 A capital Solenheim é conhecida como "A Cidade das Mil Torres", onde a Grande Catedral do Amanhecer brilha com luz própria mesmo nas noites mais escuras.`,
   alignment: "BOM",
   race: "HUMANOIDE",
-  regent: {
-    name: "Imperatriz Seraphina III",
-    description: `Terceira de seu nome, Seraphina ascendeu ao trono aos 19 anos após a morte misteriosa de seu pai durante a Batalha do Eclipse. Agora com 32 anos, ela é conhecida tanto por sua compaixão quanto por sua fúria em batalha.
-
-Dizem que ela foi tocada pelo próprio Sol Eterno quando criança, e que seu olho esquerdo brilha com luz dourada quando usa seus poderes divinos. Empunha a lendária Lança do Amanhecer, forjada com fragmentos de uma estrela caída.
-
-Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, mesmo que isso custe sua própria vida.`,
-    avatar: "1",
-    initialSkillId: "HEAL", // Skill de Cleric (curar aliados)
-    combat: 6,
-    speed: 4,
-    focus: 6,
-    armor: 5,
-    vitality: 9,
-  },
+  regentCode: "REGENT_SERAPHINA",
   troopTemplates: [
     {
       slotIndex: 0,
@@ -156,21 +140,7 @@ Nyxrath não é um reino no sentido tradicional — é uma confederação de cl�
 A capital Véu Negro é uma cidade esculpida no interior de uma montanha, iluminada apenas por fungos bioluminescentes e cristais de alma capturada. Dizem que suas ruas são patrulhadas pelos mortos, e que os vivos são minoria.`,
   alignment: "MAL",
   race: "MORTO_VIVO",
-  regent: {
-    name: "Archlich Malachar, O Eterno",
-    description: `Malachar foi um arquimago élfico há 2.000 anos, obcecado em desvendar os segredos da imortalidade. Após sacrificar sua própria família em um ritual proibido, ele ascendeu como o primeiro Lich de Nyxrath.
-
-Seu corpo é uma carcaça ressecada envolta em mantos de escuridão pura. Onde seus olhos deveriam estar, apenas chamas verdes e frias queimam com conhecimento acumulado de eras. Ele carrega o Grimório Vazio, um livro que consome as almas de seus inimigos.
-
-Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento absoluto, e está disposto a destruir mundos para obtê-lo.`,
-    avatar: "9",
-    initialSkillId: "FIREBALL", // Skill de Wizard
-    combat: 2,
-    speed: 5,
-    focus: 11,
-    armor: 3,
-    vitality: 9,
-  },
+  regentCode: "REGENT_MALACHAR",
   troopTemplates: [
     {
       slotIndex: 0,
@@ -259,21 +229,7 @@ A Confederação é governada por um conselho de Anciões Dracônicos, cada um r
 O Ninho das Eras é uma cidade impossível — construída nas encostas de vulcões adormecidos, com torres que tocam as nuvens e cavernas que descem até o coração do mundo. Humanos e outras raças menores vivem lá como servos respeitados dos dragões.`,
   alignment: "NEUTRO",
   race: "DRAGAO",
-  regent: {
-    name: "Ignatharax, O Primordial",
-    description: `Ignatharax é um dos Cinco Anciões, um dragão vermelho de proporções titânicas que dormiu por 500 anos antes de despertar na última década. Ele é o guardião do Fogo Eterno, a chama primordial que arde no coração do mundo.
-
-Com escamas que brilham como metal derretido e olhos que são brasas de pura energia, Ignatharax é tanto uma força da natureza quanto um ser senciente. Sua voz é o rugido de vulcões, e seu sopro pode derreter montanhas.
-
-Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância ou raiva. Ele vê o mundo com a perspectiva de eras, e protege Ashenvale porque sabe que o equilíbrio é a única coisa que impede a extinção de todas as coisas.`,
-    avatar: "7",
-    initialSkillId: "RECKLESS_ATTACK", // Skill de Barbarian
-    combat: 8,
-    speed: 4,
-    focus: 5,
-    armor: 6,
-    vitality: 7,
-  },
+  regentCode: "REGENT_IGNATHARAX",
   troopTemplates: [
     {
       slotIndex: 0,
@@ -368,14 +324,50 @@ export function getAllKingdomTemplates(): KingdomTemplateDefinition[] {
   return KINGDOM_TEMPLATES;
 }
 
+/**
+ * Resolve um template de reino com o regente completo
+ */
+export function resolveKingdomTemplate(
+  template: KingdomTemplateDefinition
+): KingdomTemplateResolved | null {
+  const regent = getRegentTemplate(template.regentCode);
+  if (!regent) {
+    console.error(`Regente ${template.regentCode} não encontrado`);
+    return null;
+  }
+  return {
+    id: template.id,
+    name: template.name,
+    description: template.description,
+    alignment: template.alignment,
+    race: template.race,
+    regent,
+    troopTemplates: template.troopTemplates,
+  };
+}
+
+/**
+ * Obtém um template de reino resolvido (com regente)
+ */
+export function getResolvedKingdomTemplateById(
+  id: string
+): KingdomTemplateResolved | null {
+  const template = getKingdomTemplateById(id);
+  if (!template) return null;
+  return resolveKingdomTemplate(template);
+}
+
 // Versão resumida para listagem (sem descrições completas)
 export function getKingdomTemplatesSummary() {
-  return KINGDOM_TEMPLATES.map((t) => ({
-    id: t.id,
-    name: t.name,
-    alignment: t.alignment,
-    race: t.race,
-    regentName: t.regent.name,
-    troopCount: t.troopTemplates.length,
-  }));
+  return KINGDOM_TEMPLATES.map((t) => {
+    const regent = getRegentTemplate(t.regentCode);
+    return {
+      id: t.id,
+      name: t.name,
+      alignment: t.alignment,
+      race: t.race,
+      regentName: regent?.name || "Desconhecido",
+      troopCount: t.troopTemplates.length,
+    };
+  });
 }

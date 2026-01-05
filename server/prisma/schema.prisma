@@ -200,7 +200,7 @@ model Unit {
   avatar         String?      // ID do sprite (ex: "[1].png")
   // Classe do Herói (código string, ex: BARBARIAN, WARRIOR) - Regentes NÃO possuem classe
   classCode      String?      // Código da classe (dados em server/src/data/classes.data.ts)
-  classFeatures  String       @default("[]") // IDs das skills aprendidas (Regentes escolhem de qualquer classe)
+  features       String       @default("[]") // Skills aprendidas (JSON array)
   spells         String       @default("[]") // Códigos das spells disponíveis (concedidas via eventos/skills)
   // Condições permanentes da unidade (ex: buffs de eventos, maldições, etc)
   conditions     String       @default("[]") // Códigos das condições ativas (JSON array)
@@ -218,7 +218,7 @@ model Unit {
   isAlive        Boolean      @default(true) // Morte permanente em partidas
   locationIndex  Int?
   // NOTA: Campo 'actions' foi REMOVIDO - ações são calculadas em runtime
-  // a partir de DEFAULT_UNIT_ACTIONS + skills ativas do classFeatures
+  // a partir de DEFAULT_UNIT_ACTIONS + skills ativas do features
 }
 
 model Structure {
@@ -334,7 +334,7 @@ model BattleUnit {
   troopSlot   Int?        // Para TROOP: índice do template (0-4)
   level       Int         @default(1)  // Nível da unidade
   classCode   String?     // Código da classe (ex: BARBARIAN, WARRIOR)
-  classFeatures String    @default("[]") // Skills aprendidas (JSON)
+  learnedSkills String    @default("[]") // Skills aprendidas do DB (JSON) - fonte: Unit.features
   equipment   String      @default("[]") // Itens equipados (JSON)
   spells      String      @default("[]") // Códigos das spells disponíveis (JSON)
   combat      Int         @default(1)

@@ -117,11 +117,8 @@ export async function getUserActiveSession(
         );
 
         // Limpar referências de usuários para este lobby
-        if (lobby.hostUserId) {
-          userToLobbyRef.delete(lobby.hostUserId);
-        }
-        if (lobby.guestUserId) {
-          userToLobbyRef.delete(lobby.guestUserId);
+        for (const player of lobby.players) {
+          userToLobbyRef.delete(player.userId);
         }
 
         // Deletar o lobby órfão
@@ -196,23 +193,30 @@ export function removeUserFromArena(userId: string): boolean {
 
   // Se é o host e está esperando, deleta o lobby
   if (lobby.hostUserId === userId && lobby.status === "WAITING") {
+    // Limpar referências de todos os jogadores
+    for (const player of lobby.players) {
+      userToLobbyRef.delete(player.userId);
+    }
     arenaLobbiesRef?.delete(lobbyId);
-    userToLobbyRef.delete(userId);
     return true;
   }
 
-  // Se é o guest, remove do lobby
-  if (lobby.guestUserId === userId) {
-    lobby.guestUserId = undefined;
-    lobby.guestSocketId = undefined;
-    lobby.guestKingdomId = undefined;
+  // Se não é o host, remove do lobby
+  const playerIndex = lobby.players.findIndex((p) => p.userId === userId);
+  if (playerIndex > 0) {
+    // Não é o host (índice 0)
+    lobby.players.splice(playerIndex, 1);
+    // Reindexar jogadores restantes
+    lobby.players.forEach((p, idx) => {
+      p.playerIndex = idx;
+    });
     lobby.status = "WAITING";
     userToLobbyRef.delete(userId);
     return true;
   }
 
-  // Se é o host mas tem guest, não pode sair (precisa cancelar a batalha)
-  if (lobby.hostUserId === userId && lobby.guestUserId) {
+  // Se é o host mas tem outros jogadores, não pode sair (precisa fechar o lobby)
+  if (lobby.hostUserId === userId && lobby.players.length > 1) {
     return false;
   }
 

@@ -88,7 +88,7 @@ export const ArenaBattleCanvas = memo(
       ref
     ) => {
       // Extrair configuração do servidor (grid/mapa)
-      const { config } = battle;
+      const { config, kingdoms } = battle;
       const GRID_WIDTH = config.grid.width;
       const GRID_HEIGHT = config.grid.height;
       const GRID_COLORS = config.colors;
@@ -97,6 +97,26 @@ export const ArenaBattleCanvas = memo(
       const OBSTACLES = MAP_CONFIG?.obstacles || [];
       // Cores do terreno para o grid (usa cores do terreno, não cores padrão)
       const TERRAIN_COLORS = MAP_CONFIG?.terrainColors;
+
+      // Helper para obter cores de um jogador por ownerId
+      const getPlayerColors = useCallback(
+        (ownerId: string) => {
+          const kingdom = kingdoms.find((k) => k.ownerId === ownerId);
+          const playerIndex = kingdom?.playerIndex ?? 0;
+          const playerColor =
+            GRID_COLORS.playerColors[playerIndex] ||
+            GRID_COLORS.playerColors[0];
+          return {
+            primary: playerColor?.primary || "#4a90d9",
+            secondary: playerColor?.secondary || "#2563eb",
+            highlight:
+              playerIndex === 0
+                ? UI_COLORS.hostHighlight
+                : UI_COLORS.guestHighlight,
+          };
+        },
+        [kingdoms, GRID_COLORS.playerColors]
+      );
 
       // Tamanho fixo da célula para o canvas interno (sem zoom)
       const BASE_CELL_SIZE = 40; // pixels por célula
@@ -540,17 +560,7 @@ export const ArenaBattleCanvas = memo(
             ctx.restore();
           } else {
             // Fallback: desenho procedural caso sprite não carregue
-            const colors = isOwned
-              ? {
-                  primary: GRID_COLORS.hostPrimary,
-                  secondary: GRID_COLORS.hostSecondary,
-                  highlight: UI_COLORS.hostHighlight,
-                }
-              : {
-                  primary: GRID_COLORS.guestPrimary,
-                  secondary: GRID_COLORS.guestSecondary,
-                  highlight: UI_COLORS.guestHighlight,
-                };
+            const colors = getPlayerColors(unit.ownerId);
 
             const px = Math.max(2, size / 16);
             const offsetX = x + size * 0.15;
@@ -660,6 +670,7 @@ export const ArenaBattleCanvas = memo(
           getSpriteAnimation,
           getSpriteFrame,
           isMoving,
+          getPlayerColors,
         ]
       );
 

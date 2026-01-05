@@ -30,7 +30,7 @@ interface DBUnit {
   troopSlot: number | null;
   level: number;
   classCode: string | null;
-  classFeatures: string | null; // Skills aprendidas (JSON array)
+  features: string | null; // Skills aprendidas (JSON array)
   equipment: string | null;
   spells: string | null; // Magias disponíveis (JSON array)
   conditions: string | null; // Condições permanentes (JSON array) - NOVO
@@ -71,8 +71,8 @@ export function createBattleUnit(
   position: Position,
   battleType: "arena" | "match" = "arena"
 ): BattleUnit {
-  // Parse classFeatures do JSON
-  const classFeatures: string[] = JSON.parse(dbUnit.classFeatures || "[]");
+  // Parse features do JSON (skills aprendidas no DB)
+  const learnedSkills: string[] = JSON.parse(dbUnit.features || "[]");
 
   // Parse spells do JSON
   const spells: string[] = JSON.parse(dbUnit.spells || "[]");
@@ -84,8 +84,8 @@ export function createBattleUnit(
   // O campo unitCooldowns do Unit é reservado para efeitos de longa duração (ex: skills com cooldown em turnos de partida)
   // Cooldowns de batalha são por batalha, não persistem
 
-  // Determinar ações dinamicamente baseado nos stats e skills
-  const unitActions = determineUnitActions(
+  // Determinar features: ações comuns + skills de classe
+  const unitFeatures = determineUnitActions(
     {
       combat: dbUnit.combat,
       speed: dbUnit.speed,
@@ -93,7 +93,7 @@ export function createBattleUnit(
       armor: dbUnit.armor,
       vitality: dbUnit.vitality,
       category: dbUnit.category,
-      classFeatures, // Passa skills aprendidas para adicionar ativas às ações
+      features: learnedSkills, // Passa skills aprendidas para incluir nas features
     },
     { battleType }
   );
@@ -102,7 +102,7 @@ export function createBattleUnit(
   const initialConditions: string[] = [...unitConditions];
 
   // Adicionar condições de skills passivas (se ainda não estiverem)
-  for (const skillCode of classFeatures) {
+  for (const skillCode of learnedSkills) {
     const skill = findSkillByCode(skillCode);
     if (skill && skill.category === "PASSIVE" && skill.conditionApplied) {
       if (!initialConditions.includes(skill.conditionApplied)) {
@@ -129,7 +129,7 @@ export function createBattleUnit(
     level: dbUnit.level,
     race: kingdom.race,
     classCode: dbUnit.classCode ?? undefined,
-    classFeatures, // Já foi parseado acima
+    features: unitFeatures, // Skills disponíveis: ações comuns + skills de classe
     equipment: JSON.parse(dbUnit.equipment || "[]"),
     combat: dbUnit.combat,
     speed: dbUnit.speed,
@@ -159,7 +159,6 @@ export function createBattleUnit(
     conditions: initialConditions, // Condições do Unit + passivas de skills/raça
     spells, // Lista de spells da unidade (copiada do DB)
     hasStartedAction: false,
-    actions: unitActions,
     // Tamanho da unidade (default: NORMAL 1x1)
     size: dbUnit.size || "NORMAL",
     // Alcance de visão = max(10, focus)
@@ -330,30 +329,85 @@ export function calculatePlayerInitiative(
 /**
  * Determina a ordem de ação dos jogadores baseada na soma de speed das unidades
  * Jogador com maior total de speed age primeiro
+ * Suporta múltiplos jogadores (2-8)
  */
 export function determineActionOrder(
   units: BattleUnit[],
-  hostUserId: string,
-  guestUserId: string
+  playerIds: string[]
 ): string[] {
-  if (units.length === 0) {
-    return [hostUserId, guestUserId];
+  if (units.length === 0 || playerIds.length === 0) {
+    return playerIds;
   }
 
-  const hostInitiative = calculatePlayerInitiative(units, hostUserId);
-  const guestInitiative = calculatePlayerInitiative(units, guestUserId);
+  // Calcular iniciativa para cada jogador
+  const playerInitiatives = playerIds.map((playerId) => ({
+    playerId,
+    initiative: calculatePlayerInitiative(units, playerId),
+  }));
 
-  // Em caso de empate, host vai primeiro
-  return hostInitiative >= guestInitiative
-    ? [hostUserId, guestUserId]
-    : [guestUserId, hostUserId];
+  // Ordenar por iniciativa (maior primeiro), mantendo ordem original em empate
+  playerInitiatives.sort((a, b) => b.initiative - a.initiative);
+
+  return playerInitiatives.map((p) => p.playerId);
+}
+
+/**
+ * Estrutura para um jogador na batalha
+ */
+interface BattlePlayerInput {
+  userId: string;
+  kingdom: KingdomInfo;
+  units: DBUnit[];
+  playerIndex: number;
+}
+
+/**
+ * Cria unidades de batalha para múltiplos jogadores (2-8) com posicionamento aleatório
+ * @param players - Array de jogadores com suas unidades
+ * @param gridWidth - Largura do grid
+ * @param gridHeight - Altura do grid
+ * @param battleType - Tipo de batalha ("arena" ou "match")
+ * @returns Objeto com unidades e posições ocupadas
+ */
+export function createMultiPlayerBattleUnits(
+  players: BattlePlayerInput[],
+  gridWidth: number,
+  gridHeight: number,
+  battleType: "arena" | "match" = "arena"
+): { units: BattleUnit[]; occupiedPositions: Position[] } {
+  const occupiedSet = new Set<string>();
+  const allUnits: BattleUnit[] = [];
+  const occupiedPositions: Position[] = [];
+
+  // Criar unidades para cada jogador
+  for (const player of players) {
+    for (const dbUnit of player.units) {
+      const position = getRandomPosition(gridWidth, gridHeight, occupiedSet);
+      occupiedSet.add(`${position.x},${position.y}`);
+      occupiedPositions.push(position);
+
+      const battleUnit = createBattleUnit(
+        dbUnit,
+        player.userId,
+        player.kingdom,
+        position,
+        battleType
+      );
+      allUnits.push(battleUnit);
+    }
+  }
+
+  return { units: allUnits, occupiedPositions };
 }
 
 // =============================================================================
 // BOT UNITS FROM TEMPLATE
 // =============================================================================
 
-import type { KingdomTemplateDefinition } from "../../../shared/data/kingdom-templates";
+import {
+  type KingdomTemplateDefinition,
+  resolveKingdomTemplate,
+} from "../../../shared/data/kingdom-templates";
 
 /**
  * Cria unidades de BOT a partir de um template de reino
@@ -364,7 +418,12 @@ export function createBotUnitsFromTemplate(
   botUserId: string,
   botKingdom: KingdomInfo
 ): DBUnit[] {
-  const regent = template.regent;
+  const resolved = resolveKingdomTemplate(template);
+  if (!resolved) {
+    console.error(`Falha ao resolver template ${template.id}`);
+    return [];
+  }
+  const regent = resolved.regent;
 
   // Criar um DBUnit fake a partir do template do regente
   const regentUnit: DBUnit = {
@@ -375,8 +434,8 @@ export function createBotUnitsFromTemplate(
     troopSlot: null,
     level: 1,
     classCode: null, // BOT não tem classe específica
-    classFeatures: regent.initialSkillId
-      ? JSON.stringify([regent.initialSkillId])
+    features: regent.initialSkillCode
+      ? JSON.stringify([regent.initialSkillCode])
       : "[]",
     equipment: "[]",
     spells: "[]",
