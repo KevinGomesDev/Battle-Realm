@@ -40,7 +40,7 @@ export const registerHeroHandlers = (io: Server, socket: Socket) => {
           return;
         }
 
-        const player = await prisma.matchPlayer.findUnique({
+        const player = await prisma.matchKingdom.findUnique({
           where: { id: playerId },
         });
 
@@ -74,7 +74,7 @@ export const registerHeroHandlers = (io: Server, socket: Socket) => {
 
         // Gasta recursos
         resources[resourceKey] = currentAmount - resourceAmount;
-        await prisma.matchPlayer.update({
+        await prisma.matchKingdom.update({
           where: { id: playerId },
           data: { resources: JSON.stringify(resources) },
         });
@@ -164,7 +164,7 @@ export const registerHeroHandlers = (io: Server, socket: Socket) => {
       }
 
       // Busca recursos atualizados
-      const player = await prisma.matchPlayer.findUnique({
+      const player = await prisma.matchKingdom.findUnique({
         where: { id: playerId },
       });
       const resources = JSON.parse(player!.resources || "{}");

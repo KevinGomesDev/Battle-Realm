@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { Territory } from "../types/map.types";
-import type { MatchPlayer } from "../../match/types/match.types";
+import type { MatchKingdom } from "../../match/types/match.types";
 
 interface MapCanvasProps {
   territories: Territory[];
-  players: MatchPlayer[];
+  players: MatchKingdom[];
   width?: number;
   height?: number;
   onTerritoryClick?: (territory: Territory) => void;

@@ -20,7 +20,7 @@ export type {
   MatchStatus,
   TurnType,
   OpenMatch,
-  MatchPlayer,
+  MatchKingdom,
   PlayerResources,
   MatchMapData,
   PreparationData,

@@ -8,7 +8,7 @@ export type {
   Match,
   OpenMatch,
   PlayerResources,
-  MatchPlayer,
+  MatchKingdom,
   CompleteMatchState,
   MatchMapData,
   PreparationData,

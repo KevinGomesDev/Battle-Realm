@@ -46,7 +46,7 @@ export async function getUserActiveSession(
   userId: string
 ): Promise<ActiveSession> {
   // 1. Verificar se está em uma partida ativa (WAITING, PREPARATION, ACTIVE)
-  const matchPlayer = await prisma.matchPlayer.findFirst({
+  const matchKingdom = await prisma.matchKingdom.findFirst({
     where: {
       userId,
       match: {
@@ -58,13 +58,13 @@ export async function getUserActiveSession(
     },
   });
 
-  if (matchPlayer && matchPlayer.match) {
+  if (matchKingdom && matchKingdom.match) {
     return {
       type: "MATCH",
-      sessionId: matchPlayer.match.id,
-      matchId: matchPlayer.match.id,
-      matchStatus: matchPlayer.match.status,
-      playerId: matchPlayer.id,
+      sessionId: matchKingdom.match.id,
+      matchId: matchKingdom.match.id,
+      matchStatus: matchKingdom.match.status,
+      playerId: matchKingdom.id,
     };
   }
 

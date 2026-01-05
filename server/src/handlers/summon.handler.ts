@@ -7,21 +7,13 @@ export const registerSummonHandlers = (io: Server, socket: Socket) => {
   // Create a summoned creature (linked to summoner or regent by default)
   socket.on(
     "summon:create_creature",
-    async ({
-      matchId,
-      ownerId,
-      kingdomId,
-      summonerUnitId,
-      level = 1,
-      name,
-    }) => {
+    async ({ matchId, ownerId, summonerUnitId, level = 1, name }) => {
       try {
         if (!matchId)
           return socket.emit("error", { message: "matchId requerido" });
         const result = await createSummonedCreature({
           matchId,
           ownerId,
-          kingdomId,
           summonerUnitId,
           level,
           name,

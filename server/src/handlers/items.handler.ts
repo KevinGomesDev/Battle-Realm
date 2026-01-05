@@ -1,4 +1,5 @@
 // src/handlers/items.handler.ts
+// Inventário existe apenas durante partidas (MatchKingdom)
 import { Socket, Server } from "socket.io";
 import { prisma } from "../lib/prisma";
 import { generateRandomItem, generateItems } from "../utils/items.generator";
@@ -19,43 +20,47 @@ export const registerItemsHandlers = (io: Server, socket: Socket) => {
     socket.emit("items:generated", { items });
   });
 
-  // Listar inventário do Reino
-  socket.on("inventory:list", async ({ kingdomId }) => {
-    const kingdom = await prisma.kingdom.findUnique({
-      where: { id: kingdomId },
+  // Listar inventário do Reino em Partida
+  socket.on("inventory:list", async ({ matchKingdomId }) => {
+    const matchKingdom = await prisma.matchKingdom.findUnique({
+      where: { id: matchKingdomId },
     });
-    if (!kingdom)
-      return socket.emit("error", { message: "Reino não encontrado" });
-    const inventory = parseJSON<GeneratedItem[]>(kingdom.inventory, []);
-    socket.emit("inventory:data", { kingdomId, inventory });
+    if (!matchKingdom)
+      return socket.emit("error", {
+        message: "Reino na partida não encontrado",
+      });
+    const inventory = parseJSON<GeneratedItem[]>(matchKingdom.inventory, []);
+    socket.emit("inventory:data", { matchKingdomId, inventory });
   });
 
-  // Adicionar item ao inventário do Reino
-  socket.on("inventory:add_item", async ({ kingdomId, item }) => {
-    const kingdom = await prisma.kingdom.findUnique({
-      where: { id: kingdomId },
+  // Adicionar item ao inventário do Reino em Partida
+  socket.on("inventory:add_item", async ({ matchKingdomId, item }) => {
+    const matchKingdom = await prisma.matchKingdom.findUnique({
+      where: { id: matchKingdomId },
     });
-    if (!kingdom)
-      return socket.emit("error", { message: "Reino não encontrado" });
-    const inventory = parseJSON<GeneratedItem[]>(kingdom.inventory, []);
+    if (!matchKingdom)
+      return socket.emit("error", {
+        message: "Reino na partida não encontrado",
+      });
+    const inventory = parseJSON<GeneratedItem[]>(matchKingdom.inventory, []);
     const newItem: GeneratedItem = item?.id ? item : generateRandomItem();
     inventory.push(newItem);
-    await prisma.kingdom.update({
-      where: { id: kingdomId },
+    await prisma.matchKingdom.update({
+      where: { id: matchKingdomId },
       data: { inventory: JSON.stringify(inventory) },
     });
-    socket.emit("inventory:item_added", { kingdomId, item: newItem });
+    socket.emit("inventory:item_added", { matchKingdomId, item: newItem });
   });
 
   // Transferir item do inventário para uma Unidade (Herói/Regente)
   socket.on(
     "inventory:transfer_to_unit",
-    async ({ kingdomId, unitId, itemId }) => {
-      const kingdom = await prisma.kingdom.findUnique({
-        where: { id: kingdomId },
+    async ({ matchKingdomId, unitId, itemId }) => {
+      const matchKingdom = await prisma.matchKingdom.findUnique({
+        where: { id: matchKingdomId },
       });
       const unit = await prisma.unit.findUnique({ where: { id: unitId } });
-      if (!kingdom || !unit)
+      if (!matchKingdom || !unit)
         return socket.emit("error", { message: "Dados inválidos" });
       if (unit.category !== "HERO" && unit.category !== "REGENT") {
         return socket.emit("error", {
@@ -63,7 +68,7 @@ export const registerItemsHandlers = (io: Server, socket: Socket) => {
         });
       }
 
-      const inventory = parseJSON<GeneratedItem[]>(kingdom.inventory, []);
+      const inventory = parseJSON<GeneratedItem[]>(matchKingdom.inventory, []);
       const idx = inventory.findIndex((i) => i.id === itemId);
       if (idx < 0)
         return socket.emit("error", {
@@ -91,8 +96,8 @@ export const registerItemsHandlers = (io: Server, socket: Socket) => {
 
       // Remove do inventário
       inventory.splice(idx, 1);
-      await prisma.kingdom.update({
-        where: { id: kingdomId },
+      await prisma.matchKingdom.update({
+        where: { id: matchKingdomId },
         data: { inventory: JSON.stringify(inventory) },
       });
 
@@ -103,12 +108,12 @@ export const registerItemsHandlers = (io: Server, socket: Socket) => {
   // Transferir item da Unidade de volta ao Reino (e remover bônus)
   socket.on(
     "inventory:transfer_to_kingdom",
-    async ({ kingdomId, unitId, itemId }) => {
-      const kingdom = await prisma.kingdom.findUnique({
-        where: { id: kingdomId },
+    async ({ matchKingdomId, unitId, itemId }) => {
+      const matchKingdom = await prisma.matchKingdom.findUnique({
+        where: { id: matchKingdomId },
       });
       const unit = await prisma.unit.findUnique({ where: { id: unitId } });
-      if (!kingdom || !unit)
+      if (!matchKingdom || !unit)
         return socket.emit("error", { message: "Dados inválidos" });
 
       const equipped = parseJSON<GeneratedItem[]>(unit.equipment as any, []);
@@ -132,14 +137,14 @@ export const registerItemsHandlers = (io: Server, socket: Socket) => {
         data: { equipment: JSON.stringify(equipped), ...newData },
       });
 
-      const inventory = parseJSON<GeneratedItem[]>(kingdom.inventory, []);
+      const inventory = parseJSON<GeneratedItem[]>(matchKingdom.inventory, []);
       inventory.push(item);
-      await prisma.kingdom.update({
-        where: { id: kingdomId },
+      await prisma.matchKingdom.update({
+        where: { id: matchKingdomId },
         data: { inventory: JSON.stringify(inventory) },
       });
 
-      socket.emit("inventory:item_returned", { kingdomId, unitId, item });
+      socket.emit("inventory:item_returned", { matchKingdomId, unitId, item });
     }
   );
 };

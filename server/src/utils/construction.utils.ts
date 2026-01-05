@@ -104,22 +104,21 @@ export async function buildStructure(
     where: { id: territoryId },
   });
 
-  // Obtém o Kingdom através do MatchPlayer
-  const matchPlayer = await prisma.matchPlayer.findUnique({
+  // Obtém o Kingdom através do MatchKingdom
+  const matchKingdom = await prisma.matchKingdom.findUnique({
     where: { id: playerId },
   });
 
-  if (!matchPlayer) {
+  if (!matchKingdom) {
     return {
       success: false,
-      message: "MatchPlayer não encontrado",
+      message: "MatchKingdom não encontrado",
     };
   }
 
   // Cria a estrutura
   const structure = await prisma.structure.create({
     data: {
-      kingdomId: matchPlayer.kingdomId, // Vinculado ao Reino (proprietário permanente)
       matchId,
       ownerId: playerId,
       type: structureType,
@@ -179,18 +178,17 @@ export async function buildStructureFree(
     where: { id: territoryId },
   });
 
-  const matchPlayer = await prisma.matchPlayer.findUnique({
+  const matchKingdom = await prisma.matchKingdom.findUnique({
     where: { id: playerId },
   });
 
-  if (!matchPlayer) {
-    return { success: false, message: "MatchPlayer não encontrado" };
+  if (!matchKingdom) {
+    return { success: false, message: "MatchKingdom não encontrado" };
   }
 
   // Cria a estrutura (sem cobrar recursos)
   const structure = await prisma.structure.create({
     data: {
-      kingdomId: matchPlayer.kingdomId,
       matchId,
       ownerId: playerId,
       type: structureType,
@@ -213,7 +211,7 @@ export async function buildStructureFree(
   });
 
   // Cast to any to update freeBuildingsUsed until Prisma client is regenerated
-  await (prisma as any).matchPlayer.update({
+  await (prisma as any).matchKingdom.update({
     where: { id: playerId },
     data: {
       freeBuildingsUsed: { increment: 1 },

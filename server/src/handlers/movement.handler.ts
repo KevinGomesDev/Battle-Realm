@@ -56,7 +56,7 @@ export const registerMovementHandlers = (io: Server, socket: Socket) => {
         );
 
         if (result.success) {
-          const player = await prisma.matchPlayer.findUnique({
+          const player = await prisma.matchKingdom.findUnique({
             where: { id: playerId },
           });
           const resources = JSON.parse(player!.resources);

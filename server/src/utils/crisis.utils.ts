@@ -205,7 +205,7 @@ export async function validateTributeSubmission(
 
   // Verifica se jogador tem recursos suficientes (apenas para não-naointervier)
   if (decision !== TributeDecision.NAOINTERVIER) {
-    const player = await prisma.matchPlayer.findUnique({
+    const player = await prisma.matchKingdom.findUnique({
       where: { id: playerId },
     });
 

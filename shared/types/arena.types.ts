@@ -117,6 +117,7 @@ export interface ArenaBattleResult {
   surrenderedBy?: string;
   disconnectedBy?: string;
   finalUnits: BattleUnit[];
+  vsBot?: boolean;
 }
 
 // =============================================================================
@@ -257,4 +258,5 @@ export interface BattleEndedResponse {
   disconnectedBy?: string;
   abandonedBy?: string;
   finalUnits?: BattleUnit[];
+  vsBot?: boolean;
 }

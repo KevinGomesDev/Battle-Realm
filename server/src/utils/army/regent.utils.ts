@@ -186,58 +186,44 @@ export async function recruitRegent(
     armor: number;
     vitality: number;
   },
-  name?: string // <--- ADICIONE este parâmetro
+  name?: string
 ): Promise<{ success: boolean; message: string; regent?: any }> {
-  // Obtém o Kingdom e determina o playerId correto
-  let kingdomId: string;
-  let finalPlayerId: string = playerId;
+  // NOTA: Esta função agora é usada apenas DURANTE PARTIDAS
+  // A criação de Regente fora de partida é feita diretamente no kingdom.handler.ts
 
-  if (matchId) {
-    // Durante uma partida: playerId é matchPlayerId
-    const matchPlayer = await prisma.matchPlayer.findUnique({
-      where: { id: playerId },
-    });
-
-    if (!matchPlayer) {
-      return {
-        success: false,
-        message: "MatchPlayer não encontrado",
-      };
-    }
-
-    kingdomId = matchPlayer.kingdomId;
-    finalPlayerId = matchPlayer.id;
-  } else {
-    // Durante criação de Kingdom: playerId é userId
-    // Precisa encontrar o Kingdom para este usuário
-    const userKingdom = await prisma.kingdom.findFirst({
-      where: {
-        ownerId: playerId,
-      },
-    });
-
-    if (!userKingdom) {
-      return {
-        success: false,
-        message: "Nenhum reino encontrado para este usuário",
-      };
-    }
-
-    kingdomId = userKingdom.id;
+  if (!matchId) {
+    return {
+      success: false,
+      message:
+        "Esta função só pode ser usada durante uma partida. Use kingdom:create para criar o regente inicial.",
+    };
   }
 
-  // Verifica se jogador já tem um regente NO REINO
-  const existingRegent = await prisma.unit.findFirst({
+  // Durante uma partida: playerId é matchKingdomId
+  const matchKingdom = await prisma.matchKingdom.findUnique({
+    where: { id: playerId },
+    include: { kingdom: { include: { regent: true } } },
+  });
+
+  if (!matchKingdom) {
+    return {
+      success: false,
+      message: "MatchKingdom não encontrado",
+    };
+  }
+
+  // Verifica se jogador já tem um regente na partida
+  const existingRegentInMatch = await prisma.unit.findFirst({
     where: {
-      kingdomId,
+      ownerId: playerId,
       category: "REGENT",
     },
   });
 
-  if (existingRegent) {
+  if (existingRegentInMatch) {
     return {
       success: false,
-      message: "Você já possui um Regente. Apenas um por reino.",
+      message: "Você já possui um Regente nesta partida.",
     };
   }
 
@@ -256,35 +242,28 @@ export async function recruitRegent(
     };
   }
 
-  // Busca a capital para spawn (se estiver em uma partida)
-  let spawnIndex: number | null = null;
+  // Busca a capital para spawn
+  const capital = await prisma.territory.findFirst({
+    where: {
+      matchId,
+      isCapital: true,
+      ownerId: playerId,
+    },
+  });
 
-  if (matchId) {
-    const capital = await prisma.territory.findFirst({
-      where: {
-        matchId,
-        isCapital: true,
-        ownerId: finalPlayerId,
-      },
-    });
-
-    if (!capital) {
-      return {
-        success: false,
-        message:
-          "Capital não encontrada. É necessário possuir uma capital na partida.",
-      };
-    }
-
-    spawnIndex = capital.mapIndex;
+  if (!capital) {
+    return {
+      success: false,
+      message:
+        "Capital não encontrada. É necessário possuir uma capital na partida.",
+    };
   }
 
-  // Cria o regente vinculado ao REINO
+  // Cria o regente para esta partida (vinculado ao MatchKingdom)
   const regent = await prisma.unit.create({
     data: {
-      kingdomId, // ➡️ Vinculado ao Reino (proprietário permanente)
-      matchId: matchId || null, // Vinculado à partida (opcional, temporário enquanto reino está jogando)
-      ownerId: matchId ? finalPlayerId : null, // Só tem ownerId se estiver em uma partida
+      matchId,
+      ownerId: playerId, // Vinculado ao MatchKingdom
       category: "REGENT",
       level: 1,
       combat: attributeDistribution.combat,
@@ -293,11 +272,10 @@ export async function recruitRegent(
       armor: attributeDistribution.armor,
       vitality: attributeDistribution.vitality,
       currentHp: attributeDistribution.vitality * 5,
-      movesLeft: matchId ? 3 : 0, // Só tem moves se estiver em uma partida
-      actionsLeft: matchId ? 1 : 0, // Só tem ações se estiver em uma partida
-      locationIndex: spawnIndex,
-      name: name || "REGENT", // <--- ADICIONE esta linha
-
+      movesLeft: 3,
+      actionsLeft: 1,
+      locationIndex: capital.mapIndex,
+      name: name || "REGENT",
       classFeatures: JSON.stringify([]), // Regente escolhe característica no nível 1
     },
   });

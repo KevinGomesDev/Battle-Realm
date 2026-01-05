@@ -98,15 +98,15 @@ export function registerBattleRematchHandlers(
 
           const hostKingdom = await prisma.kingdom.findUnique({
             where: { id: lobby.hostKingdomId },
-            include: { units: { where: { category: "REGENT" } } },
+            include: { regent: true },
           });
 
           const guestKingdom = await prisma.kingdom.findUnique({
             where: { id: lobby.guestKingdomId },
-            include: { units: { where: { category: "REGENT" } } },
+            include: { regent: true },
           });
 
-          if (!hostKingdom?.units[0] || !guestKingdom?.units[0]) {
+          if (!hostKingdom?.regent || !guestKingdom?.regent) {
             io.to(lobbyId).emit("battle:error", {
               message:
                 "Não foi possível iniciar revanche - regentes não encontrados",

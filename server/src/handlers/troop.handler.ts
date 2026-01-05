@@ -46,7 +46,7 @@ export const registerTroopHandlers = (io: Server, socket: Socket) => {
         const result = await recruitTroop(matchId, playerId, slotIndex, name);
 
         if (result.success) {
-          const player = await prisma.matchPlayer.findUnique({
+          const player = await prisma.matchKingdom.findUnique({
             where: { id: playerId },
           });
           const resources = JSON.parse(player!.resources);
@@ -106,7 +106,7 @@ export const registerTroopHandlers = (io: Server, socket: Socket) => {
         const result = await upgradeTroopCategory(matchId, playerId, slotIndex);
 
         if (result.success) {
-          const player = await prisma.matchPlayer.findUnique({
+          const player = await prisma.matchKingdom.findUnique({
             where: { id: playerId },
           });
           const resources = JSON.parse(player!.resources);

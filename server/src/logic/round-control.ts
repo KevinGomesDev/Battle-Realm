@@ -506,7 +506,8 @@ export function emitBattleEndEvents(
   lobbyId: string,
   battleId: string,
   victoryCheck: VictoryCheckResult,
-  units: BattleUnit[]
+  units: BattleUnit[],
+  vsBot?: boolean
 ): void {
   io.to(lobbyId).emit("battle:battle_ended", {
     battleId,
@@ -514,6 +515,7 @@ export function emitBattleEndEvents(
     winnerKingdomId: victoryCheck.winnerKingdomId,
     reason: victoryCheck.reason,
     finalUnits: units,
+    vsBot: vsBot ?? false,
   });
 
   // Limpar cache de eventos da batalha (são mantidos apenas em memória)
@@ -528,7 +530,8 @@ export function emitExhaustionEndEvents(
   lobbyId: string,
   battleId: string,
   exhaustionCheck: ExhaustionCheckResult,
-  units: BattleUnit[]
+  units: BattleUnit[],
+  vsBot?: boolean
 ): void {
   io.to(lobbyId).emit("battle:battle_ended", {
     battleId,
@@ -536,6 +539,7 @@ export function emitExhaustionEndEvents(
     winnerKingdomId: exhaustionCheck.winnerKingdomId,
     reason: "Todas as unidades estão exaustas (Action Marks máximos)",
     finalUnits: units,
+    vsBot: vsBot ?? false,
   });
 
   // Limpar cache de eventos da batalha (são mantidos apenas em memória)

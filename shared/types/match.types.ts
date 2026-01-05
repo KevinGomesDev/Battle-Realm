@@ -57,17 +57,21 @@ export interface PlayerResources {
 }
 
 /**
- * Jogador em uma partida
+ * Reino em uma partida
  */
-export interface MatchPlayer {
+export interface MatchKingdom {
   id: string;
   userId: string;
   username: string;
+  kingdomId: string;
   playerIndex: number;
   playerColor: string;
   kingdomName: string;
   capitalTerritoryId: string | null;
   isReady: boolean;
+  locationIndex?: number;
+  raceMetadata?: string;
+  inventory: string;
   resources: PlayerResources;
   hasFinishedCurrentTurn: boolean;
 }
@@ -81,7 +85,7 @@ export interface CompleteMatchState {
   currentRound: number;
   currentTurn: TurnType;
   activePlayerIds: string[];
-  players: MatchPlayer[];
+  players: MatchKingdom[];
   crisisState: object | null;
   updatedAt: Date;
 }
@@ -91,7 +95,7 @@ export interface CompleteMatchState {
  */
 export interface MatchMapData {
   territories: Territory[];
-  players: MatchPlayer[];
+  players: MatchKingdom[];
   status: MatchStatus;
 }
 

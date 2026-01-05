@@ -203,9 +203,8 @@ export async function recruitTroop(
 ): Promise<{ success: boolean; unit?: any; message?: string }> {
   try {
     // Buscar jogador e reino
-    const player = await prisma.matchPlayer.findUnique({
+    const player = await prisma.matchKingdom.findUnique({
       where: { id: playerId },
-      include: { kingdom: true },
     });
 
     if (!player) {
@@ -259,7 +258,7 @@ export async function recruitTroop(
 
     // Deduzir recursos
     resources[resourceKey] -= cost;
-    await prisma.matchPlayer.update({
+    await prisma.matchKingdom.update({
       where: { id: playerId },
       data: { resources: JSON.stringify(resources) },
     });
@@ -293,7 +292,6 @@ export async function recruitTroop(
       data: {
         matchId,
         ownerId: playerId,
-        kingdomId: player.kingdomId,
         category: "TROOP",
         troopSlot: troopSlotIndex, // Armazena qual slot de tropa
         level,
@@ -337,9 +335,8 @@ export async function getTroopCategoryInfo(
   troopCount: number;
   template: any;
 }> {
-  const player = await prisma.matchPlayer.findUnique({
+  const player = await prisma.matchKingdom.findUnique({
     where: { id: playerId },
-    include: { kingdom: true },
   });
 
   if (!player) {
@@ -407,7 +404,7 @@ export async function upgradeTroopCategory(
   newStats?: any;
 }> {
   try {
-    const player = await prisma.matchPlayer.findUnique({
+    const player = await prisma.matchKingdom.findUnique({
       where: { id: playerId },
     });
 
@@ -461,7 +458,7 @@ export async function upgradeTroopCategory(
     resources.experience -= cost;
     troopLevels[String(troopSlotIndex)] = currentLevel + 1;
 
-    await prisma.matchPlayer.update({
+    await prisma.matchKingdom.update({
       where: { id: playerId },
       data: {
         resources: JSON.stringify(resources),

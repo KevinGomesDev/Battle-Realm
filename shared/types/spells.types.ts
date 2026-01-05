@@ -1,4 +1,4 @@
-import { BattleUnit } from "./battle.types";
+import { type BattleUnit } from "./battle.types";
 
 export type SpellRange = "SELF" | "ADJACENT" | "RANGED" | "AREA";
 export type SpellTargetType =

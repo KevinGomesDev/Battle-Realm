@@ -10,6 +10,7 @@ import { getSpellByCode } from "../../../shared/data/spells.data";
 import { executeSpell } from "../spells/executors";
 import { ARENA_COOLDOWN_MULTIPLIER } from "../logic/skill-executors";
 import { validateSpellUse } from "../../../shared/utils/spell-validation";
+import { spendResources } from "../utils/turn.utils";
 import { prisma } from "../lib/prisma";
 import type { BattleUnit } from "../../../shared/types/battle.types";
 
@@ -278,6 +279,32 @@ export const registerSkillsHandlers = (io: Server, socket: Socket) => {
         if (!validation.valid) {
           socket.emit("error", { message: validation.error });
           return;
+        }
+
+        // Em partidas (Match), cobrar o custo de Arcane
+        if (!battle.isArena && spell.manaCost && spell.manaCost > 0) {
+          // Buscar o ownerId (MatchPlayer ID) da unidade
+          const battleUnit = battle.units.find((u) => u.id === unitId);
+          const matchPlayerId = battleUnit?.ownerId;
+
+          if (!matchPlayerId) {
+            socket.emit("error", {
+              message: "Não foi possível identificar o jogador da partida",
+            });
+            return;
+          }
+
+          try {
+            await spendResources(matchPlayerId, { arcane: spell.manaCost });
+            console.log(
+              `[SPELLS] Arcane consumido: ${spell.manaCost} para ${spell.name}`
+            );
+          } catch (err: any) {
+            socket.emit("error", {
+              message: err.message || "Arcane insuficiente",
+            });
+            return;
+          }
         }
 
         // Executar a spell

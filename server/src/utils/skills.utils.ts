@@ -187,7 +187,7 @@ export async function validateSkillUsage(
   }
 
   // Verifica se jogador tem recursos suficientes
-  const player = await prisma.matchPlayer.findUnique({
+  const player = await prisma.matchKingdom.findUnique({
     where: { id: playerId },
   });
 

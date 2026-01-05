@@ -52,7 +52,7 @@ export type {
   TurnType as MatchTurnType,
   Match,
   OpenMatch,
-  MatchPlayer,
+  MatchKingdom,
   CompleteMatchState,
   MatchMapData,
   PreparationData,
@@ -71,7 +71,6 @@ export interface CreateKingdomData {
   capitalName: string;
   alignment: Alignment;
   race: Race;
-  raceMetadata?: string;
 }
 
 // Tipos de Crise

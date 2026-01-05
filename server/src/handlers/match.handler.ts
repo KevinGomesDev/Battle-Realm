@@ -196,7 +196,7 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
         });
 
         // Adicionar host como jogador
-        await tx.matchPlayer.create({
+        await tx.matchKingdom.create({
           data: {
             matchId: match.id,
             userId: userId,
@@ -319,7 +319,7 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
 
       // Transação: adicionar guest + atualizar capitais
       await prisma.$transaction([
-        prisma.matchPlayer.create({
+        prisma.matchKingdom.create({
           data: {
             matchId,
             userId,
@@ -332,7 +332,7 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
           },
         }),
 
-        prisma.matchPlayer.update({
+        prisma.matchKingdom.update({
           where: { id: hostPlayer.id },
           data: { capitalTerritoryId: hostCapital.id },
         }),
@@ -354,7 +354,7 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
       ]);
 
       // Atualizar proprietário do território do guest
-      const guestPlayer = await prisma.matchPlayer.findFirst({
+      const guestPlayer = await prisma.matchKingdom.findFirst({
         where: { matchId, userId },
       });
 
@@ -428,7 +428,7 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
         orderBy: { mapIndex: "asc" },
       });
 
-      const players = await prisma.matchPlayer.findMany({
+      const players = await prisma.matchKingdom.findMany({
         where: { matchId: match.id },
         include: { user: true, kingdom: true },
       });
@@ -471,7 +471,7 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
   // ============================================================
   socket.on("match:get_preparation_data", async ({ matchId, userId }) => {
     try {
-      const player = await prisma.matchPlayer.findFirst({
+      const player = await prisma.matchKingdom.findFirst({
         where: { matchId, userId },
         include: { kingdom: true, user: true },
       });
@@ -609,7 +609,7 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
           return;
         }
 
-        const player = await prisma.matchPlayer.findUnique({
+        const player = await prisma.matchKingdom.findUnique({
           where: { id: playerId },
         });
         if (!player) {
@@ -684,7 +684,7 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
   // ============================================================
   socket.on("match:player_ready", async ({ matchId, userId }) => {
     try {
-      const player = await prisma.matchPlayer.findFirst({
+      const player = await prisma.matchKingdom.findFirst({
         where: { matchId, userId },
       });
       if (!player) {
@@ -701,12 +701,12 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
         return;
       }
 
-      await prisma.matchPlayer.updateMany({
+      await prisma.matchKingdom.updateMany({
         where: { matchId, userId },
         data: { isReady: true },
       });
 
-      const players = await prisma.matchPlayer.findMany({
+      const players = await prisma.matchKingdom.findMany({
         where: { matchId },
       });
 
@@ -790,7 +790,7 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
 
         // Se era o único jogador (ou host sem outros jogadores), cancela a partida
         if (otherPlayers.length === 0) {
-          await prisma.matchPlayer.delete({ where: { id: player.id } });
+          await prisma.matchKingdom.delete({ where: { id: player.id } });
           await prisma.territory.deleteMany({ where: { matchId } });
           await prisma.match.delete({ where: { id: matchId } });
 
@@ -814,7 +814,7 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
           const newHost = otherPlayers[0];
 
           // Atualizar o novo host para índice 0
-          await prisma.matchPlayer.update({
+          await prisma.matchKingdom.update({
             where: { id: newHost.id },
             data: {
               playerIndex: 0,
@@ -823,7 +823,7 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
           });
 
           // Remover o host antigo
-          await prisma.matchPlayer.delete({ where: { id: player.id } });
+          await prisma.matchKingdom.delete({ where: { id: player.id } });
 
           socket.leave(matchId);
           io.to(matchId).emit("match:host_changed", {
@@ -859,7 +859,7 @@ export const registerMatchHandlers = (io: Server, socket: Socket) => {
         }
 
         // Guest sai normalmente
-        await prisma.matchPlayer.delete({ where: { id: player.id } });
+        await prisma.matchKingdom.delete({ where: { id: player.id } });
 
         socket.leave(matchId);
         io.to(matchId).emit("match:player_left", {

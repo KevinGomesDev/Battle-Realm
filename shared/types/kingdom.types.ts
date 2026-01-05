@@ -51,16 +51,15 @@ export interface Kingdom {
   description?: string;
   alignment: Alignment;
   race: Race;
-  raceMetadata?: string;
-  locationIndex: number;
   ownerId: string;
+  regentId?: string;
   createdAt: Date;
-  updatedAt: Date;
+  updatedAt?: Date;
 }
 
 export interface KingdomWithRelations extends Kingdom {
   troopTemplates?: TroopTemplate[];
-  units?: Unit[];
+  regent?: Unit;
 }
 
 export interface KingdomSummary {
@@ -68,6 +67,21 @@ export interface KingdomSummary {
   name: string;
   race: Race;
   alignment: Alignment;
+}
+
+// ============ MATCH HISTORY ============
+
+export type MatchResult = "WIN" | "LOSS" | "DRAW";
+
+export interface MatchHistory {
+  id: string;
+  kingdomId: string;
+  matchDate: Date;
+  result: MatchResult;
+  opponentName: string;
+  opponentRace: string;
+  finalRound: number;
+  summary?: Record<string, unknown>;
 }
 
 // ============ TROOP TEMPLATE ============
@@ -114,7 +128,8 @@ export type UnitCategory =
 
 export interface Unit {
   id: string;
-  kingdomId?: string;
+  matchId?: string;
+  ownerId?: string;
   name: string;
   description?: string;
   avatar?: string; // ID do sprite (ex: "[1].png")
@@ -163,7 +178,6 @@ export interface CreateKingdomData {
   description?: string;
   alignment: Alignment;
   race: Race;
-  raceMetadata?: string;
   regent: CreateRegentData;
   troopTemplates: CreateTroopTemplateData[];
 }
@@ -193,7 +207,6 @@ export interface KingdomTemplateDetails {
   description: string;
   alignment: Alignment;
   race: Race;
-  raceMetadata?: string;
   regent: RegentData;
   troopTemplates: CreateTroopTemplateData[];
 }

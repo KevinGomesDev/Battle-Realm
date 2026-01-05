@@ -223,7 +223,8 @@ async function handleTimerExpired(battle: Battle): Promise<void> {
       lobby.lobbyId,
       battle.id,
       victoryCheck,
-      battle.units
+      battle.units,
+      lobby.vsBot
     );
 
     const loserId =

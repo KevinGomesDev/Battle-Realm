@@ -35,7 +35,6 @@ export interface KingdomTemplateDefinition {
   description: string;
   alignment: Alignment;
   race: Race;
-  raceMetadata?: string;
   regent: RegentDefinition;
   troopTemplates: TroopTemplateDefinition[];
 }

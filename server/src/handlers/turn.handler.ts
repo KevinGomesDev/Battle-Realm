@@ -160,7 +160,7 @@ export const registerTurnHandlers = (io: Server, socket: Socket) => {
   // --- OBTER RECURSOS DO JOGADOR ---
   socket.on("turn:get_resources", async ({ matchId, playerId }) => {
     try {
-      const player = await prisma.matchPlayer.findFirst({
+      const player = await prisma.matchKingdom.findFirst({
         where: {
           matchId,
           id: playerId,
@@ -213,7 +213,7 @@ export const registerTurnHandlers = (io: Server, socket: Socket) => {
 
         if (result.success) {
           // Atualiza recursos do jogador
-          const player = await prisma.matchPlayer.findUnique({
+          const player = await prisma.matchKingdom.findUnique({
             where: { id: playerId },
           });
           const resources = JSON.parse(player!.resources);
@@ -287,12 +287,12 @@ export const registerTurnHandlers = (io: Server, socket: Socket) => {
       const currentTurn = match.currentTurn as TurnType;
 
       if (currentTurn === TurnType.ADMINISTRACAO) {
-        await prisma.matchPlayer.update({
+        await prisma.matchKingdom.update({
           where: { id: playerId },
           data: { hasFinishedAdminTurn: true },
         });
       } else {
-        await prisma.matchPlayer.update({
+        await prisma.matchKingdom.update({
           where: { id: playerId },
           data: { hasPlayedTurn: true },
         });
@@ -333,7 +333,7 @@ export const registerTurnHandlers = (io: Server, socket: Socket) => {
         if (newTurn === TurnType.ADMINISTRACAO) {
           await restoreAllPlayersResources(matchId);
 
-          const players = await prisma.matchPlayer.findMany({
+          const players = await prisma.matchKingdom.findMany({
             where: { matchId },
           });
 

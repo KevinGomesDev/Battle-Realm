@@ -15,6 +15,7 @@ export const TELEPORT: SpellDefinition = {
   icon: "🌀",
   color: "cyan",
   cooldown: 3,
+  manaCost: 5,
 };
 
 /**
@@ -32,6 +33,7 @@ export const FIRE: SpellDefinition = {
   icon: "🔥",
   color: "red",
   cooldown: 2,
+  manaCost: 8,
 };
 
 /**
@@ -49,6 +51,7 @@ export const EMPOWER: SpellDefinition = {
   icon: "⚡",
   color: "yellow",
   cooldown: 4,
+  manaCost: 6,
 };
 
 /**

@@ -61,9 +61,9 @@ async function resetDatabase() {
     console.log(`[RESET] Deleted ${territoriesDeleted.count} territories`);
   }
 
-  const matchPlayersDeleted = await prisma.matchPlayer.deleteMany();
-  if (matchPlayersDeleted.count > 0) {
-    console.log(`[RESET] Deleted ${matchPlayersDeleted.count} match players`);
+  const matchKingdomsDeleted = await prisma.matchKingdom.deleteMany();
+  if (matchKingdomsDeleted.count > 0) {
+    console.log(`[RESET] Deleted ${matchKingdomsDeleted.count} match kingdoms`);
   }
 
   const matchesDeleted = await prisma.match.deleteMany();

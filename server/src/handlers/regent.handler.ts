@@ -51,7 +51,7 @@ export const registerRegentHandlers = (io: Server, socket: Socket) => {
             await addHeroClassFeature(unitId, classFeature);
           }
 
-          const player = await prisma.matchPlayer.findUnique({
+          const player = await prisma.matchKingdom.findUnique({
             where: { id: playerId },
           });
           const resources = JSON.parse(player!.resources);
@@ -111,19 +111,19 @@ export const registerRegentHandlers = (io: Server, socket: Socket) => {
             return;
           }
 
-          // Busca o matchPlayer
-          const matchPlayer = await prisma.matchPlayer.findFirst({
+          // Busca o matchKingdom
+          const matchKingdom = await prisma.matchKingdom.findFirst({
             where: { matchId, userId },
           });
 
-          if (!matchPlayer) {
+          if (!matchKingdom) {
             socket.emit("error", {
               message: "Jogador não encontrado na partida",
             });
             return;
           }
 
-          finalPlayerId = matchPlayer.id;
+          finalPlayerId = matchKingdom.id;
         } else {
           finalPlayerId = userId;
         }
@@ -154,7 +154,7 @@ export const registerRegentHandlers = (io: Server, socket: Socket) => {
           }
 
           const player = matchId
-            ? await prisma.matchPlayer.findUnique({
+            ? await prisma.matchKingdom.findUnique({
                 where: { id: finalPlayerId },
               })
             : null;

@@ -249,7 +249,8 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
           lobby.lobbyId,
           battle.id,
           victoryCheck,
-          battle.units
+          battle.units,
+          lobby.vsBot
         );
 
         const loserId =
@@ -288,7 +289,8 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
           lobby.lobbyId,
           battle.id,
           victoryAfterSummons,
-          battle.units
+          battle.units,
+          lobby.vsBot
         );
 
         const loserId =
@@ -416,7 +418,8 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
             lobby.lobbyId,
             battle.id,
             exhaustionCheck,
-            battle.units
+            battle.units,
+            lobby.vsBot
           );
 
           const loserId =
@@ -689,7 +692,8 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
                 lobby.lobbyId,
                 battle.id,
                 victoryCheck,
-                battle.units
+                battle.units,
+                lobby.vsBot
               );
 
               const loserId =
@@ -990,7 +994,8 @@ export function registerBattleActionHandlers(io: Server, socket: Socket): void {
                 lobby.lobbyId,
                 battle.id,
                 victoryCheck,
-                battle.units
+                battle.units,
+                lobby.vsBot
               );
 
               const loserId =

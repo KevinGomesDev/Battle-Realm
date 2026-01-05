@@ -258,7 +258,8 @@ export const registerSessionHandlers = (io: Server, socket: Socket): void => {
             battle.lobbyId,
             battle.id,
             victoryCheck,
-            battle.units as any
+            battle.units as any,
+            lobby?.vsBot
           );
 
           // Emitir para o socket que está reconectando

@@ -26,7 +26,7 @@ export function registerBattleLobbyHandlers(io: Server, socket: Socket): void {
 
       const kingdom = await prisma.kingdom.findUnique({
         where: { id: kingdomId },
-        include: { units: { where: { category: "REGENT" } } },
+        include: { regent: true },
       });
       if (!kingdom) {
         return socket.emit("battle:error", { message: "Reino não encontrado" });
@@ -36,7 +36,7 @@ export function registerBattleLobbyHandlers(io: Server, socket: Socket): void {
           message: "Este reino não pertence a você",
         });
       }
-      if (!kingdom.units.length) {
+      if (!kingdom.regent) {
         return socket.emit("battle:error", {
           message: "Reino sem Regente definido",
         });
@@ -193,7 +193,7 @@ export function registerBattleLobbyHandlers(io: Server, socket: Socket): void {
 
       const kingdom = await prisma.kingdom.findUnique({
         where: { id: kingdomId },
-        include: { units: { where: { category: "REGENT" } } },
+        include: { regent: true },
       });
       if (!kingdom) {
         return socket.emit("battle:error", { message: "Reino não encontrado" });
@@ -203,7 +203,7 @@ export function registerBattleLobbyHandlers(io: Server, socket: Socket): void {
           message: "Este reino não pertence a você",
         });
       }
-      if (!kingdom.units.length) {
+      if (!kingdom.regent) {
         return socket.emit("battle:error", {
           message: "Reino sem Regente definido",
         });
@@ -354,14 +354,14 @@ export function registerBattleLobbyHandlers(io: Server, socket: Socket): void {
 
       const hostKingdom = await prisma.kingdom.findUnique({
         where: { id: lobby.hostKingdomId },
-        include: { units: { where: { category: "REGENT" } } },
+        include: { regent: true },
       });
       const guestKingdom = await prisma.kingdom.findUnique({
         where: { id: lobby.guestKingdomId },
-        include: { units: { where: { category: "REGENT" } } },
+        include: { regent: true },
       });
 
-      if (!hostKingdom?.units.length || !guestKingdom?.units.length) {
+      if (!hostKingdom?.regent || !guestKingdom?.regent) {
         return socket.emit("battle:error", {
           message: "Um dos reinos não tem Regente",
         });

@@ -123,44 +123,11 @@ export const CreateKingdomSchema = z
       .optional(),
     alignment: AlignmentSchema,
     race: RaceSchema,
-    raceMetadata: z.string().optional(),
     // Regente (obrigatório para criação completa)
     regent: CreateRegentSchema,
     // Tropas (obrigatório para criação completa)
     troopTemplates: TroopTemplatesArraySchema,
   })
-  .refine(
-    (data) => {
-      // Validação especial para Elementais
-      if (data.race === "ELEMENTAL") {
-        if (!data.raceMetadata) return false;
-        try {
-          const elements = JSON.parse(data.raceMetadata);
-          return Array.isArray(elements) && elements.length === 2;
-        } catch {
-          return false;
-        }
-      }
-      return true;
-    },
-    {
-      message: "Elementais precisam de 2 elementos selecionados",
-      path: ["raceMetadata"],
-    }
-  )
-  .refine(
-    (data) => {
-      // Validação especial para Insetos
-      if (data.race === "INSETO") {
-        return !!data.raceMetadata;
-      }
-      return true;
-    },
-    {
-      message: "Insetos precisam de um recurso bônus selecionado",
-      path: ["raceMetadata"],
-    }
-  )
   .refine(
     (data) => {
       // Validação: avatar do regente não pode ser igual ao avatar de nenhuma tropa

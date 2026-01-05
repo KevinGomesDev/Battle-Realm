@@ -150,19 +150,19 @@ export async function canRecruitHero(
     };
   }
 
-  // Obtém o MatchPlayer
-  const matchPlayer = await prisma.matchPlayer.findUnique({
+  // Obtém o MatchKingdom
+  const matchKingdom = await prisma.matchKingdom.findUnique({
     where: { id: playerId },
   });
 
-  if (!matchPlayer) {
+  if (!matchKingdom) {
     return { canRecruit: false, reason: "Jogador não encontrado" };
   }
 
-  // Conta heróis atuais do reino
+  // Conta heróis atuais do MatchKingdom na partida
   const heroCount = await prisma.unit.count({
     where: {
-      kingdomId: matchPlayer.kingdomId,
+      ownerId: playerId,
       category: "HERO",
     },
   });
@@ -174,10 +174,10 @@ export async function canRecruitHero(
     };
   }
 
-  // Verifica se já tem esse herói no reino (de partidas anteriores)
+  // Verifica se já tem esse herói na partida
   const existingHero = await prisma.unit.findFirst({
     where: {
-      kingdomId: matchPlayer.kingdomId,
+      ownerId: playerId,
       category: "HERO",
       name: template.name,
     },
@@ -213,18 +213,17 @@ export async function recruitHeroFromTemplate(
 
   const template = getHeroTemplate(heroCode)!;
 
-  // Obtém o MatchPlayer
-  const matchPlayer = await prisma.matchPlayer.findUnique({
+  // Obtém o MatchKingdom
+  const matchKingdom = await prisma.matchKingdom.findUnique({
     where: { id: playerId },
-    include: { kingdom: true },
   });
 
-  if (!matchPlayer || !matchPlayer.kingdom) {
+  if (!matchKingdom) {
     return { success: false, message: "Reino não encontrado" };
   }
 
   // Verifica recursos
-  const resources = JSON.parse(matchPlayer.resources || "{}");
+  const resources = JSON.parse(matchKingdom.resources || "{}");
   const cost = template.recruitCost;
 
   if (cost.ore && (resources.minerio || 0) < cost.ore) {
@@ -259,12 +258,12 @@ export async function recruitHeroFromTemplate(
   }
 
   // Busca a capital do jogador
-  if (!matchPlayer.capitalTerritoryId) {
+  if (!matchKingdom.capitalTerritoryId) {
     return { success: false, message: "Capital não encontrada" };
   }
 
   const capital = await prisma.territory.findUnique({
-    where: { id: matchPlayer.capitalTerritoryId },
+    where: { id: matchKingdom.capitalTerritoryId },
   });
 
   if (!capital) {
@@ -281,7 +280,7 @@ export async function recruitHeroFromTemplate(
   if (cost.devotion)
     newResources.devocao = (newResources.devocao || 0) - cost.devotion;
 
-  await prisma.matchPlayer.update({
+  await prisma.matchKingdom.update({
     where: { id: playerId },
     data: { resources: JSON.stringify(newResources) },
   });
@@ -292,7 +291,6 @@ export async function recruitHeroFromTemplate(
   // Cria o herói baseado no template
   const hero = await prisma.unit.create({
     data: {
-      kingdomId: matchPlayer.kingdomId,
       matchId,
       ownerId: playerId,
       category: "HERO",

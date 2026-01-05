@@ -423,6 +423,7 @@ const ArenaBattleViewInner: React.FC = () => {
           onLeave={dismissBattleResult}
           rematchPending={rematchPending}
           opponentWantsRematch={opponentWantsRematch}
+          vsBot={battleResult.vsBot}
         />
       </div>
     );
@@ -1138,6 +1139,7 @@ const ArenaBattleViewInner: React.FC = () => {
           onLeave={dismissBattleResult}
           rematchPending={rematchPending}
           opponentWantsRematch={opponentWantsRematch}
+          vsBot={battleResult.vsBot}
         />
       )}
 

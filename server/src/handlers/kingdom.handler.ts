@@ -87,30 +87,14 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
         }
 
         const result = await prisma.$transaction(async (tx) => {
-          const randomLocation = Math.floor(Math.random() * MAP_SIZE) + 1;
-
-          // 1. Criar Reino
-          const newKingdom = await tx.kingdom.create({
-            data: {
-              name: validated.name,
-              description: validated.description,
-              alignment: validated.alignment,
-              race: validated.race,
-              raceMetadata: validated.raceMetadata,
-              locationIndex: randomLocation,
-              ownerId: userId,
-            },
-          });
-
-          // 2. Criar Regente
+          // 1. Criar Regente primeiro (para ter o ID)
           const regentAttrs = validated.regent.attributes;
           const initialSkills = validated.regent.initialSkillId
             ? [validated.regent.initialSkillId]
             : [];
 
-          await tx.unit.create({
+          const newRegent = await tx.unit.create({
             data: {
-              kingdomId: newKingdom.id,
               name: validated.regent.name,
               avatar: validated.regent.avatar || null,
               category: "REGENT",
@@ -124,6 +108,18 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
               movesLeft: 0, // Sem moves fora de partida
               actionsLeft: 0,
               classFeatures: JSON.stringify(initialSkills),
+            },
+          });
+
+          // 2. Criar Reino com referência ao Regente
+          const newKingdom = await tx.kingdom.create({
+            data: {
+              name: validated.name,
+              description: validated.description,
+              alignment: validated.alignment,
+              race: validated.race,
+              ownerId: userId,
+              regentId: newRegent.id,
             },
           });
 
@@ -144,7 +140,7 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
           return tx.kingdom.findUnique({
             where: { id: newKingdom.id },
             include: {
-              units: true,
+              regent: true,
               troopTemplates: { orderBy: { slotIndex: "asc" } },
             },
           });
@@ -200,7 +196,7 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
           where: { id: validated.kingdomId },
           include: {
             troopTemplates: { orderBy: { slotIndex: "asc" } },
-            units: { where: { category: "REGENT" } },
+            regent: true,
           },
         });
 
@@ -398,23 +394,9 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
 
       try {
         const result = await prisma.$transaction(async (tx) => {
-          const randomLocation = Math.floor(Math.random() * MAP_SIZE) + 1;
-
-          const newKingdom = await tx.kingdom.create({
+          // 1. Criar Regente primeiro
+          const newRegent = await tx.unit.create({
             data: {
-              name: template.name,
-              description: template.description,
-              alignment: template.alignment,
-              race: template.race,
-              raceMetadata: template.raceMetadata,
-              locationIndex: randomLocation,
-              ownerId: userId,
-            },
-          });
-
-          await tx.unit.create({
-            data: {
-              kingdomId: newKingdom.id,
               name: template.regent.name,
               description: template.regent.description,
               avatar: template.regent.avatar || null,
@@ -434,6 +416,19 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
             },
           });
 
+          // 2. Criar Reino com referência ao Regente
+          const newKingdom = await tx.kingdom.create({
+            data: {
+              name: template.name,
+              description: template.description,
+              alignment: template.alignment,
+              race: template.race,
+              ownerId: userId,
+              regentId: newRegent.id,
+            },
+          });
+
+          // 3. Criar Templates de Tropas
           const troopTemplatesData = template.troopTemplates.map((t) => ({
             kingdomId: newKingdom.id,
             slotIndex: t.slotIndex,
@@ -454,7 +449,7 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
           return tx.kingdom.findUnique({
             where: { id: newKingdom.id },
             include: {
-              units: true,
+              regent: true,
               troopTemplates: { orderBy: { slotIndex: "asc" } },
             },
           });
@@ -507,14 +502,14 @@ export const registerKingdomHandlers = (io: Server, socket: Socket) => {
       try {
         const unit = await prisma.unit.findUnique({
           where: { id: validated.unitId },
-          include: { kingdom: true },
+          include: { owner: true },
         });
 
         if (!unit) {
           return emitError(socket, "Unidade não encontrada", "NOT_FOUND");
         }
 
-        if (!unit.kingdom || unit.kingdom.ownerId !== userId) {
+        if (!unit.owner || unit.owner.userId !== userId) {
           return emitError(
             socket,
             "Acesso negado a esta unidade",

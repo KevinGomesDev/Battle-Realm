@@ -63,7 +63,7 @@ export const registerWorldMapHandlers = (io: Server, socket: Socket) => {
       // Busca informações adicionais se houver dono
       let ownerData = null;
       if (territory.ownerId) {
-        ownerData = await prisma.matchPlayer.findUnique({
+        ownerData = await prisma.matchKingdom.findUnique({
           where: { id: territory.ownerId },
           include: {
             kingdom: true,

@@ -24,23 +24,21 @@ function generateCreatureStats(level: number) {
 
 export async function createSummonedCreature(params: {
   matchId: string;
-  ownerId?: string | null; // MatchPlayer controlling creature (optional for NPC)
-  kingdomId?: string | null; // Kingdom affiliation
+  ownerId?: string | null; // MatchKingdom controlling creature (optional for NPC)
   summonerUnitId?: string | null; // Link to summoner unit; if absent, defaults to Regent
   level?: number; // default 1
   name?: string | null;
 }): Promise<{ success: boolean; unit?: any; message?: string }> {
   try {
-    const { matchId, ownerId = null, kingdomId = null } = params;
+    const { matchId, ownerId = null } = params;
     const level = Math.max(1, params.level || 1);
 
-    // Determine summoner: provided or fallback to Regent of the kingdom
+    // Determine summoner: provided or fallback to Regent of the owner
     let summonerUnitId = params.summonerUnitId || null;
-    if (!summonerUnitId && kingdomId) {
+    if (!summonerUnitId && ownerId) {
       const regent = await prisma.unit.findFirst({
-        where: { matchId, kingdomId, category: "REGENT" },
-        orderBy: { createdAt: "asc" },
-      } as any);
+        where: { matchId, ownerId, category: "REGENT" },
+      });
       if (regent) summonerUnitId = regent.id;
     }
 
@@ -58,7 +56,6 @@ export async function createSummonedCreature(params: {
       data: {
         matchId,
         ownerId: ownerId || null,
-        kingdomId: kingdomId || null,
         category: "SUMMON",
         level,
         name: params.name || null,

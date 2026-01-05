@@ -45,10 +45,10 @@ export async function createAndStartBattle({
 
   const { units: allUnits, occupiedPositions } =
     createBattleUnitsWithRandomPositions(
-      hostKingdom.units,
+      hostKingdom.regent ? [hostKingdom.regent] : [],
       lobby.hostUserId,
       { id: hostKingdom.id, name: hostKingdom.name, race: hostKingdom.race },
-      guestKingdom.units,
+      guestKingdom.regent ? [guestKingdom.regent] : [],
       lobby.guestUserId as string,
       { id: guestKingdom.id, name: guestKingdom.name, race: guestKingdom.race },
       gridWidth,
@@ -252,7 +252,7 @@ export async function createAndStartBotBattle({
   // Criar unidades do jogador e do BOT com posições aleatórias
   const { units: allUnits, occupiedPositions } =
     createBattleUnitsWithRandomPositions(
-      hostKingdom.units,
+      hostKingdom.regent ? [hostKingdom.regent] : [],
       lobby.hostUserId,
       { id: hostKingdom.id, name: hostKingdom.name, race: hostKingdom.race },
       botUnits,

@@ -17,7 +17,7 @@ import type {
 } from "../../../../shared/types/auth.types";
 
 async function findActiveMatchId(userId: string): Promise<string | null> {
-  const activePlayerEntry = await prisma.matchPlayer.findFirst({
+  const activePlayerEntry = await prisma.matchKingdom.findFirst({
     where: {
       userId: userId,
       match: { status: "ACTIVE" },

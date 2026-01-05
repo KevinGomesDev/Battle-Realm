@@ -72,7 +72,7 @@ export async function restorePlayerResources(
   const newResources = await calculatePlayerResources(matchId, playerId);
 
   // Busca recursos atuais para preservar Devoção (que acumula)
-  const player = await prisma.matchPlayer.findFirst({
+  const player = await prisma.matchKingdom.findFirst({
     where: {
       matchId,
       id: playerId,
@@ -86,7 +86,7 @@ export async function restorePlayerResources(
   }
 
   // Atualiza no banco
-  await prisma.matchPlayer.update({
+  await prisma.matchKingdom.update({
     where: { id: playerId },
     data: {
       resources: JSON.stringify(newResources),
@@ -102,7 +102,7 @@ export async function restorePlayerResources(
 export async function restoreAllPlayersResources(
   matchId: string
 ): Promise<void> {
-  const players = await prisma.matchPlayer.findMany({
+  const players = await prisma.matchKingdom.findMany({
     where: { matchId },
   });
 
@@ -158,7 +158,7 @@ export async function advanceTurn(matchId: string): Promise<{
   });
 
   // Reseta flags de turno dos jogadores
-  await prisma.matchPlayer.updateMany({
+  await prisma.matchKingdom.updateMany({
     where: { matchId },
     data: {
       hasPlayedTurn: false,
@@ -176,7 +176,7 @@ export async function checkAllPlayersFinished(
   matchId: string,
   turnType: TurnType
 ): Promise<boolean> {
-  const players = await prisma.matchPlayer.findMany({
+  const players = await prisma.matchKingdom.findMany({
     where: { matchId },
   });
 
@@ -196,7 +196,7 @@ export async function spendResources(
   playerId: string,
   costs: Partial<PlayerResources>
 ): Promise<PlayerResources> {
-  const player = await prisma.matchPlayer.findUnique({
+  const player = await prisma.matchKingdom.findUnique({
     where: { id: playerId },
   });
 
@@ -226,7 +226,7 @@ export async function spendResources(
   };
 
   // Atualiza no banco
-  await prisma.matchPlayer.update({
+  await prisma.matchKingdom.update({
     where: { id: playerId },
     data: {
       resources: JSON.stringify(newResources),
@@ -243,7 +243,7 @@ export async function addResources(
   playerId: string,
   gains: Partial<PlayerResources>
 ): Promise<PlayerResources> {
-  const player = await prisma.matchPlayer.findUnique({
+  const player = await prisma.matchKingdom.findUnique({
     where: { id: playerId },
   });
 
@@ -261,7 +261,7 @@ export async function addResources(
     devotion: currentResources.devotion + (gains.devotion || 0),
   };
 
-  await prisma.matchPlayer.update({
+  await prisma.matchKingdom.update({
     where: { id: playerId },
     data: {
       resources: JSON.stringify(newResources),

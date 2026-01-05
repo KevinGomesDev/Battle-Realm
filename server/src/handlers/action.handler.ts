@@ -60,7 +60,7 @@ export const registerActionHandlers = (io: Server, socket: Socket) => {
         }
 
         // 4. Buscar jogador
-        const player = await prisma.matchPlayer.findUnique({
+        const player = await prisma.matchKingdom.findUnique({
           where: { id: playerId },
         });
 
@@ -129,7 +129,7 @@ export const registerActionHandlers = (io: Server, socket: Socket) => {
         // 9. Deduzir custo em minério
         resources.ore -= cost;
 
-        await prisma.matchPlayer.update({
+        await prisma.matchKingdom.update({
           where: { id: playerId },
           data: { resources: JSON.stringify(resources) },
         });

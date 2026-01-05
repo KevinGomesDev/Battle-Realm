@@ -23,7 +23,7 @@ model User {
   matchLosses Int @default(0)
 
   kingdoms  Kingdom[]
-  matches   MatchPlayer[]
+  matches   MatchKingdom[]
 }
 
 model Kingdom {
@@ -32,15 +32,17 @@ model Kingdom {
   description    String?   // História ou descrição do reino (opcional)
   alignment      Alignment
   race           Race
-  raceMetadata   String?
-  locationIndex  Int
   ownerId        String
   owner          User      @relation(fields: [ownerId], references: [id])
-  matchHistory   MatchPlayer[]
-  units          Unit[]        // Regentes e unidades permanentes do reino
-  structures     Structure[]   // Estruturas permanentes do reino
-  troopTemplates TroopTemplate[] // Templates das 5 tropas do reino
-  inventory      String   @default("[]") // Itens do reino (JSON)
+  // Relação direta com o Regente do Reino
+  regentId       String?   @unique
+  regent         Unit?     @relation("KingdomRegent", fields: [regentId], references: [id])
+  // Templates das 5 tropas (permanentes)
+  troopTemplates TroopTemplate[]
+  // Histórico de partidas (resumo)
+  matchHistory   MatchHistory[]
+  // Partidas em que este reino participou
+  matchKingdoms  MatchKingdom[]
   createdAt      DateTime  @default(now())
 }
 
@@ -97,7 +99,7 @@ model Match {
   crisisMeter    Int      @default(0)
   crisisState    String?
   recruitedHeroes String  @default("[]") // Códigos de heróis já recrutados nesta partida (JSON array)
-  players        MatchPlayer[]
+  players        MatchKingdom[]
   territories    Territory[]
   units          Unit[]
   structures     Structure[]
@@ -107,7 +109,21 @@ model Match {
   updatedAt      DateTime @updatedAt
 }
 
-model MatchPlayer {
+// Histórico de partidas (resumo para o Reino)
+model MatchHistory {
+  id             String   @id @default(uuid())
+  kingdomId      String
+  kingdom        Kingdom  @relation(fields: [kingdomId], references: [id])
+  matchDate      DateTime @default(now())
+  result         String   // WIN | LOSS | DRAW
+  opponentName   String   // Nome do reino oponente
+  opponentRace   String   // Raça do oponente
+  finalRound     Int      // Rodada em que a partida terminou
+  summary        String   @default("{}") // JSON: estatísticas extras (unidades perdidas, etc)
+}
+
+// Reino participando de uma partida
+model MatchKingdom {
   id             String   @id @default(uuid())
   matchId        String
   match          Match    @relation(fields: [matchId], references: [id])
@@ -120,10 +136,13 @@ model MatchPlayer {
   isReady        Boolean  @default(false)    // Pronto na fase de preparação
   freeBuildingsUsed Int   @default(0)        // Construções gratuitas usadas na preparação (máx 3)
   capitalTerritoryId String?                 // Território inicial/capital
+  locationIndex  Int?                        // Posição no mapa (definida durante partida)
   troopLevels    String   @default("{}")
   troopTemplates String   @default("{}")
   customChoices  String   @default("{}")
-  resources      String   @default("{\"minerio\":0,\"suprimentos\":0,\"arcana\":0,\"experiencia\":0,\"devocao\":0}")
+  raceMetadata   String?                     // Metadata da raça (ex: elementos para Elemental)
+  inventory      String   @default("[]")     // Itens do reino durante esta partida (JSON)
+  resources      String   @default("{\"ore\":0,\"supplies\":0,\"arcane\":0,\"experience\":0,\"devotion\":0}")
   hasPlayedTurn  Boolean  @default(false)
   hasFinishedAdminTurn Boolean @default(false)
   unitCount      Int      @default(0)
@@ -146,7 +165,7 @@ model Territory {
   size           TerritorySize @default(MEDIUM)
   areaSlots      Int           @default(10)
   usedSlots      Int           @default(0)
-  ownerId        String?       // ID do MatchPlayer que controla (null = selvagem)
+  ownerId        String?       // ID do MatchKingdom que controla (null = selvagem)
   isCapital      Boolean       @default(false) // É a capital de algum jogador?
   hasCrisisIntel Boolean       @default(false)
   constructionCount Int        @default(0)     // Total de construções (Produtores + Fortalezas)
@@ -156,15 +175,14 @@ model Territory {
 
 model Unit {
   id             String      @id @default(uuid())
-  // Vinculação ao Reino (proprietário permanente)
-  kingdomId      String?
-  kingdom        Kingdom?    @relation(fields: [kingdomId], references: [id])
-  // Vinculação à Partida (quando o reino está jogando)
+  // Vinculação à Partida (quando em partida)
   matchId        String?
   match          Match?      @relation(fields: [matchId], references: [id])
-  // Vinculação ao Jogador na Partida (quando em partida)
+  // Vinculação ao Reino na Partida (MatchKingdom)
   ownerId        String?
-  owner          MatchPlayer? @relation(fields: [ownerId], references: [id])
+  owner          MatchKingdom? @relation(fields: [ownerId], references: [id])
+  // Relação inversa: Este Unit pode ser o Regente de um Kingdom
+  regentOfKingdom Kingdom?   @relation("KingdomRegent")
   name           String?
   description    String?     // História ou descrição do herói/regente (opcional)
   equipment      String      @default("[]") // Itens equipados (máx 3) (JSON)
@@ -205,15 +223,12 @@ model Unit {
 
 model Structure {
   id             String      @id @default(uuid())
-  // Vinculação ao Reino (proprietário permanente)
-  kingdomId      String?
-  kingdom        Kingdom?    @relation(fields: [kingdomId], references: [id])
-  // Vinculação à Partida (quando o reino está jogando)
+  // Vinculação à Partida (quando em partida)
   matchId        String?
   match          Match?      @relation(fields: [matchId], references: [id])
-  // Vinculação ao Jogador na Partida (quando em partida)
+  // Vinculação ao Reino na Partida (MatchKingdom)
   ownerId        String?
-  owner          MatchPlayer? @relation(fields: [ownerId], references: [id])
+  owner          MatchKingdom? @relation(fields: [ownerId], references: [id])
   // Dados da Estrutura
   type           String
   maxHp          Int
@@ -287,7 +302,7 @@ model Battle {
   round            Int      @default(1)
   currentTurnIndex Int      @default(0)        // índice na ordem de iniciativa
   actionOrder      String   @default("[]")      // JSON: [userId...], ordem de jogadores por iniciativa
-  winnerId         String?  // ID do vencedor (userId ou matchPlayerId)
+  winnerId         String?  // ID do vencedor (userId ou matchKingdomId)
   winReason        String?  // Motivo da vitória
   ransomPrice      Int?
   ransomResource   String?
@@ -308,8 +323,8 @@ model BattleUnit {
   battle      Battle      @relation(fields: [battleId], references: [id], onDelete: Cascade)
   unitId      String?     // Reference to original Unit (null for Arena where units are temporary)
   unit        Unit?       @relation(fields: [unitId], references: [id])
-  ownerId     String?     // MatchPlayer ID (for matches)
-  owner       MatchPlayer? @relation(fields: [ownerId], references: [id])
+  ownerId     String?     // MatchKingdom ID (for matches)
+  owner       MatchKingdom? @relation(fields: [ownerId], references: [id])
   // Data copied from Unit for battle
   userId      String?     // Owner User ID (for Arena)
   kingdomId   String?     // Owner Kingdom ID
