@@ -90,7 +90,7 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
       <div
         className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${
           isDead
-            ? "bg-gray-800/40 opacity-70"
+            ? "bg-surface-800/40 opacity-70"
             : isEnemy
             ? "bg-red-900/20 hover:bg-red-900/30"
             : "bg-blue-900/20 hover:bg-blue-900/30"
@@ -106,17 +106,17 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
           <div className="flex items-center gap-2">
             <span
               className={`font-medium truncate ${
-                isDead ? "text-gray-500 line-through" : "text-parchment-light"
+                isDead ? "text-surface-300 line-through" : "text-astral-chrome"
               }`}
             >
               {unit.name}
             </span>
-            <span className="text-xs text-parchment-dark">Lv.{unit.level}</span>
+            <span className="text-xs text-surface-200">Lv.{unit.level}</span>
           </div>
 
           {/* HP Bar compacta */}
           <div className="flex items-center gap-2 mt-1">
-            <div className="flex-1 h-1.5 bg-citadel-obsidian rounded-full overflow-hidden">
+            <div className="flex-1 h-1.5 bg-cosmos-void rounded-full overflow-hidden">
               <div
                 className="h-full transition-all"
                 style={{
@@ -131,18 +131,19 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
                 }}
               />
             </div>
-            <span className="text-xs text-parchment-dark whitespace-nowrap">
+            <span className="text-xs text-surface-200 whitespace-nowrap">
               {unit.currentHp}/{unit.maxHp}
             </span>
           </div>
         </div>
 
         {/* Stats compactos */}
-        <div className="hidden sm:flex items-center gap-3 text-xs text-parchment-dark">
+        <div className="hidden sm:flex items-center gap-3 text-xs text-surface-200">
           <span title="Combate">⚔️{unit.combat}</span>
           <span title="Velocidade">💨{unit.speed}</span>
           <span title="Foco">🎯{unit.focus}</span>
-          <span title="Armadura">🛡️{unit.armor}</span>
+          <span title="Resistência">🛡️{unit.resistance}</span>
+          <span title="Vontade">🧠{unit.will}</span>
         </div>
       </div>
     );
@@ -167,9 +168,7 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
 
     if (sortedUnits.length === 0) {
       return (
-        <div className="text-center text-parchment-dark py-8">
-          Nenhuma unidade
-        </div>
+        <div className="text-center text-surface-200 py-8">Nenhuma unidade</div>
       );
     }
 
@@ -200,7 +199,7 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
     >
       <div className="flex items-center gap-2 mb-3">
         <span className="text-lg">{isEnemy ? "⚔️" : "👑"}</span>
-        <span className="font-semibold text-parchment-light truncate">
+        <span className="font-semibold text-astral-chrome truncate">
           {label}
         </span>
       </div>
@@ -208,25 +207,25 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
       <div className="grid grid-cols-3 gap-2 text-center mb-3">
         <div>
           <div className="text-2xl font-bold text-green-400">{alive}</div>
-          <div className="text-xs text-parchment-dark">Vivos</div>
+          <div className="text-xs text-surface-200">Vivos</div>
         </div>
         <div>
           <div className="text-2xl font-bold text-red-400">{dead}</div>
-          <div className="text-xs text-parchment-dark">Mortos</div>
+          <div className="text-xs text-surface-200">Mortos</div>
         </div>
         <div>
-          <div className="text-2xl font-bold text-parchment-aged">{total}</div>
-          <div className="text-xs text-parchment-dark">Total</div>
+          <div className="text-2xl font-bold text-astral-silver">{total}</div>
+          <div className="text-xs text-surface-200">Total</div>
         </div>
       </div>
 
       {/* HP Total Bar */}
       <div>
-        <div className="flex justify-between text-xs text-parchment-dark mb-1">
+        <div className="flex justify-between text-xs text-surface-200 mb-1">
           <span>HP Total</span>
           <span>{Math.round(hpPercent)}%</span>
         </div>
-        <div className="h-2 bg-citadel-obsidian rounded-full overflow-hidden">
+        <div className="h-2 bg-cosmos-void rounded-full overflow-hidden">
           <div
             className="h-full transition-all"
             style={{
@@ -246,7 +245,7 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md animate-fadeIn">
-      <div className="bg-gradient-to-b from-citadel-granite to-citadel-carved border border-metal-iron/50 rounded-2xl shadow-2xl w-full max-w-xl mx-4 overflow-hidden animate-slideUp">
+      <div className="bg-gradient-to-b from-surface-800 to-surface-900 border border-surface-500/50 rounded-2xl shadow-2xl w-full max-w-xl mx-4 overflow-hidden animate-slideUp">
         {/* Header - Resultado */}
         <div
           className={`relative p-6 text-center overflow-hidden ${
@@ -278,22 +277,22 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
                   ? "text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-yellow-400 to-yellow-300"
                   : "text-red-400"
               }`}
-              style={{ fontFamily: "'Cinzel Decorative', cursive" }}
+              style={{ fontFamily: "'Rajdhani', sans-serif" }}
             >
               {isWinner ? "VITÓRIA" : "DERROTA"}
             </h1>
-            <p className="text-parchment-aged mt-2 text-sm">{result.reason}</p>
+            <p className="text-astral-silver mt-2 text-sm">{result.reason}</p>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-metal-iron/30">
+        <div className="flex border-b border-surface-500/30">
           <button
             onClick={() => setActiveTab("summary")}
             className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
               activeTab === "summary"
-                ? "text-parchment-light border-b-2 border-yellow-500 bg-citadel-slate/30"
-                : "text-parchment-dark hover:text-parchment-aged hover:bg-citadel-slate/20"
+                ? "text-astral-chrome border-b-2 border-stellar-amber bg-surface-800/30"
+                : "text-surface-200 hover:text-astral-silver hover:bg-surface-800/20"
             }`}
           >
             📊 Resumo
@@ -302,8 +301,8 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
             onClick={() => setActiveTab("myUnits")}
             className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
               activeTab === "myUnits"
-                ? "text-parchment-light border-b-2 border-blue-500 bg-citadel-slate/30"
-                : "text-parchment-dark hover:text-parchment-aged hover:bg-citadel-slate/20"
+                ? "text-astral-chrome border-b-2 border-blue-500 bg-surface-800/30"
+                : "text-surface-200 hover:text-astral-silver hover:bg-surface-800/20"
             }`}
           >
             👑 Minhas ({stats.myTotal})
@@ -312,8 +311,8 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
             onClick={() => setActiveTab("enemyUnits")}
             className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
               activeTab === "enemyUnits"
-                ? "text-parchment-light border-b-2 border-red-500 bg-citadel-slate/30"
-                : "text-parchment-dark hover:text-parchment-aged hover:bg-citadel-slate/20"
+                ? "text-astral-chrome border-b-2 border-red-500 bg-surface-800/30"
+                : "text-surface-200 hover:text-astral-silver hover:bg-surface-800/20"
             }`}
           >
             ⚔️ Inimigos ({stats.enemyTotal})
@@ -346,10 +345,10 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
           {activeTab === "myUnits" && (
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-parchment-light font-semibold">
+                <h3 className="text-astral-chrome font-semibold">
                   {myKingdomName}
                 </h3>
-                <span className="text-xs text-parchment-dark">
+                <span className="text-xs text-surface-200">
                   {stats.myAlive} vivos / {stats.myDead} mortos
                 </span>
               </div>
@@ -360,10 +359,10 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
           {activeTab === "enemyUnits" && (
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-parchment-light font-semibold">
+                <h3 className="text-astral-chrome font-semibold">
                   {opponentKingdomName}
                 </h3>
-                <span className="text-xs text-parchment-dark">
+                <span className="text-xs text-surface-200">
                   {stats.enemyAlive} vivos / {stats.enemyDead} mortos
                 </span>
               </div>
@@ -373,7 +372,7 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
         </div>
 
         {/* Footer - Ações */}
-        <div className="p-4 bg-citadel-slate/30 border-t border-metal-iron/30">
+        <div className="p-4 bg-surface-800/30 border-t border-surface-500/30">
           {/* Status de Revanche (apenas para jogadores humanos) */}
           {!vsBot && opponentWantsRematch && !rematchPending && (
             <div className="mb-3 p-2.5 bg-yellow-900/30 border border-yellow-600/50 rounded-lg text-center">
@@ -400,7 +399,7 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
                   rematchPending
                     ? "bg-gray-700 text-gray-500 cursor-not-allowed"
                     : opponentWantsRematch
-                    ? "bg-gradient-to-r from-yellow-500 to-amber-600 text-citadel-obsidian hover:from-yellow-400 hover:to-amber-500 shadow-lg shadow-yellow-500/20"
+                    ? "bg-gradient-to-r from-yellow-500 to-amber-600 text-cosmos-void hover:from-yellow-400 hover:to-amber-500 shadow-lg shadow-yellow-500/20"
                     : "bg-gradient-to-r from-green-600 to-emerald-700 text-white hover:from-green-500 hover:to-emerald-600 shadow-lg shadow-green-500/20"
                 }`}
               >
@@ -415,7 +414,7 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
               onClick={onLeave}
               className={`${
                 vsBot ? "w-full" : "flex-1"
-              } py-2.5 bg-gradient-to-r from-gray-700 to-gray-800 border border-gray-600 rounded-xl text-parchment-aged font-semibold text-sm hover:from-gray-600 hover:to-gray-700 transition-all`}
+              } py-2.5 bg-gradient-to-r from-surface-700 to-surface-800 border border-surface-600 rounded-xl text-astral-silver font-semibold text-sm hover:from-surface-600 hover:to-surface-700 transition-all`}
             >
               🚪 Sair
             </button>

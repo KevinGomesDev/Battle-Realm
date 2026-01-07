@@ -4,7 +4,6 @@ export * from "./kingdom.schemas";
 // ============ VALIDATION HELPERS ============
 
 import { ZodError, ZodSchema } from "zod";
-import { Socket } from "socket.io";
 
 export interface ValidationResult<T> {
   success: boolean;
@@ -33,27 +32,4 @@ export function validate<T>(
     }
     return { success: false, error: "Erro de validação desconhecido" };
   }
-}
-
-/**
- * Valida e emite erro se inválido
- * Retorna os dados validados ou null se inválido
- */
-export function validateOrEmitError<T>(
-  socket: Socket,
-  schema: ZodSchema<T>,
-  data: unknown,
-  errorEvent: string = "kingdom:error"
-): T | null {
-  const result = validate(schema, data);
-
-  if (!result.success) {
-    socket.emit(errorEvent, {
-      message: result.error,
-      code: "VALIDATION_ERROR",
-    });
-    return null;
-  }
-
-  return result.data!;
 }

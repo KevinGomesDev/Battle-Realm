@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { socketService } from "../../services/socket.service";
+import { colyseusService } from "../../services/colyseus.service";
 import type {
   RankingData,
   RankingTab,
@@ -20,15 +20,15 @@ export const Ranking: React.FC = () => {
       setLoading(false);
     };
 
-    socketService.on("ranking:data", handleRankingData);
-    socketService.on("ranking:error", handleRankingError);
+    colyseusService.on("ranking:data", handleRankingData);
+    colyseusService.on("ranking:error", handleRankingError);
 
     // Buscar ranking
-    socketService.emit("ranking:get", {});
+    colyseusService.sendToGlobal("ranking:get", {});
 
     return () => {
-      socketService.off("ranking:data", handleRankingData);
-      socketService.off("ranking:error", handleRankingError);
+      colyseusService.off("ranking:data", handleRankingData);
+      colyseusService.off("ranking:error", handleRankingError);
     };
   }, []);
 
@@ -54,7 +54,7 @@ export const Ranking: React.FC = () => {
       case 3:
         return "bg-orange-600/10 border-orange-500/30";
       default:
-        return "bg-citadel-slate/20 border-metal-iron/20";
+        return "bg-surface-800/30 border-surface-500/20";
     }
   };
 
@@ -64,13 +64,13 @@ export const Ranking: React.FC = () => {
   return (
     <div className="space-y-2">
       {/* Tabs compactas */}
-      <div className="flex gap-1 p-0.5 bg-citadel-obsidian/50 rounded">
+      <div className="flex gap-1 p-0.5 bg-surface-900/50 rounded">
         <button
           onClick={() => setActiveTab("arena")}
           className={`flex-1 py-1 px-2 text-[10px] font-semibold rounded transition-colors ${
             activeTab === "arena"
-              ? "bg-purple-600/30 text-purple-300"
-              : "text-parchment-dark hover:text-parchment-light"
+              ? "bg-mystic-blue/30 text-mystic-glow"
+              : "text-astral-steel hover:text-astral-chrome"
           }`}
         >
           🏟️ Arena
@@ -79,8 +79,8 @@ export const Ranking: React.FC = () => {
           onClick={() => setActiveTab("match")}
           className={`flex-1 py-1 px-2 text-[10px] font-semibold rounded transition-colors ${
             activeTab === "match"
-              ? "bg-war-crimson/30 text-war-ember"
-              : "text-parchment-dark hover:text-parchment-light"
+              ? "bg-red-500/30 text-red-400"
+              : "text-astral-steel hover:text-astral-chrome"
           }`}
         >
           ⚔️ Partidas
@@ -90,10 +90,10 @@ export const Ranking: React.FC = () => {
       {/* Conteúdo */}
       {loading ? (
         <div className="flex items-center justify-center py-6">
-          <div className="animate-spin w-5 h-5 border-2 border-yellow-500 border-t-transparent rounded-full" />
+          <div className="animate-spin w-5 h-5 border-2 border-stellar-amber border-t-transparent rounded-full" />
         </div>
       ) : !currentRanking || currentRanking.length === 0 ? (
-        <div className="text-center py-6 text-parchment-dark text-xs">
+        <div className="text-center py-6 text-astral-steel text-xs">
           <p className="text-xl mb-1">📜</p>
           <p>Nenhuma vitória registrada.</p>
         </div>
@@ -111,7 +111,7 @@ export const Ranking: React.FC = () => {
                 {entry.rank <= 3 ? (
                   <span className="text-sm">{getRankIcon(entry.rank)}</span>
                 ) : (
-                  <span className="text-parchment-dark text-[10px] font-bold">
+                  <span className="text-astral-steel text-[10px] font-bold">
                     {getRankIcon(entry.rank)}
                   </span>
                 )}
@@ -126,14 +126,14 @@ export const Ranking: React.FC = () => {
                     ? "text-gray-300"
                     : entry.rank === 3
                     ? "text-orange-400"
-                    : "text-parchment-light"
+                    : "text-astral-chrome"
                 }`}
               >
                 {entry.username}
               </span>
 
               {/* Victories */}
-              <span className="text-parchment-aged font-bold">
+              <span className="text-astral-silver font-bold">
                 ⚔️ {entry.victories}
               </span>
             </div>

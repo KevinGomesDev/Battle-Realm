@@ -39,7 +39,8 @@ export interface BaseAttributes {
   combat: number;
   speed: number;
   focus: number;
-  armor: number;
+  resistance: number;
+  will: number;
   vitality: number;
 }
 
@@ -98,7 +99,8 @@ export interface TroopTemplate {
   combat: number;
   speed: number;
   focus: number;
-  armor: number;
+  resistance: number;
+  will: number;
   vitality: number;
 }
 
@@ -112,7 +114,8 @@ export interface CreateTroopTemplateData {
   combat: number;
   speed: number;
   focus: number;
-  armor: number;
+  resistance: number;
+  will: number;
   vitality: number;
 }
 
@@ -140,9 +143,13 @@ export interface Unit {
   combat: number;
   speed: number;
   focus: number;
-  armor: number;
+  resistance: number;
+  will: number;
   vitality: number;
+  maxHp: number;
   currentHp: number;
+  maxMana: number;
+  currentMana: number;
   movesLeft: number;
   actionsLeft: number;
 }
@@ -157,7 +164,8 @@ export interface RegentData {
   combat: number;
   speed: number;
   focus: number;
-  armor: number;
+  resistance: number;
+  will: number;
   vitality: number;
   skills?: string[]; // Skills aprendidas
 }

@@ -2,3 +2,4 @@
 // Barrel export para providers
 
 export { AppProvider } from "./AppProvider";
+export { ColyseusAppProvider } from "./ColyseusAppProvider";

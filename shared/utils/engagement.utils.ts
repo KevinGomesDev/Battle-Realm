@@ -164,11 +164,12 @@ export function calculateEngagementCost(
     );
 
     if (!willStillBeAdjacent) {
-      // Saindo de perto deste inimigo - verificar diferença de speed
-      const speedDiff = enemy.speed - unit.speed;
-      if (speedDiff > 0) {
-        // Inimigo é mais rápido, adiciona custo
-        extraCost += speedDiff;
+      // Saindo de perto deste inimigo - verificar diferença de resistance vs speed
+      // Inimigo com maior resistance bloqueia unidades mais lentas
+      const resistanceDiff = enemy.resistance - unit.speed;
+      if (resistanceDiff > 0) {
+        // Inimigo tem mais resistance que nossa speed, adiciona custo
+        extraCost += resistanceDiff;
       }
     }
   }

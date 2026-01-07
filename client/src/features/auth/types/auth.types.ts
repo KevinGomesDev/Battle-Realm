@@ -16,6 +16,7 @@ import type { User } from "../../../../../shared/types/auth.types";
 export interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
+  isServerValidated: boolean; // true quando servidor confirmar autenticação
   isLoading: boolean;
   error: string | null;
 }

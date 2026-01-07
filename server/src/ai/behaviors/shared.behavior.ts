@@ -115,14 +115,18 @@ export function tryOffensiveSkill(
 
   const skillEval = selectBestSkill(unit, availableSkills, units, profile);
 
-  if (skillEval && skillEval.canUse && skillEval.skill.targetType === "ENEMY") {
-    return {
-      type: "SKILL",
-      unitId: unit.id,
-      skillCode: skillEval.skill.code,
-      targetId: skillEval.bestTarget!.id,
-      reason: `${behaviorName}: ${skillEval.reason}`,
-    };
+  if (skillEval && skillEval.canUse && skillEval.bestTarget) {
+    // Verificar se o alvo é inimigo (para skills ofensivas)
+    const isEnemy = skillEval.bestTarget.ownerId !== unit.ownerId;
+    if (isEnemy) {
+      return {
+        type: "SKILL",
+        unitId: unit.id,
+        skillCode: skillEval.skill.code,
+        targetId: skillEval.bestTarget.id,
+        reason: `${behaviorName}: ${skillEval.reason}`,
+      };
+    }
   }
 
   return null;
@@ -176,9 +180,9 @@ export function tryOffensiveSpell(
     return null;
   }
 
-  // Filtrar apenas spells ofensivas (ENEMY ou POSITION com efeito de dano)
+  // Filtrar apenas spells ofensivas
   const offensiveSpells = availableSpells.filter(
-    (s) => s.targetType === "ENEMY" || s.targetType === "POSITION"
+    (s) => s.effectType === "OFFENSIVE"
   );
 
   if (offensiveSpells.length === 0) {
@@ -222,9 +226,9 @@ export function trySupportSpell(
     return null;
   }
 
-  // Filtrar apenas spells de suporte (SELF ou ALLY)
+  // Filtrar apenas spells de suporte (cura e buffs)
   const supportSpells = availableSpells.filter(
-    (s) => s.targetType === "SELF" || s.targetType === "ALLY"
+    (s) => s.effectType === "HEALING" || s.effectType === "BUFF"
   );
 
   if (supportSpells.length === 0) {
@@ -347,7 +351,7 @@ export function tryBasicAttack(
       type: "ATTACK",
       unitId: unit.id,
       targetId: bestTarget.id,
-      reason: `${behaviorName}: Atacar ${bestTarget.name} (Combat: ${unit.combat} vs Armor: ${bestTarget.armor})`,
+      reason: `${behaviorName}: Atacar ${bestTarget.name} (Combat: ${unit.combat} vs Resistance: ${bestTarget.resistance})`,
     };
   }
 

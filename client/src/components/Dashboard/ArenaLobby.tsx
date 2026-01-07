@@ -1,5 +1,6 @@
 import React from "react";
 import { useArena } from "../../features/arena";
+import { Button } from "../Button";
 
 interface ArenaLobbyProps {
   onBattleStart?: () => void;
@@ -49,14 +50,14 @@ export const ArenaLobby: React.FC<ArenaLobbyProps> = ({
               ? "bg-yellow-900/50 text-yellow-400 border border-yellow-600/50"
               : currentLobby.status === "READY"
               ? "bg-green-900/50 text-green-400 border border-green-600/50"
-              : "bg-purple-900/50 text-purple-400 border border-purple-600/50"
+              : "bg-mystic-deep/50 text-mystic-glow border border-mystic-blue/50"
           }`}
         >
           {currentLobby.status === "WAITING" && "⏳ Aguardando"}
           {currentLobby.status === "READY" && "✅ Pronto"}
           {currentLobby.status === "BATTLING" && "⚔️ Batalha"}
         </span>
-        <span className="text-[10px] text-parchment-dark">
+        <span className="text-[10px] text-astral-steel">
           {currentLobby.players.length}/{currentLobby.maxPlayers}
         </span>
       </div>
@@ -68,19 +69,19 @@ export const ArenaLobby: React.FC<ArenaLobbyProps> = ({
           <div
             className={`p-2 rounded border ${
               isHost
-                ? "border-purple-500/50 bg-purple-900/10"
-                : "border-metal-iron/30 bg-citadel-slate/20"
+                ? "border-mystic-sky/50 bg-mystic-deep/10"
+                : "border-surface-500/30 bg-surface-800/20"
             }`}
           >
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-gradient-to-b from-metal-bronze to-metal-copper rounded flex items-center justify-center text-xs">
+              <div className="w-6 h-6 bg-gradient-to-b from-stellar-amber to-stellar-dark rounded flex items-center justify-center text-xs">
                 👑
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-parchment-light truncate">
+                <p className="text-xs font-semibold text-astral-chrome truncate">
                   {hostPlayer.username}
                 </p>
-                <p className="text-[10px] text-parchment-dark truncate">
+                <p className="text-[10px] text-astral-steel truncate">
                   🏰 {hostPlayer.kingdomName}
                 </p>
               </div>
@@ -94,19 +95,19 @@ export const ArenaLobby: React.FC<ArenaLobbyProps> = ({
             key={player.userId}
             className={`p-2 rounded border ${
               !isHost && player.userId === currentLobby.hostUserId
-                ? "border-purple-500/50 bg-purple-900/10"
-                : "border-metal-iron/30 bg-citadel-slate/20"
+                ? "border-mystic-sky/50 bg-mystic-deep/10"
+                : "border-surface-500/30 bg-surface-800/20"
             }`}
           >
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-gradient-to-b from-war-crimson to-war-blood rounded flex items-center justify-center text-xs">
+              <div className="w-6 h-6 bg-gradient-to-b from-red-500 to-red-800 rounded flex items-center justify-center text-xs">
                 ⚔️
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-parchment-light truncate">
+                <p className="text-xs font-semibold text-astral-chrome truncate">
                   {player.username}
                 </p>
-                <p className="text-[10px] text-parchment-dark truncate">
+                <p className="text-[10px] text-astral-steel truncate">
                   🏰 {player.kingdomName}
                 </p>
               </div>
@@ -116,9 +117,9 @@ export const ArenaLobby: React.FC<ArenaLobbyProps> = ({
 
         {/* Slots vazios */}
         {waitingSlots > 0 && (
-          <div className="p-2 rounded border border-dashed border-metal-iron/30">
+          <div className="p-2 rounded border border-dashed border-surface-500/30">
             <div className="flex items-center justify-center py-2">
-              <p className="text-parchment-dark text-xs flex items-center gap-1">
+              <p className="text-astral-steel text-xs flex items-center gap-1">
                 <span className="animate-pulse">⏳</span> Aguardando{" "}
                 {waitingSlots} oponente{waitingSlots > 1 ? "s" : ""}...
               </p>
@@ -129,29 +130,27 @@ export const ArenaLobby: React.FC<ArenaLobbyProps> = ({
 
       {/* Ações */}
       <div className="flex gap-2">
-        <button
+        <Button
+          variant="secondary"
+          size="xs"
           onClick={handleLeave}
-          className="flex-1 px-2 py-1.5 text-[10px] font-semibold
-                     bg-gradient-to-b from-citadel-granite to-citadel-carved
-                     border border-metal-iron/50 rounded
-                     hover:from-citadel-weathered hover:to-citadel-granite
-                     text-parchment-aged transition-all"
+          className="flex-1"
+          icon="🚪"
         >
-          🚪 Sair
-        </button>
+          Sair
+        </Button>
 
         {isHost && (
-          <button
+          <Button
+            variant="mystic"
+            size="xs"
             onClick={handleStart}
             disabled={!canStart}
-            className={`flex-1 px-2 py-1.5 text-[10px] font-semibold rounded border transition-all ${
-              canStart
-                ? "bg-gradient-to-b from-purple-600 to-purple-800 border-purple-500/50 text-parchment-light hover:from-purple-500 hover:to-purple-700"
-                : "bg-gradient-to-b from-citadel-slate to-citadel-granite border-metal-iron/50 text-parchment-dark cursor-not-allowed"
-            }`}
+            className="flex-1"
+            icon={canStart ? "⚔️" : "⏳"}
           >
-            {canStart ? "⚔️ Iniciar" : "⏳ Aguardar"}
-          </button>
+            {canStart ? "Iniciar" : "Aguardar"}
+          </Button>
         )}
       </div>
     </div>

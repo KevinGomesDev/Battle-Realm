@@ -1,4 +1,7 @@
-import React, {
+// client/src/core/context/SessionContext.tsx
+// Contexto de gerenciamento de sessão usando Colyseus
+
+import {
   createContext,
   useReducer,
   useCallback,
@@ -11,7 +14,7 @@ import type {
   ActiveSessionFrontend,
   SessionType,
 } from "../../../../shared/types/session.types";
-import { socketService } from "../../services/socket.service";
+import { colyseusService } from "../../services/colyseus.service";
 
 // ============================================
 // Types
@@ -101,6 +104,38 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Escutar eventos de sessão do Colyseus
+  useEffect(() => {
+    const handleSessionActive = (data: {
+      type: string;
+      matchId?: string;
+      battleId?: string;
+      lobbyId?: string;
+    }) => {
+      dispatch({
+        type: "SET_ACTIVE_SESSION",
+        payload: {
+          type: normalizeSessionType(data.type),
+          matchId: data.matchId,
+          battleId: data.battleId,
+          lobbyId: data.lobbyId,
+        },
+      });
+    };
+
+    const handleSessionNone = () => {
+      dispatch({ type: "SET_ACTIVE_SESSION", payload: null });
+    };
+
+    colyseusService.on("session:active", handleSessionActive);
+    colyseusService.on("session:none", handleSessionNone);
+
+    return () => {
+      colyseusService.off("session:active", handleSessionActive);
+      colyseusService.off("session:none", handleSessionNone);
+    };
+  }, []);
+
   /**
    * Verifica se há uma sessão ativa (partida/arena)
    */
@@ -115,19 +150,30 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "SET_CHECKING", payload: true });
 
     try {
-      const result = await socketService.waitForMultipleResponses<{
+      // Enviar mensagem para verificar sessão via GlobalRoom
+      colyseusService.sendToGlobal("session:check", { userId });
+
+      // Esperar resposta (com timeout)
+      const result = await new Promise<{
         hasSession: boolean;
         session: ActiveSessionFrontend | null;
-      }>(
-        "session:check",
-        { userId },
-        {
-          "session:active": (data: {
-            type: string;
-            matchId?: string;
-            battleId?: string;
-            lobbyId?: string;
-          }) => ({
+      }>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          colyseusService.off("session:active", handleActive);
+          colyseusService.off("session:none", handleNone);
+          reject(new Error("Timeout ao verificar sessão"));
+        }, 5000);
+
+        const handleActive = (data: {
+          type: string;
+          matchId?: string;
+          battleId?: string;
+          lobbyId?: string;
+        }) => {
+          clearTimeout(timeout);
+          colyseusService.off("session:active", handleActive);
+          colyseusService.off("session:none", handleNone);
+          resolve({
             hasSession: true,
             session: {
               type: normalizeSessionType(data.type),
@@ -135,14 +181,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
               battleId: data.battleId,
               lobbyId: data.lobbyId,
             },
-          }),
-          "session:none": () => ({
-            hasSession: false,
-            session: null,
-          }),
-        },
-        5000
-      );
+          });
+        };
+
+        const handleNone = () => {
+          clearTimeout(timeout);
+          colyseusService.off("session:active", handleActive);
+          colyseusService.off("session:none", handleNone);
+          resolve({ hasSession: false, session: null });
+        };
+
+        colyseusService.on("session:active", handleActive);
+        colyseusService.on("session:none", handleNone);
+      });
 
       // Verificar se a operação foi abortada
       if (signal.aborted) return;
@@ -167,23 +218,28 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       if (!userId) return false;
 
       try {
-        const result = await socketService.waitForResponse<{
-          canJoin: boolean;
-          reason?: string;
-        }>(
-          "session:can_join",
-          { userId },
-          "session:can_join_result",
-          "error",
-          5000
-        );
+        // Com Colyseus, verificamos baseado no estado atual das rooms
+        const isInArena = colyseusService.isInArena();
+        const isInMatch = colyseusService.isInMatch();
+
+        if (isInArena || isInMatch) {
+          dispatch({
+            type: "SET_CAN_JOIN",
+            payload: {
+              canJoin: false,
+              reason: isInArena
+                ? "Já está em uma arena"
+                : "Já está em uma partida",
+            },
+          });
+          return false;
+        }
 
         dispatch({
           type: "SET_CAN_JOIN",
-          payload: { canJoin: result.canJoin, reason: result.reason || null },
+          payload: { canJoin: true, reason: null },
         });
-
-        return result.canJoin;
+        return true;
       } catch (error) {
         console.error("[Session] Erro ao verificar permissão:", error);
         dispatch({

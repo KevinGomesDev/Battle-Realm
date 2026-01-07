@@ -8,7 +8,8 @@
 - Backend calcula, frontend exibe
 - Reutilizar tipos existentes (NUNCA duplicar)
 - Deletar código não usado (não comentar)
-- Socket events: `{domain}:{action}` pattern
+- Colyseus rooms: padrão `{domain}Room` (ex: ArenaRoom, MatchRoom)
+- Mensagens Colyseus: `{domain}:{action}` pattern
 
 ### ❌ NÃO FAZER
 
@@ -19,7 +20,74 @@
 - Manter arquivos/imports não usados
 - Não crie Docs
 - Antes de finalizar a tarefa, confira se não existem erros. Se existirem, corrija-os.
-- NUNCA faça sub-componentes dentro do mesmo arquivo. Sempre separe em arquivos diferentes. Se ver algum componente grande, que pode ser dividido, divida-o em vários componentes menores, cada um em seu próprio arquivo.
+- NUNCA faça sub-componentes dentro do mesmo arquivo. Sempre separe em arquivos diferentes.
+- NUNCA use Socket.IO - usar Colyseus
+
+---
+
+## 🛠️ Stack de Bibliotecas
+
+| Área                     | Biblioteca           | Prioridade |
+| ------------------------ | -------------------- | ---------- |
+| **Multiplayer/Realtime** | Colyseus             | ⭐ Top     |
+| **Animação**             | Framer Motion        | Alta       |
+| **Input (Teclado)**      | React-Hotkeys-Hook   | Alta       |
+| **Lógica de Grid/Path**  | Pathfinding.js       | Alta       |
+| **Estado Local**         | Zustand              | Alta       |
+| **Som**                  | Howler.js            | Média      |
+| **Mapas/Grid/Canvas**    | React-Konva (Canvas) | Alta       |
+
+### Colyseus - Padrões de Uso
+
+**Server (Rooms):**
+
+```typescript
+// server/src/colyseus/rooms/MinhaRoom.ts
+import { Room, Client } from "@colyseus/core";
+import { MinhaState } from "../schemas/minha.schema";
+
+export class MinhaRoom extends Room<MinhaState> {
+  onCreate(options: any) {
+    this.setState(new MinhaState());
+
+    // Registrar handlers de mensagens
+    this.onMessage("action:fazer_algo", (client, data) => {
+      // Lógica aqui
+    });
+  }
+}
+```
+
+**Client (Service):**
+
+```typescript
+// Usar colyseusService singleton
+import { colyseusService } from "../services/colyseus.service";
+
+// Conectar
+await colyseusService.connect();
+
+// Criar/entrar em room
+const room = await colyseusService.createArenaLobby({ kingdomId });
+
+// Enviar mensagem
+colyseusService.sendToArena("action:fazer_algo", { data });
+
+// Escutar eventos
+colyseusService.on("arena:state_changed", (state) => {});
+```
+
+**Client (Hooks/Context):**
+
+```typescript
+// Usar hooks do core
+import { useArena, useMatch, useColyseus } from "../core";
+
+function MeuComponente() {
+  const { state, createLobby, moveUnit } = useArena();
+  // ...
+}
+```
 
 ---
 
@@ -32,13 +100,21 @@ shared/
   config/             # Configurações globais
 
 server/src/
-  handlers/           # Socket event handlers
+  colyseus/
+    rooms/            # Colyseus Rooms (ArenaRoom, MatchRoom, GlobalRoom)
+    schemas/          # Colyseus Schemas (estado sincronizado)
+    index.ts          # Barrel exports
   logic/              # Lógica pura (combat, conditions, round-control)
   services/           # Business logic com I/O
   spells/             # Sistema de magias (executors, utils)
   utils/              # Utilities e factories
 
 client/src/
+  services/
+    colyseus.service.ts  # Serviço singleton de conexão
+  core/
+    context/          # ColyseusContext (conexão global)
+    hooks/            # useColyseus, useArena, useMatch
   features/{feature}/ # Componentes, context, hooks por feature
 ```
 
@@ -46,19 +122,20 @@ client/src/
 
 ## 🔧 Quick Reference
 
-| Tarefa             | Arquivo                                   |
-| ------------------ | ----------------------------------------- |
-| Tipo compartilhado | `shared/types/{tipo}.types.ts`            |
-| Skill/Classe       | `shared/data/skills.data.ts`              |
-| Spell/Magia        | `shared/data/spells.data.ts`              |
-| Condição           | `server/src/logic/skill-conditions.ts`    |
-| Raça               | `shared/data/races.ts`                    |
-| Executor de skill  | `server/src/logic/skill-executors.ts`     |
-| Executor de spell  | `server/src/spells/executors.ts`          |
-| Utilitários spell  | `server/src/spells/utils.ts`              |
-| Turnos/Rodadas     | `server/src/logic/round-control.ts`       |
-| Socket handler     | `server/src/handlers/{domain}.handler.ts` |
-| Feature client     | `client/src/features/{feature}/`          |
+| Tarefa              | Arquivo                                          |
+| ------------------- | ------------------------------------------------ |
+| Tipo compartilhado  | `shared/types/{tipo}.types.ts`                   |
+| Skill/Classe        | `shared/data/skills.data.ts`                     |
+| Spell/Magia         | `shared/data/spells.data.ts`                     |
+| Condição            | `server/src/logic/skill-conditions.ts`           |
+| Raça                | `shared/data/races.ts`                           |
+| Executor de skill   | `server/src/logic/skill-executors.ts`            |
+| Executor de spell   | `server/src/spells/executors.ts`                 |
+| Utilitários spell   | `server/src/spells/utils.ts`                     |
+| Turnos/Rodadas      | `server/src/logic/round-control.ts`              |
+| **Colyseus Room**   | `server/src/colyseus/rooms/{Domain}Room.ts`      |
+| **Colyseus Schema** | `server/src/colyseus/schemas/{domain}.schema.ts` |
+| Feature client      | `client/src/features/{feature}/`                 |
 
 ---
 
@@ -73,8 +150,8 @@ export const MINHA_SKILL: SkillDefinition = {
   description: "Descrição do que a skill faz",
   category: "ACTIVE", // ou "PASSIVE"
   costTier: "MEDIUM", // LOW, MEDIUM, HIGH
-  range: "ADJACENT", // SELF, ADJACENT, RANGED, AREA
-  targetType: "ENEMY", // SELF, ALLY, ENEMY, ALL
+  range: "ADJACENT", // SELF, MELEE, RANGED, AREA
+  targetType: "UNIT", // SELF, UNIT, ALL, POSITION, GROUND
   functionName: "executeMinhaSkill", // Se ACTIVE
   conditionApplied: "MINHA_CONDICAO", // Se PASSIVE
   consumesAction: true,
@@ -215,13 +292,14 @@ export const CONDITIONS_INFO: Record<string, ConditionInfo> = {
 
 ## 🎮 Sistema de Atributos
 
-| Atributo | Uso                                |
-| -------- | ---------------------------------- |
-| Combat   | Dano de ataque físico (direto)     |
-| Speed    | Movimento + Esquiva (3% por ponto) |
-| Focus    | Dano mágico + Proteção mágica (2x) |
-| Armor    | Proteção física (2x)               |
-| Vitality | HP máximo (1x)                     |
+| Atributo   | Uso                                                  |
+| ---------- | ---------------------------------------------------- |
+| Combat     | Dano de ataque físico (direto)                       |
+| Speed      | Movimento + Esquiva (3% por ponto)                   |
+| Focus      | Poder mágico e visão                                 |
+| Resistance | Proteção física (2x) + Custo de Engajamento vs Speed |
+| Will       | Mana (2x) + Proteção mágica (2x)                     |
+| Vitality   | HP máximo (1x)                                       |
 
 **Arquivo:** `shared/config/global.config.ts`
 
@@ -249,8 +327,8 @@ export const CONDITIONS_INFO: Record<string, ConditionInfo> = {
 ```typescript
 BattleUnit {
   id, name, avatar, category, level, race,
-  combat, speed, focus, armor, vitality,
-  currentHp, maxHp,
+  combat, speed, focus, resistance, will, vitality,
+  currentHp, maxHp, currentMana, maxMana,
   physicalProtection, magicalProtection,
   conditions: string[], // IDs das condições ativas
   actions: string[],    // Ações disponíveis

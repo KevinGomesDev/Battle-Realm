@@ -56,7 +56,8 @@ export const ATTRIBUTE_TOOLTIPS: Record<string, string> = {
   combat: "Bônus de ataque corpo-a-corpo",
   speed: "Velocidade - determina chance de esquiva e ordem de turno",
   focus: "Bônus para habilidades mágicas",
-  armor: "Redução de dano recebido",
+  resistance: "Redução de dano físico recebido",
+  will: "Força mental e mana",
   vitality: "Pontos de vida máximos = Vitality × 2",
   protection: "Escudo temporário, absorve dano antes do HP",
   initiative: "Ordem de ação na batalha (maior = primeiro)",
@@ -82,7 +83,6 @@ export const UI_COLORS = {
 
   // Protection
   protection: PROTECTION_COLORS.physical.hex,
-  protectionBroken: PLAYER_COLORS.neutral.hex,
 
   // Grid
   gridDefault: "#1f2937",

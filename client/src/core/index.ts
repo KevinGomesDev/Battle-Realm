@@ -1,18 +1,13 @@
 // Core - Public API
+
+// Colyseus Connection
 export {
-  ConnectionProvider,
-  ConnectionContext,
-} from "./context/ConnectionContext";
-export {
-  useConnection,
-  useConnectionState,
-  useIsConnected,
-} from "./hooks/useConnection";
-export type {
-  ConnectionState,
-  ConnectionContextType,
-  ConnectionAction,
-} from "./types/connection.types";
+  ColyseusProvider,
+  useColyseusConnection,
+} from "./context/ColyseusContext";
+export { useColyseus } from "./hooks/useColyseus";
+// Note: useArena and useMatch hooks available via features/arena and features/match
+// Low-level Colyseus hooks are in core/hooks/ but not exported to avoid conflicts
 
 // Session Management
 export { SessionProvider, SessionContext } from "./context/SessionContext";

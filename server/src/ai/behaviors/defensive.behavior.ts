@@ -82,9 +82,7 @@ export function makeDefensiveDecision(
 
     // 3. Skills defensivas baseado no último tipo de dano
     const selfBuffSkills = availableSkills.filter(
-      (s) =>
-        (s.targetType === "SELF" || s.targetType === "ALLY") &&
-        s.conditionApplied
+      (s) => s.effectType === "BUFF"
     );
     if (selfBuffSkills.length > 0 && hpPercentage < 0.7) {
       if (selfAssessment) {
@@ -95,7 +93,7 @@ export function makeDefensiveDecision(
         ) {
           const physicalBuffs = selfBuffSkills.filter(
             (s) =>
-              s.code.toLowerCase().includes("armor") ||
+              s.code.toLowerCase().includes("resistance") ||
               s.code.toLowerCase().includes("physical") ||
               s.code.toLowerCase().includes("shield")
           );

@@ -74,8 +74,8 @@ export const BattleBubbles: React.FC<BattleBubblesProps> = ({
             max-w-md text-center
             ${
               bubble.isOwned
-                ? "bg-gradient-to-r from-metal-gold/90 to-metal-bronze/90 text-citadel-obsidian"
-                : "bg-gradient-to-r from-crimson-blood/90 to-crimson-deep/90 text-parchment-light"
+                ? "bg-gradient-to-r from-stellar-gold/90 to-stellar-amber/90 text-surface-900"
+                : "bg-gradient-to-r from-red-700/90 to-red-900/90 text-astral-chrome"
             }
           `}
         >

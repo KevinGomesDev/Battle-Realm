@@ -27,10 +27,15 @@ export const ATTRIBUTE_INFO: Record<AttributeKey, AttributeInfo> = {
     description: ATTRIBUTE_NAMES.focus.description,
     icon: ATTRIBUTE_NAMES.focus.icon,
   },
-  armor: {
-    name: ATTRIBUTE_NAMES.armor.name,
-    description: ATTRIBUTE_NAMES.armor.description,
-    icon: ATTRIBUTE_NAMES.armor.icon,
+  resistance: {
+    name: ATTRIBUTE_NAMES.resistance.name,
+    description: ATTRIBUTE_NAMES.resistance.description,
+    icon: ATTRIBUTE_NAMES.resistance.icon,
+  },
+  will: {
+    name: ATTRIBUTE_NAMES.will.name,
+    description: ATTRIBUTE_NAMES.will.description,
+    icon: ATTRIBUTE_NAMES.will.icon,
   },
   vitality: {
     name: ATTRIBUTE_NAMES.vitality.name,
@@ -74,7 +79,14 @@ export const AttributesPanel: React.FC<AttributesPanelProps> = ({
 
       <div className="space-y-2.5">
         {(
-          ["combat", "speed", "focus", "armor", "vitality"] as AttributeKey[]
+          [
+            "combat",
+            "speed",
+            "focus",
+            "resistance",
+            "will",
+            "vitality",
+          ] as AttributeKey[]
         ).map((key) => {
           const info = ATTRIBUTE_INFO[key];
           return (

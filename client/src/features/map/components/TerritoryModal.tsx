@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import type { Territory } from "../types/map.types";
-import { socketService } from "../../../services/socket.service";
+import { colyseusService } from "../../../services/colyseus.service";
 
 export interface TerritoryArea {
   index: number;
@@ -103,9 +103,9 @@ export const TerritoryModal: React.FC<TerritoryModalProps> = ({
       }
     };
 
-    socketService.on("structure:created", handleStructureCreated);
+    colyseusService.on("structure:created", handleStructureCreated);
     return () => {
-      socketService.off("structure:created", handleStructureCreated);
+      colyseusService.off("structure:created", handleStructureCreated);
     };
   }, [territory.id, onBuildSuccess]);
 
@@ -147,9 +147,9 @@ export const TerritoryModal: React.FC<TerritoryModalProps> = ({
     setError(null);
 
     const cleanup = () => {
-      socketService.off("preparation:build_success", successHandler);
-      socketService.off("preparation:build_failed", failHandler);
-      socketService.off("error", failHandler);
+      colyseusService.off("preparation:build_success", successHandler);
+      colyseusService.off("preparation:build_failed", failHandler);
+      colyseusService.off("error", failHandler);
     };
 
     const successHandler = () => {
@@ -163,11 +163,11 @@ export const TerritoryModal: React.FC<TerritoryModalProps> = ({
       cleanup();
     };
 
-    socketService.on("preparation:build_success", successHandler);
-    socketService.on("preparation:build_failed", failHandler);
-    socketService.on("error", failHandler);
+    colyseusService.on("preparation:build_success", successHandler);
+    colyseusService.on("preparation:build_failed", failHandler);
+    colyseusService.on("error", failHandler);
 
-    socketService.emit("preparation:build_structure", {
+    colyseusService.sendToMatch("preparation:build_structure", {
       matchId,
       playerId,
       territoryId: territory.id,
@@ -211,19 +211,19 @@ export const TerritoryModal: React.FC<TerritoryModalProps> = ({
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative bg-gradient-to-b from-citadel-granite to-citadel-carved border-4 border-metal-iron rounded-xl shadow-stone-raised max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden">
-        {/* Textura */}
-        <div className="absolute inset-0 bg-stone-texture opacity-30 pointer-events-none rounded-xl" />
+      <div className="relative bg-gradient-to-b from-surface-800 to-surface-900 border-2 border-surface-600 rounded-xl shadow-cosmic max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden">
+        {/* Fundo cósmico */}
+        <div className="absolute inset-0 bg-cosmos opacity-30 pointer-events-none rounded-xl" />
 
         {/* Header */}
-        <div className="relative bg-gradient-to-r from-citadel-carved via-citadel-granite to-citadel-carved border-b-2 border-metal-rust/50 px-6 py-4">
+        <div className="relative bg-gradient-to-r from-surface-800 via-surface-900 to-surface-800 border-b-2 border-surface-600/50 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               {/* Ícone do terreno */}
               <div
                 className={`w-12 h-12 rounded-lg bg-gradient-to-br ${getTerrainColor(
                   territory.terrainType
-                )} border-2 border-metal-iron shadow-stone-inset flex items-center justify-center`}
+                )} border-2 border-surface-500 shadow-inner flex items-center justify-center`}
               >
                 <span className="text-2xl">
                   {territory.isCapital ? "👑" : "🏔️"}
@@ -231,12 +231,12 @@ export const TerritoryModal: React.FC<TerritoryModalProps> = ({
               </div>
               <div>
                 <h2
-                  className="text-parchment-light font-bold text-xl tracking-wider"
-                  style={{ fontFamily: "'Cinzel', serif" }}
+                  className="text-astral-chrome font-bold text-xl tracking-wider"
+                  style={{ fontFamily: "'Rajdhani', sans-serif" }}
                 >
                   Território #{territory.mapIndex}
                 </h2>
-                <div className="flex items-center gap-3 text-parchment-aged text-sm">
+                <div className="flex items-center gap-3 text-surface-200 text-sm">
                   <span>{territory.terrainType}</span>
                   <span>•</span>
                   <span>{territory.size}</span>
@@ -249,8 +249,8 @@ export const TerritoryModal: React.FC<TerritoryModalProps> = ({
             </div>
 
             {territory.isCapital && (
-              <div className="bg-metal-gold/20 border-2 border-metal-gold rounded-lg px-4 py-2">
-                <span className="text-metal-gold font-bold">👑 Capital</span>
+              <div className="bg-stellar-amber/20 border-2 border-stellar-amber rounded-lg px-4 py-2">
+                <span className="text-stellar-amber font-bold">👑 Capital</span>
               </div>
             )}
           </div>
@@ -260,31 +260,31 @@ export const TerritoryModal: React.FC<TerritoryModalProps> = ({
         <div className="relative p-6 overflow-y-auto max-h-[60vh]">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="w-12 h-12 border-4 border-war-crimson border-t-transparent rounded-full animate-spin" />
+              <div className="w-12 h-12 border-4 border-stellar-amber border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
             <>
               {error && (
-                <div className="mb-4 p-3 bg-war-blood/30 border-2 border-war-crimson rounded-lg">
-                  <p className="text-war-ember text-sm">{error}</p>
+                <div className="mb-4 p-3 bg-red-900/30 border-2 border-red-600 rounded-lg">
+                  <p className="text-red-400 text-sm">{error}</p>
                 </div>
               )}
 
               {buildingInProgress && (
-                <div className="mb-4 p-3 bg-metal-gold/20 border-2 border-metal-gold rounded-lg flex items-center gap-3">
-                  <div className="w-5 h-5 border-2 border-metal-gold border-t-transparent rounded-full animate-spin" />
-                  <p className="text-metal-gold text-sm">Construindo...</p>
+                <div className="mb-4 p-3 bg-stellar-amber/20 border-2 border-stellar-amber rounded-lg flex items-center gap-3">
+                  <div className="w-5 h-5 border-2 border-stellar-amber border-t-transparent rounded-full animate-spin" />
+                  <p className="text-stellar-amber text-sm">Construindo...</p>
                 </div>
               )}
 
               <div className="mb-4">
                 <h3
-                  className="text-parchment-light font-bold text-sm tracking-wider mb-3"
-                  style={{ fontFamily: "'Cinzel', serif" }}
+                  className="text-astral-chrome font-bold text-sm tracking-wider mb-3"
+                  style={{ fontFamily: "'Rajdhani', sans-serif" }}
                 >
                   ÁREAS DO TERRITÓRIO
                 </h3>
-                <p className="text-parchment-aged text-xs mb-4">
+                <p className="text-surface-200 text-xs mb-4">
                   Arraste uma construção da barra lateral para uma área vazia.
                 </p>
               </div>
@@ -297,12 +297,12 @@ export const TerritoryModal: React.FC<TerritoryModalProps> = ({
                     onDragOver={(e) => handleDragOver(e, area.index)}
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, area.index)}
-                    className={`relative aspect-square rounded-lg border-3 transition-all duration-200 flex flex-col items-center justify-center p-3 ${
+                    className={`relative aspect-square rounded-lg border-2 transition-all duration-200 flex flex-col items-center justify-center p-3 ${
                       area.structure
-                        ? "bg-citadel-carved border-metal-bronze shadow-stone-inset"
+                        ? "bg-surface-800 border-stellar-amber/50 shadow-inner"
                         : dragOverArea === area.index
-                        ? "bg-war-crimson/30 border-war-crimson border-dashed scale-105"
-                        : "bg-citadel-slate/50 border-metal-iron/50 border-dashed hover:border-metal-iron hover:bg-citadel-slate/70"
+                        ? "bg-stellar-amber/30 border-stellar-amber border-dashed scale-105"
+                        : "bg-surface-700/50 border-surface-600/50 border-dashed hover:border-surface-500 hover:bg-surface-700/70"
                     }`}
                   >
                     {area.structure ? (
@@ -310,31 +310,31 @@ export const TerritoryModal: React.FC<TerritoryModalProps> = ({
                         <span className="text-3xl mb-2">
                           {getStructureIcon(area.structure.type)}
                         </span>
-                        <span className="text-parchment-light font-semibold text-xs text-center">
+                        <span className="text-astral-chrome font-semibold text-xs text-center">
                           {area.structure.name}
                         </span>
                         {area.structure.level && (
-                          <span className="text-parchment-aged text-[10px]">
+                          <span className="text-surface-200 text-[10px]">
                             Nível {area.structure.level}
                           </span>
                         )}
                       </>
                     ) : (
                       <>
-                        <span className="text-2xl text-parchment-dark/40 mb-1">
+                        <span className="text-2xl text-surface-300/40 mb-1">
                           {dragOverArea === area.index ? "⬇️" : "➕"}
                         </span>
-                        <span className="text-parchment-dark/60 text-xs text-center">
+                        <span className="text-surface-300/60 text-xs text-center">
                           Área {area.index + 1}
                         </span>
-                        <span className="text-parchment-dark/40 text-[10px]">
+                        <span className="text-surface-300/40 text-[10px]">
                           {dragOverArea === area.index ? "Solte aqui" : "Vazia"}
                         </span>
                       </>
                     )}
 
                     {/* Número do slot */}
-                    <div className="absolute top-1 right-1 w-5 h-5 bg-citadel-obsidian/60 rounded text-parchment-aged text-[10px] flex items-center justify-center">
+                    <div className="absolute top-1 right-1 w-5 h-5 bg-cosmos-void/60 rounded text-surface-200 text-[10px] flex items-center justify-center">
                       {area.index + 1}
                     </div>
                   </div>
@@ -345,15 +345,15 @@ export const TerritoryModal: React.FC<TerritoryModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="relative bg-citadel-carved border-t-2 border-metal-rust/50 px-6 py-4">
+        <div className="relative bg-surface-800 border-t-2 border-surface-600/50 px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="text-parchment-aged text-xs">
-              <span className="text-parchment-light font-bold">Dica:</span>{" "}
+            <div className="text-surface-200 text-xs">
+              <span className="text-astral-chrome font-bold">Dica:</span>{" "}
               Arraste construções da sidebar direita para as áreas vazias.
             </div>
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-citadel-slate border-2 border-metal-iron rounded-lg text-parchment-light font-semibold text-sm hover:bg-citadel-weathered transition-colors"
+              className="px-4 py-2 bg-surface-700 border-2 border-surface-500 rounded-lg text-astral-chrome font-semibold text-sm hover:bg-surface-600 transition-colors"
             >
               Fechar
             </button>

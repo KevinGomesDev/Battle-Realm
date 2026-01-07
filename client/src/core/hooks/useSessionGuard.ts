@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useSession } from "./useSession";
 import { useAuth } from "../../features/auth";
-import { useArena } from "../../features/arena";
+import { useArenaOptional } from "../../features/arena";
 import type { SessionGuardState } from "../../../../shared/types/session.types";
 
 // ============================================
@@ -53,7 +53,8 @@ const LOADING_MESSAGES: Record<SessionGuardState, string | null> = {
 export function useSessionGuard(): SessionGuardResult {
   const { state: sessionState, checkSession } = useSession();
   const { state: authState } = useAuth();
-  const { state: arenaState } = useArena();
+  const arenaContext = useArenaOptional();
+  const arenaState = arenaContext?.state ?? null;
 
   const [guardState, setGuardState] = useState<SessionGuardState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -114,6 +115,12 @@ export function useSessionGuard(): SessionGuardResult {
       return;
     }
 
+    // Se não temos contexto de arena, ir para ready (não bloquear)
+    if (!arenaState) {
+      setGuardState("ready");
+      return;
+    }
+
     // Verifica se precisa aguardar restauração de arena
     const needsArenaRestore =
       (session.type === "ARENA_BATTLE" && !arenaState.battle) ||
@@ -135,8 +142,8 @@ export function useSessionGuard(): SessionGuardResult {
     guardState,
     sessionState.isChecking,
     sessionState.activeSession,
-    arenaState.battle,
-    arenaState.currentLobby,
+    arenaState?.battle,
+    arenaState?.currentLobby,
   ]);
 
   /**
@@ -147,6 +154,12 @@ export function useSessionGuard(): SessionGuardResult {
 
     const session = sessionState.activeSession;
     if (!session?.type) {
+      setGuardState("ready");
+      return;
+    }
+
+    // Se não temos contexto de arena, ir para ready
+    if (!arenaState) {
       setGuardState("ready");
       return;
     }
@@ -169,8 +182,8 @@ export function useSessionGuard(): SessionGuardResult {
   }, [
     guardState,
     sessionState.activeSession,
-    arenaState.battle,
-    arenaState.currentLobby,
+    arenaState?.battle,
+    arenaState?.currentLobby,
   ]);
 
   /**

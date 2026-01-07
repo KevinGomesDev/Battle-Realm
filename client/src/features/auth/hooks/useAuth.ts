@@ -18,6 +18,7 @@ export function useAuth() {
     // Estado
     user: context.state.user,
     isAuthenticated: context.state.isAuthenticated,
+    isServerValidated: context.state.isServerValidated,
     isLoading: context.state.isLoading,
     error: context.state.error,
     // Acesso ao state completo

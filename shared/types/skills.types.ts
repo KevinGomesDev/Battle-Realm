@@ -1,14 +1,32 @@
 // shared/types/skills.types.ts
 // Tipos e constantes do sistema de habilidades - Compartilhado entre Frontend e Backend
 
+import {
+  type AbilityRange,
+  type AbilityTargetType,
+  type AbilityEffectType,
+  type DynamicValue,
+  DEFAULT_RANGE_DISTANCE,
+} from "./ability.types";
+
+// Re-exportar tipos de ability para compatibilidade
+export type {
+  AbilityRange,
+  AbilityTargetType,
+  AbilityEffectType,
+  DynamicValue,
+};
+export { DEFAULT_RANGE_DISTANCE };
+
 // =============================================================================
 // ENUMS E TIPOS BASE
 // =============================================================================
 
 export type SkillCategory = "PASSIVE" | "ACTIVE";
 export type SkillCostTier = "LOW" | "MEDIUM" | "HIGH";
-export type SkillRange = "SELF" | "ADJACENT" | "RANGED" | "AREA";
-export type SkillTargetType = "SELF" | "ALLY" | "ENEMY" | "ALL";
+// Tipos legados (mantidos para compatibilidade)
+export type SkillRange = AbilityRange | "ADJACENT"; // ADJACENT é legado, usar MELEE
+export type SkillTargetType = AbilityTargetType;
 export type Archetype = "PHYSICAL" | "SPIRITUAL" | "ARCANE";
 export type SkillResourceType = "FOOD" | "DEVOTION" | "ARCANA";
 
@@ -26,17 +44,15 @@ export const COST_VALUES: Record<SkillCostTier, number> = {
 };
 
 /**
+ * @deprecated Use DEFAULT_RANGE_DISTANCE de ability.types.ts
  * Valores base de alcance (em tiles Manhattan)
- * SELF = 0 (apenas usuário)
- * ADJACENT = 1 (1 bloco qualquer direção)
- * RANGED = valor customizável (padrão 4)
- * AREA = raio de efeito (padrão 2)
  */
 export const DEFAULT_RANGE_VALUES: Record<SkillRange, number> = {
   SELF: 0,
-  ADJACENT: 1,
-  RANGED: 4,
-  AREA: 2,
+  MELEE: 1,
+  ADJACENT: 1, // Legado
+  RANGED: 5,
+  AREA: 5,
 };
 
 // =============================================================================
@@ -75,6 +91,9 @@ export interface SkillDefinition {
   description: string;
   category: SkillCategory;
 
+  // Tipo de efeito da skill (usado pela IA para decisões)
+  effectType?: AbilityEffectType;
+
   // Ação comum disponível para todas unidades por padrão
   commonAction?: boolean;
 
@@ -87,14 +106,25 @@ export interface SkillDefinition {
   // Alcance (apenas para ACTIVE)
   range?: SkillRange;
   rangeValue?: number; // Valor customizado para RANGED/AREA
+  rangeDistance?: DynamicValue; // Distância máxima de seleção de alvo (tiles Manhattan)
+  areaSize?: DynamicValue; // Tamanho da área de efeito (ex: 3 = 3x3)
 
   // Alvo (para ACTIVE com AREA)
   targetType?: SkillTargetType;
+
+  // Visual
+  icon?: string;
+  color?: string;
 
   // Execução (apenas para ACTIVE)
   functionName?: string; // Nome da função que executa a skill
   consumesAction?: boolean; // Se consome ação ao usar. Default: true
   cooldown?: number; // Rodadas de espera após uso. Default: 0
+
+  // Atributos dinâmicos (podem ser números ou bindings de atributo)
+  baseDamage?: DynamicValue; // Dano base da skill
+  healing?: DynamicValue; // Cura base da skill
+  conditionDuration?: DynamicValue; // Duração da condição em turnos
 
   // Condição aplicada (para PASSIVE ou algumas ACTIVE)
   conditionApplied?: string;
@@ -371,7 +401,8 @@ export function getCategoryLabel(category: SkillCategory): string {
 export function getRangeLabel(range: SkillRange): string {
   const labels: Record<SkillRange, string> = {
     SELF: "Pessoal",
-    ADJACENT: "Adjacente",
+    MELEE: "Corpo-a-corpo",
+    ADJACENT: "Adjacente", // Legado
     RANGED: "À Distância",
     AREA: "Área",
   };
@@ -384,9 +415,10 @@ export function getRangeLabel(range: SkillRange): string {
 export function getTargetTypeLabel(targetType: SkillTargetType): string {
   const labels: Record<SkillTargetType, string> = {
     SELF: "Você",
-    ALLY: "Aliados",
-    ENEMY: "Inimigos",
+    UNIT: "Unidade",
     ALL: "Todos",
+    POSITION: "Posição",
+    GROUND: "Terreno",
   };
   return labels[targetType];
 }

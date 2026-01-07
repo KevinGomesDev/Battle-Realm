@@ -22,9 +22,11 @@ export const AttributeRow: React.FC<AttributeRowProps> = ({
         max="30"
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value) || 0)}
-        className="flex-1 px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-white text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+        className="flex-1 px-3 py-2 bg-surface-800/50 border border-surface-500 rounded-lg text-white text-sm focus:border-stellar-gold focus:ring-1 focus:ring-stellar-gold transition-all"
       />
-      <div className="w-12 text-right font-bold text-purple-300">{value}</div>
+      <div className="w-12 text-right font-bold text-stellar-light">
+        {value}
+      </div>
     </div>
   );
 };

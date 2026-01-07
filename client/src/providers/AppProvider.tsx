@@ -4,13 +4,13 @@
 import React from "react";
 
 // Core Providers
-import { ConnectionProvider, SessionProvider } from "../core";
+import { ColyseusProvider, SessionProvider } from "../core";
 
 // Feature Providers
 import { AuthProvider } from "../features/auth";
 import { KingdomProvider } from "../features/kingdom";
-import { MatchProvider } from "../features/match";
-import { ArenaProvider } from "../features/arena";
+import { MatchColyseusProvider } from "../features/match";
+import { ArenaColyseusProvider } from "../features/arena";
 import { EventProvider } from "../features/events";
 
 interface AppProviderProps {
@@ -21,28 +21,28 @@ interface AppProviderProps {
  * AppProvider - Compõe todos os context providers na ordem correta
  *
  * Ordem de dependência (de fora para dentro):
- * 1. ConnectionProvider - Base de conexão socket
+ * 1. ColyseusProvider - Base de conexão Colyseus
  * 2. SessionProvider - Gerenciamento de sessão
  * 3. AuthProvider - Autenticação do usuário
  * 4. EventProvider - Sistema de eventos/toasts
  * 5. KingdomProvider - Gerenciamento de reinos
- * 6. MatchProvider - Gerenciamento de partidas
- * 7. ArenaProvider - Gerenciamento de arena PvP
+ * 6. MatchColyseusProvider - Gerenciamento de partidas (Colyseus)
+ * 7. ArenaColyseusProvider - Gerenciamento de arena PvP (Colyseus)
  */
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   return (
-    <ConnectionProvider>
+    <ColyseusProvider>
       <SessionProvider>
         <AuthProvider>
           <EventProvider>
             <KingdomProvider>
-              <MatchProvider>
-                <ArenaProvider>{children}</ArenaProvider>
-              </MatchProvider>
+              <MatchColyseusProvider>
+                <ArenaColyseusProvider>{children}</ArenaColyseusProvider>
+              </MatchColyseusProvider>
             </KingdomProvider>
           </EventProvider>
         </AuthProvider>
       </SessionProvider>
-    </ConnectionProvider>
+    </ColyseusProvider>
   );
 };

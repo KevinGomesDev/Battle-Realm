@@ -1,26 +1,20 @@
 // server/src/logic/round-control.ts
 // =============================================================================
-// ROUND CONTROL - Sistema centralizado de controle de rodadas e turnos
+// ROUND CONTROL - Sistema de utilidades para controle de rodadas e turnos
 // =============================================================================
-// Este módulo é a FONTE DE VERDADE para toda lógica de:
-// - Troca de turnos (unit -> unit, player -> player)
-// - Avanço de rodadas
+// Este módulo contém funções puras para:
 // - Processamento de efeitos de início/fim de turno
 // - Processamento de condições que expiram
 // - Verificação de condições de vitória
 // =============================================================================
+// NOTA: A lógica principal de turnos está nas Colyseus Rooms (ArenaRoom, MatchRoom)
+// Este módulo fornece funções auxiliares reutilizáveis.
+// =============================================================================
 
-import { Server } from "socket.io";
 import type { BattleUnit } from "../utils/battle-unit.factory";
-import type { Battle, BattleLobby } from "../handlers/battle/battle-types";
 import { CONDITIONS, removeNextTurnConditions } from "./conditions";
-import {
-  emitRoundStartEvent,
-  emitConditionRemovedEvent,
-} from "./combat-events";
 import { getMaxMarksByCategory } from "../utils/battle.utils";
 import { tickUnitCooldowns } from "./skill-executors";
-import { clearBattleEventsCache } from "../services/event.service";
 
 // =============================================================================
 // TIPOS
@@ -123,14 +117,15 @@ export function processUnitTurnEndConditions(unit: BattleUnit): TurnEndResult {
     (c) => !conditionsToRemove.includes(c)
   );
 
-  // 5. Atualizar action marks
-  const maxMarks = getMaxMarksByCategory(unit.category);
-  unit.actionMarks = Math.min(maxMarks, unit.actionMarks + 1);
+  // 5. Atualizar action marks (decrementar apenas se usou ação)
+  if (unit.actionsLeft < 1) {
+    unit.actionMarks = Math.max(0, unit.actionMarks - 1);
+  }
 
   // 6. Resetar recursos do turno
   unit.movesLeft = 0;
   unit.actionsLeft = 0;
-  unit.attacksLeftThisTurn = 0; // Resetar ataques extras
+  unit.attacksLeftThisTurn = 0;
   unit.hasStartedAction = false;
 
   return {
@@ -144,166 +139,56 @@ export function processUnitTurnEndConditions(unit: BattleUnit): TurnEndResult {
 /**
  * Processa efeitos de condições que ocorrem no início do turno de uma unidade.
  * Isso inclui:
- * - Cura de condições como REGENERATING
+ * - Regeneração (HP regen)
+ * - Recuperação de mana
  * - Remoção de condições que expiram em "next_turn"
  */
-export function processUnitTurnStartConditions(unit: BattleUnit): {
-  healFromConditions: number;
-  conditionsRemoved: string[];
-} {
-  let healFromConditions = 0;
+export function processUnitTurnStartConditions(
+  unit: BattleUnit
+): TurnEndResult {
+  let healingFromConditions = 0;
   const conditionsRemoved: string[] = [];
 
+  // 1. Processar regeneração de condições
   for (const condId of unit.conditions) {
     const condition = CONDITIONS[condId];
     if (!condition) continue;
 
-    // Aplicar cura de condições
+    // Aplicar regeneração
     if (condition.effects.healPerTurn) {
-      healFromConditions += condition.effects.healPerTurn;
+      healingFromConditions += condition.effects.healPerTurn;
     }
   }
 
-  // Remover condições que expiram no próximo turno (next_turn)
-  const beforeConditions = [...unit.conditions];
-  unit.conditions = removeNextTurnConditions(unit.conditions);
-
-  for (const condId of beforeConditions) {
-    if (!unit.conditions.includes(condId)) {
-      conditionsRemoved.push(condId);
-    }
+  // 2. Aplicar cura
+  if (healingFromConditions > 0) {
+    unit.currentHp = Math.min(
+      unit.maxHp,
+      unit.currentHp + healingFromConditions
+    );
   }
 
-  // Aplicar cura (respeitando HP máximo)
-  if (healFromConditions > 0) {
-    const maxHp = unit.vitality; // Vitality é o HP máximo
-    unit.currentHp = Math.min(maxHp, unit.currentHp + healFromConditions);
-  }
-
-  return {
-    healFromConditions,
-    conditionsRemoved,
-  };
-}
-
-// =============================================================================
-// CONTROLE DE TROCA DE TURNO
-// =============================================================================
-
-/**
- * Avança para o próximo jogador no ciclo de turnos.
- * Retorna informações sobre a transição.
- */
-export function advanceToNextPlayer(battle: Battle): TurnTransitionResult {
-  const previousPlayerId = battle.actionOrder[battle.currentTurnIndex];
-  const previousTurnIndex = battle.currentTurnIndex;
-
-  // Incrementar index circular
-  if (battle.actionOrder.length > 0) {
-    battle.currentTurnIndex =
-      (battle.currentTurnIndex + 1) % battle.actionOrder.length;
-  }
-
-  const nextPlayerId = battle.actionOrder[battle.currentTurnIndex];
-
-  // Verificar se voltamos ao início (nova rodada)
-  const allPlayersActed = battle.actionOrder.every(
-    (playerId) => (battle.roundActionsCount.get(playerId) || 0) >= 1
+  // 3. Remover condições que expiram no próximo turno
+  const remainingConditions = removeNextTurnConditions(unit.conditions);
+  const removed = unit.conditions.filter(
+    (c) => !remainingConditions.includes(c)
   );
+  conditionsRemoved.push(...removed);
+  unit.conditions = remainingConditions;
 
-  let roundAdvanced = false;
-  let newRound = battle.round;
+  // 4. Preparar unidade para o turno
+  unit.movesLeft = unit.speed;
+  unit.actionsLeft = 1;
+  unit.attacksLeftThisTurn = 1;
 
-  if (allPlayersActed) {
-    roundAdvanced = true;
-    newRound = battle.round + 1;
-    battle.round = newRound;
-
-    // Resetar contadores de ação
-    for (const playerId of battle.actionOrder) {
-      battle.roundActionsCount.set(playerId, 0);
-    }
-  }
-
-  // Limpar unidade ativa
-  battle.activeUnitId = undefined;
+  // 5. Atualizar cooldowns
+  tickUnitCooldowns(unit);
 
   return {
-    previousPlayerId,
-    nextPlayerId,
-    previousTurnIndex,
-    nextTurnIndex: battle.currentTurnIndex,
-    roundAdvanced,
-    newRound,
-  };
-}
-
-/**
- * Registra que um jogador executou uma ação nesta rodada.
- */
-export function recordPlayerAction(battle: Battle, playerId: string): void {
-  const currentCount = battle.roundActionsCount.get(playerId) || 0;
-  battle.roundActionsCount.set(playerId, currentCount + 1);
-}
-
-// =============================================================================
-// PROCESSAMENTO DE NOVA RODADA
-// =============================================================================
-
-/**
- * Processa o início de uma nova rodada.
- * Aplica efeitos de início de rodada em todas as unidades.
- * Reseta hasStartedAction para permitir que cada jogador escolha uma nova unidade.
- */
-export async function processNewRound(
-  battle: Battle,
-  io: Server,
-  lobbyId: string
-): Promise<RoundAdvanceResult> {
-  const unitsDefeatedByConditions: string[] = [];
-  const allUnitsProcessed: BattleUnit[] = [];
-
-  // Emitir evento de início de rodada
-  await emitRoundStartEvent(battle.id, battle.round);
-
-  // === NOVA RODADA: Resetar estado de todas as unidades ===
-  // Isso permite que cada jogador escolha qual unidade usar nesta rodada
-  for (const unit of battle.units) {
-    if (!unit.isAlive) continue;
-
-    // Resetar flag de ação iniciada - agora o jogador pode escolher qualquer unidade
-    unit.hasStartedAction = false;
-    // Resetar movimentos e ações para 0 - serão definidos ao escolher a unidade
-    unit.movesLeft = 0;
-    unit.actionsLeft = 0;
-    // Resetar ataques extras
-    unit.attacksLeftThisTurn = 0;
-
-    // Reduzir cooldowns de skills/spells em 1 a cada rodada
-    tickUnitCooldowns(unit);
-  }
-
-  // Processar condições de início de turno para todas as unidades vivas
-  for (const unit of battle.units) {
-    if (!unit.isAlive) continue;
-
-    const startResult = processUnitTurnStartConditions(unit);
-
-    // Emitir eventos de condições removidas
-    for (const condId of startResult.conditionsRemoved) {
-      const conditionDef = CONDITIONS[condId];
-      const conditionName = conditionDef?.name || condId;
-      await emitConditionRemovedEvent(battle.id, unit, condId, conditionName);
-    }
-
-    allUnitsProcessed.push(unit);
-  }
-
-  return {
-    newRound: battle.round,
-    roundAdvanced: true,
-    allUnitsProcessed,
-    unitsDefeatedByConditions,
+    unitUpdated: unit,
+    conditionsRemoved,
+    damageFromConditions: -healingFromConditions, // Negativo = cura
+    unitDefeated: false,
   };
 }
 
@@ -312,64 +197,51 @@ export async function processNewRound(
 // =============================================================================
 
 /**
- * Verifica se a batalha terminou (vitória/derrota/empate).
+ * Verifica se a batalha terminou e determina o vencedor.
+ * Retorna informações sobre o resultado.
  */
-export function checkVictoryCondition(battle: Battle): VictoryCheckResult {
-  const aliveBySide = new Map<string, number>();
+export function checkVictoryConditions(
+  units: BattleUnit[]
+): VictoryCheckResult {
+  // Agrupar unidades vivas por jogador/reino
+  const aliveByPlayer = new Map<string, BattleUnit[]>();
 
-  console.log("[VICTORY_CHECK] Verificando condição de vitória...");
-  console.log("[VICTORY_CHECK] Total de unidades:", battle.units.length);
+  for (const unit of units) {
+    if (!unit.isAlive) continue;
 
-  for (const unit of battle.units) {
-    console.log(`[VICTORY_CHECK] Unidade ${unit.name} (${unit.id}):`, {
-      isAlive: unit.isAlive,
-      currentHp: unit.currentHp,
-      maxHp: unit.maxHp,
-      ownerId: unit.ownerId,
-    });
-
-    if (unit.isAlive) {
-      const count = aliveBySide.get(unit.ownerId) || 0;
-      aliveBySide.set(unit.ownerId, count + 1);
-    }
+    const playerId = unit.ownerId;
+    const existing = aliveByPlayer.get(playerId) || [];
+    existing.push(unit);
+    aliveByPlayer.set(playerId, existing);
   }
 
-  console.log(
-    "[VICTORY_CHECK] Unidades vivas por lado:",
-    Array.from(aliveBySide.entries())
-  );
+  // Verificar quantos jogadores ainda têm unidades vivas
+  const playersAlive = Array.from(aliveByPlayer.entries());
 
-  // Se só um lado tem unidades vivas, ele venceu
-  if (aliveBySide.size === 0) {
-    console.log("[VICTORY_CHECK] ❌ EMPATE - Nenhuma unidade viva");
+  if (playersAlive.length === 0) {
+    // Empate - todos morreram
     return {
       battleEnded: true,
       winnerId: null,
       winnerKingdomId: null,
-      reason: "Empate - Todas as unidades foram derrotadas",
+      reason: "Empate - todas as unidades foram derrotadas",
     };
   }
 
-  if (aliveBySide.size === 1) {
-    const winnerId = aliveBySide.keys().next().value || null;
-    const winnerKingdom = battle.units.find(
-      (u) => u.ownerId === winnerId
-    )?.ownerKingdomId;
-
-    console.log("[VICTORY_CHECK] ✅ VITÓRIA!", {
-      winnerId,
-      winnerKingdom,
-    });
+  if (playersAlive.length === 1) {
+    // Apenas um jogador sobreviveu - vitória!
+    const [winnerId, winnerUnits] = playersAlive[0];
+    const winnerKingdomId = winnerUnits[0]?.ownerKingdomId || null;
 
     return {
       battleEnded: true,
       winnerId,
-      winnerKingdomId: winnerKingdom || null,
-      reason: "Todas as unidades inimigas foram derrotadas",
+      winnerKingdomId,
+      reason: "Vitória - último jogador com unidades vivas",
     };
   }
 
-  console.log("[VICTORY_CHECK] ⚔️ Batalha continua");
+  // Batalha continua
   return {
     battleEnded: false,
     winnerId: null,
@@ -379,20 +251,26 @@ export function checkVictoryCondition(battle: Battle): VictoryCheckResult {
 }
 
 /**
- * Verifica se todas as unidades estão exaustas (para batalhas não-arena).
- * Determina vencedor por HP total.
+ * Verifica se todas as unidades estão exaustas (action marks máximos).
  */
-export function checkExhaustionCondition(
-  battle: Battle
-): ExhaustionCheckResult {
-  const allUnitsExhausted = battle.units
-    .filter((u) => u.isAlive)
-    .every((u) => {
-      const maxMarks = getMaxMarksByCategory(u.category);
-      return u.actionMarks >= maxMarks;
-    });
+export function checkExhaustion(units: BattleUnit[]): ExhaustionCheckResult {
+  const aliveUnits = units.filter((u) => u.isAlive);
 
-  if (!allUnitsExhausted) {
+  if (aliveUnits.length === 0) {
+    return {
+      allExhausted: true,
+      winnerId: null,
+      winnerKingdomId: null,
+    };
+  }
+
+  // Verificar se todas as unidades vivas estão exaustas
+  const allExhausted = aliveUnits.every((unit) => {
+    const maxMarks = getMaxMarksByCategory(unit.category);
+    return unit.actionMarks >= maxMarks;
+  });
+
+  if (!allExhausted) {
     return {
       allExhausted: false,
       winnerId: null,
@@ -400,148 +278,138 @@ export function checkExhaustionCondition(
     };
   }
 
-  // Calcular HP total por jogador
-  const hpByPlayer = new Map<string, number>();
-  for (const unit of battle.units) {
-    if (unit.isAlive) {
-      const currentHp = hpByPlayer.get(unit.ownerId) || 0;
-      hpByPlayer.set(unit.ownerId, currentHp + unit.currentHp);
-    }
+  // Todas exaustas - encontrar quem tem mais HP total
+  const hpByPlayer = new Map<string, { total: number; kingdomId: string }>();
+
+  for (const unit of aliveUnits) {
+    const current = hpByPlayer.get(unit.ownerId) || {
+      total: 0,
+      kingdomId: unit.ownerKingdomId,
+    };
+    current.total += unit.currentHp;
+    hpByPlayer.set(unit.ownerId, current);
   }
 
-  // Determinar vencedor
   let winnerId: string | null = null;
-  let maxHp = -1;
-  for (const [playerId, totalHp] of hpByPlayer.entries()) {
-    if (totalHp > maxHp) {
-      maxHp = totalHp;
+  let winnerKingdomId: string | null = null;
+  let maxHp = 0;
+
+  for (const [playerId, data] of hpByPlayer.entries()) {
+    if (data.total > maxHp) {
+      maxHp = data.total;
       winnerId = playerId;
+      winnerKingdomId = data.kingdomId;
     }
   }
-
-  const winnerKingdom = battle.units.find(
-    (u) => u.ownerId === winnerId
-  )?.ownerKingdomId;
 
   return {
     allExhausted: true,
     winnerId,
-    winnerKingdomId: winnerKingdom || null,
+    winnerKingdomId,
   };
 }
 
 // =============================================================================
-// FUNÇÃO PRINCIPAL: FINALIZAR TURNO DE UNIDADE
+// CÁLCULO DE ORDEM DE AÇÃO
 // =============================================================================
 
 /**
- * Fluxo completo de finalização do turno de uma unidade.
- * Retorna todos os dados necessários para emissão de eventos.
+ * Calcula a ordem de ação das unidades baseado em Speed.
+ * Unidades mais rápidas agem primeiro.
  */
-export interface EndUnitTurnParams {
-  battle: Battle;
-  unit: BattleUnit;
-  io: Server;
-  lobby: BattleLobby;
-}
-
-export interface EndUnitTurnOutput {
-  turnEndResult: TurnEndResult;
-  turnTransition: TurnTransitionResult;
-  victoryCheck: VictoryCheckResult;
-  exhaustionCheck: ExhaustionCheckResult | null;
-  shouldEmitNewRound: boolean;
-}
-
-export async function executeEndUnitTurn(
-  params: EndUnitTurnParams
-): Promise<EndUnitTurnOutput> {
-  const { battle, unit, io, lobby } = params;
-
-  // 1. Processar condições de fim de turno
-  const turnEndResult = processUnitTurnEndConditions(unit);
-
-  // 2. Registrar ação do jogador
-  const currentPlayerId = battle.actionOrder[battle.currentTurnIndex];
-  if (unit.hasStartedAction || true) {
-    // Sempre registrar para avançar a rodada corretamente
-    recordPlayerAction(battle, currentPlayerId);
-  }
-
-  // 3. Avançar para próximo jogador
-  const turnTransition = advanceToNextPlayer(battle);
-
-  // 4. Verificar vitória (pode ter morrido por condição)
-  const victoryCheck = checkVictoryCondition(battle);
-
-  // 5. Verificar exaustão (apenas para batalhas não-arena)
-  let exhaustionCheck: ExhaustionCheckResult | null = null;
-  if (!battle.isArena && !victoryCheck.battleEnded) {
-    exhaustionCheck = checkExhaustionCondition(battle);
-  }
-
-  // 6. Processar nova rodada se necessário
-  if (turnTransition.roundAdvanced && !victoryCheck.battleEnded) {
-    await processNewRound(battle, io, lobby.lobbyId);
-  }
-
-  return {
-    turnEndResult,
-    turnTransition,
-    victoryCheck,
-    exhaustionCheck,
-    shouldEmitNewRound: turnTransition.roundAdvanced,
-  };
-}
-
-// =============================================================================
-// EMISSÃO DE EVENTOS (helpers para uso nos handlers)
-// =============================================================================
-
-/**
- * Emite eventos de fim de batalha.
- */
-export function emitBattleEndEvents(
-  io: Server,
-  lobbyId: string,
-  battleId: string,
-  victoryCheck: VictoryCheckResult,
-  units: BattleUnit[],
-  vsBot?: boolean
-): void {
-  io.to(lobbyId).emit("battle:battle_ended", {
-    battleId,
-    winnerId: victoryCheck.winnerId,
-    winnerKingdomId: victoryCheck.winnerKingdomId,
-    reason: victoryCheck.reason,
-    finalUnits: units,
-    vsBot: vsBot ?? false,
-  });
-
-  // Limpar cache de eventos da batalha (são mantidos apenas em memória)
-  clearBattleEventsCache(battleId);
+export function calculateActionOrder(units: BattleUnit[]): string[] {
+  return units
+    .filter((u) => u.isAlive)
+    .sort((a, b) => {
+      // Maior speed primeiro
+      if (b.speed !== a.speed) return b.speed - a.speed;
+      // Desempate por ID (determinístico)
+      return a.id.localeCompare(b.id);
+    })
+    .map((u) => u.id);
 }
 
 /**
- * Emite eventos de fim de batalha por exaustão.
+ * Recalcula a ordem de ação removendo unidades mortas.
  */
-export function emitExhaustionEndEvents(
-  io: Server,
-  lobbyId: string,
-  battleId: string,
-  exhaustionCheck: ExhaustionCheckResult,
-  units: BattleUnit[],
-  vsBot?: boolean
-): void {
-  io.to(lobbyId).emit("battle:battle_ended", {
-    battleId,
-    winnerId: exhaustionCheck.winnerId,
-    winnerKingdomId: exhaustionCheck.winnerKingdomId,
-    reason: "Todas as unidades estão exaustas (Action Marks máximos)",
-    finalUnits: units,
-    vsBot: vsBot ?? false,
-  });
+export function updateActionOrder(
+  currentOrder: string[],
+  units: BattleUnit[]
+): string[] {
+  const aliveIds = new Set(units.filter((u) => u.isAlive).map((u) => u.id));
+  return currentOrder.filter((id) => aliveIds.has(id));
+}
 
-  // Limpar cache de eventos da batalha (são mantidos apenas em memória)
-  clearBattleEventsCache(battleId);
+// =============================================================================
+// PREPARAÇÃO DE UNIDADE PARA TURNO
+// =============================================================================
+
+/**
+ * Prepara uma unidade para iniciar seu turno.
+ * Define movimentos, ações e ataques disponíveis.
+ */
+export function prepareUnitForTurn(unit: BattleUnit): void {
+  if (!unit.isAlive) return;
+
+  // Definir recursos do turno
+  unit.movesLeft = unit.speed;
+  unit.actionsLeft = 1;
+  unit.attacksLeftThisTurn = 1;
+  unit.hasStartedAction = true;
+
+  // Processar efeitos de início de turno
+  processUnitTurnStartConditions(unit);
+}
+
+/**
+ * Limpa o estado do turno de uma unidade.
+ */
+export function clearUnitTurnState(unit: BattleUnit): void {
+  unit.movesLeft = 0;
+  unit.actionsLeft = 0;
+  unit.attacksLeftThisTurn = 0;
+  unit.hasStartedAction = false;
+}
+
+// =============================================================================
+// UTILITÁRIOS
+// =============================================================================
+
+/**
+ * Encontra a próxima unidade viva na ordem de ação.
+ */
+export function findNextAliveUnit(
+  actionOrder: string[],
+  currentIndex: number,
+  units: BattleUnit[]
+): { unitId: string; index: number } | null {
+  const aliveUnits = new Map(
+    units.filter((u) => u.isAlive).map((u) => [u.id, u])
+  );
+
+  let index = (currentIndex + 1) % actionOrder.length;
+  let attempts = 0;
+
+  while (attempts < actionOrder.length) {
+    const unitId = actionOrder[index];
+    if (aliveUnits.has(unitId)) {
+      return { unitId, index };
+    }
+    index = (index + 1) % actionOrder.length;
+    attempts++;
+  }
+
+  return null;
+}
+
+/**
+ * Obtém a unidade que controla o turno atual.
+ */
+export function getCurrentTurnUnit(
+  actionOrder: string[],
+  currentTurnIndex: number,
+  units: BattleUnit[]
+): BattleUnit | null {
+  const unitId = actionOrder[currentTurnIndex];
+  return units.find((u) => u.id === unitId && u.isAlive) || null;
 }

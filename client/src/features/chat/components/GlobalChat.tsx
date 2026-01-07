@@ -15,9 +15,9 @@ const GlobalChatInner: React.FC = () => {
         className="
           w-full flex items-center justify-center gap-2
           px-4 py-3
-          bg-citadel-slate/30 border border-metal-iron/30 rounded-lg
-          text-parchment-dark hover:text-parchment-light
-          hover:border-metal-bronze/50 hover:bg-citadel-slate/50
+          bg-surface-800/30 border border-surface-500/30 rounded-lg
+          text-astral-steel hover:text-astral-chrome
+          hover:border-stellar-amber/50 hover:bg-surface-800/50
           transition-all text-sm
         "
       >
@@ -32,7 +32,7 @@ const GlobalChatInner: React.FC = () => {
       variant="full"
       placeholder="Mensagem para todos..."
       maxHeight="250px"
-      title="Chat Global"
+      showHeader={false}
       onClose={closeChat}
     />
   );

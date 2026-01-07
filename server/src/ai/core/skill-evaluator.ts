@@ -230,41 +230,44 @@ export function evaluateSkill(
     };
   }
 
-  // Avaliar baseado na categoria e targetType da skill
-  // Como não temos um campo "type" explícito, inferimos do targetType
+  // Avaliar baseado no effectType da skill
   let evaluation: {
     score: number;
     bestTarget: BattleUnit | null;
     reason: string;
   };
 
-  // Inferir tipo de skill baseado no targetType
-  const isHealingSkill =
-    skill.targetType === "ALLY" || skill.targetType === "SELF";
-  const isOffensiveSkill = skill.targetType === "ENEMY";
+  // Usar effectType diretamente para decisões de IA
+  const effectType = skill.effectType;
 
-  // Se skill aplica condição, verificar se é buff ou debuff
-  const appliesCondition = !!skill.conditionApplied;
-
-  if (isHealingSkill && appliesCondition) {
-    // Buff em aliados
-    evaluation = evaluateBuffSkill(caster, skill, validTargets);
-  } else if (isHealingSkill) {
-    // Cura (skill de suporte sem condição)
-    evaluation = evaluateHealSkill(caster, skill, validTargets);
-  } else if (isOffensiveSkill && appliesCondition) {
-    // Debuff em inimigos
-    evaluation = evaluateDebuffSkill(caster, skill, validTargets);
-  } else if (isOffensiveSkill) {
-    // Dano
-    evaluation = evaluateDamageSkill(caster, skill, validTargets);
-  } else {
-    // Skill genérica
-    evaluation = {
-      score: 20,
-      bestTarget: validTargets[0],
-      reason: "Skill genérica",
-    };
+  switch (effectType) {
+    case "OFFENSIVE":
+      evaluation = evaluateDamageSkill(caster, skill, validTargets);
+      break;
+    case "HEALING":
+      evaluation = evaluateHealSkill(caster, skill, validTargets);
+      break;
+    case "BUFF":
+      evaluation = evaluateBuffSkill(caster, skill, validTargets);
+      break;
+    case "DEBUFF":
+      evaluation = evaluateDebuffSkill(caster, skill, validTargets);
+      break;
+    case "UTILITY":
+      // Skills utilitárias (movimento, etc) têm score base menor
+      evaluation = {
+        score: 15,
+        bestTarget: caster, // Geralmente afeta a si mesmo
+        reason: "Skill utilitária",
+      };
+      break;
+    default:
+      // Fallback: skill sem effectType definido
+      evaluation = {
+        score: 20,
+        bestTarget: validTargets[0],
+        reason: "Skill genérica",
+      };
   }
 
   // Ajustar score baseado na prioridade

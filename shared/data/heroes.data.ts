@@ -4,10 +4,11 @@
 // Re-exporta templates e fornece funções utilitárias
 
 // Re-exportar tipos e templates
-export type { HeroTemplate } from "./Templates/HeroesTemplates";
+export type { HeroTemplate } from "../types/units.types";
 export { HERO_TEMPLATES } from "./Templates/HeroesTemplates";
 
-import { HERO_TEMPLATES, type HeroTemplate } from "./Templates/HeroesTemplates";
+import { HERO_TEMPLATES } from "./Templates/HeroesTemplates";
+import type { HeroTemplate } from "../types/units.types";
 
 // =============================================================================
 // HELPERS
@@ -44,7 +45,14 @@ export function getHeroTotalCost(hero: HeroTemplate): number {
  * Retorna os atributos totais do herói (soma)
  */
 export function getHeroTotalAttributes(hero: HeroTemplate): number {
-  return hero.combat + hero.speed + hero.focus + hero.armor + hero.vitality;
+  return (
+    hero.combat +
+    hero.speed +
+    hero.focus +
+    hero.resistance +
+    hero.will +
+    hero.vitality
+  );
 }
 
 // =============================================================================

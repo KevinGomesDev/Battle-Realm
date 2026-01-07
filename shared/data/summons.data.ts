@@ -3,15 +3,13 @@
 // Re-exporta templates e fornece funções utilitárias
 
 import { getCommonActionCodes } from "./skills.data";
+import type { SummonAIBehavior, SummonTemplate } from "../types/units.types";
 
 // Re-exportar tipos e templates
-export type {
-  SummonAIBehavior,
-  SummonTemplate,
-} from "./Templates/SummonsTemplates";
+export type { SummonAIBehavior, SummonTemplate } from "../types/units.types";
 export { EIDOLON } from "./Templates/SummonsTemplates";
 
-import { EIDOLON, type SummonTemplate } from "./Templates/SummonsTemplates";
+import { EIDOLON } from "./Templates/SummonsTemplates";
 
 // =============================================================================
 // REGISTRO DE TODOS OS SUMMONS
@@ -47,7 +45,8 @@ export function createSummonStats(
   combat: number;
   speed: number;
   focus: number;
-  armor: number;
+  resistance: number;
+  will: number;
   vitality: number;
   damageReduction: number;
 } | null {
@@ -58,7 +57,8 @@ export function createSummonStats(
     combat: template.combat + bonusStats,
     speed: template.speed + bonusStats,
     focus: template.focus + bonusStats,
-    armor: template.armor + bonusStats,
+    resistance: template.resistance + bonusStats,
+    will: template.will + bonusStats,
     vitality: template.vitality + bonusStats,
     damageReduction: template.damageReduction,
   };

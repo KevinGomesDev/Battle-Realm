@@ -1,12 +1,12 @@
 import React from "react";
-import { useConnection } from "../core";
+import { useColyseusConnection } from "../core";
 
 /**
  * Componente que exibe o status do servidor
  * Mostra se o servidor está ativo e disponível para conexão
  */
 export const ServerStatus: React.FC = () => {
-  const { isConnected, error } = useConnection();
+  const { isConnected, error } = useColyseusConnection();
 
   return (
     <div className="fixed top-4 right-4 sm:top-6 sm:right-6 z-20">

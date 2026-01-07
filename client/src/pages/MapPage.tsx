@@ -84,11 +84,11 @@ const MapPage: React.FC = () => {
   const displayError = localError || error;
 
   return (
-    <div className="relative min-h-screen flex flex-col bg-citadel-obsidian">
+    <div className="relative min-h-screen flex flex-col bg-surface-900">
       {/* Ambiente de Fundo Medieval */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-b from-citadel-slate via-citadel-obsidian to-black" />
-        <div className="absolute inset-0 bg-torch-light opacity-20" />
+        <div className="absolute inset-0 bg-gradient-to-b from-surface-800 via-surface-900 to-black" />
+        <div className="absolute inset-0 bg-stellar-amber opacity-20" />
       </div>
 
       {/* TopHUD - Barra Superior */}
@@ -102,17 +102,17 @@ const MapPage: React.FC = () => {
 
       {/* Error Display */}
       {displayError && (
-        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-40 p-4 bg-war-blood/90 border-2 border-war-crimson rounded-lg shadow-forge-glow max-w-md pointer-events-auto">
-          <p className="text-parchment-light font-semibold">{displayError}</p>
+        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-40 p-4 bg-red-800/90 border-2 border-red-500 rounded-lg shadow-stellar max-w-md pointer-events-auto">
+          <p className="text-astral-chrome font-semibold">{displayError}</p>
         </div>
       )}
 
       {/* Loading State */}
       {(isLoadingMap || isLoading) && !matchMapData && (
-        <div className="absolute inset-0 flex items-center justify-center z-30 bg-citadel-obsidian/80">
+        <div className="absolute inset-0 flex items-center justify-center z-30 bg-surface-900/80">
           <div className="text-center">
-            <div className="w-16 h-16 border-4 border-war-crimson border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-parchment-aged text-lg">Loading map...</p>
+            <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-astral-silver text-lg">Loading map...</p>
           </div>
         </div>
       )}
@@ -144,9 +144,9 @@ const MapPage: React.FC = () => {
       {/* Dica para o jogador durante preparação (quando nenhum território selecionado) */}
       {canBuild && !openTerritoryModal && (
         <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none">
-          <div className="bg-citadel-carved/90 border-2 border-metal-iron rounded-lg px-6 py-3 shadow-stone-raised">
+          <div className="bg-surface-600/90 border-2 border-surface-500 rounded-lg px-6 py-3 shadow-card">
             <p
-              className="text-parchment-aged text-sm text-center"
+              className="text-astral-silver text-sm text-center"
               style={{ fontFamily: "'Cinzel', serif" }}
             >
               {inPreparation

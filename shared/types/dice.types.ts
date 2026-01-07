@@ -131,8 +131,8 @@ export interface MultiTargetAttackResult {
  * - Dano Final = Dano - Defesa (mínimo 0)
  *
  * PROTEÇÕES (ver balance.config.ts para multiplicadores)
- * - Proteção Física = Armor * PHYSICAL_PROTECTION_CONFIG.multiplier
- * - Proteção Mágica = Focus * MAGICAL_PROTECTION_CONFIG.multiplier
+ * - Proteção Física = Resistance * PHYSICAL_PROTECTION_CONFIG.multiplier
+ * - Proteção Mágica = Will * MAGICAL_PROTECTION_CONFIG.multiplier
  * - Dano VERDADEIRO ignora todas as proteções
  * - Quando proteção chega a 0, fica "quebrada" e dano vai pro HP
  *

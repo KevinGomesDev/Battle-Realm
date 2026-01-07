@@ -1,7 +1,7 @@
 // server/src/services/event.service.ts
-// Serviço para criar, persistir e emitir eventos do jogo
+// Serviço para criar, persistir e cachear eventos do jogo
+// NOTA: A emissão de eventos é feita pelas Colyseus Rooms diretamente
 
-import { Server, Socket } from "socket.io";
 import { prisma } from "../lib/prisma";
 import type {
   GameEvent,
@@ -10,12 +10,15 @@ import type {
   EventContext,
   EventsPageResponse,
 } from "../../../shared/types/events.types";
+import type { BattleUnit } from "../../../shared/types/battle.types";
+import {
+  getPlayersWithVisionAt,
+  getPlayersWithVisionAtAny,
+} from "../utils/vision.utils";
 
 // =============================================================================
 // ESTADO GLOBAL
 // =============================================================================
-
-let io: Server | null = null;
 
 /**
  * Cache em memória para eventos de batalha (não persistidos no banco)
@@ -26,11 +29,16 @@ const battleEventsCache = new Map<string, GameEvent[]>();
 /** Limite máximo de eventos por batalha em memória */
 const MAX_BATTLE_EVENTS = 500;
 
+// Callback para emissão de eventos (configurado pelas Rooms)
+type EventEmitter = (event: GameEvent) => void;
+let eventEmitter: EventEmitter | null = null;
+
 /**
- * Inicializa o serviço com a instância do Socket.IO
+ * Configura o callback de emissão de eventos
+ * Usado pelas Colyseus Rooms para receber eventos e broadcast
  */
-export function initEventService(socketServer: Server): void {
-  io = socketServer;
+export function setEventEmitter(emitter: EventEmitter): void {
+  eventEmitter = emitter;
 }
 
 // =============================================================================
@@ -65,6 +73,54 @@ export function getBattleEventsFromCache(battleId: string): GameEvent[] {
 }
 
 /**
+ * Carrega eventos de uma batalha do banco de dados
+ * Usado quando o usuário entra/reconecta na batalha
+ */
+export async function loadBattleEventsFromDB(
+  battleId: string
+): Promise<GameEvent[]> {
+  // Verificar se já temos no cache
+  const cached = battleEventsCache.get(battleId);
+  if (cached && cached.length > 0) {
+    return cached;
+  }
+
+  // Carregar do banco
+  const dbEvents = await prisma.gameEvent.findMany({
+    where: { battleId },
+    orderBy: { timestamp: "desc" },
+    take: MAX_BATTLE_EVENTS,
+  });
+
+  // Converter e adicionar ao cache
+  const events: GameEvent[] = dbEvents.map((dbEvent) => ({
+    id: dbEvent.id,
+    timestamp: dbEvent.timestamp,
+    context: dbEvent.context as EventContext,
+    scope: dbEvent.scope as "GLOBAL" | "INDIVIDUAL",
+    category: dbEvent.category as GameEvent["category"],
+    severity: dbEvent.severity as GameEvent["severity"],
+    matchId: dbEvent.matchId || undefined,
+    battleId: dbEvent.battleId || undefined,
+    arenaLobbyId: dbEvent.arenaLobbyId || undefined,
+    targetUserIds: JSON.parse(dbEvent.targetUserIds),
+    sourceUserId: dbEvent.sourceUserId || undefined,
+    message: dbEvent.message,
+    code: dbEvent.code,
+    data: JSON.parse(dbEvent.data),
+    actorId: dbEvent.actorId || undefined,
+    actorName: dbEvent.actorName || undefined,
+    targetId: dbEvent.targetId || undefined,
+    targetName: dbEvent.targetName || undefined,
+  }));
+
+  // Salvar no cache (ordem reversa para mais recente primeiro no cache)
+  battleEventsCache.set(battleId, [...events].reverse());
+
+  return events;
+}
+
+/**
  * Limpa eventos de uma batalha do cache (chamar quando batalha terminar)
  */
 export function clearBattleEventsCache(battleId: string): void {
@@ -93,78 +149,18 @@ function getEventRoom(context: EventContext, contextId?: string): string {
   return `events:${context.toLowerCase()}:${contextId}`;
 }
 
-/**
- * Inscreve socket em sala de eventos
- */
-export function subscribeToEvents(
-  socket: Socket,
-  context: EventContext,
-  contextId?: string
-): void {
-  const room = getEventRoom(context, contextId);
-  socket.join(room);
-  console.log(`[EventService] Socket ${socket.id} joined room ${room}`);
-}
-
-/**
- * Remove socket de sala de eventos
- */
-export function unsubscribeFromEvents(
-  socket: Socket,
-  context: EventContext,
-  contextId?: string
-): void {
-  const room = getEventRoom(context, contextId);
-  socket.leave(room);
-  console.log(`[EventService] Socket ${socket.id} left room ${room}`);
-}
-
 // =============================================================================
 // CRIAÇÃO E EMISSÃO DE EVENTOS
 // =============================================================================
 
 /**
- * Cria um evento, persiste no banco (exceto BATTLE) e emite para os destinatários
- * Eventos de BATTLE ficam apenas em memória para performance
+ * Cria um evento, persiste no banco e emite para os destinatários
+ * Eventos também ficam em cache de memória para acesso rápido
  */
 export async function createAndEmitEvent(
   eventData: GameEventCreate
 ): Promise<GameEvent> {
-  // Eventos de BATTLE não vão para o banco - ficam só em memória
-  if (eventData.context === "BATTLE" && eventData.battleId) {
-    const event: GameEvent = {
-      id: `battle-${eventData.battleId}-${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2, 8)}`,
-      timestamp: new Date(),
-      context: eventData.context,
-      scope: eventData.scope,
-      category: eventData.category,
-      severity: eventData.severity,
-      matchId: eventData.matchId,
-      battleId: eventData.battleId,
-      arenaLobbyId: eventData.arenaLobbyId,
-      targetUserIds: eventData.targetUserIds || [],
-      sourceUserId: eventData.sourceUserId,
-      message: eventData.message,
-      code: eventData.code,
-      data: eventData.data || {},
-      actorId: eventData.actorId,
-      actorName: eventData.actorName,
-      targetId: eventData.targetId,
-      targetName: eventData.targetName,
-    };
-
-    // Guardar em memória
-    addBattleEventToCache(event);
-
-    // Emitir via Socket.IO
-    emitEvent(event);
-
-    return event;
-  }
-
-  // Outros contextos: persistir no banco
+  // Persistir no banco para todos os contextos
   const dbEvent = await prisma.gameEvent.create({
     data: {
       context: eventData.context,
@@ -208,7 +204,12 @@ export async function createAndEmitEvent(
     targetName: dbEvent.targetName || undefined,
   };
 
-  // Emitir evento via Socket.IO
+  // Guardar em cache de memória (para eventos de BATTLE)
+  if (eventData.context === "BATTLE" && eventData.battleId) {
+    addBattleEventToCache(event);
+  }
+
+  // Emitir evento via callback (se configurado)
   emitEvent(event);
 
   return event;
@@ -216,35 +217,16 @@ export async function createAndEmitEvent(
 
 /**
  * Emite evento para os destinatários apropriados
+ * Usa o callback configurado pelas Colyseus Rooms
  */
 function emitEvent(event: GameEvent): void {
-  if (!io) {
-    console.warn("[EventService] Socket.IO not initialized");
+  if (!eventEmitter) {
+    // Sem emitter configurado, evento só fica no cache/banco
     return;
   }
 
-  // Determinar sala de destino
-  let contextId: string | undefined;
-  if (event.context === "MATCH" && event.matchId) {
-    contextId = event.matchId;
-  } else if (event.context === "BATTLE" && event.battleId) {
-    contextId = event.battleId;
-  } else if (event.context === "ARENA" && event.arenaLobbyId) {
-    contextId = event.arenaLobbyId;
-  }
-
-  const room = getEventRoom(event.context, contextId);
-
-  if (event.scope === "GLOBAL") {
-    // Emitir para toda a sala
-    io.to(room).emit("event:new", event);
-  } else if (event.scope === "INDIVIDUAL" && event.targetUserIds?.length) {
-    // Emitir apenas para usuários específicos na sala
-    // Precisamos encontrar os sockets desses usuários
-    for (const userId of event.targetUserIds) {
-      io.to(`user:${userId}`).emit("event:new", event);
-    }
-  }
+  // Delegar emissão para o callback configurado
+  eventEmitter(event);
 }
 
 // =============================================================================
@@ -392,7 +374,21 @@ export async function getEventsLegacy(
 // =============================================================================
 
 /**
+ * Interface de visibilidade para eventos de batalha
+ * Quando fornecida, o evento será emitido apenas para jogadores com visão
+ */
+interface EventVisibilityParams {
+  /** Todas as unidades da batalha para cálculo de visão */
+  allUnits: BattleUnit[];
+  /** Posição(ões) do evento - se qualquer uma for visível, o jogador recebe o evento */
+  positions: Array<{ x: number; y: number }>;
+  /** IDs de jogadores que SEMPRE devem receber o evento (ex: dono da unidade morta) */
+  alwaysInclude?: string[];
+}
+
+/**
  * Cria evento de combate
+ * @param params.visibility - Se fornecido, emite apenas para jogadores com visão
  */
 export async function createCombatEvent(params: {
   battleId: string;
@@ -404,10 +400,32 @@ export async function createCombatEvent(params: {
   targetId?: string;
   targetName?: string;
   data?: Record<string, any>;
+  visibility?: EventVisibilityParams;
 }): Promise<GameEvent> {
+  // Calcular destinatários baseado em visibilidade
+  let scope: "GLOBAL" | "INDIVIDUAL" = "GLOBAL";
+  let targetUserIds: string[] | undefined;
+
+  if (params.visibility) {
+    const { allUnits, positions, alwaysInclude } = params.visibility;
+    const playersWithVision = getPlayersWithVisionAtAny(allUnits, positions);
+
+    // Adicionar jogadores que sempre devem receber
+    if (alwaysInclude) {
+      for (const playerId of alwaysInclude) {
+        if (!playersWithVision.includes(playerId)) {
+          playersWithVision.push(playerId);
+        }
+      }
+    }
+
+    scope = "INDIVIDUAL";
+    targetUserIds = playersWithVision;
+  }
+
   return createAndEmitEvent({
     context: "BATTLE",
-    scope: "GLOBAL",
+    scope,
     category: "COMBAT",
     severity: params.severity || "NEUTRAL",
     battleId: params.battleId,
@@ -418,11 +436,13 @@ export async function createCombatEvent(params: {
     targetId: params.targetId,
     targetName: params.targetName,
     data: params.data,
+    targetUserIds,
   });
 }
 
 /**
  * Cria evento de movimento
+ * @param params.visibility - Se fornecido, emite apenas para jogadores com visão
  */
 export async function createMovementEvent(params: {
   battleId: string;
@@ -431,10 +451,32 @@ export async function createMovementEvent(params: {
   actorId: string;
   actorName: string;
   data?: Record<string, any>;
+  visibility?: EventVisibilityParams;
 }): Promise<GameEvent> {
+  // Calcular destinatários baseado em visibilidade
+  let scope: "GLOBAL" | "INDIVIDUAL" = "GLOBAL";
+  let targetUserIds: string[] | undefined;
+
+  if (params.visibility) {
+    const { allUnits, positions, alwaysInclude } = params.visibility;
+    const playersWithVision = getPlayersWithVisionAtAny(allUnits, positions);
+
+    // Adicionar jogadores que sempre devem receber
+    if (alwaysInclude) {
+      for (const playerId of alwaysInclude) {
+        if (!playersWithVision.includes(playerId)) {
+          playersWithVision.push(playerId);
+        }
+      }
+    }
+
+    scope = "INDIVIDUAL";
+    targetUserIds = playersWithVision;
+  }
+
   return createAndEmitEvent({
     context: "BATTLE",
-    scope: "GLOBAL",
+    scope,
     category: "MOVEMENT",
     severity: "NEUTRAL",
     battleId: params.battleId,
@@ -443,6 +485,7 @@ export async function createMovementEvent(params: {
     actorId: params.actorId,
     actorName: params.actorName,
     data: params.data,
+    targetUserIds,
   });
 }
 
@@ -469,6 +512,7 @@ export async function createTurnEvent(params: {
 
 /**
  * Cria evento de condição
+ * @param params.visibility - Se fornecido, emite apenas para jogadores com visão
  */
 export async function createConditionEvent(params: {
   battleId: string;
@@ -480,10 +524,32 @@ export async function createConditionEvent(params: {
   targetId?: string;
   targetName?: string;
   data?: Record<string, any>;
+  visibility?: EventVisibilityParams;
 }): Promise<GameEvent> {
+  // Calcular destinatários baseado em visibilidade
+  let scope: "GLOBAL" | "INDIVIDUAL" = "GLOBAL";
+  let targetUserIds: string[] | undefined;
+
+  if (params.visibility) {
+    const { allUnits, positions, alwaysInclude } = params.visibility;
+    const playersWithVision = getPlayersWithVisionAtAny(allUnits, positions);
+
+    // Adicionar jogadores que sempre devem receber
+    if (alwaysInclude) {
+      for (const playerId of alwaysInclude) {
+        if (!playersWithVision.includes(playerId)) {
+          playersWithVision.push(playerId);
+        }
+      }
+    }
+
+    scope = "INDIVIDUAL";
+    targetUserIds = playersWithVision;
+  }
+
   return createAndEmitEvent({
     context: "BATTLE",
-    scope: "GLOBAL",
+    scope,
     category: "CONDITION",
     severity: params.severity || "INFO",
     battleId: params.battleId,
@@ -494,6 +560,61 @@ export async function createConditionEvent(params: {
     targetId: params.targetId,
     targetName: params.targetName,
     data: params.data,
+    targetUserIds,
+  });
+}
+
+/**
+ * Cria evento de skill
+ * @param params.visibility - Se fornecido, emite apenas para jogadores com visão
+ */
+export async function createSkillEvent(params: {
+  battleId: string;
+  code: string;
+  message: string;
+  severity?: GameEvent["severity"];
+  actorId?: string;
+  actorName?: string;
+  targetId?: string;
+  targetName?: string;
+  data?: Record<string, any>;
+  visibility?: EventVisibilityParams;
+}): Promise<GameEvent> {
+  // Calcular destinatários baseado em visibilidade
+  let scope: "GLOBAL" | "INDIVIDUAL" = "GLOBAL";
+  let targetUserIds: string[] | undefined;
+
+  if (params.visibility) {
+    const { allUnits, positions, alwaysInclude } = params.visibility;
+    const playersWithVision = getPlayersWithVisionAtAny(allUnits, positions);
+
+    // Adicionar jogadores que sempre devem receber
+    if (alwaysInclude) {
+      for (const playerId of alwaysInclude) {
+        if (!playersWithVision.includes(playerId)) {
+          playersWithVision.push(playerId);
+        }
+      }
+    }
+
+    scope = "INDIVIDUAL";
+    targetUserIds = playersWithVision;
+  }
+
+  return createAndEmitEvent({
+    context: "BATTLE",
+    scope,
+    category: "SKILL",
+    severity: params.severity || "INFO",
+    battleId: params.battleId,
+    code: params.code,
+    message: params.message,
+    actorId: params.actorId,
+    actorName: params.actorName,
+    targetId: params.targetId,
+    targetName: params.targetName,
+    data: params.data,
+    targetUserIds,
   });
 }
 

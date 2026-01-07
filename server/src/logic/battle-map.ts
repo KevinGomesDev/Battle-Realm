@@ -6,12 +6,14 @@ import type {
   TerritorySize,
   BattleObstacle,
   BattleMapConfig,
+  ObstacleType,
 } from "../../../shared/types/battle.types";
 import {
   getRandomTerrain,
   getRandomTerritorySize,
   getObstacleCount,
   TERRAIN_DEFINITIONS,
+  getRandomObstacleType,
 } from "../../../shared/types/battle.types";
 import type { ArenaMapConfig } from "../../../shared/types/arena.types";
 import { OBSTACLE_CONFIG } from "../../../shared/config/global.config";
@@ -90,15 +92,14 @@ export function generateObstacles(
 
     if (tooClose) continue;
 
-    // Alternar entre emoji principal e alternativo
-    const useAlt = Math.random() > 0.7;
-    const emoji = useAlt ? terrain.obstacleAlt : terrain.obstacleEmoji;
+    // Gerar tipo de obstáculo baseado no terreno
+    const obstacleType: ObstacleType = getRandomObstacleType(terrainType);
 
     obstacles.push({
       id: generateObstacleId(),
       posX: x,
       posY: y,
-      emoji,
+      type: obstacleType,
       hp: OBSTACLE_CONFIG.defaultHp,
       maxHp: OBSTACLE_CONFIG.defaultHp,
       destroyed: false,

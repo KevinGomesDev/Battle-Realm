@@ -12,14 +12,14 @@ export const FullScreenLoading: React.FC<FullScreenLoadingProps> = ({
   message = "Carregando...",
 }) => {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-900">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-cosmos-void">
       {/* Barra de progresso */}
-      <div className="w-64 h-2 bg-gray-700 rounded-full overflow-hidden mb-4">
-        <div className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 animate-loading-bar" />
+      <div className="w-64 h-2 bg-surface-800 rounded-full overflow-hidden mb-4">
+        <div className="h-full bg-gradient-to-r from-stellar-gold via-stellar-amber to-stellar-gold animate-loading-bar" />
       </div>
 
       {/* Mensagem */}
-      <p className="text-gray-300 text-sm animate-pulse">{message}</p>
+      <p className="text-astral-silver text-sm animate-pulse">{message}</p>
     </div>
   );
 };

@@ -1,63 +1,61 @@
-import { useContext } from "react";
-import { MatchContext } from "../context/MatchContext";
+// Re-export from MatchColyseusContext
+// Este arquivo mantém compatibilidade com código antigo
 
-export function useMatch() {
-  const context = useContext(MatchContext);
+import { useMatchColyseus } from "../context/MatchColyseusContext";
 
-  if (!context) {
-    throw new Error("useMatch deve ser usado dentro de MatchProvider");
-  }
+export { useMatchColyseus as useMatch };
 
-  // Retorna uma API mais amigável
-  return {
-    // Métodos
-    listOpenMatches: context.listOpenMatches,
-    createMatch: context.createMatch,
-    joinMatch: context.joinMatch,
-    getPreparationData: context.getPreparationData,
-    requestMapData: context.requestMapData,
-    requestMatchState: context.requestMatchState,
-    setPlayerReady: context.setPlayerReady,
-    finishTurn: context.finishTurn,
-    startMatch: context.startMatch,
-    loadMatch: context.loadMatch,
-    // Estado
-    currentMatch: context.state.currentMatch,
-    openMatches: context.state.openMatches,
-    preparationData: context.state.preparationData,
-    matchMapData: context.state.matchMapData,
-    completeMatchState: context.state.completeMatchState,
-    myPlayerId: context.state.myPlayerId,
-    isMyTurn: context.state.isMyTurn,
-    waitingForPlayers: context.state.waitingForPlayers,
-    isLoading: context.state.isLoading,
-    error: context.state.error,
-    // Acesso ao state completo
-    state: context.state,
-  };
-}
-
+/**
+ * Hook para acessar apenas o estado do Match
+ */
 export function useMatchState() {
-  const { state } = useMatch();
+  const { state } = useMatchColyseus();
   return state;
 }
 
+/**
+ * Hook para acessar o match atual (por compatibilidade)
+ */
 export function useCurrentMatch() {
-  const { state } = useMatch();
-  return state.currentMatch;
+  const { state } = useMatchColyseus();
+  return {
+    matchId: state.matchId,
+    status: state.status,
+    phase: state.phase,
+  };
 }
 
+/**
+ * Hook para listar partidas abertas (stub - funcionalidade via Colyseus matchmaker)
+ */
 export function useOpenMatches() {
-  const { state } = useMatch();
-  return state.openMatches;
+  // Com Colyseus, partidas abertas são gerenciadas via matchmaker
+  return [];
 }
 
+/**
+ * Hook para dados de preparação (por compatibilidade)
+ */
 export function usePreparationData() {
-  const { state } = useMatch();
-  return state.preparationData;
+  const { state } = useMatchColyseus();
+  return {
+    players: state.players,
+    territories: state.territories,
+    isReady: state.players.find((p) => p.odataUserId === state.myPlayerId)
+      ?.isReady,
+  };
 }
 
+/**
+ * Hook para dados do mapa (por compatibilidade)
+ */
 export function useMatchMapData() {
-  const { state } = useMatch();
-  return state.matchMapData;
+  const { state } = useMatchColyseus();
+  return {
+    territories: state.territories,
+    mapWidth: state.mapWidth,
+    mapHeight: state.mapHeight,
+    players: state.players,
+    status: state.status,
+  };
 }

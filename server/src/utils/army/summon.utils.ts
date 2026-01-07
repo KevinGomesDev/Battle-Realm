@@ -5,6 +5,10 @@ import {
   HERO_CLASSES,
   getSkillsForClass,
 } from "../../../../shared/data/classes.data";
+import {
+  HP_CONFIG,
+  MANA_CONFIG,
+} from "../../../../shared/config/global.config";
 
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -17,7 +21,8 @@ function generateCreatureStats(level: number) {
     combat: randomBase(),
     speed: randomBase(),
     focus: randomBase(),
-    armor: randomBase(),
+    resistance: randomBase(),
+    will: randomBase(),
     vitality: randomBase(),
   };
 }
@@ -68,9 +73,13 @@ export async function createSummonedCreature(params: {
         combat: stats.combat,
         speed: stats.speed,
         focus: stats.focus,
-        armor: stats.armor,
+        resistance: stats.resistance,
+        will: stats.will,
         vitality: stats.vitality,
-        currentHp: stats.vitality,
+        maxHp: stats.vitality * HP_CONFIG.multiplier,
+        currentHp: stats.vitality * HP_CONFIG.multiplier,
+        maxMana: stats.will * MANA_CONFIG.multiplier,
+        currentMana: stats.will * MANA_CONFIG.multiplier,
         movesLeft: 3,
         actionsLeft: 1,
         summonerId: summonerUnitId || null,

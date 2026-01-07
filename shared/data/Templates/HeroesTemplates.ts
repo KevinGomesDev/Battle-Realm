@@ -1,41 +1,7 @@
 // shared/data/Templates/HeroesTemplates.ts
 // Templates raw de todos os heróis pré-criados (recrutáveis durante partidas)
 
-export interface HeroTemplate {
-  /** Código único do herói (usado como ID) */
-  code: string;
-  /** Nome do herói */
-  name: string;
-  /** Descrição/história do herói */
-  description: string;
-  /** Classe do herói (deve existir em classes.data.ts) */
-  classCode: string;
-  /** Avatar (sprite ID) */
-  avatar: string;
-  /** Nível inicial */
-  level: number;
-  /** Atributos base */
-  combat: number;
-  speed: number;
-  focus: number;
-  armor: number;
-  vitality: number;
-  /** Skills iniciais (códigos de skills da classe) */
-  initialSkills: string[];
-  /** Spells iniciais (códigos de spells) */
-  initialSpells: string[];
-  /** Custo para recrutar (em recursos do reino) */
-  recruitCost: {
-    ore?: number;
-    supplies?: number;
-    arcane?: number;
-    devotion?: number;
-  };
-  /** Ícone/emoji para exibição */
-  icon: string;
-  /** Cor temática (para UI) */
-  themeColor: string;
-}
+import type { HeroTemplate } from "../../types/units.types";
 
 // =============================================================================
 // HERÓIS PRÉ-DEFINIDOS
@@ -56,7 +22,8 @@ export const HERO_TEMPLATES: HeroTemplate[] = [
     combat: 6,
     speed: 3,
     focus: 1,
-    armor: 4,
+    resistance: 4,
+    will: 2,
     vitality: 6,
     initialSkills: ["EXTRA_ATTACK"],
     initialSpells: [],
@@ -82,7 +49,8 @@ export const HERO_TEMPLATES: HeroTemplate[] = [
     combat: 2,
     speed: 3,
     focus: 5,
-    armor: 3,
+    resistance: 3,
+    will: 2,
     vitality: 7,
     initialSkills: ["HEAL"],
     initialSpells: [],
@@ -108,7 +76,8 @@ export const HERO_TEMPLATES: HeroTemplate[] = [
     combat: 1,
     speed: 3,
     focus: 8,
-    armor: 1,
+    resistance: 1,
+    will: 2,
     vitality: 7,
     initialSkills: ["GRIMOIRE"],
     initialSpells: ["FIRE"],

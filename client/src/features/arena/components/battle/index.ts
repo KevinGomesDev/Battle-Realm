@@ -4,3 +4,4 @@ export { UnitPanel } from "./UnitPanel";
 export { BattleResultModal } from "./BattleResultModal";
 export { PauseMenu } from "./PauseMenu";
 export { BattleEventLog, BattleEventLogButton } from "./BattleEventLog";
+export { TargetSelectionNotification } from "./TargetSelectionNotification";

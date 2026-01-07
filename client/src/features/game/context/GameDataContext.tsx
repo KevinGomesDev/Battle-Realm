@@ -6,7 +6,7 @@ import type {
   TerrainType,
   StructureInfo,
 } from "../types/game-data.types";
-import { socketService } from "../../../services/socket.service";
+import { colyseusService } from "../../../services/colyseus.service";
 
 const initialState: GameDataState = {
   terrains: {},
@@ -48,36 +48,9 @@ export function GameDataProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "SET_LOADING", payload: true });
 
     try {
-      socketService.emit("game:get_terrains");
-
-      const terrains = await new Promise<Record<string, TerrainType>>(
-        (resolve, reject) => {
-          let timeoutId: ReturnType<typeof setTimeout>;
-
-          const successHandler = (data: Record<string, TerrainType>) => {
-            clearTimeout(timeoutId);
-            socketService.off("game:terrains_data", successHandler);
-            socketService.off("error", errorHandler);
-            resolve(data);
-          };
-
-          const errorHandler = (data: { message: string }) => {
-            clearTimeout(timeoutId);
-            socketService.off("game:terrains_data", successHandler);
-            socketService.off("error", errorHandler);
-            reject(new Error(data.message || "Erro ao carregar terrenos"));
-          };
-
-          socketService.on("game:terrains_data", successHandler);
-          socketService.on("error", errorHandler);
-
-          timeoutId = setTimeout(() => {
-            socketService.off("game:terrains_data", successHandler);
-            socketService.off("error", errorHandler);
-            reject(new Error("Timeout ao carregar terrenos"));
-          }, 10000);
-        }
-      );
+      const terrains = await colyseusService.sendAndWait<
+        Record<string, TerrainType>
+      >("game:get_terrains", undefined, "game:terrains_data");
 
       dispatch({ type: "SET_TERRAINS", payload: terrains });
       dispatch({ type: "SET_LOADING", payload: false });
@@ -93,38 +66,11 @@ export function GameDataProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "SET_LOADING", payload: true });
 
     try {
-      socketService.emit("game:get_structures", {});
+      const data = await colyseusService.sendAndWait<
+        StructureInfo[] | { structures: StructureInfo[] }
+      >("game:get_structures", {}, "game:structures_data");
 
-      const structures = await new Promise<StructureInfo[]>(
-        (resolve, reject) => {
-          let timeoutId: ReturnType<typeof setTimeout>;
-
-          const successHandler = (
-            data: StructureInfo[] | { structures: StructureInfo[] }
-          ) => {
-            clearTimeout(timeoutId);
-            socketService.off("game:structures_data", successHandler);
-            socketService.off("error", errorHandler);
-            resolve(Array.isArray(data) ? data : data.structures || []);
-          };
-
-          const errorHandler = (data: { message: string }) => {
-            clearTimeout(timeoutId);
-            socketService.off("game:structures_data", successHandler);
-            socketService.off("error", errorHandler);
-            reject(new Error(data.message || "Erro ao carregar estruturas"));
-          };
-
-          socketService.on("game:structures_data", successHandler);
-          socketService.on("error", errorHandler);
-
-          timeoutId = setTimeout(() => {
-            socketService.off("game:structures_data", successHandler);
-            socketService.off("error", errorHandler);
-            reject(new Error("Timeout ao carregar estruturas"));
-          }, 10000);
-        }
-      );
+      const structures = Array.isArray(data) ? data : data.structures || [];
 
       dispatch({ type: "SET_STRUCTURES", payload: structures });
       dispatch({ type: "SET_LOADING", payload: false });

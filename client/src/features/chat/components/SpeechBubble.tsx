@@ -39,15 +39,15 @@ export const SpeechBubble: React.FC<SpeechBubbleProps> = ({
           shadow-lg
           ${
             isOwned
-              ? "bg-metal-gold/90 border border-metal-bronze"
-              : "bg-war-blood/90 border border-war-crimson"
+              ? "bg-stellar-gold/90 border border-stellar-amber"
+              : "bg-red-800/90 border border-red-500"
           }
         `}
       >
         <p
           className={`
             text-xs font-medium break-words
-            ${isOwned ? "text-citadel-obsidian" : "text-parchment-light"}
+            ${isOwned ? "text-surface-900" : "text-astral-chrome"}
           `}
         >
           {displayMessage}
@@ -60,7 +60,7 @@ export const SpeechBubble: React.FC<SpeechBubbleProps> = ({
             w-0 h-0
             border-l-4 border-r-4 border-t-4
             border-l-transparent border-r-transparent
-            ${isOwned ? "border-t-metal-gold/90" : "border-t-war-blood/90"}
+            ${isOwned ? "border-t-stellar-gold/90" : "border-t-red-800/90"}
           `}
         />
       </div>

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ErrorAlert, SuccessAlert } from "@/components/Alerts";
+import { Button } from "@/components/Button";
 import type { AuthFormData } from "../../../shared/types/auth.types";
 
 // Re-export for backwards compatibility
@@ -81,15 +82,18 @@ export const AuthForm: React.FC<AuthFormProps> = ({
 
   return (
     <div className="w-full space-y-6">
-      {/* Form Title - Estilo Pergaminho Medieval */}
+      {/* Form Title - Estilo Stellar */}
       <div className="text-center mb-8">
         <h2
-          className="text-3xl sm:text-4xl font-bold text-parchment-light drop-shadow-lg"
-          style={{ fontFamily: "'Cinzel', serif", letterSpacing: "0.1em" }}
+          className="text-3xl sm:text-4xl font-bold text-stellar-gradient drop-shadow-lg"
+          style={{
+            fontFamily: "'Orbitron', sans-serif",
+            letterSpacing: "0.1em",
+          }}
         >
           {title}
         </h2>
-        <div className="h-1 w-20 mx-auto bg-gradient-to-r from-transparent via-metal-gold to-transparent mt-3 rounded-full"></div>
+        <div className="h-px w-20 mx-auto bg-gradient-to-r from-transparent via-stellar-amber to-transparent mt-3 rounded-full"></div>
       </div>
 
       {showSuccess && (
@@ -116,9 +120,9 @@ export const AuthForm: React.FC<AuthFormProps> = ({
         <div className="group">
           <label
             htmlFor="username"
-            className="block font-semibold text-parchment-aged text-sm mb-2 uppercase tracking-widest"
+            className="block font-semibold text-astral-silver text-sm mb-2 uppercase tracking-widest"
           >
-            👤 Usuário
+            ✦ Usuário
           </label>
           <div className="relative">
             <input
@@ -128,14 +132,14 @@ export const AuthForm: React.FC<AuthFormProps> = ({
               value={formData.username}
               onChange={handleInputChange}
               disabled={isLoading}
-              placeholder="Digite seu nome de guerreiro"
+              placeholder="Digite seu nome de viajante"
               autoComplete="username"
-              className="w-full px-4 py-3 bg-citadel-slate border-2 border-metal-iron rounded-lg 
-                         text-parchment-light placeholder-parchment-dark/50 text-sm 
+              className="w-full px-4 py-3 bg-surface-900 border border-surface-500/50 rounded-lg 
+                         text-astral-chrome placeholder-surface-300/50 text-sm 
                          transition-all duration-300 
-                         focus:outline-none focus:border-metal-bronze focus:ring-2 focus:ring-metal-bronze/20 
+                         focus:outline-none focus:border-stellar-amber/50 focus:ring-2 focus:ring-stellar-amber/20 
                          disabled:opacity-50 disabled:cursor-not-allowed 
-                         hover:border-metal-steel shadow-stone-inset"
+                         hover:border-surface-400"
             />
           </div>
         </div>
@@ -145,9 +149,9 @@ export const AuthForm: React.FC<AuthFormProps> = ({
           <div className="group">
             <label
               htmlFor="email"
-              className="block font-semibold text-parchment-aged text-sm mb-2 uppercase tracking-widest"
+              className="block font-semibold text-astral-silver text-sm mb-2 uppercase tracking-widest"
             >
-              📧 Email
+              ✧ Email
             </label>
             <div className="relative">
               <input
@@ -157,14 +161,14 @@ export const AuthForm: React.FC<AuthFormProps> = ({
                 value={formData.email}
                 onChange={handleInputChange}
                 disabled={isLoading}
-                placeholder="seu.email@realm.com"
+                placeholder="seu.email@cosmos.com"
                 autoComplete="email"
-                className="w-full px-4 py-3 bg-citadel-slate border-2 border-metal-iron rounded-lg 
-                           text-parchment-light placeholder-parchment-dark/50 text-sm 
+                className="w-full px-4 py-3 bg-surface-900 border border-surface-500/50 rounded-lg 
+                           text-astral-chrome placeholder-surface-300/50 text-sm 
                            transition-all duration-300 
-                           focus:outline-none focus:border-metal-bronze focus:ring-2 focus:ring-metal-bronze/20 
+                           focus:outline-none focus:border-stellar-amber/50 focus:ring-2 focus:ring-stellar-amber/20 
                            disabled:opacity-50 disabled:cursor-not-allowed 
-                           hover:border-metal-steel shadow-stone-inset"
+                           hover:border-surface-400"
               />
             </div>
           </div>
@@ -174,9 +178,9 @@ export const AuthForm: React.FC<AuthFormProps> = ({
         <div className="group">
           <label
             htmlFor="password"
-            className="block font-semibold text-parchment-aged text-sm mb-2 uppercase tracking-widest"
+            className="block font-semibold text-astral-silver text-sm mb-2 uppercase tracking-widest"
           >
-            🔐 Senha
+            ◈ Senha
           </label>
           <div className="relative">
             <input
@@ -188,61 +192,42 @@ export const AuthForm: React.FC<AuthFormProps> = ({
               disabled={isLoading}
               placeholder="Mínimo 6 caracteres"
               autoComplete={isLogin ? "current-password" : "new-password"}
-              className="w-full px-4 py-3 bg-citadel-slate border-2 border-metal-iron rounded-lg 
-                         text-parchment-light placeholder-parchment-dark/50 text-sm 
+              className="w-full px-4 py-3 bg-surface-900 border border-surface-500/50 rounded-lg 
+                         text-astral-chrome placeholder-surface-300/50 text-sm 
                          transition-all duration-300 
-                         focus:outline-none focus:border-metal-bronze focus:ring-2 focus:ring-metal-bronze/20 
+                         focus:outline-none focus:border-stellar-amber/50 focus:ring-2 focus:ring-stellar-amber/20 
                          disabled:opacity-50 disabled:cursor-not-allowed 
-                         hover:border-metal-steel shadow-stone-inset"
+                         hover:border-surface-400"
             />
           </div>
         </div>
 
         {/* Actions */}
         <div className="space-y-3 pt-4">
-          {/* Submit Button - Estilo Forja */}
-          <button
+          <Button
             type="submit"
+            variant="primary"
+            size="lg"
+            fullWidth
             disabled={isLoading}
-            className="group relative w-full px-6 py-4 bg-gradient-to-b from-war-crimson to-war-blood 
-                       border-3 border-metal-iron rounded-lg shadow-forge-glow
-                       hover:from-war-ember hover:to-war-crimson
-                       disabled:from-citadel-granite disabled:to-citadel-carved disabled:shadow-none
-                       active:animate-stone-press transition-all duration-200"
+            isLoading={isLoading}
+            icon="✦"
           >
-            {/* Rebites */}
-            <div className="absolute top-1 left-1 w-2 h-2 bg-metal-iron rounded-full"></div>
-            <div className="absolute top-1 right-1 w-2 h-2 bg-metal-iron rounded-full"></div>
-            <div className="absolute bottom-1 left-1 w-2 h-2 bg-metal-iron rounded-full"></div>
-            <div className="absolute bottom-1 right-1 w-2 h-2 bg-metal-iron rounded-full"></div>
-
-            <span
-              className="relative flex items-center justify-center gap-2 text-parchment-light font-bold tracking-wider"
-              style={{ fontFamily: "'Cinzel', serif" }}
-            >
-              {isLoading ? (
-                <>
-                  <div className="animate-spin w-5 h-5 border-2 border-parchment-light border-t-transparent rounded-full"></div>
-                  Carregando...
-                </>
-              ) : (
-                <>⚔️ {buttonText.toUpperCase()}</>
-              )}
-            </span>
-          </button>
+            {buttonText.toUpperCase()}
+          </Button>
 
           {onCancel && (
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="md"
+              fullWidth
               onClick={onCancel}
               disabled={isLoading}
-              className="w-full px-6 py-3 bg-gradient-to-b from-citadel-granite to-citadel-carved 
-                         border-2 border-metal-iron rounded-lg shadow-stone-raised
-                         hover:from-citadel-weathered hover:to-citadel-granite
-                         text-parchment-aged font-semibold transition-all duration-200"
+              icon="←"
             >
-              ← Voltar
-            </button>
+              Voltar
+            </Button>
           )}
         </div>
       </form>

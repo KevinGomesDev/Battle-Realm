@@ -13,7 +13,9 @@ import type { ArenaBattle } from "../../types/arena.types";
 import type {
   BattleObstacle,
   BattleUnit,
+  ObstacleType,
 } from "../../../../../../shared/types/battle.types";
+import { getObstacleVisualConfig } from "../../../../../../shared/config/global.config";
 import {
   getFullMovementInfo,
   type MovementCellInfo,
@@ -35,8 +37,18 @@ export type { SpriteDirection };
 export interface ArenaBattleCanvasRef {
   /** Centralizar câmera em uma unidade pelo ID */
   centerOnUnit: (unitId: string) => void;
+  /** Centralizar câmera em uma unidade APENAS se estiver na visão do jogador */
+  centerOnUnitIfVisible: (unitId: string) => void;
+  /** Centralizar câmera em uma posição do grid APENAS se estiver na visão do jogador */
+  centerOnPositionIfVisible: (x: number, y: number) => void;
+  /** Verificar se uma unidade está na visão do jogador */
+  isUnitVisible: (unitId: string) => boolean;
+  /** Verificar se uma posição do grid está na visão do jogador */
+  isPositionVisible: (x: number, y: number) => boolean;
   /** Iniciar animação de sprite em uma unidade */
   playAnimation: (unitId: string, animation: SpriteAnimation) => void;
+  /** Sacudir a câmera (feedback de dano) */
+  shake: (intensity?: number, duration?: number) => void;
 }
 
 interface ActiveBubble {
@@ -54,6 +66,8 @@ interface ArenaBattleCanvasProps {
   onCellClick?: (x: number, y: number) => void;
   onUnitClick?: (unit: BattleUnit) => void;
   onObstacleClick?: (obstacle: BattleObstacle) => void;
+  /** Handler para clique com botão direito (cancela ação pendente) */
+  onRightClick?: () => void;
   /** Direção para virar a unidade selecionada (baseado no movimento/clique) */
   unitDirection?: { unitId: string; direction: SpriteDirection } | null;
   /** Ação pendente - quando "attack", mostra células atacáveis */
@@ -62,6 +76,14 @@ interface ArenaBattleCanvasProps {
   activeBubbles?: Map<string, ActiveBubble>;
   /** IDs de unidades para destacar como alvos válidos */
   highlightedUnitIds?: Set<string>;
+  /** Preview de área de spell/skill (tamanho e cor) */
+  spellAreaPreview?: {
+    size: number; // Ex: 3 = 3x3
+    color: string; // Cor base do preview (usada no centro)
+    centerOnSelf?: boolean; // Se true, centra na unidade selecionada (para range SELF)
+    rangeDistance?: number; // Distância máxima do caster (bloqueio de área)
+    casterPos?: { x: number; y: number }; // Posição do caster para calcular distância
+  } | null;
 }
 
 /**
@@ -80,10 +102,12 @@ export const ArenaBattleCanvas = memo(
         onCellClick,
         onUnitClick,
         onObstacleClick,
+        onRightClick,
         unitDirection,
         pendingAction,
         activeBubbles,
         highlightedUnitIds,
+        spellAreaPreview,
       },
       ref
     ) => {
@@ -98,7 +122,6 @@ export const ArenaBattleCanvas = memo(
       // Cores do terreno para o grid (usa cores do terreno, não cores padrão)
       const TERRAIN_COLORS = MAP_CONFIG?.terrainColors;
 
-      // Helper para obter cores de um jogador por ownerId
       const getPlayerColors = useCallback(
         (ownerId: string) => {
           const kingdom = kingdoms.find((k) => k.ownerId === ownerId);
@@ -145,6 +168,10 @@ export const ArenaBattleCanvas = memo(
         clientX: number;
         clientY: number;
       } | null>(null);
+
+      // Ref para detectar drag vs click (posição do mousedown)
+      const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
+      const DRAG_THRESHOLD = 5; // pixels de tolerância para considerar click
 
       // Hook de sprites (usa refs para evitar re-renders)
       const {
@@ -453,6 +480,150 @@ export const ArenaBattleCanvas = memo(
         pendingAction,
       ]);
 
+      // =========================================
+      // RENDERIZAÇÃO DE OBSTÁCULOS 2.5D
+      // =========================================
+
+      /**
+       * Desenha uma face do bloco 3D
+       */
+      const drawFace = useCallback(
+        (
+          ctx: CanvasRenderingContext2D,
+          points: { x: number; y: number }[],
+          fillColor: string,
+          strokeColor: string = "#000"
+        ) => {
+          ctx.fillStyle = fillColor;
+          ctx.strokeStyle = strokeColor;
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.moveTo(points[0].x, points[0].y);
+          for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        },
+        []
+      );
+
+      /**
+       * Desenha um obstáculo com efeito 2.5D baseado na posição do mouse/câmera
+       */
+      const drawObstacle3D = useCallback(
+        (
+          ctx: CanvasRenderingContext2D,
+          obstacle: BattleObstacle,
+          cellSize: number,
+          cameraPos: { x: number; y: number }
+        ) => {
+          const config = getObstacleVisualConfig(
+            (obstacle.type as ObstacleType) || "ROCK"
+          );
+
+          const baseX = obstacle.posX * cellSize;
+          const baseY = obstacle.posY * cellSize;
+
+          // Centro do obstáculo
+          const centerX = baseX + cellSize / 2;
+          const centerY = baseY + cellSize / 2;
+
+          // Vetor do centro para a câmera (determina perspectiva)
+          const vecX = centerX - cameraPos.x;
+          const vecY = centerY - cameraPos.y;
+
+          // Força da perspectiva baseada na altura do obstáculo
+          const perspectiveStrength = 0.15;
+          const shiftX = vecX * perspectiveStrength * config.heightScale;
+          const shiftY = vecY * perspectiveStrength * config.heightScale;
+
+          // Tamanho do bloco (ligeiramente menor que a célula para dar espaço)
+          const blockSize = cellSize * 0.85;
+          const offset = (cellSize - blockSize) / 2;
+
+          // Cantos da base
+          const bTL = { x: baseX + offset, y: baseY + offset };
+          const bTR = { x: baseX + offset + blockSize, y: baseY + offset };
+          const bBR = {
+            x: baseX + offset + blockSize,
+            y: baseY + offset + blockSize,
+          };
+          const bBL = { x: baseX + offset, y: baseY + offset + blockSize };
+
+          // Cantos do topo (deslocados pela perspectiva)
+          const tTL = { x: bTL.x + shiftX, y: bTL.y + shiftY };
+          const tTR = { x: bTR.x + shiftX, y: bTR.y + shiftY };
+          const tBR = { x: bBR.x + shiftX, y: bBR.y + shiftY };
+          const tBL = { x: bBL.x + shiftX, y: bBL.y + shiftY };
+
+          // Renderizar faces baseado na direção da câmera
+
+          // Face Y (Norte ou Sul)
+          if (vecY > 0) {
+            // Vendo o lado Norte
+            drawFace(ctx, [bTL, bTR, tTR, tTL], config.sideYColor);
+          } else {
+            // Vendo o lado Sul
+            drawFace(ctx, [bBL, bBR, tBR, tBL], config.sideYColor);
+          }
+
+          // Face X (Oeste ou Leste)
+          if (vecX > 0) {
+            // Vendo o lado Oeste
+            drawFace(ctx, [bTL, bBL, tBL, tTL], config.sideXColor);
+          } else {
+            // Vendo o lado Leste
+            drawFace(ctx, [bTR, bBR, tBR, tTR], config.sideXColor);
+          }
+
+          // Topo
+          ctx.fillStyle = config.topColor;
+          ctx.beginPath();
+          ctx.moveTo(tTL.x, tTL.y);
+          ctx.lineTo(tTR.x, tTR.y);
+          ctx.lineTo(tBR.x, tBR.y);
+          ctx.lineTo(tBL.x, tBL.y);
+          ctx.closePath();
+          ctx.fill();
+
+          // Borda do topo (highlight)
+          if (config.highlightColor) {
+            ctx.strokeStyle = config.highlightColor;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+
+          // HP bar se o obstáculo foi danificado
+          if (
+            obstacle.hp !== undefined &&
+            obstacle.maxHp !== undefined &&
+            obstacle.hp < obstacle.maxHp
+          ) {
+            const hpPercent = obstacle.hp / obstacle.maxHp;
+            const barWidth = blockSize * 0.8;
+            const barHeight = 4;
+            const barX = tTL.x + (blockSize - barWidth) / 2;
+            const barY = tTL.y - 8;
+
+            // Background
+            ctx.fillStyle = "rgba(0,0,0,0.5)";
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+
+            // HP
+            ctx.fillStyle =
+              hpPercent > 0.5
+                ? "#2ecc71"
+                : hpPercent > 0.25
+                ? "#f39c12"
+                : "#e74c3c";
+            ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
+          }
+        },
+        [drawFace]
+      );
+
       // Função para desenhar unidade usando sprite
       const drawUnit = useCallback(
         (
@@ -703,16 +874,14 @@ export const ArenaBattleCanvas = memo(
       //     ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
 
       //     // Proteção
-      //     if (unit.protection > 0 || unit.protectionBroken) {
+      //     if (unit.protection > 0) {
       //       const protY = barY - barHeight - 1;
-      //       const maxProt = unit.armor * 2;
+      //       const maxProt = unit.resistance * 2;
       //       const protPercent = unit.protection / maxProt;
 
       //       ctx.fillStyle = "#1a1a1a";
       //       ctx.fillRect(barX, protY, barWidth, barHeight - 1);
-      //       ctx.fillStyle = unit.protectionBroken
-      //         ? UI_COLORS.protectionBroken
-      //         : UI_COLORS.protection;
+      //       ctx.fillStyle = UI_COLORS.protection;
       //       ctx.fillRect(barX, protY, barWidth * protPercent, barHeight - 1);
       //     }
       //   },
@@ -955,8 +1124,181 @@ export const ArenaBattleCanvas = memo(
           ctx.strokeRect(cellX, cellY, cellSize, cellSize);
         });
 
-        // Hover
-        if (hoveredCell) {
+        // === INDICADOR DE RANGE PARA SPELL/SKILL ===
+        // Desenha todos os blocos FORA do rangeDistance em vermelho translúcido
+        if (
+          spellAreaPreview &&
+          spellAreaPreview.rangeDistance !== undefined &&
+          spellAreaPreview.casterPos &&
+          !spellAreaPreview.centerOnSelf
+        ) {
+          const casterX = spellAreaPreview.casterPos.x;
+          const casterY = spellAreaPreview.casterPos.y;
+          const maxRange = spellAreaPreview.rangeDistance;
+
+          for (let gx = 0; gx < GRID_WIDTH; gx++) {
+            for (let gy = 0; gy < GRID_HEIGHT; gy++) {
+              // Usar Chebyshev distance (8 direções)
+              const distance = Math.max(
+                Math.abs(gx - casterX),
+                Math.abs(gy - casterY)
+              );
+
+              if (distance > maxRange) {
+                const cellX = gx * cellSize;
+                const cellY = gy * cellSize;
+                ctx.fillStyle = GRID_COLORS.areaPreviewOutOfRange;
+                ctx.fillRect(cellX, cellY, cellSize, cellSize);
+              }
+            }
+          }
+        }
+
+        // === PREVIEW DE ÁREA DE SPELL/SKILL ===
+        // Para skills SELF com área, sempre mostra centrado na unidade selecionada
+        // Para outras, mostra onde o mouse está (limitado por rangeDistance)
+        const selectedUnit = units.find((u) => u.id === selectedUnitId);
+
+        // Calcular centro do preview (clamped ao rangeDistance)
+        const areaPreviewCenter = (() => {
+          if (!spellAreaPreview) return null;
+
+          // SELF: sempre centrado na unidade selecionada
+          if (spellAreaPreview.centerOnSelf) {
+            return selectedUnit
+              ? { x: selectedUnit.posX, y: selectedUnit.posY }
+              : null;
+          }
+
+          // Sem hover, não mostra preview
+          if (!hoveredCell) return null;
+
+          // Se não tem rangeDistance definido, usa posição do mouse diretamente
+          if (
+            spellAreaPreview.rangeDistance === undefined ||
+            !spellAreaPreview.casterPos
+          ) {
+            return hoveredCell;
+          }
+
+          // Calcular distância do caster até o hover
+          const casterX = spellAreaPreview.casterPos.x;
+          const casterY = spellAreaPreview.casterPos.y;
+          const maxRange = spellAreaPreview.rangeDistance;
+
+          // Distância Chebyshev (8 direções)
+          const distance = Math.max(
+            Math.abs(hoveredCell.x - casterX),
+            Math.abs(hoveredCell.y - casterY)
+          );
+
+          // Se dentro do alcance, usa posição do mouse
+          if (distance <= maxRange) {
+            return hoveredCell;
+          }
+
+          // Fora do alcance: clamp para o último bloco válido na direção
+          const dx = hoveredCell.x - casterX;
+          const dy = hoveredCell.y - casterY;
+
+          // Normalizar direção e escalar para maxRange
+          const scale = maxRange / Math.max(Math.abs(dx), Math.abs(dy));
+          const clampedX = Math.round(casterX + dx * scale);
+          const clampedY = Math.round(casterY + dy * scale);
+
+          return { x: clampedX, y: clampedY };
+        })();
+
+        if (spellAreaPreview && areaPreviewCenter) {
+          const radius = Math.floor(spellAreaPreview.size / 2);
+          const centerX = areaPreviewCenter.x;
+          const centerY = areaPreviewCenter.y;
+
+          // Verificar se a posição central está fora do alcance (para feedback visual)
+          let isCenterOutOfRange = false;
+          if (
+            spellAreaPreview.rangeDistance !== undefined &&
+            spellAreaPreview.casterPos &&
+            hoveredCell
+          ) {
+            const casterX = spellAreaPreview.casterPos.x;
+            const casterY = spellAreaPreview.casterPos.y;
+            const distanceToHover = Math.max(
+              Math.abs(hoveredCell.x - casterX),
+              Math.abs(hoveredCell.y - casterY)
+            );
+            isCenterOutOfRange =
+              distanceToHover > spellAreaPreview.rangeDistance;
+          }
+
+          // Desenhar área de efeito (células que serão afetadas)
+          for (let dx = -radius; dx <= radius; dx++) {
+            for (let dy = -radius; dy <= radius; dy++) {
+              const areaX = centerX + dx;
+              const areaY = centerY + dy;
+
+              // Verificar limites do grid
+              if (
+                areaX < 0 ||
+                areaX >= GRID_WIDTH ||
+                areaY < 0 ||
+                areaY >= GRID_HEIGHT
+              ) {
+                continue;
+              }
+
+              const cellX = areaX * cellSize;
+              const cellY = areaY * cellSize;
+
+              // Verificar se há unidade ou obstáculo nesta célula
+              const unitInCell = units.find(
+                (u) => u.isAlive && u.posX === areaX && u.posY === areaY
+              );
+              const obstacleInCell = OBSTACLES.find(
+                (o) => !o.destroyed && o.posX === areaX && o.posY === areaY
+              );
+              const hasTarget = unitInCell || obstacleInCell;
+
+              // Determinar cor baseada no contexto
+              if (isCenterOutOfRange) {
+                // Fora do alcance: vermelho
+                ctx.fillStyle = GRID_COLORS.areaPreviewOutOfRange;
+                ctx.strokeStyle = GRID_COLORS.areaPreviewOutOfRangeBorder;
+                ctx.lineWidth = 1;
+              } else if (hasTarget) {
+                // Com alvo: verde
+                ctx.fillStyle = GRID_COLORS.areaPreviewTarget;
+                ctx.strokeStyle = GRID_COLORS.areaPreviewTargetBorder;
+                ctx.lineWidth = 2;
+              } else {
+                // Sem alvo: branco
+                ctx.fillStyle = GRID_COLORS.areaPreviewEmpty;
+                ctx.strokeStyle = GRID_COLORS.areaPreviewEmptyBorder;
+                ctx.lineWidth = 1;
+              }
+
+              ctx.fillRect(cellX, cellY, cellSize, cellSize);
+              ctx.strokeRect(cellX, cellY, cellSize, cellSize);
+            }
+          }
+
+          // Desenhar centro com destaque especial
+          const centerCellX = centerX * cellSize;
+          const centerCellY = centerY * cellSize;
+          ctx.strokeStyle = isCenterOutOfRange
+            ? GRID_COLORS.areaPreviewOutOfRangeBorder
+            : GRID_COLORS.areaPreviewCenter;
+          ctx.lineWidth = 3;
+          ctx.strokeRect(
+            centerCellX + 2,
+            centerCellY + 2,
+            cellSize - 4,
+            cellSize - 4
+          );
+        }
+
+        // Hover (apenas se não há preview de área)
+        if (hoveredCell && !spellAreaPreview) {
           const cellX = hoveredCell.x * cellSize;
           const cellY = hoveredCell.y * cellSize;
           ctx.fillStyle = GRID_COLORS.cellHover;
@@ -966,27 +1308,43 @@ export const ArenaBattleCanvas = memo(
           ctx.strokeRect(cellX, cellY, cellSize, cellSize);
         }
 
-        // === DESENHAR OBSTÁCULOS (não destruídos e visíveis) ===
-        OBSTACLES.forEach((obstacle) => {
-          if (obstacle.destroyed) return;
+        // === DESENHAR OBSTÁCULOS (não destruídos e visíveis) - 2.5D ===
+        // Calcular posição da câmera para perspectiva
+        // Usa centro do canvas como padrão, ou posição do mouse se disponível
+        const canvasBounds = canvas?.getBoundingClientRect();
+        const cameraPos =
+          mousePosition && canvasBounds
+            ? {
+                x:
+                  (mousePosition.clientX - canvasBounds.left) /
+                  (canvasBounds.width / canvasWidth),
+                y:
+                  (mousePosition.clientY - canvasBounds.top) /
+                  (canvasBounds.height / canvasHeight),
+              }
+            : { x: canvasWidth / 2, y: canvasHeight / 2 };
 
-          // Fog of War: só desenha se célula é visível
-          const obsKey = `${obstacle.posX},${obstacle.posY}`;
-          if (!visibleCells.has(obsKey)) return;
+        // Ordenar obstáculos por distância à câmera (mais distantes primeiro)
+        const sortedObstacles = [...OBSTACLES]
+          .filter(
+            (obs) =>
+              !obs.destroyed && visibleCells.has(`${obs.posX},${obs.posY}`)
+          )
+          .sort((a, b) => {
+            const aCenterX = a.posX * cellSize + cellSize / 2;
+            const aCenterY = a.posY * cellSize + cellSize / 2;
+            const bCenterX = b.posX * cellSize + cellSize / 2;
+            const bCenterY = b.posY * cellSize + cellSize / 2;
+            const aDistSq =
+              (aCenterX - cameraPos.x) ** 2 + (aCenterY - cameraPos.y) ** 2;
+            const bDistSq =
+              (bCenterX - cameraPos.x) ** 2 + (bCenterY - cameraPos.y) ** 2;
+            return bDistSq - aDistSq; // Mais distante primeiro
+          });
 
-          const cellX = obstacle.posX * cellSize;
-          const cellY = obstacle.posY * cellSize;
-
-          // Desenhar emoji do obstáculo (tamanho maior)
-          const fontSize = Math.max(16, cellSize * 0.85);
-          ctx.font = `${fontSize}px Arial`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(
-            obstacle.emoji,
-            cellX + cellSize / 2,
-            cellY + cellSize / 2
-          );
+        // Renderizar obstáculos ordenados
+        sortedObstacles.forEach((obstacle) => {
+          drawObstacle3D(ctx, obstacle, cellSize, cameraPos);
         });
 
         // === DESENHAR UNIDADES ===
@@ -1121,6 +1479,10 @@ export const ArenaBattleCanvas = memo(
         getVisualPosition,
         drawStaticGrid,
         highlightedUnitIds,
+        drawObstacle3D,
+        mousePosition,
+        canvasWidth,
+        canvasHeight,
       ]);
 
       // === MARCAR PARA REDESENHO ===
@@ -1250,10 +1612,30 @@ export const ArenaBattleCanvas = memo(
       const handleMouseLeave = useCallback(() => {
         setHoveredCell(null);
         setMousePosition(null);
+        mouseDownPosRef.current = null;
       }, []);
+
+      const handleMouseDown = useCallback(
+        (e: React.MouseEvent<HTMLCanvasElement>) => {
+          mouseDownPosRef.current = { x: e.clientX, y: e.clientY };
+        },
+        []
+      );
 
       const handleClick = useCallback(
         (e: React.MouseEvent<HTMLCanvasElement>) => {
+          // Verificar se foi um drag (não um click direto)
+          if (mouseDownPosRef.current) {
+            const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
+            const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
+            if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+              // Foi um drag, ignorar click
+              mouseDownPosRef.current = null;
+              return;
+            }
+          }
+          mouseDownPosRef.current = null;
+
           const canvas = canvasRef.current;
           if (!canvas) return;
 
@@ -1305,17 +1687,76 @@ export const ArenaBattleCanvas = memo(
         [units, cellSize]
       );
 
+      // Verificar se uma unidade está na visão do jogador
+      const isUnitVisible = useCallback(
+        (unitId: string): boolean => {
+          const unit = units.find((u) => u.id === unitId);
+          if (!unit) return false;
+
+          // Unidades aliadas são sempre visíveis
+          if (unit.ownerId === currentUserId) return true;
+
+          // Para unidades inimigas, verificar se a posição está em uma célula visível
+          return visibleCells.has(`${unit.posX},${unit.posY}`);
+        },
+        [units, currentUserId, visibleCells]
+      );
+
+      // Verificar se uma posição do grid está na visão do jogador
+      const isPositionVisible = useCallback(
+        (x: number, y: number): boolean => {
+          return visibleCells.has(`${x},${y}`);
+        },
+        [visibleCells]
+      );
+
+      // Centralizar câmera em uma unidade APENAS se estiver na visão
+      const centerOnUnitIfVisible = useCallback(
+        (unitId: string) => {
+          if (isUnitVisible(unitId)) {
+            centerOnUnit(unitId);
+          }
+        },
+        [isUnitVisible, centerOnUnit]
+      );
+
+      // Centralizar câmera em uma posição do grid APENAS se estiver na visão
+      const centerOnPositionIfVisible = useCallback(
+        (x: number, y: number) => {
+          if (isPositionVisible(x, y) && cameraRef.current) {
+            const pixelX = (x + 0.5) * cellSize;
+            const pixelY = (y + 0.5) * cellSize;
+            cameraRef.current.centerOn(pixelX, pixelY);
+          }
+        },
+        [isPositionVisible, cellSize]
+      );
+
       // Expor métodos via ref
       useImperativeHandle(
         ref,
         () => ({
           centerOnUnit,
+          centerOnUnitIfVisible,
+          centerOnPositionIfVisible,
+          isUnitVisible,
+          isPositionVisible,
           playAnimation: (unitId: string, animation: SpriteAnimation) => {
             startSpriteAnimation(unitId, animation);
             needsRedrawRef.current = true;
           },
+          shake: (intensity?: number, duration?: number) => {
+            cameraRef.current?.shake(intensity, duration);
+          },
         }),
-        [centerOnUnit, startSpriteAnimation]
+        [
+          centerOnUnit,
+          centerOnUnitIfVisible,
+          centerOnPositionIfVisible,
+          isUnitVisible,
+          isPositionVisible,
+          startSpriteAnimation,
+        ]
       );
 
       // Calcular info do tooltip para a célula hovered
@@ -1331,6 +1772,43 @@ export const ArenaBattleCanvas = memo(
           type: cellInfo.type,
         };
       }, [hoveredCell, mousePosition, movableCellsMap]);
+
+      // Tooltip simples de hover para unidades/corpos/obstáculos
+      const hoverTooltip = useMemo(() => {
+        if (!hoveredCell || !mousePosition) return null;
+        const cellKey = `${hoveredCell.x},${hoveredCell.y}`;
+
+        // Verificar unidade
+        const unit = unitPositionMap.get(cellKey);
+        if (unit) {
+          const isAlly = unit.ownerId === currentUserId;
+          return {
+            name: unit.name,
+            relation: isAlly ? "Aliado" : "Inimigo",
+            status: unit.isAlive ? "Vivo" : "Morto",
+            color: isAlly ? "blue" : "red",
+          };
+        }
+
+        // Verificar obstáculo
+        const obstacle = obstaclePositionMap.get(cellKey);
+        if (obstacle) {
+          return {
+            name: obstacle.emoji,
+            relation: "—",
+            status: obstacle.destroyed ? "Destruído" : "Obstáculo",
+            color: "gray",
+          };
+        }
+
+        return null;
+      }, [
+        hoveredCell,
+        mousePosition,
+        unitPositionMap,
+        obstaclePositionMap,
+        currentUserId,
+      ]);
 
       return (
         <>
@@ -1365,10 +1843,15 @@ export const ArenaBattleCanvas = memo(
                 })(),
                 transition: "filter 0.5s ease-in-out, cursor 0.1s ease",
               }}
-              className="border-4 border-metal-iron rounded-lg shadow-2xl arena"
+              className="border-4 border-surface-500 rounded-lg shadow-2xl arena"
+              onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseLeave={handleMouseLeave}
               onClick={handleClick}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                onRightClick?.();
+              }}
             />
           </CameraController>
           {/* Tooltip de custo de movimento - usando Portal para renderizar fora do CameraController */}
@@ -1398,6 +1881,46 @@ export const ArenaBattleCanvas = memo(
                       ⚠️ Penalidade de engajamento
                     </div>
                   )}
+                </div>
+              </div>,
+              document.body
+            )}
+          {/* Tooltip simples de hover para unidades/corpos/obstáculos */}
+          {hoverTooltip &&
+            mousePosition &&
+            !tooltipInfo &&
+            createPortal(
+              <div
+                className="fixed z-[9998] pointer-events-none"
+                style={{
+                  left: mousePosition.clientX + 12,
+                  top: mousePosition.clientY - 8,
+                }}
+              >
+                <div
+                  className={`px-2 py-1 rounded text-[10px] shadow-lg border backdrop-blur-sm ${
+                    hoverTooltip.color === "blue"
+                      ? "bg-blue-900/90 text-blue-100 border-blue-500/50"
+                      : hoverTooltip.color === "red"
+                      ? "bg-red-900/90 text-red-100 border-red-500/50"
+                      : "bg-gray-800/90 text-gray-200 border-gray-500/50"
+                  }`}
+                >
+                  <span className="font-semibold">{hoverTooltip.name}</span>
+                  <span className="mx-1 opacity-50">•</span>
+                  <span className="opacity-75">{hoverTooltip.relation}</span>
+                  <span className="mx-1 opacity-50">•</span>
+                  <span
+                    className={
+                      hoverTooltip.status === "Vivo"
+                        ? "text-green-300"
+                        : hoverTooltip.status === "Morto"
+                        ? "text-red-300"
+                        : "text-gray-400"
+                    }
+                  >
+                    {hoverTooltip.status}
+                  </span>
                 </div>
               </div>,
               document.body

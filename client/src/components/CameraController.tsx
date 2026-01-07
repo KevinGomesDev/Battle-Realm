@@ -34,6 +34,8 @@ export interface CameraControllerRef {
   reset: () => void;
   /** Estado atual da câmera */
   getCamera: () => CameraState;
+  /** Sacudir a câmera (para feedback de dano) */
+  shake: (intensity?: number, duration?: number) => void;
 }
 
 export interface CameraControllerProps {
@@ -126,6 +128,10 @@ export const CameraController = forwardRef<
     // Animação suave
     const animationRef = useRef<number | null>(null);
     const targetCameraRef = useRef<CameraState | null>(null);
+
+    // Camera shake
+    const shakeAnimationRef = useRef<number | null>(null);
+    const [shakeOffset, setShakeOffset] = useState({ x: 0, y: 0 });
 
     // Estado da câmera
     const [camera, setCamera] = useState<CameraState>({
@@ -471,6 +477,46 @@ export const CameraController = forwardRef<
       });
     }, [contentWidth, contentHeight, initialZoom]);
 
+    // Shake da câmera (feedback de dano)
+    const shake = useCallback((intensity = 6, duration = 200) => {
+      // Cancelar shake anterior se existir
+      if (shakeAnimationRef.current) {
+        cancelAnimationFrame(shakeAnimationRef.current);
+        shakeAnimationRef.current = null;
+      }
+
+      const startTime = performance.now();
+
+      const animateShake = () => {
+        const elapsed = performance.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        if (progress < 1) {
+          // Shake com diminuição gradual
+          const currentIntensity = intensity * (1 - progress);
+          const offsetX = (Math.random() - 0.5) * 2 * currentIntensity;
+          const offsetY = (Math.random() - 0.5) * 2 * currentIntensity;
+          setShakeOffset({ x: offsetX, y: offsetY });
+          shakeAnimationRef.current = requestAnimationFrame(animateShake);
+        } else {
+          // Shake terminou - resetar offset
+          setShakeOffset({ x: 0, y: 0 });
+          shakeAnimationRef.current = null;
+        }
+      };
+
+      shakeAnimationRef.current = requestAnimationFrame(animateShake);
+    }, []);
+
+    // Cleanup shake animation
+    useEffect(() => {
+      return () => {
+        if (shakeAnimationRef.current) {
+          cancelAnimationFrame(shakeAnimationRef.current);
+        }
+      };
+    }, []);
+
     // Centralizar em coordenadas do conteúdo (x, y em pixels do conteúdo) com animação suave
     const centerOn = useCallback(
       (x: number, y: number, animated = true) => {
@@ -524,8 +570,9 @@ export const CameraController = forwardRef<
         zoomOut: handleZoomOut,
         reset: handleReset,
         getCamera: () => camera,
+        shake,
       }),
-      [centerOn, handleZoomIn, handleZoomOut, handleReset, camera]
+      [centerOn, handleZoomIn, handleZoomOut, handleReset, camera, shake]
     );
 
     // === RENDER ===
@@ -551,7 +598,9 @@ export const CameraController = forwardRef<
         {/* Conteúdo transformado */}
         <div
           style={{
-            transform: `translate(${camera.offsetX}px, ${camera.offsetY}px) scale(${camera.zoom})`,
+            transform: `translate(${camera.offsetX + shakeOffset.x}px, ${
+              camera.offsetY + shakeOffset.y
+            }px) scale(${camera.zoom})`,
             transformOrigin: "0 0",
             width: contentWidth,
             height: contentHeight,

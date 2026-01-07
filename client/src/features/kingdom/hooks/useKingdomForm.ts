@@ -42,7 +42,8 @@ const DEFAULT_REGENT: RegentFormData = {
     combat: 0,
     speed: 0,
     focus: 0,
-    armor: 0,
+    resistance: 0,
+    will: 0,
     vitality: 0,
   },
   initialSkillId: undefined,
@@ -77,7 +78,8 @@ const createDefaultTroopTemplate = (
   combat: 2,
   speed: 2,
   focus: 2,
-  armor: 2,
+  resistance: 2,
+  will: 0,
   vitality: 2,
 });
 
@@ -177,7 +179,7 @@ export function useTroopsForm(initialPassives: string[] = []) {
   const currentTemplate = templates[activeSlot];
 
   const getTemplateTotal = (t: TroopTemplateFormData) =>
-    t.combat + t.speed + t.focus + t.armor + t.vitality;
+    t.combat + t.speed + t.focus + t.resistance + t.will + t.vitality;
 
   const isTemplateValid = (t: TroopTemplateFormData) =>
     t.name.length >= 2 &&

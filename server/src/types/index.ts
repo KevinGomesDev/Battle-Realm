@@ -8,7 +8,7 @@ import {
   MAX_FORTRESSES_PER_TERRITORY,
   MOVEMENT_COST_BETWEEN_TERRITORIES,
   MOVEMENT_WITHIN_TERRITORY_COST,
-} from "../../../shared/data/turns";
+} from "../../../shared/data/turns.data";
 import {
   REGENT_LEVELUP_BASE_COST,
   REGENT_LEVELUP_INCREMENT,
@@ -22,13 +22,13 @@ import {
   TROOP_ATTRIBUTE_POINTS_PER_LEVEL,
   LEVELUP_COSTS,
   calculateLevelUpCost,
-} from "../../../shared/data/units";
+} from "../../../shared/data/units.data";
 import {
   TributeDecision,
   CRISIS_METER_START,
   CRISIS_METER_MAX,
   CRISIS_METER_TRIGGERED_AT_TURN,
-} from "../../../shared/data/crisis";
+} from "../../../shared/data/crisis.data";
 import {
   SkillCategory,
   SkillCostTier,
@@ -41,7 +41,7 @@ import {
   ClassArchetype,
   TroopCategory,
   TROOP_RESOURCE_MAP,
-} from "../../../shared/data/archetypes";
+} from "../../../shared/data/archetypes.data";
 
 // ============ RE-EXPORT SHARED TYPES ============
 export type {
@@ -88,7 +88,8 @@ export interface CrisisState {
     combat: number;
     speed: number;
     focus: number;
-    armor: number;
+    resistance: number;
+    will: number;
     vitality: number;
     maxVitality: number;
   };
@@ -190,7 +191,7 @@ export {
   MAX_FORTRESSES_PER_TERRITORY,
   MOVEMENT_COST_BETWEEN_TERRITORIES,
   MOVEMENT_WITHIN_TERRITORY_COST,
-} from "../../../shared/data/turns";
+} from "../../../shared/data/turns.data";
 export {
   REGENT_LEVELUP_BASE_COST,
   REGENT_LEVELUP_INCREMENT,
@@ -204,7 +205,7 @@ export {
   TROOP_ATTRIBUTE_POINTS_PER_LEVEL,
   LEVELUP_COSTS,
   calculateLevelUpCost,
-} from "../../../shared/data/units";
+} from "../../../shared/data/units.data";
 export {
   HERO_TEMPLATES,
   getHeroTemplate,
@@ -220,7 +221,7 @@ export {
   CRISIS_METER_START,
   CRISIS_METER_MAX,
   CRISIS_METER_TRIGGERED_AT_TURN,
-} from "../../../shared/data/crisis";
+} from "../../../shared/data/crisis.data";
 export {
   SkillCategory,
   SkillCostTier,
@@ -242,4 +243,4 @@ export {
   ClassArchetype,
   TroopCategory,
   TROOP_RESOURCE_MAP,
-} from "../../../shared/data/archetypes";
+} from "../../../shared/data/archetypes.data";

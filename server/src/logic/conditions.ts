@@ -62,7 +62,8 @@ export interface ConditionModifiers {
   combatMod: number;
   speedMod: number;
   focusMod: number;
-  armorMod: number;
+  resistanceMod: number;
+  willMod: number;
   vitalityMod: number;
   // Stats derivados
   movementMod: number;
@@ -96,7 +97,8 @@ function createEmptyModifiers(): ConditionModifiers {
     combatMod: 0,
     speedMod: 0,
     focusMod: 0,
-    armorMod: 0,
+    resistanceMod: 0,
+    willMod: 0,
     vitalityMod: 0,
     movementMod: 0,
     movementMultiplier: 1,
@@ -152,7 +154,8 @@ export function scanConditionsForAction(
       "combatMod",
       "speedMod",
       "focusMod",
-      "armorMod",
+      "resistanceMod",
+      "willMod",
       "vitalityMod",
       "movementMod",
       "maxHpMod",
@@ -411,7 +414,8 @@ export function getMinAttackSuccesses(conditions: string[]): number {
 //   combatMod      - Modifica Combat
 //   speedMod      - Modifica speed
 //   focusMod       - Modifica Focus
-//   armorMod       - Modifica Armor
+//   resistanceMod  - Modifica Resistance
+//   willMod       - Modifica Will
 //   vitalityMod    - Modifica Vitality
 //
 // MODIFICADORES DE STATS DERIVADOS:
@@ -469,3 +473,81 @@ export function getMinAttackSuccesses(conditions: string[]): number {
 //   highGround            - Bônus de dano para ataques à distância
 //   lowGround             - Penalidade de dano para ataques à distância
 // =============================================================================
+
+// =============================================================================
+// CÁLCULO DE EFEITOS ATIVOS (AGREGADOS)
+// =============================================================================
+
+import type {
+  ActiveEffectsMap,
+  ActiveEffect,
+} from "../../../shared/types/conditions.types";
+
+/**
+ * Calcula todos os efeitos ativos agregados das condições de uma unidade
+ * Retorna um mapa de efeitos com valores somados/combinados e fontes
+ */
+export function calculateActiveEffects(conditions: string[]): ActiveEffectsMap {
+  const result: ActiveEffectsMap = {};
+
+  for (const conditionId of conditions) {
+    const condition = getCondition(conditionId);
+    if (!condition?.effects) continue;
+
+    // Iterar sobre cada efeito da condição
+    for (const [effectKey, effectValue] of Object.entries(condition.effects)) {
+      if (effectValue === undefined || effectValue === null) continue;
+
+      const key = effectKey as keyof ConditionEffects;
+
+      // Pular arrays e outros tipos complexos (bonusActionSkills, immuneToConditions, etc.)
+      if (Array.isArray(effectValue)) continue;
+
+      // Inicializar o efeito se não existir
+      if (!result[key]) {
+        result[key] = {
+          key,
+          value: typeof effectValue === "boolean" ? effectValue : 0,
+          sources: [],
+        };
+      }
+
+      const activeEffect = result[key] as ActiveEffect;
+
+      // Agregar valores
+      if (typeof effectValue === "number") {
+        activeEffect.value = (activeEffect.value as number) + effectValue;
+      } else if (typeof effectValue === "boolean" && effectValue) {
+        activeEffect.value = true;
+      }
+
+      // Registrar a fonte
+      activeEffect.sources.push(conditionId);
+    }
+  }
+
+  // Remover efeitos com valor 0 ou false
+  for (const key of Object.keys(result) as (keyof ConditionEffects)[]) {
+    const effect = result[key];
+    if (!effect) continue;
+
+    if (typeof effect.value === "number" && effect.value === 0) {
+      delete result[key];
+    } else if (typeof effect.value === "boolean" && !effect.value) {
+      delete result[key];
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Atualiza os activeEffects de uma unidade baseado em suas condições atuais
+ * Modifica a unidade in-place e retorna ela para conveniência
+ */
+export function updateUnitActiveEffects<
+  T extends { conditions: string[]; activeEffects?: ActiveEffectsMap }
+>(unit: T): T {
+  unit.activeEffects = calculateActiveEffects(unit.conditions);
+  return unit;
+}

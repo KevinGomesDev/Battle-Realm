@@ -1,15 +1,7 @@
 // shared/data/Templates/RacesTemplates.ts
 // Templates raw de todas as raças do jogo
 
-export interface RaceDefinition {
-  id: string; // O Enum do Banco (HUMANOIDE, DRAGAO...)
-  name: string;
-  description: string; // Flavor text
-  passiveName: string;
-  passiveEffect: string; // Regra mecânica
-  passiveConditionId: string; // ID da condição a aplicar
-  color: number; // Cor temática (apenas para UI)
-}
+import type { RaceDefinition } from "../../types/units.types";
 
 export const RACE_DEFINITIONS: RaceDefinition[] = [
   {

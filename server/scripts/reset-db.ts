@@ -20,10 +20,6 @@ async function resetDatabase() {
   // Start with the most dependent tables first.
 
   // === BATTLE RELATED ===
-  const logsDeleted = await prisma.battleLog.deleteMany();
-  if (logsDeleted.count > 0) {
-    console.log(`[RESET] Deleted ${logsDeleted.count} battle logs`);
-  }
 
   const battleUnitsDeleted = await prisma.battleUnit.deleteMany();
   if (battleUnitsDeleted.count > 0) {

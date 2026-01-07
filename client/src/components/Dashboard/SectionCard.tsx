@@ -3,7 +3,7 @@ import React from "react";
 interface SectionCardProps {
   title: string;
   icon: string;
-  accentColor?: "bronze" | "crimson" | "purple" | "gold";
+  accentColor?: "bronze" | "crimson" | "mystic" | "gold";
   badge?: string;
   compact?: boolean;
   /** Ação no header (botão) */
@@ -13,33 +13,41 @@ interface SectionCardProps {
 
 const accentStyles = {
   bronze: {
-    iconBg: "bg-gradient-to-br from-metal-bronze to-metal-copper",
-    glow: "shadow-[0_0_15px_rgba(205,127,50,0.15)]",
-    border: "border-metal-bronze/30",
-    headerBg: "from-metal-bronze/10 to-transparent",
+    iconBg: "bg-gradient-to-br from-stellar-amber to-stellar-dark",
+    glow: "shadow-[0_0_15px_rgba(251,191,36,0.1)]",
+    border: "border-stellar-amber/30",
+    headerBg: "from-stellar-amber/10 to-transparent",
+    badgeBg: "bg-stellar-amber/10",
+    badgeText: "text-stellar-amber",
   },
   crimson: {
-    iconBg: "bg-gradient-to-br from-war-crimson to-war-blood",
-    glow: "shadow-[0_0_15px_rgba(220,38,38,0.15)]",
-    border: "border-war-crimson/30",
-    headerBg: "from-war-crimson/10 to-transparent",
+    iconBg: "bg-gradient-to-br from-red-500 to-red-700",
+    glow: "shadow-[0_0_15px_rgba(239,68,68,0.1)]",
+    border: "border-red-500/30",
+    headerBg: "from-red-500/10 to-transparent",
+    badgeBg: "bg-red-500/10",
+    badgeText: "text-red-400",
   },
-  purple: {
-    iconBg: "bg-gradient-to-br from-purple-600 to-purple-800",
-    glow: "shadow-[0_0_15px_rgba(147,51,234,0.15)]",
-    border: "border-purple-500/30",
-    headerBg: "from-purple-600/10 to-transparent",
+  mystic: {
+    iconBg: "bg-gradient-to-br from-mystic-blue to-mystic-deep",
+    glow: "shadow-[0_0_15px_rgba(59,130,246,0.1)]",
+    border: "border-mystic-blue/30",
+    headerBg: "from-mystic-blue/10 to-transparent",
+    badgeBg: "bg-mystic-blue/10",
+    badgeText: "text-mystic-glow",
   },
   gold: {
-    iconBg: "bg-gradient-to-br from-yellow-500 to-yellow-700",
-    glow: "shadow-[0_0_15px_rgba(234,179,8,0.15)]",
-    border: "border-yellow-500/30",
-    headerBg: "from-yellow-500/10 to-transparent",
+    iconBg: "bg-gradient-to-br from-stellar-gold to-stellar-deep",
+    glow: "shadow-[0_0_15px_rgba(245,158,11,0.1)]",
+    border: "border-stellar-gold/30",
+    headerBg: "from-stellar-gold/10 to-transparent",
+    badgeBg: "bg-stellar-gold/10",
+    badgeText: "text-stellar-light",
   },
 };
 
 /**
- * SectionCard - Card compacto e elegante para Dashboard
+ * SectionCard - Card compacto e elegante para Dashboard - Boundless Theme
  */
 export const SectionCard: React.FC<SectionCardProps> = ({
   title,
@@ -55,8 +63,8 @@ export const SectionCard: React.FC<SectionCardProps> = ({
   return (
     <div
       className={`
-        relative bg-citadel-granite/90 backdrop-blur-sm
-        border border-metal-iron/50 rounded-lg overflow-hidden
+        relative bg-surface-900/95 backdrop-blur-sm
+        border border-surface-500/30 rounded-lg overflow-hidden
         ${styles.glow} hover:${styles.border}
         transition-all duration-300
       `}
@@ -66,7 +74,7 @@ export const SectionCard: React.FC<SectionCardProps> = ({
         className={`
           flex items-center gap-2 px-3 py-2
           bg-gradient-to-r ${styles.headerBg}
-          border-b border-metal-iron/30
+          border-b border-surface-500/20
         `}
       >
         {/* Ícone pequeno */}
@@ -82,8 +90,8 @@ export const SectionCard: React.FC<SectionCardProps> = ({
 
         {/* Título */}
         <h3
-          className="text-xs font-bold text-parchment-light tracking-wider uppercase flex-1"
-          style={{ fontFamily: "'Cinzel', serif" }}
+          className="text-xs font-bold text-astral-chrome tracking-wider uppercase flex-1"
+          style={{ fontFamily: "'Rajdhani', sans-serif" }}
         >
           {title}
         </h3>
@@ -93,24 +101,7 @@ export const SectionCard: React.FC<SectionCardProps> = ({
           <span
             className={`
               text-[10px] px-1.5 py-0.5 rounded
-              bg-${
-                accentColor === "purple"
-                  ? "purple"
-                  : accentColor === "crimson"
-                  ? "war-blood"
-                  : accentColor === "gold"
-                  ? "yellow-900"
-                  : "metal-bronze"
-              }/20
-              text-${
-                accentColor === "purple"
-                  ? "purple-400"
-                  : accentColor === "crimson"
-                  ? "war-ember"
-                  : accentColor === "gold"
-                  ? "yellow-400"
-                  : "metal-gold"
-              }
+              ${styles.badgeBg} ${styles.badgeText}
               border border-current/30
             `}
           >

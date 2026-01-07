@@ -10,6 +10,8 @@ export type {
   BattleTerrainType, // Alias legado
   TerrainDefinition,
   TerrainColor,
+  ObstacleType,
+  ObstacleVisualConfig,
 } from "../config/global.config";
 
 export {
@@ -29,6 +31,10 @@ export {
   // Obstáculos
   OBSTACLE_CONFIG,
   getObstacleCount,
+  OBSTACLE_VISUAL_CONFIG,
+  TERRAIN_OBSTACLE_TYPES,
+  getRandomObstacleType,
+  getObstacleVisualConfig,
   // Grid
   GRID_CONFIG,
   getGridDimensions,
@@ -39,14 +45,20 @@ export {
 // OBSTÁCULOS - Interface (mantida aqui por ser tipo de dados)
 // =============================================================================
 
+import type { ObstacleType } from "../config/global.config";
+
 /**
  * Obstáculo no grid de batalha
+ * Usa sistema visual 2.5D com tipos ao invés de emojis
  */
 export interface BattleObstacle {
   id: string;
   posX: number;
   posY: number;
-  emoji: string;
+  /** Tipo do obstáculo para renderização 2.5D */
+  type: ObstacleType;
+  /** @deprecated Use 'type' - mantido apenas para compatibilidade */
+  emoji?: string;
   hp?: number; // HP do obstáculo (default: 5)
   maxHp?: number; // HP máximo (default: 5)
   destroyed?: boolean; // Se foi destruído
@@ -61,6 +73,8 @@ import type {
   TerritorySize,
   UnitSize,
 } from "../config/global.config";
+
+import type { ActiveEffectsMap } from "./conditions.types";
 
 /**
  * Configuração de mapa de batalha
@@ -96,11 +110,14 @@ export interface BattleUnit {
   combat: number;
   speed: number;
   focus: number;
-  armor: number;
+  resistance: number;
+  will: number;
   vitality: number;
   damageReduction: number;
   currentHp: number;
   maxHp: number;
+  currentMana: number;
+  maxMana: number;
   posX: number;
   posY: number;
   movesLeft: number;
@@ -122,4 +139,9 @@ export interface BattleUnit {
   isAIControlled: boolean;
   /** Comportamento de IA para summons/monsters (default: AGGRESSIVE) */
   aiBehavior?: "AGGRESSIVE" | "TACTICAL" | "DEFENSIVE" | "SUPPORT" | "RANGED";
+  /**
+   * Efeitos ativos calculados a partir das condições
+   * Agregados pelo servidor e enviados ao cliente para exibição dinâmica
+   */
+  activeEffects?: ActiveEffectsMap;
 }

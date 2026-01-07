@@ -1,36 +1,7 @@
 // shared/data/Templates/RegentTemplates.ts
 // Templates raw de todos os regentes pré-definidos
 
-import type { Alignment, Race } from "../../types/kingdom.types";
-
-export interface RegentTemplate {
-  /** Código único do regente (usado como ID e referência) */
-  code: string;
-  /** Nome do regente */
-  name: string;
-  /** Descrição/história do regente */
-  description: string;
-  /** Avatar (sprite ID) */
-  avatar: string;
-  /** Skill inicial (código da skill) - Regentes podem escolher de qualquer classe */
-  initialSkillCode?: string;
-  /** Spells iniciais (códigos de spells) */
-  initialSpells?: string[];
-  /** Atributos base (soma = 30 para regentes) */
-  combat: number;
-  speed: number;
-  focus: number;
-  armor: number;
-  vitality: number;
-  /** Ícone/emoji para exibição */
-  icon: string;
-  /** Cor temática (para UI) */
-  themeColor: string;
-  /** Alinhamento do regente */
-  alignment: Alignment;
-  /** Raça do regente */
-  race: Race;
-}
+import type { RegentTemplate } from "../../types/units.types";
 
 // =============================================================================
 // REGENTES PRÉ-DEFINIDOS
@@ -54,7 +25,8 @@ Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, m
   combat: 6,
   speed: 4,
   focus: 6,
-  armor: 5,
+  resistance: 5,
+  will: 6,
   vitality: 9, // Total: 30
   icon: "👑",
   themeColor: "#eab308", // yellow-500
@@ -80,7 +52,8 @@ Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento ab
   combat: 2,
   speed: 5,
   focus: 11,
-  armor: 3,
+  resistance: 3,
+  will: 11,
   vitality: 9, // Total: 30
   icon: "💀",
   themeColor: "#7c3aed", // violet-600
@@ -106,10 +79,21 @@ Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância 
   combat: 8,
   speed: 4,
   focus: 5,
-  armor: 6,
+  resistance: 6,
+  will: 5,
   vitality: 7, // Total: 30
   icon: "🐉",
   themeColor: "#dc2626", // red-600
   alignment: "NEUTRO",
   race: "DRAGAO",
 };
+
+// =============================================================================
+// ARRAY CONSOLIDADO DE TODOS OS REGENTES
+// =============================================================================
+
+export const REGENT_TEMPLATES: RegentTemplate[] = [
+  SERAPHINA,
+  MALACHAR,
+  IGNATHARAX,
+];

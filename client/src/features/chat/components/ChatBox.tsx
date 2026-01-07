@@ -5,6 +5,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useChat } from "../context/ChatContext";
 import { useAuth } from "../../auth";
 import { CHAT_CONFIG } from "../../../../../shared/types/chat.types";
+import { Button } from "@/components/Button";
 
 interface ChatBoxProps {
   /** ID da unidade atual (para batalha) */
@@ -102,27 +103,28 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
     <div
       className={`
         flex flex-col
-        bg-citadel-obsidian/95 backdrop-blur-sm
-        border border-metal-iron/50 rounded-lg
+        bg-surface-900/95 backdrop-blur-sm
+        border border-surface-500/50 rounded-lg
         shadow-lg
         ${isCompact ? "text-xs" : "text-sm"}
       `}
     >
       {/* Header */}
       {showHeader && (
-        <div className="flex items-center justify-between px-3 py-2 border-b border-metal-iron/30">
-          <span className="text-parchment-light font-medieval text-sm">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-surface-500/30">
+          <span className="text-astral-chrome font-medieval text-sm">
             💬 {title}
           </span>
-          <button
+          <Button
+            variant="ghost"
+            size="xs"
             onClick={() => {
               closeChat();
               onClose?.();
             }}
-            className="text-parchment-dark hover:text-parchment-light transition-colors"
           >
             ✕
-          </button>
+          </Button>
         </div>
       )}
 
@@ -132,7 +134,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
         style={{ maxHeight }}
       >
         {state.messages.length === 0 ? (
-          <div className="text-parchment-dark/50 text-center py-4 italic">
+          <div className="text-astral-steel/50 text-center py-4 italic">
             Nenhuma mensagem ainda...
           </div>
         ) : (
@@ -151,12 +153,12 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
                   <span
                     className={`
                       text-[10px] font-semibold
-                      ${isOwn ? "text-metal-gold" : "text-metal-bronze"}
+                      ${isOwn ? "text-stellar-gold" : "text-stellar-amber"}
                     `}
                   >
                     {isOwn ? "Você" : msg.senderName}
                   </span>
-                  <span className="text-parchment-dark/40 text-[9px]">
+                  <span className="text-astral-steel/40 text-[9px]">
                     {formatTime(msg.timestamp)}
                   </span>
                 </div>
@@ -166,12 +168,12 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
                     max-w-[85%] px-2 py-1 rounded-lg
                     ${
                       isOwn
-                        ? "bg-metal-bronze/30 border border-metal-bronze/40"
-                        : "bg-citadel-slate/50 border border-metal-iron/30"
+                        ? "bg-stellar-amber/30 border border-stellar-amber/40"
+                        : "bg-surface-800/50 border border-surface-500/30"
                     }
                   `}
                 >
-                  <p className="text-parchment-light break-words">
+                  <p className="text-astral-chrome break-words">
                     {msg.message}
                   </p>
                 </div>
@@ -185,7 +187,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
       {/* Input */}
       <form
         onSubmit={handleSubmit}
-        className="flex items-center gap-2 p-2 border-t border-metal-iron/30"
+        className="flex items-center gap-2 p-2 border-t border-surface-500/30"
       >
         <input
           ref={inputRef}
@@ -199,33 +201,27 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
           disabled={state.isLoading}
           className={`
             flex-1 px-2 py-1.5 rounded
-            bg-citadel-slate/50 border border-metal-iron/30
-            text-parchment-light placeholder-parchment-dark/50
-            focus:outline-none focus:border-metal-bronze/50
+            bg-surface-800/50 border border-surface-500/30
+            text-astral-chrome placeholder-astral-steel/50
+            focus:outline-none focus:border-stellar-amber/50
             disabled:opacity-50
             ${isCompact ? "text-xs" : "text-sm"}
           `}
         />
-        <button
+        <Button
           type="submit"
+          variant="primary"
+          size="xs"
           disabled={state.isLoading || !inputValue.trim()}
-          className={`
-            px-3 py-1.5 rounded
-            bg-metal-bronze/30 border border-metal-bronze/50
-            text-parchment-light
-            hover:bg-metal-bronze/50
-            disabled:opacity-50 disabled:cursor-not-allowed
-            transition-colors
-            ${isCompact ? "text-xs" : "text-sm"}
-          `}
+          isLoading={state.isLoading}
         >
-          {state.isLoading ? "..." : "➤"}
-        </button>
+          ➤
+        </Button>
       </form>
 
       {/* Error */}
       {state.error && (
-        <div className="px-2 py-1 text-war-ember text-xs text-center">
+        <div className="px-2 py-1 text-red-400 text-xs text-center">
           {state.error}
         </div>
       )}

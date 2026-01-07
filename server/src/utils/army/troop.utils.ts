@@ -10,7 +10,11 @@ import {
   MAX_TROOP_LEVEL,
   PlayerResources,
 } from "../../types";
-import { getResourceName } from "../../../../shared/config/global.config";
+import {
+  getResourceName,
+  HP_CONFIG,
+  MANA_CONFIG,
+} from "../../../../shared/config/global.config";
 import {
   TroopTemplateData,
   TROOP_INITIAL_ATTRIBUTE_POINTS,
@@ -33,7 +37,12 @@ export function validateTroopAttributes(data: TroopTemplateData): {
   message?: string;
 } {
   const total =
-    data.combat + data.speed + data.focus + data.armor + data.vitality;
+    data.combat +
+    data.speed +
+    data.focus +
+    data.resistance +
+    data.will +
+    data.vitality;
 
   if (total !== TROOP_INITIAL_ATTRIBUTE_POINTS) {
     return {
@@ -46,7 +55,8 @@ export function validateTroopAttributes(data: TroopTemplateData): {
     data.combat,
     data.speed,
     data.focus,
-    data.armor,
+    data.resistance,
+    data.will,
     data.vitality,
   ];
   for (const attr of attrs) {
@@ -153,7 +163,8 @@ export async function createTroopTemplatesForKingdom(
         combat: t.combat,
         speed: t.speed,
         focus: t.focus,
-        armor: t.armor,
+        resistance: t.resistance,
+        will: t.will ?? 0,
         vitality: t.vitality,
       })),
     });
@@ -288,6 +299,10 @@ export async function recruitTroop(
     });
 
     // Criar unidade
+    const finalVitality =
+      template.vitality + bonusPerAttr + (remainder > 5 ? 1 : 0);
+    const finalWill =
+      (template.will ?? 0) + bonusPerAttr + (remainder > 4 ? 1 : 0);
     const unit = await prisma.unit.create({
       data: {
         matchId,
@@ -301,9 +316,14 @@ export async function recruitTroop(
         combat: template.combat + bonusPerAttr + (remainder > 0 ? 1 : 0),
         speed: template.speed + bonusPerAttr + (remainder > 1 ? 1 : 0),
         focus: template.focus + bonusPerAttr + (remainder > 2 ? 1 : 0),
-        armor: template.armor + bonusPerAttr + (remainder > 3 ? 1 : 0),
-        vitality: template.vitality + bonusPerAttr + (remainder > 4 ? 1 : 0),
-        currentHp: template.vitality + bonusPerAttr + (remainder > 4 ? 1 : 0),
+        resistance:
+          template.resistance + bonusPerAttr + (remainder > 3 ? 1 : 0),
+        will: finalWill,
+        vitality: finalVitality,
+        maxHp: finalVitality * HP_CONFIG.multiplier,
+        currentHp: finalVitality * HP_CONFIG.multiplier,
+        maxMana: finalWill * MANA_CONFIG.multiplier,
+        currentMana: finalWill * MANA_CONFIG.multiplier,
         movesLeft: 3,
         actionsLeft: 1,
         locationIndex: capitalTerritory?.mapIndex ?? null,
@@ -329,7 +349,8 @@ export async function getTroopCategoryInfo(
     combat: number;
     speed: number;
     focus: number;
-    armor: number;
+    resistance: number;
+    will: number;
     vitality: number;
   };
   troopCount: number;
@@ -384,8 +405,9 @@ export async function getTroopCategoryInfo(
       combat: template.combat + bonusPerAttr + (remainder > 0 ? 1 : 0),
       speed: template.speed + bonusPerAttr + (remainder > 1 ? 1 : 0),
       focus: template.focus + bonusPerAttr + (remainder > 2 ? 1 : 0),
-      armor: template.armor + bonusPerAttr + (remainder > 3 ? 1 : 0),
-      vitality: template.vitality + bonusPerAttr + (remainder > 4 ? 1 : 0),
+      resistance: template.resistance + bonusPerAttr + (remainder > 3 ? 1 : 0),
+      will: (template.will ?? 0) + bonusPerAttr + (remainder > 4 ? 1 : 0),
+      vitality: template.vitality + bonusPerAttr + (remainder > 5 ? 1 : 0),
     },
     troopCount,
     template,

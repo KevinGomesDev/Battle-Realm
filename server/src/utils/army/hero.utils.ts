@@ -3,8 +3,12 @@
 // Heróis são templates pré-definidos, ÚNICOS por partida
 
 import { prisma } from "../../lib/prisma";
-import { getResourceName } from "../../../../shared/config/global.config";
-import { MAX_HEROES_PER_KINGDOM } from "../../../../shared/data/units";
+import {
+  getResourceName,
+  HP_CONFIG,
+  MANA_CONFIG,
+} from "../../../../shared/config/global.config";
+import { MAX_HEROES_PER_KINGDOM } from "../../../../shared/data/units.data";
 import {
   HERO_TEMPLATES,
   getHeroTemplate,
@@ -294,9 +298,13 @@ export async function recruitHeroFromTemplate(
       combat: template.combat,
       speed: template.speed,
       focus: template.focus,
-      armor: template.armor,
+      resistance: template.resistance,
+      will: template.will,
       vitality: template.vitality,
-      currentHp: template.vitality * 2,
+      maxHp: template.vitality * HP_CONFIG.multiplier,
+      currentHp: template.vitality * HP_CONFIG.multiplier,
+      maxMana: template.will * MANA_CONFIG.multiplier,
+      currentMana: template.will * MANA_CONFIG.multiplier,
       movesLeft: 0,
       actionsLeft: 0,
       locationIndex: capital.mapIndex,

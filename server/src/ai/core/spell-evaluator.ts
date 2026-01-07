@@ -126,8 +126,8 @@ function evaluateDamageSpell(
     }
   }
 
-  // Para spells de alvo único ENEMY
-  if (spell.targetType === "ENEMY") {
+  // Para spells de alvo único com dano (UNIT ofensivo)
+  if (spell.targetType === "UNIT" && spell.baseDamage !== undefined) {
     const targetsWithScores = enemies.map((enemy) => {
       const hpPercent = enemy.currentHp / enemy.maxHp;
       let score = 40;
@@ -176,7 +176,7 @@ function evaluateSupportSpell(
     };
   }
 
-  if (spell.targetType === "ALLY") {
+  if (spell.targetType === "UNIT") {
     // Encontrar aliado que mais se beneficiaria
     const validAllies = allies.filter((a) => a.id !== caster.id);
 
@@ -313,24 +313,31 @@ function evaluateSpell(
     };
   }
 
-  // Avaliar baseado no tipo de spell
+  // Avaliar baseado no effectType da spell
   let evalResult: { score: number; bestTarget: any; reason: string };
 
-  switch (spell.code) {
-    case "FIRE":
+  // Usar effectType diretamente para decisões de IA
+  const effectType = spell.effectType;
+
+  switch (effectType) {
+    case "OFFENSIVE":
       evalResult = evaluateDamageSpell(caster, spell, allUnits);
       break;
-    case "EMPOWER":
+    case "HEALING":
+    case "BUFF":
       evalResult = evaluateSupportSpell(caster, spell, allUnits);
       break;
-    case "TELEPORT":
+    case "DEBUFF":
+      evalResult = evaluateDamageSpell(caster, spell, allUnits); // Debuffs geralmente miram inimigos
+      break;
+    case "UTILITY":
       evalResult = evaluateMovementSpell(caster, spell, allUnits);
       break;
     default:
-      // Fallback genérico baseado no targetType
-      if (spell.targetType === "ENEMY" || spell.targetType === "POSITION") {
+      // Fallback para spells sem effectType (legacy)
+      if (spell.baseDamage !== undefined) {
         evalResult = evaluateDamageSpell(caster, spell, allUnits);
-      } else if (spell.targetType === "ALLY" || spell.targetType === "SELF") {
+      } else if (spell.conditionApplied) {
         evalResult = evaluateSupportSpell(caster, spell, allUnits);
       } else {
         evalResult = {

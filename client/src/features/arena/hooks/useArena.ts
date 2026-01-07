@@ -1,23 +1,25 @@
-import { useContext } from "react";
-import { ArenaContext } from "../context/ArenaContext";
-import type { ArenaContextType, ArenaState } from "../types/arena.types";
+// Re-export from ArenaColyseusContext
+// Este arquivo mantém compatibilidade com código antigo
 
-/**
- * Hook principal para acessar o contexto da Arena
- */
-export function useArena(): ArenaContextType {
-  const context = useContext(ArenaContext);
-  if (!context) {
-    throw new Error("useArena deve ser usado dentro de um ArenaProvider");
-  }
+import { useContext } from "react";
+import {
+  useArenaColyseus,
+  ArenaColyseusContext,
+} from "../context/ArenaColyseusContext";
+
+export { useArenaColyseus as useArena };
+
+// Hooks opcionais - podem ser removidos se não usados
+export function useArenaOptional() {
+  const context = useContext(ArenaColyseusContext);
   return context;
 }
 
 /**
  * Hook para acessar apenas o estado da Arena
  */
-export function useArenaState(): ArenaState {
-  const { state } = useArena();
+export function useArenaState() {
+  const { state } = useArenaColyseus();
   return state;
 }
 
@@ -25,11 +27,11 @@ export function useArenaState(): ArenaState {
  * Hook para verificar se está em um lobby
  */
 export function useArenaLobby() {
-  const { state, leaveLobby, startBattle } = useArena();
+  const { state, leaveLobby, startBattle } = useArenaColyseus();
   return {
-    lobby: state.currentLobby,
+    lobbyId: state.lobbyId,
     isHost: state.isHost,
-    isInLobby: state.currentLobby !== null,
+    isInLobby: state.lobbyId !== null,
     leaveLobby,
     startBattle,
   };
@@ -48,11 +50,11 @@ export function useArenaBattle() {
     executeAction,
     castSpell,
     surrender,
-  } = useArena();
+  } = useArenaColyseus();
   return {
-    battle: state.battle,
+    status: state.status,
     units: state.units,
-    isInBattle: state.battle !== null && state.battle.status === "ACTIVE",
+    isInBattle: state.status === "ACTIVE",
     beginAction,
     moveUnit,
     attackUnit,

@@ -64,10 +64,10 @@ const BattleChatInner: React.FC<BattleChatInnerProps> = ({
             onClick={openChat}
             className="
               flex items-center gap-2 px-3 py-1.5
-              bg-citadel-obsidian/80 backdrop-blur-sm
-              border border-metal-iron/30 rounded-lg
-              text-parchment-dark hover:text-parchment-light
-              hover:border-metal-bronze/50
+              bg-surface-900/80 backdrop-blur-sm
+              border border-surface-500/30 rounded-lg
+              text-astral-steel hover:text-astral-chrome
+              hover:border-stellar-amber/50
               transition-all text-xs
             "
             title="Pressione Enter para abrir o chat"

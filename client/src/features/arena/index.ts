@@ -1,7 +1,10 @@
 // Arena Feature - Public API
 
-// Context
-export { ArenaProvider, ArenaContext } from "./context/ArenaContext";
+// Context (Colyseus)
+export {
+  ArenaColyseusProvider,
+  useArenaColyseus,
+} from "./context/ArenaColyseusContext";
 export {
   arenaReducer,
   initialArenaState,
@@ -11,6 +14,7 @@ export {
 // Hooks
 export {
   useArena,
+  useArenaOptional,
   useArenaState,
   useArenaLobby,
   useArenaBattle,
@@ -44,7 +48,7 @@ export {
 } from "./components/shared";
 
 // Utils
-export { arenaLog, battleLog, lobbyLog } from "./utils";
+export { arenaLog, lobbyLog } from "./utils";
 
 // Constants
 export {

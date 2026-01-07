@@ -1,39 +1,77 @@
 // client/src/config/colors.config.ts
-// Configuração centralizada de cores da aplicação
+// Configuração centralizada de cores da aplicação - BOUNDLESS Theme
 // ESTE É O ÚNICO ARQUIVO DE CORES DO FRONTEND
 
 // =============================================================================
-// PALETA BASE
+// PALETA BASE - BOUNDLESS COSMIC THEME
 // =============================================================================
 
 export const COLORS = {
-  // Cores primárias
-  primary: {
-    50: "#eff6ff",
-    100: "#dbeafe",
-    200: "#bfdbfe",
-    300: "#93c5fd",
-    400: "#60a5fa",
-    500: "#3b82f6",
-    600: "#2563eb",
-    700: "#1d4ed8",
-    800: "#1e40af",
-    900: "#1e3a8a",
+  // Cosmos - Backgrounds profundos
+  cosmos: {
+    void: "#050510",
+    deep: "#0a0a1a",
+    dark: "#0d0d20",
+    space: "#121230",
+    nebula: "#1a1a40",
   },
 
-  // Cores de fundo/superfície
+  // Stellar - Dourados e âmbares (destaque primário)
+  stellar: {
+    gold: "#f59e0b",
+    amber: "#fbbf24",
+    light: "#fcd34d",
+    pale: "#fde68a",
+    dark: "#d97706",
+    deep: "#b45309",
+  },
+
+  // Astral - Pratas e aços (texto secundário)
+  astral: {
+    silver: "#94a3b8",
+    steel: "#64748b",
+    chrome: "#cbd5e1",
+    dim: "#475569",
+    dark: "#334155",
+  },
+
+  // Arcane - Violetas e roxos (magia/especial)
+  arcane: {
+    violet: "#8b5cf6",
+    purple: "#7c3aed",
+    deep: "#5b21b6",
+    dark: "#3b0764",
+    glow: "#a78bfa",
+  },
+
+  // Mystic - Azuis e cianos (informação/ação)
+  mystic: {
+    blue: "#3b82f6",
+    cyan: "#22d3ee",
+    sky: "#0ea5e9",
+    deep: "#1d4ed8",
+    glow: "#60a5fa",
+  },
+
+  // Ember - Verdes (sucesso/vida)
+  ember: {
+    green: "#22c55e",
+    emerald: "#10b981",
+    teal: "#14b8a6",
+    glow: "#4ade80",
+  },
+
+  // Surface - Superfícies de UI
   surface: {
-    50: "#f9fafb",
-    100: "#f3f4f6",
-    200: "#e5e7eb",
-    300: "#d1d5db",
-    400: "#9ca3af",
-    500: "#6b7280",
-    600: "#4b5563",
-    700: "#374151",
-    800: "#1f2937",
-    900: "#111827",
-    950: "#030712",
+    900: "#0f0f1a",
+    800: "#1a1a2d",
+    700: "#252545",
+    600: "#2f2f56",
+    500: "#3d3d6b",
+    400: "#4f4f80",
+    300: "#6b6b99",
+    200: "#8888aa",
+    100: "#ababcc",
   },
 
   // Cores semânticas
@@ -82,11 +120,17 @@ export const ATTRIBUTE_COLORS = {
     border: "border-purple-500",
     hex: "#a78bfa",
   },
-  armor: {
+  resistance: {
     text: "text-amber-400",
     bg: "bg-amber-500",
     border: "border-amber-500",
     hex: "#fbbf24",
+  },
+  will: {
+    text: "text-cyan-400",
+    bg: "bg-cyan-500",
+    border: "border-cyan-500",
+    hex: "#22d3ee",
   },
   vitality: {
     text: "text-green-400",

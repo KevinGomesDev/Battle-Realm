@@ -3,6 +3,11 @@
 
 import type { SpellDefinition } from "../types/spells.types";
 import type { BattleUnit } from "../types/battle.types";
+import {
+  resolveDynamicValue,
+  DEFAULT_RANGE_DISTANCE,
+  mapLegacyRange,
+} from "../types/ability.types";
 
 // =============================================================================
 // TIPOS
@@ -100,22 +105,22 @@ export function isWithinRange(
 
 /**
  * Calcula o alcance máximo de uma spell baseado no range e no caster
+ * Suporta valores dinâmicos (números ou referências a atributos)
  */
 export function getSpellMaxRange(
   spell: SpellDefinition,
   caster: BattleUnit
 ): number {
-  switch (spell.range) {
-    case "SELF":
-      return 0;
-    case "ADJACENT":
-      return 1;
-    case "RANGED":
-    case "AREA":
-      return caster.speed; // Range baseado em Speed
-    default:
-      return 1;
+  // Mapear range legado (ADJACENT -> MELEE)
+  const normalizedRange = mapLegacyRange(spell.range);
+
+  // Se spell tem rangeDistance definido, usar valor dinâmico
+  if (spell.rangeDistance !== undefined) {
+    return resolveDynamicValue(spell.rangeDistance, caster);
   }
+
+  // Fallback para valores padrão baseado no tipo de range
+  return DEFAULT_RANGE_DISTANCE[normalizedRange];
 }
 
 /**
@@ -218,11 +223,11 @@ export function validateSpellRange(
     };
   }
 
-  // Calcular distância
+  // Calcular distância - usar Chebyshev para consistência com preview visual
   let distance: number;
   if ("id" in target) {
     // Alvo é uma unidade
-    distance = getManhattanDistance(
+    distance = getChebyshevDistance(
       caster.posX,
       caster.posY,
       target.posX,
@@ -230,7 +235,7 @@ export function validateSpellRange(
     );
   } else {
     // Alvo é uma posição
-    distance = getManhattanDistance(
+    distance = getChebyshevDistance(
       caster.posX,
       caster.posY,
       target.x,
@@ -275,7 +280,7 @@ export function validateSpellTargetType(
     return { valid: true };
   }
 
-  // ALLY/ENEMY/ALL - precisa ser uma unidade
+  // UNIT/ALL - precisa ser uma unidade
   if (!target || !("id" in target)) {
     return {
       valid: false,
@@ -286,35 +291,12 @@ export function validateSpellTargetType(
 
   const targetUnit = target as BattleUnit;
 
-  // Verificar se alvo está vivo (para spells ofensivas)
-  if (spell.targetType === "ENEMY" && !targetUnit.isAlive) {
+  // Verificar se alvo está vivo
+  if (!targetUnit.isAlive) {
     return {
       valid: false,
       error: "Alvo não está vivo",
       errorCode: "TARGET_DEAD",
-    };
-  }
-
-  // Verificar se é aliado ou inimigo
-  const isSameTeam = targetUnit.ownerId === caster.ownerId;
-
-  if (
-    spell.targetType === "ALLY" &&
-    !isSameTeam &&
-    targetUnit.id !== caster.id
-  ) {
-    return {
-      valid: false,
-      error: "Apenas aliados podem ser alvos",
-      errorCode: "TARGET_NOT_ALLY",
-    };
-  }
-
-  if (spell.targetType === "ENEMY" && isSameTeam) {
-    return {
-      valid: false,
-      error: "Apenas inimigos podem ser alvos",
-      errorCode: "TARGET_NOT_ENEMY",
     };
   }
 
@@ -378,9 +360,9 @@ export function getValidSpellTargets(
   }
 
   return allUnits.filter((unit) => {
-    // Self sempre é válido para SELF e ALLY
+    // Self sempre é válido para SELF e UNIT
     if (unit.id === caster.id) {
-      return spell.targetType === "SELF" || spell.targetType === "ALLY";
+      return spell.targetType === "SELF" || spell.targetType === "UNIT";
     }
 
     return isValidSpellTarget(caster, spell, unit);
@@ -413,8 +395,8 @@ export function isValidSpellPosition(
     return false;
   }
 
-  // Verificar alcance
-  const distance = getManhattanDistance(
+  // Verificar alcance - usar Chebyshev para consistência com preview visual
+  const distance = getChebyshevDistance(
     caster.posX,
     caster.posY,
     position.x,

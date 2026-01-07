@@ -9,7 +9,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { socketService } from "../../../services/socket.service";
+import { colyseusService } from "../../../services/colyseus.service";
 import type {
   GameEvent,
   EventContext as EventContextType,
@@ -218,17 +218,17 @@ export function EventProvider({
       }
     };
 
-    socketService.on("event:new", handleNewEvent);
+    colyseusService.on("event:new", handleNewEvent);
 
     return () => {
-      socketService.off("event:new", handleNewEvent);
+      colyseusService.off("event:new", handleNewEvent);
     };
   }, [showToast]);
 
   // Inscrever em contexto de eventos
   const subscribeToContext = useCallback(
     (context: EventContextType, contextId?: string) => {
-      socketService.emit("event:subscribe", { context, contextId });
+      colyseusService.sendToGlobal("event:subscribe", { context, contextId });
       dispatch({ type: "SET_CONTEXT", payload: { context, contextId } });
       dispatch({ type: "CLEAR_EVENTS" });
     },
@@ -238,7 +238,7 @@ export function EventProvider({
   // Cancelar inscrição
   const unsubscribeFromContext = useCallback(
     (context: EventContextType, contextId?: string) => {
-      socketService.emit("event:unsubscribe", { context, contextId });
+      colyseusService.sendToGlobal("event:unsubscribe", { context, contextId });
     },
     []
   );
@@ -247,12 +247,16 @@ export function EventProvider({
   const fetchHistory = useCallback(async (filter?: EventFilter) => {
     dispatch({ type: "SET_LOADING", payload: true });
     try {
-      const response = await socketService.emitAsync<{
+      const response = await colyseusService.sendAndWait<{
         success: boolean;
         events: GameEvent[];
         nextCursor?: string;
         hasMore: boolean;
-      }>("event:fetch", { filter: { ...filter, limit: 50 } });
+      }>(
+        "event:fetch",
+        { filter: { ...filter, limit: 50 } },
+        "event:fetch:response"
+      );
 
       if (response.success && response.events) {
         const eventsWithDates = response.events.map((e) => ({
@@ -294,12 +298,12 @@ export function EventProvider({
         filter.context = state.currentContext;
       }
 
-      const response = await socketService.emitAsync<{
+      const response = await colyseusService.sendAndWait<{
         success: boolean;
         events: GameEvent[];
         nextCursor?: string;
         hasMore: boolean;
-      }>("event:fetch", { filter });
+      }>("event:fetch", { filter }, "event:fetch:response");
 
       if (response.success && response.events) {
         const eventsWithDates = response.events.map((e) => ({

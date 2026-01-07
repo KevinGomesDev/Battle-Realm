@@ -75,7 +75,7 @@ export function useSkillExecution(
   const canSelfCast = useMemo(() => {
     if (!pendingSkill) return false;
     return (
-      pendingSkill.targetType === "ALLY" || pendingSkill.targetType === "SELF"
+      pendingSkill.targetType === "UNIT" || pendingSkill.targetType === "SELF"
     );
   }, [pendingSkill]);
 

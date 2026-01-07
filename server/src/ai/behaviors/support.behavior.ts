@@ -59,9 +59,7 @@ export function makeSupportDecision(
     // 1. Auto-cura se HP baixo
     if (selfAssessment?.isWounded) {
       const selfHealSkills = availableSkills.filter(
-        (s) =>
-          s.targetType === "SELF" ||
-          (s.targetType === "ALLY" && getSkillEffectiveRange(s) === 0)
+        (s) => s.effectType === "HEALING" && s.targetType === "SELF"
       );
 
       if (selfHealSkills.length > 0) {
@@ -105,7 +103,7 @@ export function makeSupportDecision(
 
     // 4. Curar aliados que precisam com skills
     const healSkills = availableSkills.filter(
-      (s) => s.targetType === "ALLY" || s.targetType === "SELF"
+      (s) => s.effectType === "HEALING"
     );
     if (healSkills.length > 0) {
       for (const healSkill of healSkills) {
@@ -130,11 +128,7 @@ export function makeSupportDecision(
     }
 
     // 4. Buffar aliados
-    const buffSkills = availableSkills.filter(
-      (s) =>
-        (s.targetType === "ALLY" || s.targetType === "SELF") &&
-        s.conditionApplied
-    );
+    const buffSkills = availableSkills.filter((s) => s.effectType === "BUFF");
     if (buffSkills.length > 0) {
       const skillEval = selectBestSkill(unit, buffSkills, units, profile);
       if (skillEval && skillEval.canUse) {

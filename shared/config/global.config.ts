@@ -2,18 +2,38 @@
 // Configuração global centralizada do jogo
 // Altere valores aqui para ajustar o balanceamento globalmente
 
+import type { UnitCategory } from "../types/units.types";
+
 // =============================================================================
 // NOMES DOS ATRIBUTOS
 // =============================================================================
 // Altere aqui para mudar o nome dos atributos em toda a aplicação
 
-export type AttributeKey = "combat" | "speed" | "focus" | "armor" | "vitality";
+export type AttributeKey =
+  | "combat"
+  | "speed"
+  | "focus"
+  | "resistance"
+  | "will"
+  | "vitality";
+
+export interface AttributeStyle {
+  /** Cor principal (hex) */
+  color: string;
+  /** Cor secundária/escura (hex) */
+  colorDark: string;
+  /** Cor da borda (hex com alpha) */
+  borderColor: string;
+  /** Sombra glow (rgba string) */
+  glowColor: string;
+}
 
 export interface AttributeDefinition {
   key: AttributeKey;
   name: string;
   shortName: string;
   description: string;
+  style: AttributeStyle;
 }
 
 export const ATTRIBUTE_NAMES: Record<AttributeKey, AttributeDefinition> = {
@@ -22,6 +42,12 @@ export const ATTRIBUTE_NAMES: Record<AttributeKey, AttributeDefinition> = {
     name: "Combate",
     shortName: "COM",
     description: "Determina dados de ataque e dano. Dano = Sucessos × Combate.",
+    style: {
+      color: "#dc2626", // Vermelho sangue - agressivo
+      colorDark: "#991b1b",
+      borderColor: "rgba(239,68,68,0.7)",
+      glowColor: "rgba(220,38,38,0.5)",
+    },
   },
   speed: {
     key: "speed",
@@ -29,25 +55,62 @@ export const ATTRIBUTE_NAMES: Record<AttributeKey, AttributeDefinition> = {
     shortName: "VEL",
     description:
       "Determina chance de esquiva e movimento. Esquiva = Speed × 3%.",
+    style: {
+      color: "#06b6d4", // Ciano elétrico - rápido
+      colorDark: "#0e7490",
+      borderColor: "rgba(34,211,238,0.7)",
+      glowColor: "rgba(6,182,212,0.5)",
+    },
   },
   focus: {
     key: "focus",
     name: "Foco",
     shortName: "FOC",
-    description: "Poder mágico. Proteção Mágica = Foco × 4. Usado para magias.",
+    description: "Poder mágico. Usado para magias e determina visão.",
+    style: {
+      color: "#6366f1", // Índigo místico - mental
+      colorDark: "#4338ca",
+      borderColor: "rgba(129,140,248,0.7)",
+      glowColor: "rgba(99,102,241,0.5)",
+    },
   },
-  armor: {
-    key: "armor",
-    name: "Armadura",
-    shortName: "ARM",
+  resistance: {
+    key: "resistance",
+    name: "Resistência",
+    shortName: "RES",
     description:
-      "Redução de dano físico. Proteção Física = Armadura × 4. Absorve dano antes do HP.",
+      "Redução de dano físico. Proteção Física = Resistência × 2. Também define custo extra de engajamento.",
+    style: {
+      color: "#f97316", // Laranja bronze - armadura
+      colorDark: "#c2410c",
+      borderColor: "rgba(251,146,60,0.7)",
+      glowColor: "rgba(249,115,22,0.5)",
+    },
+  },
+  will: {
+    key: "will",
+    name: "Vontade",
+    shortName: "VON",
+    description:
+      "Força mental. Mana = Vontade × 2. Proteção Mágica = Vontade × 2.",
+    style: {
+      color: "#a855f7", // Roxo arcano - magia
+      colorDark: "#7e22ce",
+      borderColor: "rgba(192,132,252,0.7)",
+      glowColor: "rgba(168,85,247,0.5)",
+    },
   },
   vitality: {
     key: "vitality",
     name: "Vitalidade",
     shortName: "VIT",
-    description: "Pontos de vida. HP Máximo = Vitalidade × 2.",
+    description: "Pontos de vida. HP Máximo = Vitalidade × 1.",
+    style: {
+      color: "#22c55e", // Verde vida - saúde
+      colorDark: "#15803d",
+      borderColor: "rgba(74,222,128,0.7)",
+      glowColor: "rgba(34,197,94,0.5)",
+    },
   },
 };
 
@@ -66,7 +129,8 @@ export const ALL_ATTRIBUTE_KEYS: AttributeKey[] = [
   "combat",
   "speed",
   "focus",
-  "armor",
+  "resistance",
+  "will",
   "vitality",
 ];
 
@@ -666,23 +730,27 @@ export function calculateMagicDamage(
 // =============================================================================
 
 /**
- * Categorias de unidades e suas respectivas marcas máximas de ação.
- * Quando actionMarks >= maxMarks, a unidade está exausta.
+ * Categorias de unidades e suas respectivas marcas de ação iniciais.
+ * Unidades começam com actionMarks = maxMarks e são decrementadas ao usar AÇÃO.
+ * Quando actionMarks <= 0, a unidade está exausta.
  * Em Arena: unidade exausta perde 5 HP ao agir.
  * Fora de Arena: unidade exausta não pode mais agir.
+ * NOTA: Apenas movimentação NÃO decrementa action marks.
  */
-export type UnitCategory = "TROOP" | "HERO" | "REGENT";
 
 export const ACTION_MARKS_CONFIG: Record<UnitCategory, number> = {
   TROOP: 1,
   HERO: 2,
   REGENT: 3,
+  SUMMON: 1,
+  MONSTER: 2,
 } as const;
 
 /**
- * Retorna o número máximo de marcas de ação por categoria de unidade.
+ * Retorna o número inicial de marcas de ação por categoria de unidade.
+ * Unidades começam com este valor e é decrementado quando usam ações.
  * @param category - Categoria da unidade (TROOP, HERO, REGENT)
- * @returns Número máximo de marcas antes de exaustão
+ * @returns Número inicial de marcas de ação
  */
 export function getMaxMarksByCategory(category: string): number {
   return ACTION_MARKS_CONFIG[category as UnitCategory] ?? 1;
@@ -696,12 +764,12 @@ export const PHYSICAL_PROTECTION_CONFIG = {
   /**
    * Atributo base para calcular proteção física
    */
-  attribute: "armor" as const,
+  attribute: "resistance" as const,
 
   /**
    * Multiplicador do atributo
    * Fórmula: Atributo * multiplier
-   * Ex: Armor * 4
+   * Ex: Resistance * 2
    */
   multiplier: 2,
 
@@ -719,12 +787,12 @@ export const MAGICAL_PROTECTION_CONFIG = {
   /**
    * Atributo base para calcular proteção mágica
    */
-  attribute: "focus" as const,
+  attribute: "will" as const,
 
   /**
    * Multiplicador do atributo
    * Fórmula: Atributo * multiplier
-   * Ex: Focus * 4
+   * Ex: Will * 2
    */
   multiplier: 2,
 
@@ -732,6 +800,24 @@ export const MAGICAL_PROTECTION_CONFIG = {
    * Tipos de dano que usam proteção mágica primeiro
    */
   absorbsDamageTypes: ["MAGICO"] as const,
+} as const;
+
+// =============================================================================
+// CONFIGURAÇÃO DE MANA
+// =============================================================================
+
+export const MANA_CONFIG = {
+  /**
+   * Atributo base para calcular Mana máxima
+   */
+  attribute: "will" as const,
+
+  /**
+   * Multiplicador do atributo
+   * Fórmula: Will * multiplier
+   * Ex: Will * 2
+   */
+  multiplier: 1,
 } as const;
 
 // =============================================================================
@@ -804,6 +890,189 @@ export function getObstacleCount(size: TerritorySize): number {
 }
 
 // =============================================================================
+// TIPOS DE OBSTÁCULOS (2.5D VISUAL)
+// =============================================================================
+
+/**
+ * Tipos de obstáculos disponíveis
+ */
+export type ObstacleType =
+  | "ROCK"
+  | "TREE"
+  | "PILLAR"
+  | "CRATE"
+  | "CRYSTAL"
+  | "RUINS"
+  | "ICE_SPIKE"
+  | "CACTUS"
+  | "MUSHROOM"
+  | "TOMBSTONE";
+
+/**
+ * Configuração visual de um tipo de obstáculo para renderização 2.5D
+ */
+export interface ObstacleVisualConfig {
+  /** Identificador do tipo */
+  type: ObstacleType;
+  /** Nome amigável */
+  name: string;
+  /** Cor do topo do obstáculo */
+  topColor: string;
+  /** Cor da lateral X (esquerda/direita) */
+  sideXColor: string;
+  /** Cor da lateral Y (frente/trás) */
+  sideYColor: string;
+  /** Multiplicador de altura (quanto maior, mais alto o bloco parece) */
+  heightScale: number;
+  /** Cor de destaque/borda (opcional) */
+  highlightColor?: string;
+  /** Se o obstáculo tem formato especial (não é bloco quadrado) */
+  shape?: "block" | "cylinder" | "pyramid";
+}
+
+/**
+ * Mapeamento de terreno para tipos de obstáculo
+ */
+export const TERRAIN_OBSTACLE_TYPES: Record<TerrainType, ObstacleType[]> = {
+  FOREST: ["TREE", "ROCK", "MUSHROOM"],
+  PLAINS: ["ROCK", "CRATE"],
+  MOUNTAIN: ["ROCK", "PILLAR"],
+  DESERT: ["CACTUS", "ROCK", "RUINS"],
+  ICE: ["ICE_SPIKE", "ROCK", "CRYSTAL"],
+  WASTELAND: ["TOMBSTONE", "RUINS", "ROCK"],
+  SWAMP: ["MUSHROOM", "TREE", "ROCK"],
+  RUINS: ["RUINS", "PILLAR", "TOMBSTONE"],
+  OCEAN: ["ROCK"], // Raramente usado
+};
+
+/**
+ * Configurações visuais para cada tipo de obstáculo
+ * Seguindo o padrão 2.5D com perspectiva top-down
+ */
+export const OBSTACLE_VISUAL_CONFIG: Record<
+  ObstacleType,
+  ObstacleVisualConfig
+> = {
+  ROCK: {
+    type: "ROCK",
+    name: "Rocha",
+    topColor: "#7f8c8d",
+    sideXColor: "#5d6d7e",
+    sideYColor: "#4d5d6e",
+    heightScale: 0.4,
+    highlightColor: "#95a5a6",
+    shape: "block",
+  },
+  TREE: {
+    type: "TREE",
+    name: "Árvore",
+    topColor: "#27ae60",
+    sideXColor: "#1e8449",
+    sideYColor: "#145a32",
+    heightScale: 1.2,
+    highlightColor: "#2ecc71",
+    shape: "cylinder",
+  },
+  PILLAR: {
+    type: "PILLAR",
+    name: "Pilar",
+    topColor: "#bdc3c7",
+    sideXColor: "#95a5a6",
+    sideYColor: "#7f8c8d",
+    heightScale: 1.5,
+    highlightColor: "#ecf0f1",
+    shape: "block",
+  },
+  CRATE: {
+    type: "CRATE",
+    name: "Caixa",
+    topColor: "#d35400",
+    sideXColor: "#ba4a00",
+    sideYColor: "#a04000",
+    heightScale: 0.6,
+    highlightColor: "#e67e22",
+    shape: "block",
+  },
+  CRYSTAL: {
+    type: "CRYSTAL",
+    name: "Cristal",
+    topColor: "#9b59b6",
+    sideXColor: "#8e44ad",
+    sideYColor: "#7d3c98",
+    heightScale: 0.8,
+    highlightColor: "#bb8fce",
+    shape: "pyramid",
+  },
+  RUINS: {
+    type: "RUINS",
+    name: "Ruínas",
+    topColor: "#5d6d7e",
+    sideXColor: "#4a5a6a",
+    sideYColor: "#3a4a5a",
+    heightScale: 0.5,
+    highlightColor: "#85929e",
+    shape: "block",
+  },
+  ICE_SPIKE: {
+    type: "ICE_SPIKE",
+    name: "Espinho de Gelo",
+    topColor: "#85c1e9",
+    sideXColor: "#5dade2",
+    sideYColor: "#3498db",
+    heightScale: 1.0,
+    highlightColor: "#aed6f1",
+    shape: "pyramid",
+  },
+  CACTUS: {
+    type: "CACTUS",
+    name: "Cacto",
+    topColor: "#58d68d",
+    sideXColor: "#28b463",
+    sideYColor: "#1d8348",
+    heightScale: 0.9,
+    highlightColor: "#82e0aa",
+    shape: "cylinder",
+  },
+  MUSHROOM: {
+    type: "MUSHROOM",
+    name: "Cogumelo",
+    topColor: "#e74c3c",
+    sideXColor: "#f5b7b1",
+    sideYColor: "#fadbd8",
+    heightScale: 0.5,
+    highlightColor: "#f1948a",
+    shape: "cylinder",
+  },
+  TOMBSTONE: {
+    type: "TOMBSTONE",
+    name: "Lápide",
+    topColor: "#566573",
+    sideXColor: "#2c3e50",
+    sideYColor: "#1c2833",
+    heightScale: 0.7,
+    highlightColor: "#aab7b8",
+    shape: "block",
+  },
+};
+
+/**
+ * Obtém um tipo de obstáculo aleatório para um terreno
+ */
+export function getRandomObstacleType(terrain: TerrainType): ObstacleType {
+  const types = TERRAIN_OBSTACLE_TYPES[terrain] || ["ROCK"];
+  return types[Math.floor(Math.random() * types.length)];
+}
+
+/**
+ * Obtém a configuração visual de um obstáculo
+ */
+export function getObstacleVisualConfig(
+  type: ObstacleType
+): ObstacleVisualConfig {
+  return OBSTACLE_VISUAL_CONFIG[type] || OBSTACLE_VISUAL_CONFIG.ROCK;
+}
+
+// =============================================================================
 // CONFIGURAÇÃO DO GRID DE BATALHA
 // =============================================================================
 
@@ -820,7 +1089,7 @@ export const GRID_CONFIG = {
   /**
    * Tamanhos disponíveis para sorteio em Arena
    */
-  arenaSizes: ["SMALL", "MEDIUM", "LARGE"] as const,
+  arenaSizes: ["SMALL", "SMALL", "SMALL"] as const,
 
   /**
    * Tamanho padrão se nenhum for especificado
@@ -860,12 +1129,20 @@ export const ARENA_COLORS = {
   cellMovable: "#2a4a2a",
   cellAttackable: "#4a2a2a",
   // Células de movimento
-  cellMovableNormal: "rgba(34, 197, 94, 0.4)", // Verde - movimento normal
-  cellMovableNormalBorder: "rgba(34, 197, 94, 0.8)",
+  cellMovableNormal: "rgba(250, 204, 21, 0.4)", // Amarelo - movimento normal
+  cellMovableNormalBorder: "rgba(250, 204, 21, 0.8)",
   cellMovableEngagement: "rgba(251, 146, 60, 0.4)", // Laranja - com penalidade de engajamento
   cellMovableEngagementBorder: "rgba(251, 146, 60, 0.8)",
   cellMovableBlocked: "rgba(239, 68, 68, 0.4)", // Vermelho - caminho bloqueado
   cellMovableBlockedBorder: "rgba(239, 68, 68, 0.8)",
+  // Cores de preview de área (spells/skills)
+  areaPreviewEmpty: "rgba(255, 255, 255, 0.3)", // Branco - sem alvo
+  areaPreviewEmptyBorder: "rgba(255, 255, 255, 0.6)",
+  areaPreviewTarget: "rgba(34, 197, 94, 0.5)", // Verde - com alvo
+  areaPreviewTargetBorder: "rgba(34, 197, 94, 0.9)",
+  areaPreviewOutOfRange: "rgba(239, 68, 68, 0.3)", // Vermelho - fora do alcance
+  areaPreviewOutOfRangeBorder: "rgba(239, 68, 68, 0.6)",
+  areaPreviewCenter: "rgba(255, 255, 255, 0.9)", // Centro destacado
   // Cores dos jogadores (até 8)
   playerColors: [
     { primary: "#4a90d9", secondary: "#2d5a8a" }, // Azul
@@ -953,13 +1230,20 @@ export const DICE_CONFIG = {
 // HELPER: Obter valor do atributo por nome
 // =============================================================================
 
-export type AttributeName = "combat" | "speed" | "focus" | "armor" | "vitality";
+export type AttributeName =
+  | "combat"
+  | "speed"
+  | "focus"
+  | "resistance"
+  | "will"
+  | "vitality";
 
 export interface UnitAttributes {
   combat: number;
   speed: number;
   focus: number;
-  armor: number;
+  resistance: number;
+  will: number;
   vitality: number;
 }
 
@@ -1021,7 +1305,8 @@ export function calculateMagicalProtection(unit: UnitAttributes): number {
 }
 
 /**
- * Calcula HP máximo
+ * Calcula HP máximo (usado apenas para criação inicial de Units)
+ * NOTA: Durante batalhas, usar o valor armazenado (maxHp) ao invés de recalcular
  */
 export function calculateMaxHp(unit: UnitAttributes): number {
   const attrValue = getAttributeValue(unit, HP_CONFIG.attribute);
@@ -1037,6 +1322,16 @@ export function calculateMovement(unit: UnitAttributes): number {
   return Math.max(MOVEMENT_CONFIG.minMovement, movement);
 }
 
+/**
+ * Calcula mana máxima (usado apenas para criação inicial de Units)
+ * NOTA: Durante batalhas, usar o valor armazenado (maxMana) ao invés de recalcular
+ * Fórmula: Will * MANA_CONFIG.multiplier
+ */
+export function calculateMaxMana(unit: UnitAttributes): number {
+  const attrValue = getAttributeValue(unit, MANA_CONFIG.attribute);
+  return Math.max(0, attrValue * MANA_CONFIG.multiplier);
+}
+
 // =============================================================================
 // EXPORT CONSOLIDADO
 // =============================================================================
@@ -1046,6 +1341,7 @@ export const GLOBAL_CONFIG = {
   defense: DEFENSE_CONFIG,
   physicalProtection: PHYSICAL_PROTECTION_CONFIG,
   magicalProtection: MAGICAL_PROTECTION_CONFIG,
+  mana: MANA_CONFIG,
   hp: HP_CONFIG,
   turn: TURN_CONFIG,
   obstacle: OBSTACLE_CONFIG,

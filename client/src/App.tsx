@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useConnection } from "./core";
+import { useEffect, useState, useRef } from "react";
+import { useColyseusConnection } from "./core";
 import { useAuth } from "./features/auth";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ReconnectingOverlay } from "./components/ReconnectingOverlay";
@@ -7,12 +7,26 @@ import HomePage from "./pages/HomePage";
 import DashboardPage from "./pages/DashboardPage";
 
 function App() {
-  const { connect, isConnected } = useConnection();
+  const { connect, isConnected } = useColyseusConnection();
   const { user, isLoading: isAuthLoading, restoreSession } = useAuth();
   const [isRestoring, setIsRestoring] = useState(true);
+  const hasInitialized = useRef(false);
 
-  // Inicializa conexão e restaura sessão
+  // Desabilitar menu de contexto em toda a aplicação
   useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    document.addEventListener("contextmenu", handleContextMenu);
+    return () => document.removeEventListener("contextmenu", handleContextMenu);
+  }, []);
+
+  // Inicializa conexão e restaura sessão (apenas uma vez)
+  useEffect(() => {
+    // Prevenir múltiplas inicializações (StrictMode)
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
     const initApp = async () => {
       try {
         // 1. Conecta ao servidor

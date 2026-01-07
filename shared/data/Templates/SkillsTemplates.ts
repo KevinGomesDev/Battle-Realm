@@ -30,9 +30,10 @@ export const TOTAL_DESTRUCTION: SkillDefinition = {
   description:
     "Escolha dano de 1 até seu Combate em alvo adjacente. Você recebe o mesmo dano.",
   category: "ACTIVE",
+  effectType: "OFFENSIVE",
   costTier: "LOW",
   range: "ADJACENT",
-  targetType: "ENEMY",
+  targetType: "UNIT",
   functionName: "executeTotalDestruction",
   consumesAction: true,
   cooldown: 0,
@@ -63,6 +64,7 @@ export const SECOND_WIND: SkillDefinition = {
   description:
     "Recupera HP igual à sua Vitalidade. Pode ser usado uma vez por batalha.",
   category: "ACTIVE",
+  effectType: "HEALING",
   costTier: "LOW",
   range: "SELF",
   functionName: "executeSecondWind",
@@ -75,6 +77,7 @@ export const ACTION_SURGE: SkillDefinition = {
   name: "Surto de Ação",
   description: "Você recebe uma ação extra em seu turno.",
   category: "ACTIVE",
+  effectType: "BUFF",
   costTier: "MEDIUM",
   range: "SELF",
   functionName: "executeActionSurge",
@@ -134,10 +137,11 @@ export const HUNTERS_MARK: SkillDefinition = {
   description:
     "Marca um inimigo. Todos os seus ataques contra ele causam +2 de dano.",
   category: "ACTIVE",
+  effectType: "DEBUFF",
   costTier: "LOW",
   range: "RANGED",
   rangeValue: 6,
-  targetType: "ENEMY",
+  targetType: "UNIT",
   functionName: "executeHuntersMark",
   consumesAction: true,
   cooldown: 0,
@@ -157,13 +161,17 @@ export const VOLLEY: SkillDefinition = {
   name: "Rajada",
   description: "Ataca todos os inimigos em uma área com metade do dano normal.",
   category: "ACTIVE",
+  effectType: "OFFENSIVE",
   costTier: "MEDIUM",
   range: "AREA",
   rangeValue: 2,
-  targetType: "ENEMY",
+  areaSize: 3, // 3x3 área de efeito
+  targetType: "UNIT",
   functionName: "executeVolley",
   consumesAction: true,
   cooldown: 2,
+  icon: "🏹",
+  color: "green",
 };
 
 export const RANGER_SKILLS: SkillDefinition[] = [
@@ -181,9 +189,10 @@ export const HEAL: SkillDefinition = {
   name: "Curar",
   description: "Cura um aliado adjacente em Foco de HP.",
   category: "ACTIVE",
+  effectType: "HEALING",
   costTier: "LOW",
   range: "ADJACENT",
-  targetType: "ALLY",
+  targetType: "UNIT",
   functionName: "executeHeal",
   consumesAction: true,
   cooldown: 1,
@@ -194,9 +203,10 @@ export const CELESTIAL_EXPULSION: SkillDefinition = {
   name: "Expulsão Celestial",
   description: "Remove condições negativas do alvo.",
   category: "ACTIVE",
+  effectType: "HEALING",
   costTier: "MEDIUM",
   range: "ADJACENT",
-  targetType: "ALLY",
+  targetType: "UNIT",
   functionName: "executeCelestialExpulsion",
   consumesAction: true,
   cooldown: 2,
@@ -207,13 +217,17 @@ export const BLESS: SkillDefinition = {
   name: "Abençoar",
   description: "Aliados em área ganham +1 em todos os testes por 3 turnos.",
   category: "ACTIVE",
+  effectType: "BUFF",
   costTier: "MEDIUM",
   range: "AREA",
   rangeValue: 2,
-  targetType: "ALLY",
+  areaSize: 3, // 3x3 área de efeito
+  targetType: "UNIT",
   functionName: "executeBless",
   consumesAction: true,
   cooldown: 3,
+  icon: "✨",
+  color: "gold",
 };
 
 export const CLERIC_SKILLS: SkillDefinition[] = [
@@ -241,9 +255,10 @@ export const MAGIC_WEAPON: SkillDefinition = {
   description:
     "Imbuí a arma de uma Unidade adjacente com Magia. Até o fim do Combate, os Ataques dessa Unidade causam dano Mágico ao invés de Físico.",
   category: "ACTIVE",
+  effectType: "BUFF",
   costTier: "MEDIUM",
   range: "ADJACENT",
-  targetType: "ALLY",
+  targetType: "UNIT",
   functionName: "executeMagicWeapon",
   consumesAction: true,
 };
@@ -252,8 +267,9 @@ export const ARCANE_SHIELD: SkillDefinition = {
   code: "ARCANE_SHIELD",
   name: "Escudo Arcano",
   description:
-    "Você recebe Redução de Dano igual à metade do seu Foco, até o fim do seu próximo turno.",
+    "Até o começo do seu próximo turno, sempre que receberia dano no HP, sua Mana é reduzida no lugar.",
   category: "ACTIVE",
+  effectType: "BUFF",
   costTier: "MEDIUM",
   range: "SELF",
   targetType: "SELF",
@@ -304,9 +320,10 @@ export const EIDOLON_RESISTANCE: SkillDefinition = {
   description:
     "Caso seu Eidolon tenha 1 ou mais de Proteção, você recupera [FOCO] de Proteção dele.",
   category: "ACTIVE",
+  effectType: "HEALING",
   costTier: "HIGH",
   range: "ADJACENT",
-  targetType: "ALLY",
+  targetType: "UNIT",
   functionName: "executeEidolonResistance",
   consumesAction: true,
   cooldown: 2,
@@ -384,9 +401,10 @@ export const COMMON_ACTION_ATTACK: SkillDefinition = {
   name: "Atacar",
   description: "Ataca um inimigo adjacente",
   category: "ACTIVE",
+  effectType: "OFFENSIVE",
   commonAction: true,
   range: "ADJACENT",
-  targetType: "ENEMY",
+  targetType: "UNIT",
   functionName: "executeAttackSkill",
   consumesAction: true,
   cooldown: 0,
@@ -397,6 +415,7 @@ export const COMMON_ACTION_DASH: SkillDefinition = {
   name: "Disparada",
   description: "Gasta uma ação para dobrar o movimento neste turno",
   category: "ACTIVE",
+  effectType: "UTILITY",
   commonAction: true,
   range: "SELF",
   functionName: "executeDash",
@@ -409,6 +428,7 @@ export const COMMON_ACTION_DODGE: SkillDefinition = {
   name: "Esquiva",
   description: "Aumenta a chance de esquiva até o próximo turno",
   category: "ACTIVE",
+  effectType: "BUFF",
   commonAction: true,
   range: "SELF",
   functionName: "executeDodge",
@@ -421,4 +441,20 @@ export const COMMON_ACTIONS: SkillDefinition[] = [
   COMMON_ACTION_ATTACK,
   COMMON_ACTION_DASH,
   COMMON_ACTION_DODGE,
+];
+
+// =============================================================================
+// ARRAY CONSOLIDADO DE TODAS AS SKILLS
+// =============================================================================
+
+export const ALL_SKILL_TEMPLATES: SkillDefinition[] = [
+  ...COMMON_ACTIONS,
+  ...BARBARIAN_SKILLS,
+  ...WARRIOR_SKILLS,
+  ...ROGUE_SKILLS,
+  ...RANGER_SKILLS,
+  ...CLERIC_SKILLS,
+  ...WIZARD_SKILLS,
+  ...SUMMONER_SKILLS,
+  ...TROOP_SKILLS,
 ];

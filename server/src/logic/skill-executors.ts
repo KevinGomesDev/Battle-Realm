@@ -6,6 +6,7 @@ import type {
   SkillExecutionResult,
   SkillDefinition,
 } from "../../../shared/types/skills.types";
+import { resolveDynamicValue } from "../../../shared/types/ability.types";
 import {
   getManhattanDistance,
   isAdjacentOmnidirectional,
@@ -17,12 +18,11 @@ import type {
   BattleUnit,
 } from "../../../shared/types/battle.types";
 import {
-  processSummonerDeath,
   shouldTransferDamageToEidolon,
   transferDamageToEidolon,
-  processUnitDeathForEidolon,
   processEidolonDeath,
 } from "./summon-logic";
+import { processUnitDeath } from "./death-logic";
 import {
   scanConditionsForAction,
   applyConditionScanResult,
@@ -33,17 +33,30 @@ import { applyDualProtectionDamage } from "../utils/battle.utils";
 import {
   OBSTACLE_CONFIG,
   DEFENSE_CONFIG,
+  HP_CONFIG,
+  MANA_CONFIG,
+  PHYSICAL_PROTECTION_CONFIG,
+  MAGICAL_PROTECTION_CONFIG,
 } from "../../../shared/config/global.config";
 
 // =============================================================================
 // TIPOS LOCAIS
 // =============================================================================
 
+/** Contexto opcional para execução de skills */
+export interface SkillExecutionContext {
+  targetPosition?: { x: number; y: number };
+  obstacles?: BattleObstacle[];
+  /** ID da batalha (para eventos) */
+  battleId?: string;
+}
+
 export type SkillExecutorFn = (
   caster: BattleUnit,
   target: BattleUnit | null,
   allUnits: BattleUnit[],
-  skill: SkillDefinition
+  skill: SkillDefinition,
+  context?: SkillExecutionContext
 ) => SkillExecutionResult;
 
 // =============================================================================
@@ -101,13 +114,15 @@ export const ARENA_COOLDOWN_MULTIPLIER = 2;
  * Executa uma skill pelo seu functionName
  * Gerencia consumo de ação e cooldown automaticamente
  * @param isArena - Se true, cooldowns são dobrados
+ * @param context - Contexto opcional (targetPosition, obstacles)
  */
 export function executeSkill(
   caster: BattleUnit,
   skillCode: string,
   target: BattleUnit | null,
   allUnits: BattleUnit[],
-  isArena: boolean = false
+  isArena: boolean = false,
+  context?: SkillExecutionContext
 ): SkillExecutionResult {
   const skill = findSkillByCode(skillCode);
   if (!skill) {
@@ -137,8 +152,8 @@ export function executeSkill(
     };
   }
 
-  // Executar a skill
-  const result = executor(caster, target, allUnits, skill);
+  // Executar a skill (com contexto)
+  const result = executor(caster, target, allUnits, skill, context);
 
   // Se sucesso, aplicar consumo de ação e cooldown
   if (result.success) {
@@ -207,10 +222,9 @@ function executeSecondWind(
   _skill: SkillDefinition
 ): SkillExecutionResult {
   const healAmount = caster.vitality;
-  const maxHp = caster.vitality * 2;
-
+  // Use stored maxHp instead of recalculating
   const oldHp = caster.currentHp;
-  caster.currentHp = Math.min(caster.currentHp + healAmount, maxHp);
+  caster.currentHp = Math.min(caster.currentHp + healAmount, caster.maxHp);
   const actualHeal = caster.currentHp - oldHp;
 
   return {
@@ -243,12 +257,14 @@ function executeActionSurge(
 
 /**
  * BARBARIAN_TOTAL_DESTRUCTION: Dano igual ao Combat em alvo adjacente, recebe o mesmo dano
+ * Dano físico - usa sistema de proteção dual
  */
 function executeTotalDestruction(
   caster: BattleUnit,
   target: BattleUnit | null,
   allUnits: BattleUnit[],
-  _skill: SkillDefinition
+  _skill: SkillDefinition,
+  context?: SkillExecutionContext
 ): SkillExecutionResult {
   if (!target) {
     return { success: false, error: "Requer um alvo" };
@@ -256,21 +272,37 @@ function executeTotalDestruction(
 
   const damage = caster.combat;
 
-  // Aplicar dano no alvo
-  target.currentHp = Math.max(0, target.currentHp - damage);
+  // Aplicar dano físico no alvo usando sistema de proteção dual
+  const targetResult = applyDualProtectionDamage(
+    target.physicalProtection,
+    target.magicalProtection,
+    target.currentHp,
+    damage,
+    "FISICO"
+  );
+  target.physicalProtection = targetResult.newPhysicalProtection;
+  target.magicalProtection = targetResult.newMagicalProtection;
+  target.currentHp = targetResult.newHp;
+
   const targetDefeated = target.currentHp <= 0;
   if (targetDefeated) {
-    target.isAlive = false;
-    // Matar invocações do alvo
-    processSummonerDeath(target, allUnits, "arena");
+    processUnitDeath(target, allUnits, caster, "arena", context?.battleId);
   }
 
-  // Aplicar mesmo dano no caster
-  caster.currentHp = Math.max(0, caster.currentHp - damage);
+  // Aplicar mesmo dano físico no caster usando sistema de proteção dual
+  const casterResult = applyDualProtectionDamage(
+    caster.physicalProtection,
+    caster.magicalProtection,
+    caster.currentHp,
+    damage,
+    "FISICO"
+  );
+  caster.physicalProtection = casterResult.newPhysicalProtection;
+  caster.magicalProtection = casterResult.newMagicalProtection;
+  caster.currentHp = casterResult.newHp;
+
   if (caster.currentHp <= 0) {
-    caster.isAlive = false;
-    // Matar invocações do caster
-    processSummonerDeath(caster, allUnits, "arena");
+    processUnitDeath(caster, allUnits, null, "arena", context?.battleId);
   }
 
   return {
@@ -301,10 +333,12 @@ function executeHeal(
   }
 
   const healAmount = caster.focus;
-  const maxHp = healTarget.vitality * 2;
-
+  // Use stored maxHp instead of recalculating
   const oldHp = healTarget.currentHp;
-  healTarget.currentHp = Math.min(healTarget.currentHp + healAmount, maxHp);
+  healTarget.currentHp = Math.min(
+    healTarget.currentHp + healAmount,
+    healTarget.maxHp
+  );
   const actualHeal = healTarget.currentHp - oldHp;
 
   return {
@@ -388,10 +422,12 @@ function executeCureWounds(
   }
 
   const healAmount = caster.focus;
-  const maxHp = healTarget.vitality * 2;
-
+  // Use stored maxHp instead of recalculating
   const oldHp = healTarget.currentHp;
-  healTarget.currentHp = Math.min(healTarget.currentHp + healAmount, maxHp);
+  healTarget.currentHp = Math.min(
+    healTarget.currentHp + healAmount,
+    healTarget.maxHp
+  );
   const actualHeal = healTarget.currentHp - oldHp;
 
   return {
@@ -580,55 +616,90 @@ function executeHuntersMark(
 
 /**
  * RANGER_VOLLEY: Ataca todos os inimigos em área com metade do dano
+ * Pode atingir obstáculos destrutíveis na área
  */
 function executeVolley(
   caster: BattleUnit,
   target: BattleUnit | null,
   allUnits: BattleUnit[],
-  skill: SkillDefinition
+  skill: SkillDefinition,
+  context?: SkillExecutionContext
 ): SkillExecutionResult {
-  if (!target) {
-    return { success: false, error: "Requer um ponto alvo" };
+  // Determinar centro da área: targetPosition ou posição do target
+  const centerX = context?.targetPosition?.x ?? target?.posX;
+  const centerY = context?.targetPosition?.y ?? target?.posY;
+
+  if (centerX === undefined || centerY === undefined) {
+    return { success: false, error: "Requer uma posição ou alvo" };
   }
 
   const baseDamage = Math.floor(caster.combat / 2);
-  const radius = skill.rangeValue ?? 2;
+  // Resolver areaSize dinamicamente (pode ser número ou atributo)
+  const areaSize = skill.areaSize
+    ? resolveDynamicValue(skill.areaSize, caster)
+    : 3;
+  const radius = Math.floor(areaSize / 2); // Ex: 3x3 = radius 1
   let totalDamage = 0;
   let unitsHit = 0;
+  const obstaclesDestroyed: string[] = [];
 
+  // Atacar unidades na área
   for (const unit of allUnits) {
     if (unit.ownerId === caster.ownerId) continue;
     if (!unit.isAlive) continue;
 
     const distance = getManhattanDistance(
-      target.posX,
-      target.posY,
+      centerX,
+      centerY,
       unit.posX,
       unit.posY
     );
-    if (distance > radius) continue;
+    // Checar se está dentro do quadrado de área (não Manhattan para área quadrada)
+    if (
+      Math.abs(unit.posX - centerX) > radius ||
+      Math.abs(unit.posY - centerY) > radius
+    )
+      continue;
 
-    // Dano físico
-    let remainingDamage = baseDamage;
-
-    if (unit.physicalProtection > 0) {
-      const absorbed = Math.min(unit.physicalProtection, remainingDamage);
-      unit.physicalProtection -= absorbed;
-      remainingDamage -= absorbed;
-    }
-
-    if (remainingDamage > 0) {
-      unit.currentHp = Math.max(0, unit.currentHp - remainingDamage);
-      totalDamage += remainingDamage;
-    }
+    // Dano físico - usar sistema de proteção dual
+    const damageResult = applyDualProtectionDamage(
+      unit.physicalProtection,
+      unit.magicalProtection,
+      unit.currentHp,
+      baseDamage,
+      "FISICO"
+    );
+    unit.physicalProtection = damageResult.newPhysicalProtection;
+    unit.magicalProtection = damageResult.newMagicalProtection;
+    unit.currentHp = damageResult.newHp;
+    totalDamage += baseDamage;
 
     if (unit.currentHp <= 0) {
-      unit.isAlive = false;
-      // Matar invocações da unidade
-      processSummonerDeath(unit, allUnits, "arena");
+      processUnitDeath(unit, allUnits, caster, "arena", context?.battleId);
     }
 
     unitsHit++;
+  }
+
+  // Atacar obstáculos destrutíveis na área
+  if (context?.obstacles) {
+    for (const obstacle of context.obstacles) {
+      if (obstacle.destroyed) continue;
+
+      // Checar se está dentro da área
+      if (
+        Math.abs(obstacle.posX - centerX) > radius ||
+        Math.abs(obstacle.posY - centerY) > radius
+      )
+        continue;
+
+      // Aplicar dano ao obstáculo
+      obstacle.hp = (obstacle.hp ?? 0) - baseDamage;
+      if (obstacle.hp <= 0) {
+        obstacle.destroyed = true;
+        obstaclesDestroyed.push(obstacle.id);
+      }
+    }
   }
 
   return {
@@ -781,17 +852,24 @@ export function processEidolonKill(
   eidolon.combat += statsGained;
   eidolon.speed += statsGained;
   eidolon.focus += statsGained;
-  eidolon.armor += statsGained;
+  eidolon.resistance += statsGained;
+  eidolon.will += statsGained;
   eidolon.vitality += statsGained;
 
-  // Aumentar HP máximo e atual proporcionalmente
-  const hpGain = statsGained * 2; // vitality * 2 = HP
+  // Aumentar HP máximo e atual usando configs
+  const hpGain = statsGained * HP_CONFIG.multiplier;
+  eidolon.maxHp += hpGain;
   eidolon.currentHp += hpGain;
-  // maxHp precisa ser recalculado baseado no novo vitality
 
-  // Recalcular proteções máximas
-  eidolon.maxPhysicalProtection = eidolon.armor * 2;
-  eidolon.maxMagicalProtection = eidolon.focus * 2;
+  // Aumentar Mana máxima usando config
+  const manaGain = statsGained * MANA_CONFIG.multiplier;
+  eidolon.maxMana += manaGain;
+
+  // Recalcular proteções máximas usando configs
+  eidolon.maxPhysicalProtection =
+    eidolon.resistance * PHYSICAL_PROTECTION_CONFIG.multiplier;
+  eidolon.maxMagicalProtection =
+    eidolon.will * MAGICAL_PROTECTION_CONFIG.multiplier;
 
   return { newBonus, statsGained };
 }
@@ -804,7 +882,8 @@ export function resetEidolonOnDeath(): {
   combat: number;
   speed: number;
   focus: number;
-  armor: number;
+  resistance: number;
+  will: number;
   vitality: number;
 } {
   // Stats base do Eidolon (de summons.data.ts)
@@ -812,7 +891,8 @@ export function resetEidolonOnDeath(): {
     combat: 3,
     speed: 3,
     focus: 3,
-    armor: 3,
+    resistance: 3,
+    will: 1,
     vitality: 3,
   };
 }
@@ -861,7 +941,8 @@ export function executeAttack(
   allUnits: BattleUnit[],
   _skill: SkillDefinition,
   damageType: string = "FISICO",
-  obstacle?: BattleObstacle
+  obstacle?: BattleObstacle,
+  battleId?: string
 ): AttackActionResult {
   if (!attacker.features.includes("ATTACK")) {
     return { success: false, error: "Unit cannot attack" };
@@ -1145,18 +1226,14 @@ export function executeAttack(
   let killedSummons: BattleUnit[] = [];
   if (target.currentHp <= 0) {
     targetDefeated = true;
-    target.isAlive = false;
-
-    // Processar morte para crescimento do Eidolon (se atacante for Eidolon)
-    processUnitDeathForEidolon(attacker, target, "arena");
-
-    // Se o alvo era um Eidolon, processar reset
-    if (target.conditions.includes("EIDOLON_GROWTH")) {
-      processEidolonDeath(target, "arena");
-    }
-
-    // Matar todas as invocações do alvo (summons morrem com o invocador)
-    killedSummons = processSummonerDeath(target, allUnits, "arena");
+    const deathResult = processUnitDeath(
+      target,
+      allUnits,
+      attacker,
+      "arena",
+      battleId
+    );
+    killedSummons = deathResult.killedSummons;
   }
 
   return {
@@ -1185,10 +1262,19 @@ function executeAttackSkill(
   caster: BattleUnit,
   target: BattleUnit | null,
   allUnits: BattleUnit[],
-  skill: SkillDefinition
+  skill: SkillDefinition,
+  context?: SkillExecutionContext
 ): SkillExecutionResult {
   // Delega para a função completa com parâmetros padrão
-  return executeAttack(caster, target, allUnits, skill, "FISICO", undefined);
+  return executeAttack(
+    caster,
+    target,
+    allUnits,
+    skill,
+    "FISICO",
+    undefined,
+    context?.battleId
+  );
 }
 
 /**

@@ -9,7 +9,8 @@ import React, {
   useEffect,
   useRef,
 } from "react";
-import { socketService } from "../../../services/socket.service";
+import { colyseusService } from "../../../services/colyseus.service";
+import { useAuth } from "../../auth";
 import type {
   ChatMessage,
   ChatContext as ChatContextType,
@@ -129,67 +130,32 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
 }) => {
   const [state, dispatch] = useReducer(chatReducer, initialState);
   const bubbleCleanupRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { state: authState } = useAuth();
 
-  // Listener para novas mensagens
-  useEffect(() => {
-    const handleMessage = (data: { message: ChatMessage }) => {
-      // Verificar se a mensagem é para este contexto
-      if (data.message.context !== context) return;
-      if (context !== "GLOBAL" && data.message.contextId !== contextId) return;
+  // =========================================================================
+  // Callbacks (definidos antes dos useEffects que os usam)
+  // =========================================================================
 
-      dispatch({ type: "ADD_MESSAGE", payload: data.message });
+  const loadHistory = useCallback(async (): Promise<void> => {
+    try {
+      const response = await colyseusService.sendAndWait<{
+        success: boolean;
+        messages?: ChatMessage[];
+      }>(
+        "chat:load_history",
+        { context, contextId },
+        "chat:load_history:response"
+      );
 
-      // Se tiver unitId (batalha), adicionar balão
-      if (data.message.unitId) {
-        console.log(
-          "%c[ChatContext] 💬 Adicionando balão para unidade",
-          "color: #22c55e;",
-          {
-            unitId: data.message.unitId,
-            message: data.message.message,
-            expiresAt: Date.now() + CHAT_CONFIG.bubbleDuration,
-          }
-        );
+      if (response.success) {
         dispatch({
-          type: "ADD_BUBBLE",
-          payload: {
-            unitId: data.message.unitId,
-            message: data.message.message,
-            expiresAt: Date.now() + CHAT_CONFIG.bubbleDuration,
-          },
+          type: "SET_MESSAGES",
+          payload: response.messages || [],
         });
-      } else {
-        console.log(
-          "%c[ChatContext] ⚠️ Mensagem sem unitId - balão não será exibido",
-          "color: #f59e0b;",
-          { message: data.message }
-        );
       }
-    };
-
-    socketService.on("chat:message", handleMessage);
-
-    return () => {
-      socketService.off("chat:message", handleMessage);
-    };
-  }, [context, contextId]);
-
-  // Limpeza de balões expirados
-  useEffect(() => {
-    bubbleCleanupRef.current = setInterval(() => {
-      dispatch({ type: "CLEAR_EXPIRED_BUBBLES" });
-    }, 1000);
-
-    return () => {
-      if (bubbleCleanupRef.current) {
-        clearInterval(bubbleCleanupRef.current);
-      }
-    };
-  }, []);
-
-  // Carregar histórico ao montar
-  useEffect(() => {
-    loadHistory();
+    } catch (error) {
+      console.error("Erro ao carregar histórico:", error);
+    }
   }, [context, contextId]);
 
   const sendMessage = useCallback(
@@ -205,10 +171,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
           unitId,
         };
 
-        const response = await socketService.emitAsync<{
+        const response = await colyseusService.sendAndWait<{
           success: boolean;
           error?: string;
-        }>("chat:send", payload);
+        }>("chat:send", payload, "chat:send:response");
 
         if (!response.success) {
           throw new Error(response.error || "Erro ao enviar mensagem");
@@ -223,24 +189,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     },
     [context, contextId]
   );
-
-  const loadHistory = useCallback(async (): Promise<void> => {
-    try {
-      const response = await socketService.emitAsync<{
-        success: boolean;
-        messages?: ChatMessage[];
-      }>("chat:load_history", { context, contextId });
-
-      if (response.success) {
-        dispatch({
-          type: "SET_MESSAGES",
-          payload: response.messages || [],
-        });
-      }
-    } catch (error) {
-      console.error("Erro ao carregar histórico:", error);
-    }
-  }, [context, contextId]);
 
   const openChat = useCallback(() => {
     dispatch({ type: "SET_OPEN", payload: true });
@@ -264,6 +212,63 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     },
     [state.activeBubbles]
   );
+
+  // =========================================================================
+  // Effects
+  // =========================================================================
+
+  // Listener para novas mensagens
+  useEffect(() => {
+    const handleMessage = (data: { message: ChatMessage }) => {
+      // Verificar se a mensagem é para este contexto
+      if (data.message.context !== context) return;
+      if (context !== "GLOBAL" && data.message.contextId !== contextId) return;
+
+      dispatch({ type: "ADD_MESSAGE", payload: data.message });
+
+      // Se tiver unitId (batalha), adicionar balão
+      if (data.message.unitId) {
+        dispatch({
+          type: "ADD_BUBBLE",
+          payload: {
+            unitId: data.message.unitId,
+            message: data.message.message,
+            expiresAt: Date.now() + CHAT_CONFIG.bubbleDuration,
+          },
+        });
+      }
+    };
+
+    colyseusService.on("chat:message", handleMessage);
+
+    return () => {
+      colyseusService.off("chat:message", handleMessage);
+    };
+  }, [context, contextId]);
+
+  // Limpeza de balões expirados
+  useEffect(() => {
+    bubbleCleanupRef.current = setInterval(() => {
+      dispatch({ type: "CLEAR_EXPIRED_BUBBLES" });
+    }, 1000);
+
+    return () => {
+      if (bubbleCleanupRef.current) {
+        clearInterval(bubbleCleanupRef.current);
+      }
+    };
+  }, []);
+
+  // Carregar histórico quando servidor validar autenticação
+  useEffect(() => {
+    if (authState.isServerValidated) {
+      loadHistory();
+    }
+  }, [authState.isServerValidated, loadHistory]);
+
+  // =========================================================================
+  // Provider Value
+  // =========================================================================
 
   const value: ChatContextValue = {
     state,

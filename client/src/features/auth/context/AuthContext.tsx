@@ -5,11 +5,22 @@ import type {
   AuthAction,
   User,
 } from "../types/auth.types";
-import { socketService } from "../../../services/socket.service";
+import { colyseusService } from "../../../services/colyseus.service";
+
+// Tipo da resposta do servidor para login/register
+interface AuthServerResponse {
+  token: string;
+  user: {
+    id: string;
+    username: string;
+    email: string;
+  };
+}
 
 const initialState: AuthState = {
   user: null,
   isAuthenticated: false,
+  isServerValidated: false,
   isLoading: false,
   error: null,
 };
@@ -21,6 +32,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         ...state,
         user: action.payload,
         isAuthenticated: !!action.payload,
+        isServerValidated: !!action.payload, // Usuário só é setado após validação
       };
     case "SET_LOADING":
       return { ...state, isLoading: action.payload };
@@ -50,13 +62,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: "SET_ERROR", payload: null });
 
       try {
-        const user = await socketService.waitForResponse<User>(
-          "auth:register",
-          { username, email, password },
-          "auth:success",
-          "auth:error",
-          10000
-        );
+        const response =
+          await colyseusService.waitForResponse<AuthServerResponse>(
+            "auth:register",
+            { username, email, password },
+            "auth:success",
+            "auth:error",
+            10000
+          );
+
+        // Mapear resposta do servidor para User
+        const user: User = {
+          id: response.user.id,
+          username: response.user.username,
+          email: response.user.email,
+          token: response.token,
+        };
 
         // Save token to localStorage
         if (user.token) {
@@ -86,13 +107,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: "SET_ERROR", payload: null });
 
       try {
-        const user = await socketService.waitForResponse<User>(
-          "auth:login",
-          { username, password },
-          "auth:success",
-          "auth:error",
-          10000
-        );
+        const response =
+          await colyseusService.waitForResponse<AuthServerResponse>(
+            "auth:login",
+            { username, password },
+            "auth:success",
+            "auth:error",
+            10000
+          );
+
+        // Mapear resposta do servidor para User
+        const user: User = {
+          id: response.user.id,
+          username: response.user.username,
+          email: response.user.email,
+          token: response.token,
+        };
 
         if (user.token) {
           localStorage.setItem("auth_token", user.token);
@@ -116,7 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(() => {
-    socketService.emit("auth:logout");
+    colyseusService.sendToGlobal("auth:logout");
     localStorage.removeItem("auth_token");
     localStorage.removeItem("auth_user");
     dispatch({ type: "RESET" });
@@ -132,21 +162,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const verifiedUser = await socketService.waitForResponse<User>(
-          "auth:verify",
+        // auth:validate retorna { userId, username }
+        const validatedData = await colyseusService.waitForResponse<{
+          userId: string;
+          username: string;
+        }>(
+          "auth:validate",
           { token: savedToken },
-          "auth:verified",
+          "auth:validated",
           "auth:error",
           5000
         );
 
-        // Atualiza o token se o servidor enviou um novo (refresh)
-        if (verifiedUser.token) {
-          localStorage.setItem("auth_token", verifiedUser.token);
-        }
-        localStorage.setItem("auth_user", JSON.stringify(verifiedUser));
+        // Manter os dados do localStorage mas atualizar com dados validados
+        const user: User = {
+          id: validatedData.userId,
+          username: validatedData.username,
+          token: savedToken,
+        };
 
-        dispatch({ type: "SET_USER", payload: verifiedUser });
+        localStorage.setItem("auth_user", JSON.stringify(user));
+
+        dispatch({ type: "SET_USER", payload: user });
         return true;
       } catch {
         localStorage.removeItem("auth_token");

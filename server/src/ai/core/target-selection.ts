@@ -100,7 +100,7 @@ export function getAllies(
 
 /**
  * Avalia a ameaça que um alvo representa
- * Considera: combat, armor, HP atual, distância
+ * Considera: combat, resistance, HP atual, distância
  */
 export function evaluateThreatLevel(
   attacker: BattleUnit,
@@ -112,7 +112,7 @@ export function evaluateThreatLevel(
   threat += target.combat * 2;
 
   // Alvos tanky são menos urgentes (vão demorar para matar)
-  threat -= target.armor * 0.5;
+  threat -= target.resistance * 0.5;
 
   // Alvos com HP baixo são menos ameaçadores
   const hpPercent = target.currentHp / target.maxHp;
@@ -131,15 +131,15 @@ export function evaluateThreatLevel(
 
 /**
  * Avalia se a unidade consegue derrotar o alvo
- * Considera: combat vs armor/HP, chance de acerto
+ * Considera: combat vs resistance/HP, chance de acerto
  */
 export function canDefeatTarget(
   attacker: BattleUnit,
   target: BattleUnit,
   turnsToKill: number = 3
 ): boolean {
-  // Dano estimado por ataque (combat - armor, mínimo 1)
-  const estimatedDamage = Math.max(1, attacker.combat - target.armor);
+  // Dano estimado por ataque (combat - resistance, mínimo 1)
+  const estimatedDamage = Math.max(1, attacker.combat - target.resistance);
 
   // Ataques necessários para matar
   const attacksNeeded = Math.ceil(target.currentHp / estimatedDamage);
@@ -193,12 +193,12 @@ export function calculateTargetScore(
   }
 
   // Se nosso combat é alto, podemos enfrentar alvos mais tanky
-  if (attacker.combat >= target.armor + 5) {
+  if (attacker.combat >= target.resistance + 5) {
     score += 10; // Temos vantagem de dano
   }
 
-  // Se nosso armor é baixo, evitar alvos com alto combat
-  if (attacker.armor < target.combat - 3) {
+  // Se nosso resistance é baixo, evitar alvos com alto combat
+  if (attacker.resistance < target.combat - 3) {
     score -= 15; // Alvo perigoso para nós
   }
 
@@ -215,14 +215,14 @@ export function calculateTargetScore(
       // Tático prioriza por ameaça real
       score += evaluateThreatLevel(attacker, target);
       // Penaliza alvos muito tanky
-      if (target.armor > attacker.combat) score -= 20;
+      if (target.resistance > attacker.combat) score -= 20;
       break;
 
     case "RANGED":
       // Ranged prefere alvos distantes que ainda pode alcançar
       if (distance >= 2 && canAttack) score += 20;
-      // Prefere alvos com baixo armor (mais fáceis de danificar)
-      score += (10 - target.armor) * 2;
+      // Prefere alvos com baixo resistance (mais fáceis de danificar)
+      score += (10 - target.resistance) * 2;
       break;
 
     case "SUPPORT":
@@ -456,7 +456,7 @@ export function isUnitInDanger(
   // Calcular dano potencial dos inimigos próximos
   let totalThreat = 0;
   for (const enemy of nearbyEnemies) {
-    const potentialDamage = Math.max(1, enemy.combat - unit.armor);
+    const potentialDamage = Math.max(1, enemy.combat - unit.resistance);
     totalThreat += potentialDamage;
   }
 
@@ -466,8 +466,8 @@ export function isUnitInDanger(
   }
 
   // Se muitos inimigos próximos (considerando nossa defesa)
-  // Unidades com armor alto aguentam mais pressão
-  const maxSafeEnemies = Math.max(1, Math.floor(unit.armor / 3) + 1);
+  // Unidades com resistance alto aguentam mais pressão
+  const maxSafeEnemies = Math.max(1, Math.floor(unit.resistance / 3) + 1);
   return nearbyEnemies.length > maxSafeEnemies;
 }
 

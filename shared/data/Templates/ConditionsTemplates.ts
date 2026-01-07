@@ -719,3 +719,18 @@ export const RACE_CONDITIONS: Record<string, ConditionDefinition> = {
     effects: {},
   },
 };
+
+// =============================================================================
+// OBJETO CONSOLIDADO DE TODAS AS CONDIÇÕES
+// =============================================================================
+
+export const ALL_CONDITIONS: Record<string, ConditionDefinition> = {
+  ...COMBAT_CONDITIONS,
+  ...SKILL_CONDITIONS,
+  ...SPELL_CONDITIONS,
+  ...RACE_CONDITIONS,
+};
+
+// Array de todas as condições (para listagem)
+export const CONDITION_TEMPLATES: ConditionDefinition[] =
+  Object.values(ALL_CONDITIONS);

@@ -1,78 +1,110 @@
 @import "tailwindcss";
 
+/* Disable context menu globally */
+* {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Allow text selection in inputs and textareas */
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* Default pointer cursor for clickable buttons */
 button {
   cursor: pointer;
 }
 
 /* ========================================
-   A CIDADELA DE PEDRA - Tema Medieval
+   BOUNDLESS - Cosmic Fantasy Theme
    ======================================== */
 
 @theme {
-  /* === CORES DA CIDADELA === */
+  /* === CORES BOUNDLESS === */
 
-  /* Pedras da Fortaleza */
-  --color-citadel-granite: #4a4a4a;
-  --color-citadel-slate: #1a1a1a;
-  --color-citadel-sandstone: #6b5c4d;
-  --color-citadel-obsidian: #0d0d0d;
-  --color-citadel-weathered: #5a5a5a;
-  --color-citadel-carved: #3d3d3d;
+  /* Cosmos - Fundo cósmico da logo */
+  --color-cosmos-void: #050510;
+  --color-cosmos-deep: #0a0a1a;
+  --color-cosmos-dark: #0d0d20;
+  --color-cosmos-space: #121230;
+  --color-cosmos-nebula: #1a1a40;
 
-  /* Metais Medievais */
-  --color-metal-iron: #4a4a50;
-  --color-metal-rust: #6b4423;
-  --color-metal-steel: #71797e;
-  --color-metal-bronze: #8b7355;
-  --color-metal-gold: #9c7a3c;
-  --color-metal-copper: #7c4a3a;
+  /* Stellar - Dourado/Âmbar da estrela principal */
+  --color-stellar-gold: #f59e0b;
+  --color-stellar-amber: #fbbf24;
+  --color-stellar-light: #fcd34d;
+  --color-stellar-pale: #fef3c7;
+  --color-stellar-dark: #b45309;
+  --color-stellar-deep: #92400e;
 
-  /* Cores de Guerra */
-  --color-war-crimson: #8b1a1a;
-  --color-war-blood: #6b0f0f;
-  --color-war-ember: #c44536;
-  --color-war-fire: #a33c1f;
+  /* Astral - Prata/Aço das pontas secundárias */
+  --color-astral-silver: #94a3b8;
+  --color-astral-steel: #64748b;
+  --color-astral-chrome: #cbd5e1;
+  --color-astral-dim: #475569;
+  --color-astral-dark: #334155;
 
-  /* Pergaminho */
-  --color-parchment-light: #d4c5a9;
-  --color-parchment-aged: #b8a88a;
-  --color-parchment-dark: #8b7d5c;
+  /* Arcane - Roxo/Violeta do vórtice */
+  --color-arcane-violet: #8b5cf6;
+  --color-arcane-purple: #7c3aed;
+  --color-arcane-deep: #5b21b6;
+  --color-arcane-dark: #4c1d95;
+  --color-arcane-glow: #a78bfa;
 
-  /* Tochas */
-  --color-torch-glow: #ff9500;
-  --color-torch-warm: #e8730e;
-  --color-torch-dim: #7a4a15;
+  /* Mystic - Azul/Ciano do vórtice */
+  --color-mystic-blue: #3b82f6;
+  --color-mystic-cyan: #22d3ee;
+  --color-mystic-sky: #0ea5e9;
+  --color-mystic-deep: #1d4ed8;
+  --color-mystic-glow: #60a5fa;
 
-  /* Medieval Legacy */
-  --color-medieval-dark: rgb(50, 50, 50);
-  --color-medieval-darker: rgb(30, 30, 30);
-  --color-medieval-blood: #8b0000;
-  --color-medieval-stone: #323232;
-  --color-medieval-iron: #404040;
+  /* Ember - Verde/Esmeralda do vórtice */
+  --color-ember-green: #22c55e;
+  --color-ember-emerald: #10b981;
+  --color-ember-teal: #14b8a6;
+  --color-ember-glow: #4ade80;
 
-  /* === FONTES MEDIEVAIS === */
-  --font-stone: "Cinzel", serif;
-  --font-medieval: "Cinzel Decorative", serif;
-  --font-scroll: "Palatino Linotype", "Book Antiqua", serif;
+  /* Interface - Cinzas neutros */
+  --color-surface-900: #0f0f1a;
+  --color-surface-800: #1a1a2e;
+  --color-surface-700: #252545;
+  --color-surface-600: #353560;
+  --color-surface-500: #4a4a70;
+  --color-surface-400: #6b6b90;
+  --color-surface-300: #9090b0;
+  --color-surface-200: #b8b8d0;
+  --color-surface-100: #e0e0f0;
+
+  /* Semânticas */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+
+  /* === FONTES === */
+  --font-display: "Cinzel", serif;
+  --font-title: "Cinzel Decorative", serif;
+  --font-body: "Inter", "Segoe UI", sans-serif;
 
   /* === ANIMAÇÕES === */
+  --animate-pulse-glow: pulseGlow 2s ease-in-out infinite;
+  --animate-cosmic-rotate: cosmicRotate 20s linear infinite;
+  --animate-star-twinkle: starTwinkle 3s ease-in-out infinite;
   --animate-float: float 6s ease-in-out infinite;
-  --animate-flicker: flicker 2s ease-in-out infinite;
-  --animate-torch-glow: torchGlow 3s ease-in-out infinite;
-  --animate-stone-press: stonePress 0.15s ease-out;
-  --animate-rune-glow: runeGlow 2s ease-in-out infinite;
-  --animate-dust: dust 2s ease-out forwards;
 
   /* === SOMBRAS === */
-  --shadow-stone-inset: inset 0 2px 4px rgba(0, 0, 0, 0.5),
-    inset 0 -1px 2px rgba(255, 255, 255, 0.05);
-  --shadow-stone-raised: 0 4px 8px rgba(0, 0, 0, 0.5),
-    0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  --shadow-forge-glow: 0 0 20px rgba(196, 69, 54, 0.4),
-    0 0 40px rgba(139, 26, 26, 0.2);
-  --shadow-torch: 0 0 30px rgba(255, 149, 0, 0.3),
-    0 0 60px rgba(232, 115, 14, 0.15);
+  --shadow-stellar: 0 0 20px rgba(251, 191, 36, 0.3),
+    0 0 40px rgba(245, 158, 11, 0.15);
+  --shadow-arcane: 0 0 20px rgba(139, 92, 246, 0.3),
+    0 0 40px rgba(124, 58, 237, 0.15);
+  --shadow-cosmic: 0 4px 20px rgba(0, 0, 0, 0.5),
+    0 0 60px rgba(139, 92, 246, 0.1);
+  --shadow-card: 0 4px 6px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 /* === KEYFRAMES === */
@@ -86,61 +118,60 @@ button {
   }
 }
 
-@keyframes flicker {
+@keyframes pulseGlow {
   0%,
   100% {
     opacity: 1;
-  }
-  50% {
-    opacity: 0.85;
-  }
-}
-
-@keyframes torchGlow {
-  0%,
-  100% {
-    box-shadow: 0 0 20px rgba(255, 149, 0, 0.3),
-      0 0 40px rgba(232, 115, 14, 0.2);
     filter: brightness(1);
   }
   50% {
-    box-shadow: 0 0 30px rgba(255, 149, 0, 0.5),
-      0 0 60px rgba(232, 115, 14, 0.3);
-    filter: brightness(1.1);
+    opacity: 0.8;
+    filter: brightness(1.2);
   }
 }
 
-@keyframes stonePress {
-  0% {
-    transform: translateY(0);
+@keyframes cosmicRotate {
+  from {
+    transform: rotate(0deg);
   }
-  50% {
-    transform: translateY(3px);
-  }
-  100% {
-    transform: translateY(1px);
+  to {
+    transform: rotate(360deg);
   }
 }
 
-@keyframes runeGlow {
+@keyframes starTwinkle {
   0%,
   100% {
-    text-shadow: 0 0 10px rgba(139, 26, 26, 0.5);
+    opacity: 0.3;
+    transform: scale(0.8);
   }
   50% {
-    text-shadow: 0 0 20px rgba(139, 26, 26, 0.8),
-      0 0 30px rgba(139, 26, 26, 0.4);
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
-@keyframes dust {
-  0% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+@keyframes stellarPulse {
+  0%,
   100% {
-    opacity: 0;
-    transform: translateY(10px) scale(0.5);
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.3),
+      0 0 40px rgba(245, 158, 11, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(251, 191, 36, 0.5),
+      0 0 60px rgba(245, 158, 11, 0.3);
+  }
+}
+
+@keyframes arcanePulse {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3),
+      0 0 40px rgba(124, 58, 237, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(139, 92, 246, 0.5),
+      0 0 60px rgba(124, 58, 237, 0.3);
   }
 }
 
@@ -155,45 +186,108 @@ button {
   }
 }
 
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out forwards;
 }
 
+.animate-stellar-pulse {
+  animation: stellarPulse 3s ease-in-out infinite;
+}
+
+.animate-arcane-pulse {
+  animation: arcanePulse 3s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s linear infinite;
+}
+
 /* === BACKGROUNDS CUSTOMIZADOS === */
-.bg-radial-glow {
-  background: radial-gradient(
-    circle at 50% 50%,
-    rgba(139, 0, 0, 0.15) 0%,
-    transparent 70%
-  );
+.bg-cosmos {
+  background: linear-gradient(180deg, #050510 0%, #0a0a1a 50%, #0d0d20 100%);
 }
 
-.bg-stone-texture {
-  background: linear-gradient(
-    135deg,
-    #3d3d3d 0%,
-    #4a4a4a 25%,
-    #3a3a3a 50%,
-    #454545 75%,
-    #3d3d3d 100%
-  );
-}
-
-.bg-torch-light {
+.bg-cosmos-radial {
   background: radial-gradient(
-    ellipse at top,
-    rgba(255, 149, 0, 0.15) 0%,
+    ellipse at 50% 0%,
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(59, 130, 246, 0.1) 25%,
     transparent 60%
   );
 }
 
-.bg-metal-sheen {
+.bg-stellar-glow {
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(251, 191, 36, 0.15) 0%,
+    transparent 70%
+  );
+}
+
+.bg-arcane-glow {
+  background: radial-gradient(
+    ellipse at top,
+    rgba(139, 92, 246, 0.15) 0%,
+    transparent 60%
+  );
+}
+
+.bg-card-gradient {
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.1) 0%,
-    transparent 50%,
-    rgba(0, 0, 0, 0.2) 100%
+    rgba(26, 26, 46, 0.95) 0%,
+    rgba(15, 15, 26, 0.98) 100%
   );
+}
+
+.bg-surface-gradient {
+  background: linear-gradient(
+    180deg,
+    rgba(37, 37, 69, 0.5) 0%,
+    rgba(26, 26, 46, 0.8) 100%
+  );
+}
+
+/* === BORDAS E EFEITOS === */
+.border-stellar {
+  border-color: rgba(251, 191, 36, 0.5);
+}
+
+.border-arcane {
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+.glow-stellar {
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.3),
+    0 0 40px rgba(245, 158, 11, 0.15);
+}
+
+.glow-arcane {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.3),
+    0 0 40px rgba(124, 58, 237, 0.15);
+}
+
+.text-stellar-gradient {
+  background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 50%, #f59e0b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-arcane-gradient {
+  background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 50%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 /* === LOADING BAR ANIMATION === */

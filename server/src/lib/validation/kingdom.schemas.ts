@@ -37,7 +37,8 @@ export const BaseAttributesSchema = z.object({
   combat: z.number().min(1).max(30),
   speed: z.number().min(1).max(30),
   focus: z.number().min(1).max(30),
-  armor: z.number().min(1).max(30),
+  resistance: z.number().min(1).max(30),
+  will: z.number().min(0).max(30),
   vitality: z.number().min(1).max(30),
 });
 
@@ -47,13 +48,19 @@ export const RegentAttributesSchema = z
     combat: z.number().min(0).max(30),
     speed: z.number().min(0).max(30),
     focus: z.number().min(0).max(30),
-    armor: z.number().min(0).max(30),
+    resistance: z.number().min(0).max(30),
+    will: z.number().min(0).max(30),
     vitality: z.number().min(0).max(30),
   })
   .refine(
     (data) => {
       const total =
-        data.combat + data.speed + data.focus + data.armor + data.vitality;
+        data.combat +
+        data.speed +
+        data.focus +
+        data.resistance +
+        data.will +
+        data.vitality;
       return total === 30;
     },
     { message: "Atributos do regente devem somar exatamente 30 pontos" }
@@ -86,7 +93,8 @@ export const CreateTroopTemplateSchema = z.object({
   combat: z.number().min(1).max(15),
   speed: z.number().min(1).max(15),
   focus: z.number().min(1).max(15),
-  armor: z.number().min(1).max(15),
+  resistance: z.number().min(1).max(15),
+  will: z.number().min(0).max(15),
   vitality: z.number().min(1).max(15),
 });
 

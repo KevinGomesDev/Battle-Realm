@@ -6,7 +6,7 @@ import { AttributesPanel } from "./AttributesPanel";
 const RESOURCE_TYPES = [
   { id: "ore", name: "Ore", color: "text-amber-400" },
   { id: "supplies", name: "Supplies", color: "text-green-400" },
-  { id: "arcane", name: "Arcane", color: "text-purple-400" },
+  { id: "arcane", name: "Arcane", color: "text-stellar-amber" },
   { id: "experience", name: "Experience", color: "text-blue-400" },
   { id: "devotion", name: "Devotion", color: "text-yellow-400" },
 ] as const;
@@ -50,7 +50,8 @@ export const Step3Troops: React.FC<Step3TroopsProps> = ({
     currentTemplate.combat +
     currentTemplate.speed +
     currentTemplate.focus +
-    currentTemplate.armor +
+    currentTemplate.resistance +
+    currentTemplate.will +
     currentTemplate.vitality;
 
   // Calcular avatares em uso: regente + outras tropas (não a atual)
@@ -65,7 +66,8 @@ export const Step3Troops: React.FC<Step3TroopsProps> = ({
   ];
 
   const allTemplatesValid = templates.every((t) => {
-    const total = t.combat + t.speed + t.focus + t.armor + t.vitality;
+    const total =
+      t.combat + t.speed + t.focus + t.resistance + t.will + t.vitality;
     return t.name && t.passiveId && t.resourceType && total === 10;
   });
 
@@ -78,7 +80,8 @@ export const Step3Troops: React.FC<Step3TroopsProps> = ({
       <div className="bg-slate-700/30 rounded">
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-xs">
           {templates.map((t, i) => {
-            const total = t.combat + t.speed + t.focus + t.armor + t.vitality;
+            const total =
+              t.combat + t.speed + t.focus + t.resistance + t.will + t.vitality;
             const isValid =
               t.name && t.passiveId && t.resourceType && total === 10;
             return (

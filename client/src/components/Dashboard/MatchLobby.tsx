@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useMatch } from "../../features/match";
 import { useAuth } from "../../features/auth";
-import { socketService } from "../../services/socket.service";
+import { colyseusService } from "../../services/colyseus.service";
+import { Button } from "../Button";
 
 interface MatchLobbyProps {
   matchId: string;
@@ -13,7 +14,7 @@ interface MatchLobbyProps {
  * MatchLobby - Lobby compacto para partidas (Dashboard)
  */
 export const MatchLobby: React.FC<MatchLobbyProps> = ({
-  matchId,
+  matchId: _matchId,
   onGameStart,
   onLeave,
 }) => {
@@ -21,64 +22,48 @@ export const MatchLobby: React.FC<MatchLobbyProps> = ({
     state: { user },
   } = useAuth();
   const {
-    state: { preparationData, matchMapData, isLoading, error },
-    getPreparationData,
-    loadMatch,
-    requestMapData,
-    requestMatchState,
-    setPlayerReady,
+    state: { players, status, isLoading, error },
+    setReady,
+    leaveMatch,
   } = useMatch();
 
-  const [isReady, setIsReady] = useState(false);
+  const [isReady, setIsReadyLocal] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-
-  useEffect(() => {
-    getPreparationData(matchId).catch(console.error);
-  }, [matchId, getPreparationData]);
 
   useEffect(() => {
     const handleMatchStarted = () => onGameStart?.();
 
-    const handlePreparationStarted = () => {
-      getPreparationData(matchId).catch(console.error);
-      loadMatch(matchId).catch(console.error);
-      requestMapData(matchId).catch(console.error);
-      requestMatchState(matchId).catch(console.error);
-    };
-
-    const handlePlayerReadyUpdate = () => {
-      getPreparationData(matchId).catch(console.error);
-    };
-
-    socketService.on("match:started", handleMatchStarted);
-    socketService.on("match:preparation_started", handlePreparationStarted);
-    socketService.on("match:player_ready_update", handlePlayerReadyUpdate);
+    colyseusService.on("match:started", handleMatchStarted);
 
     return () => {
-      socketService.off("match:started", handleMatchStarted);
-      socketService.off("match:preparation_started", handlePreparationStarted);
-      socketService.off("match:player_ready_update", handlePlayerReadyUpdate);
+      colyseusService.off("match:started", handleMatchStarted);
     };
-  }, [
-    matchId,
-    getPreparationData,
-    loadMatch,
-    requestMapData,
-    requestMatchState,
-    onGameStart,
-  ]);
+  }, [onGameStart]);
 
+  // Atualiza estado de pronto baseado nos players
   useEffect(() => {
-    if (preparationData) setIsReady(preparationData.isReady);
-  }, [preparationData]);
+    const myPlayer = players.find((p) => p.odataUserId === user?.id);
+    if (myPlayer) {
+      setIsReadyLocal(myPlayer.isReady);
+    }
+  }, [players, user?.id]);
 
-  const handleReady = async () => {
+  const handleReady = () => {
     setLocalError(null);
     try {
-      await setPlayerReady(matchId);
-      setIsReady(true);
+      setReady();
+      setIsReadyLocal(true);
     } catch (err: any) {
       setLocalError(err.message || "Erro ao marcar como pronto");
+    }
+  };
+
+  const handleLeave = async () => {
+    try {
+      await leaveMatch();
+      onLeave?.();
+    } catch (err) {
+      console.error("Erro ao sair:", err);
     }
   };
 
@@ -88,68 +73,58 @@ export const MatchLobby: React.FC<MatchLobbyProps> = ({
     <div className="space-y-2">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-parchment-aged text-xs flex items-center gap-1">
-          <span className="w-2 h-2 bg-torch-glow rounded-full animate-pulse" />
+        <span className="text-astral-silver text-xs flex items-center gap-1">
+          <span className="w-2 h-2 bg-stellar-amber rounded-full animate-pulse" />
           Aguardando...
         </span>
-        <button
-          onClick={onLeave}
-          className="px-2 py-0.5 text-[10px] font-semibold
-                     bg-gradient-to-b from-war-crimson to-war-blood
-                     border border-metal-iron/50 rounded
-                     hover:from-war-ember hover:to-war-crimson
-                     text-parchment-light transition-all"
-        >
+        <Button variant="danger" size="xs" onClick={handleLeave}>
           Sair
-        </button>
+        </Button>
       </div>
 
       {/* Erro */}
       {displayError && (
-        <div className="p-1.5 bg-war-blood/20 border border-war-crimson/50 rounded">
-          <p className="text-war-ember text-[10px]">⚠️ {displayError}</p>
+        <div className="p-1.5 bg-red-800/20 border border-red-500/50 rounded">
+          <p className="text-red-400 text-[10px]">⚠️ {displayError}</p>
         </div>
       )}
 
       {/* Loading */}
-      {isLoading && !preparationData ? (
+      {isLoading && players.length === 0 ? (
         <div className="flex items-center justify-center py-4">
-          <div className="animate-spin w-5 h-5 border-2 border-war-crimson border-t-transparent rounded-full" />
+          <div className="animate-spin w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full" />
         </div>
       ) : (
         <>
           {/* Players */}
           <div className="space-y-1">
-            {matchMapData?.players.map((player) => {
-              const isCurrentUser =
-                player.id === user?.id ||
-                player.playerIndex === preparationData?.playerIndex;
+            {players.map((player, idx) => {
+              const isCurrentUser = player.odataUserId === user?.id;
               const playerName =
-                (player as any).username ||
-                (player as any).name ||
+                player.username ||
                 (isCurrentUser && user?.username) ||
                 "Guerreiro";
 
               return (
                 <div
-                  key={player.id}
+                  key={player.odataId}
                   className={`flex items-center gap-2 p-2 rounded border ${
                     isCurrentUser
-                      ? "border-metal-gold/50 bg-metal-gold/5"
-                      : "border-metal-iron/30 bg-citadel-slate/20"
+                      ? "border-stellar-gold/50 bg-stellar-gold/5"
+                      : "border-surface-500/30 bg-surface-800/20"
                   }`}
                 >
                   <div
-                    className="w-6 h-6 rounded border border-metal-iron/50 flex items-center justify-center text-xs"
-                    style={{ backgroundColor: player.playerColor }}
+                    className="w-6 h-6 rounded border border-surface-500/50 flex items-center justify-center text-xs"
+                    style={{ backgroundColor: player.color }}
                   >
-                    {player.playerIndex === 0 ? "👑" : "⚔️"}
+                    {idx === 0 ? "👑" : "⚔️"}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-parchment-light truncate">
+                    <p className="text-xs font-semibold text-astral-chrome truncate">
                       {playerName}
                     </p>
-                    <p className="text-[10px] text-parchment-dark truncate">
+                    <p className="text-[10px] text-astral-steel truncate">
                       🏰 {player.kingdomName}
                     </p>
                   </div>
@@ -164,9 +139,9 @@ export const MatchLobby: React.FC<MatchLobbyProps> = ({
               );
             })}
 
-            {matchMapData && matchMapData.players.length < 2 && (
-              <div className="p-2 rounded border border-dashed border-metal-iron/30 text-center">
-                <p className="text-parchment-dark text-xs">
+            {players.length < 2 && (
+              <div className="p-2 rounded border border-dashed border-surface-500/30 text-center">
+                <p className="text-astral-steel text-xs">
                   ⏳ Aguardando oponente...
                 </p>
               </div>
@@ -174,35 +149,35 @@ export const MatchLobby: React.FC<MatchLobbyProps> = ({
           </div>
 
           {/* Status */}
-          <div className="flex items-center gap-2 p-1.5 bg-citadel-slate/20 border border-metal-iron/20 rounded">
+          <div className="flex items-center gap-2 p-1.5 bg-surface-800/20 border border-surface-500/20 rounded">
             <div
               className={`w-2 h-2 rounded-full ${
-                matchMapData?.status === "PREPARATION"
-                  ? "bg-torch-glow animate-pulse"
-                  : matchMapData?.status === "ACTIVE"
+                status === "PREPARATION"
+                  ? "bg-stellar-amber animate-pulse"
+                  : status === "ACTIVE"
                   ? "bg-green-500"
-                  : "bg-metal-steel"
+                  : "bg-astral-steel"
               }`}
             />
-            <span className="text-parchment-aged text-[10px]">
-              {matchMapData?.status === "WAITING" && "Reunindo tropas"}
-              {matchMapData?.status === "PREPARATION" && "Preparação"}
-              {matchMapData?.status === "ACTIVE" && "Batalha"}
+            <span className="text-astral-silver text-[10px]">
+              {status === "WAITING" && "Reunindo tropas"}
+              {status === "PREPARATION" && "Preparação"}
+              {status === "ACTIVE" && "Batalha"}
             </span>
           </div>
 
           {/* Ready Button */}
-          <button
+          <Button
+            variant={isReady ? "success" : "danger"}
+            size="sm"
+            fullWidth
             onClick={handleReady}
             disabled={isReady || isLoading}
-            className={`w-full py-2 text-xs font-bold rounded border transition-all ${
-              isReady
-                ? "bg-gradient-to-b from-green-700 to-green-800 border-green-600/50 text-parchment-light cursor-not-allowed"
-                : "bg-gradient-to-b from-war-crimson to-war-blood border-metal-iron/50 text-parchment-light hover:from-war-ember hover:to-war-crimson"
-            }`}
+            isLoading={isLoading}
+            icon={isReady ? "✅" : "⚔️"}
           >
-            {isLoading ? "..." : isReady ? "✅ Pronto!" : "⚔️ ESTOU PRONTO!"}
-          </button>
+            {isReady ? "Pronto!" : "ESTOU PRONTO!"}
+          </Button>
         </>
       )}
     </div>

@@ -19,7 +19,8 @@ export interface UnitStats {
   combat: number;
   speed: number;
   focus: number;
-  armor: number;
+  resistance: number;
+  will: number;
   vitality: number;
   category?: string;
   features?: string[]; // IDs das skills aprendidas (do DB)

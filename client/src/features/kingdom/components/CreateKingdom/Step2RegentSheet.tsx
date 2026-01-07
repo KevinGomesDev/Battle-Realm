@@ -18,11 +18,12 @@ interface Step2RegentSheetProps {
     combat: number;
     speed: number;
     focus: number;
-    armor: number;
+    resistance: number;
+    will: number;
     vitality: number;
   };
   updateAttribute: (
-    key: "combat" | "speed" | "focus" | "armor" | "vitality",
+    key: "combat" | "speed" | "focus" | "resistance" | "will" | "vitality",
     value: number
   ) => void;
   totalPoints: number;
@@ -148,7 +149,7 @@ export const Step2RegentSheet: React.FC<Step2RegentSheetProps> = ({
                 <span
                   className={`text-xs mt-1 inline-block px-2 py-0.5 rounded ${
                     skill.category === "PASSIVE"
-                      ? "bg-purple-900/50 text-purple-300"
+                      ? "bg-stellar-deep/50 text-stellar-light"
                       : "bg-blue-900/50 text-blue-300"
                   }`}
                 >

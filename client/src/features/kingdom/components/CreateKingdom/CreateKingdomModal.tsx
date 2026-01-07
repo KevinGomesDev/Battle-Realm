@@ -117,7 +117,8 @@ export const CreateKingdomModal: React.FC<CreateKingdomModalProps> = ({
           combat: t.combat,
           speed: t.speed,
           focus: t.focus,
-          armor: t.armor,
+          resistance: t.resistance,
+          will: t.will,
           vitality: t.vitality,
         })),
       });

@@ -45,16 +45,16 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
       />
 
       {/* Modal */}
-      <div className="relative bg-gradient-to-b from-citadel-slate to-citadel-obsidian border-2 border-metal-iron rounded-xl shadow-2xl p-6 min-w-[320px] max-w-md">
+      <div className="relative bg-gradient-to-b from-surface-800 to-surface-900 border border-surface-500/50 rounded-xl shadow-cosmic p-6 min-w-[320px] max-w-md">
         {/* Header */}
         <div className="text-center mb-6">
           <h2
-            className="text-2xl font-bold text-parchment-light mb-1"
-            style={{ fontFamily: "'Cinzel', serif" }}
+            className="text-2xl font-bold text-astral-chrome mb-1"
+            style={{ fontFamily: "'Rajdhani', sans-serif" }}
           >
             ⚔️ Menu
           </h2>
-          <p className="text-parchment-dark text-sm">Batalha pausada</p>
+          <p className="text-surface-200 text-sm">Batalha pausada</p>
         </div>
 
         {/* Opções */}
@@ -62,11 +62,11 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
           {/* Continuar */}
           <button
             onClick={onClose}
-            className="w-full py-3 px-4 bg-gradient-to-r from-emerald-700 to-emerald-900 
-                       hover:from-emerald-600 hover:to-emerald-800
-                       border border-emerald-500 rounded-lg text-parchment-light font-bold
+            className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-emerald-800 
+                       hover:from-emerald-500 hover:to-emerald-700
+                       border border-emerald-500/50 rounded-lg text-white font-bold
                        transition-all duration-200 flex items-center justify-center gap-2"
-            style={{ fontFamily: "'Cinzel', serif" }}
+            style={{ fontFamily: "'Rajdhani', sans-serif" }}
           >
             <span>▶️</span>
             <span>Continuar</span>
@@ -75,11 +75,11 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
           {/* Renderizar */}
           <button
             onClick={handleSurrender}
-            className="w-full py-3 px-4 bg-gradient-to-r from-war-crimson to-war-blood
-                       hover:from-war-ember hover:to-war-crimson
-                       border border-war-ember rounded-lg text-parchment-light font-bold
+            className="w-full py-3 px-4 bg-gradient-to-r from-red-600 to-red-800
+                       hover:from-red-500 hover:to-red-700
+                       border border-red-500/50 rounded-lg text-white font-bold
                        transition-all duration-200 flex items-center justify-center gap-2"
-            style={{ fontFamily: "'Cinzel', serif" }}
+            style={{ fontFamily: "'Rajdhani', sans-serif" }}
           >
             <span>🏳️</span>
             <span>Render-se</span>
@@ -88,9 +88,9 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
 
         {/* Footer */}
         <div className="mt-6 text-center">
-          <p className="text-parchment-dark text-xs">
+          <p className="text-surface-200 text-xs">
             Pressione{" "}
-            <kbd className="px-1 py-0.5 bg-citadel-granite rounded text-parchment-light">
+            <kbd className="px-1 py-0.5 bg-surface-700 rounded text-astral-chrome">
               ESC
             </kbd>{" "}
             para fechar

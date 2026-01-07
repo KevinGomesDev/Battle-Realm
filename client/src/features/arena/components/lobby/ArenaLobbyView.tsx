@@ -1,5 +1,6 @@
 import React from "react";
 import { useArena } from "../../hooks/useArena";
+import { Button } from "@/components/Button";
 
 interface ArenaLobbyViewProps {
   onBattleStart?: () => void;
@@ -61,15 +62,15 @@ export const ArenaLobbyView: React.FC<ArenaLobbyViewProps> = ({
       {/* Cabeçalho do Lobby */}
       <div className="text-center py-4">
         <h3
-          className="text-2xl font-bold text-parchment-light tracking-wider"
+          className="text-2xl font-bold text-astral-chrome tracking-wider"
           style={{ fontFamily: "'Cinzel', serif" }}
         >
           🏟️ ARENA DE COMBATE
         </h3>
-        <p className="text-parchment-dark text-sm mt-1">
+        <p className="text-astral-steel text-sm mt-1">
           {isHost ? "Aguardando desafiantes..." : "Preparando para batalha..."}
         </p>
-        <p className="text-parchment-aged text-xs mt-1">
+        <p className="text-astral-silver text-xs mt-1">
           {currentLobby.players.length}/{currentLobby.maxPlayers} jogadores
         </p>
       </div>
@@ -83,8 +84,8 @@ export const ArenaLobbyView: React.FC<ArenaLobbyViewProps> = ({
               : currentLobby.status === "READY"
               ? "bg-green-900/50 text-green-400 border border-green-600"
               : currentLobby.status === "BATTLING"
-              ? "bg-purple-900/50 text-purple-400 border border-purple-600"
-              : "bg-citadel-slate text-parchment-dark border border-metal-iron"
+              ? "bg-stellar-deep/50 text-stellar-amber border border-stellar-dark"
+              : "bg-surface-800 text-astral-steel border border-surface-500"
           }`}
         >
           {currentLobby.status === "WAITING" && "⏳ Aguardando"}
@@ -101,28 +102,28 @@ export const ArenaLobbyView: React.FC<ArenaLobbyViewProps> = ({
           <div
             className={`p-4 rounded-xl border-2 ${
               isHost
-                ? "border-purple-600 bg-purple-900/20"
-                : "border-metal-iron bg-citadel-slate/30"
+                ? "border-stellar-dark bg-stellar-deep/20"
+                : "border-surface-500 bg-surface-800/30"
             }`}
           >
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 bg-gradient-to-b from-metal-bronze to-metal-copper rounded-lg border-2 border-metal-iron flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-b from-stellar-amber to-stellar-dark rounded-lg border-2 border-surface-500 flex items-center justify-center">
                 <span className="text-2xl">👑</span>
               </div>
               <div>
-                <p className="text-xs text-parchment-dark uppercase tracking-wider">
+                <p className="text-xs text-astral-steel uppercase tracking-wider">
                   Anfitrião
                 </p>
                 <p
-                  className="text-parchment-light font-bold"
+                  className="text-astral-chrome font-bold"
                   style={{ fontFamily: "'Cinzel', serif" }}
                 >
                   {hostPlayer.username}
                 </p>
               </div>
             </div>
-            <div className="bg-citadel-obsidian/50 rounded-lg p-3">
-              <p className="text-parchment-aged text-sm">
+            <div className="bg-surface-900/50 rounded-lg p-3">
+              <p className="text-astral-silver text-sm">
                 🏰 {hostPlayer.kingdomName}
               </p>
             </div>
@@ -135,28 +136,28 @@ export const ArenaLobbyView: React.FC<ArenaLobbyViewProps> = ({
             key={player.userId}
             className={`p-4 rounded-xl border-2 ${
               player.userId === currentLobby.hostUserId
-                ? "border-purple-600 bg-purple-900/20"
-                : "border-metal-iron bg-citadel-slate/30"
+                ? "border-stellar-dark bg-stellar-deep/20"
+                : "border-surface-500 bg-surface-800/30"
             }`}
           >
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 bg-gradient-to-b from-war-crimson to-war-blood rounded-lg border-2 border-metal-iron flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-b from-red-500 to-red-800 rounded-lg border-2 border-surface-500 flex items-center justify-center">
                 <span className="text-2xl">⚔️</span>
               </div>
               <div>
-                <p className="text-xs text-parchment-dark uppercase tracking-wider">
+                <p className="text-xs text-astral-steel uppercase tracking-wider">
                   Desafiante {player.playerIndex}
                 </p>
                 <p
-                  className="text-parchment-light font-bold"
+                  className="text-astral-chrome font-bold"
                   style={{ fontFamily: "'Cinzel', serif" }}
                 >
                   {player.username}
                 </p>
               </div>
             </div>
-            <div className="bg-citadel-obsidian/50 rounded-lg p-3">
-              <p className="text-parchment-aged text-sm">
+            <div className="bg-surface-900/50 rounded-lg p-3">
+              <p className="text-astral-silver text-sm">
                 🏰 {player.kingdomName}
               </p>
             </div>
@@ -167,13 +168,13 @@ export const ArenaLobbyView: React.FC<ArenaLobbyViewProps> = ({
         {Array.from({ length: waitingSlots }).map((_, idx) => (
           <div
             key={`waiting-${idx}`}
-            className="p-4 rounded-xl border-2 border-dashed border-metal-iron bg-citadel-slate/30"
+            className="p-4 rounded-xl border-2 border-dashed border-surface-500 bg-surface-800/30"
           >
             <div className="flex flex-col items-center justify-center h-full py-6">
-              <div className="w-12 h-12 border-2 border-dashed border-metal-iron/50 rounded-lg flex items-center justify-center mb-3">
+              <div className="w-12 h-12 border-2 border-dashed border-surface-500/50 rounded-lg flex items-center justify-center mb-3">
                 <span className="text-2xl opacity-50">❓</span>
               </div>
-              <p className="text-parchment-dark text-sm">
+              <p className="text-astral-steel text-sm">
                 Aguardando oponente...
               </p>
               <div className="flex items-center gap-2 mt-2">
@@ -193,38 +194,34 @@ export const ArenaLobbyView: React.FC<ArenaLobbyViewProps> = ({
       </div>
 
       {/* Ações */}
-      <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-metal-iron/30">
-        {/* Sair */}
-        <button
+      <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-surface-500/30">
+        <Button
+          variant="secondary"
+          size="md"
           onClick={handleLeave}
-          className="flex-1 px-6 py-3 bg-gradient-to-b from-citadel-granite to-citadel-carved 
-                     border-2 border-metal-iron rounded-lg
-                     hover:from-citadel-weathered hover:to-citadel-granite
-                     text-parchment-aged font-semibold transition-all"
+          className="flex-1"
+          icon="🚪"
         >
-          🚪 Sair do Lobby
-        </button>
+          Sair do Lobby
+        </Button>
 
-        {/* Iniciar (apenas host quando pronto) */}
         {isHost && (
-          <button
+          <Button
+            variant="primary"
+            size="md"
             onClick={handleStart}
             disabled={!canStart}
-            className={`flex-1 px-6 py-3 rounded-lg border-2 font-bold transition-all ${
-              canStart
-                ? "bg-gradient-to-b from-purple-700 to-purple-900 border-purple-500 text-parchment-light hover:from-purple-600 hover:to-purple-800 shadow-[0_0_20px_rgba(147,51,234,0.4)]"
-                : "bg-gradient-to-b from-citadel-granite to-citadel-carved border-metal-iron text-parchment-dark cursor-not-allowed"
-            }`}
-            style={{ fontFamily: "'Cinzel', serif" }}
+            className="flex-1"
+            icon={canStart ? "⚔️" : "⏳"}
           >
-            {canStart ? "⚔️ INICIAR BATALHA" : "⏳ Aguardando..."}
-          </button>
+            {canStart ? "INICIAR BATALHA" : "Aguardando..."}
+          </Button>
         )}
       </div>
 
       {/* Informação extra */}
       <div className="text-center">
-        <p className="text-parchment-dark/60 text-xs">
+        <p className="text-astral-steel/60 text-xs">
           💡 A batalha ocorrerá em um grid 20x20. Cada Regente terá 3 marcas de
           ação.
         </p>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { socketService } from "../../../../services/socket.service";
+import { colyseusService } from "../../../../services/colyseus.service";
 import type { KingdomTemplateSummary, KingdomTemplateDetails } from "./types";
 import { RESOURCE_NAMES as GLOBAL_RESOURCE_NAMES } from "../../../../../../shared/config/global.config";
 
@@ -50,8 +50,8 @@ const TemplateCard: React.FC<TemplateCardProps> = ({
         relative cursor-pointer transition-all duration-300 overflow-hidden rounded-xl
         ${
           isSelected
-            ? "ring-2 ring-metal-gold shadow-[0_0_30px_rgba(255,215,0,0.3)]"
-            : "hover:ring-1 hover:ring-metal-bronze/50"
+            ? "ring-2 ring-stellar-gold shadow-[0_0_30px_rgba(255,215,0,0.3)]"
+            : "hover:ring-1 hover:ring-stellar-amber/50"
         }
         ${!isSelected && !isExpanded ? "grayscale" : ""}
       `}
@@ -62,8 +62,8 @@ const TemplateCard: React.FC<TemplateCardProps> = ({
         absolute inset-0 transition-all duration-300
         ${
           isSelected
-            ? "bg-gradient-to-b from-citadel-granite via-citadel-carved to-citadel-obsidian"
-            : "bg-gradient-to-b from-citadel-slate to-citadel-obsidian"
+            ? "bg-gradient-to-b from-surface-700 via-surface-600 to-surface-900"
+            : "bg-gradient-to-b from-surface-800 to-surface-900"
         }
       `}
       />
@@ -84,7 +84,7 @@ const TemplateCard: React.FC<TemplateCardProps> = ({
         <h3
           className={`
             text-lg font-bold mb-2 transition-colors duration-300
-            ${isSelected ? "text-parchment-light" : "text-parchment-dark"}
+            ${isSelected ? "text-astral-chrome" : "text-astral-steel"}
           `}
           style={{ fontFamily: "'Cinzel', serif" }}
         >
@@ -95,7 +95,7 @@ const TemplateCard: React.FC<TemplateCardProps> = ({
         <p
           className={`
           text-xs leading-relaxed mb-3 flex-1 transition-colors duration-300
-          ${isSelected ? "text-parchment-aged" : "text-parchment-dark/70"}
+          ${isSelected ? "text-astral-silver" : "text-astral-steel/70"}
         `}
         >
           {template.description}
@@ -107,8 +107,8 @@ const TemplateCard: React.FC<TemplateCardProps> = ({
             <span
               className={`px-2 py-0.5 rounded ${
                 isSelected
-                  ? "bg-citadel-slate/50 text-parchment-aged"
-                  : "bg-citadel-obsidian/50 text-parchment-dark"
+                  ? "bg-surface-800/50 text-astral-silver"
+                  : "bg-surface-900/50 text-astral-steel"
               }`}
             >
               {template.raceName}
@@ -116,8 +116,8 @@ const TemplateCard: React.FC<TemplateCardProps> = ({
             <span
               className={`px-2 py-0.5 rounded ${
                 isSelected
-                  ? "bg-citadel-slate/50 text-parchment-aged"
-                  : "bg-citadel-obsidian/50 text-parchment-dark"
+                  ? "bg-surface-800/50 text-astral-silver"
+                  : "bg-surface-900/50 text-astral-steel"
               }`}
             >
               {template.alignmentName}
@@ -133,8 +133,8 @@ const TemplateCard: React.FC<TemplateCardProps> = ({
 
         {/* Indicador de seleção */}
         {isSelected && (
-          <div className="absolute top-2 right-2 w-6 h-6 bg-metal-gold rounded-full flex items-center justify-center">
-            <span className="text-citadel-obsidian text-sm">✓</span>
+          <div className="absolute top-2 right-2 w-6 h-6 bg-stellar-gold rounded-full flex items-center justify-center">
+            <span className="text-surface-900 text-sm">✓</span>
           </div>
         )}
       </div>
@@ -204,13 +204,13 @@ const TemplateDetailsView: React.FC<TemplateDetailsViewProps> = ({
   const troops = template.troopTemplates || [];
 
   return (
-    <div className="bg-citadel-slate/30 rounded-xl border border-metal-iron/30 p-6 mt-4 animate-fadeIn">
+    <div className="bg-surface-800/30 rounded-xl border border-surface-500/30 p-6 mt-4 animate-fadeIn">
       {/* Header */}
-      <div className="flex items-start gap-4 mb-6 pb-4 border-b border-metal-iron/30">
+      <div className="flex items-start gap-4 mb-6 pb-4 border-b border-surface-500/30">
         <div className="text-4xl">🏰</div>
         <div className="flex-1">
           <h3
-            className="text-2xl font-bold text-parchment-light mb-1"
+            className="text-2xl font-bold text-astral-chrome mb-1"
             style={{ fontFamily: "'Cinzel', serif" }}
           >
             {template.name}
@@ -219,8 +219,8 @@ const TemplateDetailsView: React.FC<TemplateDetailsViewProps> = ({
       </div>
 
       {/* Descrição/Lore */}
-      <div className="mb-6 p-4 bg-citadel-obsidian/30 rounded-lg border-l-4 border-metal-gold/50">
-        <p className="text-parchment-aged text-sm leading-relaxed whitespace-pre-line">
+      <div className="mb-6 p-4 bg-surface-900/30 rounded-lg border-l-4 border-stellar-gold/50">
+        <p className="text-astral-silver text-sm leading-relaxed whitespace-pre-line">
           {template.description}
         </p>
       </div>
@@ -228,20 +228,20 @@ const TemplateDetailsView: React.FC<TemplateDetailsViewProps> = ({
       {/* Grid de informações */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {/* Reino */}
-        <div className="bg-citadel-obsidian/50 rounded-lg p-4">
-          <h4 className="text-parchment-light font-semibold mb-3 flex items-center gap-2">
+        <div className="bg-surface-900/50 rounded-lg p-4">
+          <h4 className="text-astral-chrome font-semibold mb-3 flex items-center gap-2">
             <span>🏰</span> Reino
           </h4>
           <div className="space-y-3 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-parchment-dark">Raça:</span>
-              <span className="text-parchment-aged font-medium">
+              <span className="text-astral-steel">Raça:</span>
+              <span className="text-astral-silver font-medium">
                 {RACE_NAMES[template.race] || template.race}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-parchment-dark">Alinhamento:</span>
-              <span className="text-parchment-aged font-medium">
+              <span className="text-astral-steel">Alinhamento:</span>
+              <span className="text-astral-silver font-medium">
                 {ALIGNMENT_NAMES[template.alignment] || template.alignment}
               </span>
             </div>
@@ -249,58 +249,64 @@ const TemplateDetailsView: React.FC<TemplateDetailsViewProps> = ({
         </div>
 
         {/* Regente */}
-        <div className="bg-citadel-obsidian/50 rounded-lg p-4">
-          <h4 className="text-parchment-light font-semibold mb-3 flex items-center gap-2">
+        <div className="bg-surface-900/50 rounded-lg p-4">
+          <h4 className="text-astral-chrome font-semibold mb-3 flex items-center gap-2">
             <span>👑</span> Regente
           </h4>
           {regent ? (
             <>
               <div className="space-y-2 text-sm mb-3">
                 <div>
-                  <span className="text-parchment-dark">Nome:</span>
-                  <span className="text-parchment-aged ml-2 font-medium">
+                  <span className="text-astral-steel">Nome:</span>
+                  <span className="text-astral-silver ml-2 font-medium">
                     {regent.name}
                   </span>
                 </div>
                 <div>
-                  <span className="text-parchment-dark">Classe:</span>
-                  <span className="text-parchment-aged ml-2 font-medium">
+                  <span className="text-astral-steel">Classe:</span>
+                  <span className="text-astral-silver ml-2 font-medium">
                     Regente
                   </span>
                 </div>
               </div>
 
               {/* Atributos do Regente */}
-              <div className="pt-3 border-t border-metal-iron/20">
-                <p className="text-parchment-dark text-xs mb-2">Atributos:</p>
-                <div className="grid grid-cols-5 gap-1 text-center text-xs">
-                  <div className="bg-citadel-slate/30 rounded p-1">
-                    <div className="text-war-ember">⚔️</div>
-                    <div className="text-parchment-light font-bold">
+              <div className="pt-3 border-t border-surface-500/20">
+                <p className="text-astral-steel text-xs mb-2">Atributos:</p>
+                <div className="grid grid-cols-6 gap-1 text-center text-xs">
+                  <div className="bg-surface-800/30 rounded p-1">
+                    <div className="text-red-400">⚔️</div>
+                    <div className="text-astral-chrome font-bold">
                       {regent.combat ?? 0}
                     </div>
                   </div>
-                  <div className="bg-citadel-slate/30 rounded p-1">
+                  <div className="bg-surface-800/30 rounded p-1">
                     <div className="text-blue-400">👁️</div>
-                    <div className="text-parchment-light font-bold">
+                    <div className="text-astral-chrome font-bold">
                       {regent.speed ?? 0}
                     </div>
                   </div>
-                  <div className="bg-citadel-slate/30 rounded p-1">
-                    <div className="text-purple-400">🎯</div>
-                    <div className="text-parchment-light font-bold">
+                  <div className="bg-surface-800/30 rounded p-1">
+                    <div className="text-stellar-amber">🎯</div>
+                    <div className="text-astral-chrome font-bold">
                       {regent.focus ?? 0}
                     </div>
                   </div>
-                  <div className="bg-citadel-slate/30 rounded p-1">
-                    <div className="text-metal-steel">🛡️</div>
-                    <div className="text-parchment-light font-bold">
-                      {regent.armor ?? 0}
+                  <div className="bg-surface-800/30 rounded p-1">
+                    <div className="text-astral-steel">🛡️</div>
+                    <div className="text-astral-chrome font-bold">
+                      {regent.resistance ?? 0}
                     </div>
                   </div>
-                  <div className="bg-citadel-slate/30 rounded p-1">
+                  <div className="bg-surface-800/30 rounded p-1">
+                    <div className="text-mystic-glow">🧠</div>
+                    <div className="text-astral-chrome font-bold">
+                      {regent.will ?? 0}
+                    </div>
+                  </div>
+                  <div className="bg-surface-800/30 rounded p-1">
                     <div className="text-green-400">❤️</div>
-                    <div className="text-parchment-light font-bold">
+                    <div className="text-astral-chrome font-bold">
                       {regent.vitality ?? 0}
                     </div>
                   </div>
@@ -308,13 +314,13 @@ const TemplateDetailsView: React.FC<TemplateDetailsViewProps> = ({
               </div>
             </>
           ) : (
-            <p className="text-parchment-dark text-sm">Regente não definido</p>
+            <p className="text-astral-steel text-sm">Regente não definido</p>
           )}
         </div>
 
         {/* Tropas */}
-        <div className="bg-citadel-obsidian/50 rounded-lg p-4">
-          <h4 className="text-parchment-light font-semibold mb-3 flex items-center gap-2">
+        <div className="bg-surface-900/50 rounded-lg p-4">
+          <h4 className="text-astral-chrome font-semibold mb-3 flex items-center gap-2">
             <span>⚔️</span> Exército
           </h4>
           <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -322,23 +328,23 @@ const TemplateDetailsView: React.FC<TemplateDetailsViewProps> = ({
               troops.map((troop, index) => (
                 <div
                   key={index}
-                  className="bg-citadel-slate/20 rounded p-2 text-xs"
+                  className="bg-surface-800/20 rounded p-2 text-xs"
                 >
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-parchment-light font-semibold">
+                    <span className="text-astral-chrome font-semibold">
                       {troop.name}
                     </span>
-                    <span className="text-parchment-dark text-[10px]">
+                    <span className="text-astral-steel text-[10px]">
                       {RESOURCE_NAMES[troop.resourceType] || troop.resourceType}
                     </span>
                   </div>
-                  <div className="text-metal-gold text-[10px]">
+                  <div className="text-stellar-gold text-[10px]">
                     🔸 {PASSIVE_NAMES[troop.passiveId] || troop.passiveId}
                   </div>
                 </div>
               ))
             ) : (
-              <p className="text-parchment-dark text-sm">
+              <p className="text-astral-steel text-sm">
                 Nenhuma tropa definida
               </p>
             )}
@@ -348,11 +354,11 @@ const TemplateDetailsView: React.FC<TemplateDetailsViewProps> = ({
 
       {/* Descrição do Regente */}
       {regent?.description && (
-        <div className="mb-6 p-4 bg-citadel-obsidian/30 rounded-lg">
-          <h4 className="text-parchment-light font-semibold mb-2 text-sm flex items-center gap-2">
+        <div className="mb-6 p-4 bg-surface-900/30 rounded-lg">
+          <h4 className="text-astral-chrome font-semibold mb-2 text-sm flex items-center gap-2">
             <span>📜</span> Sobre o Regente
           </h4>
-          <p className="text-parchment-dark text-xs leading-relaxed whitespace-pre-line">
+          <p className="text-astral-steel text-xs leading-relaxed whitespace-pre-line">
             {regent.description}
           </p>
         </div>
@@ -362,16 +368,16 @@ const TemplateDetailsView: React.FC<TemplateDetailsViewProps> = ({
       <button
         onClick={onCreateFromTemplate}
         disabled={isLoading}
-        className="w-full py-4 bg-gradient-to-b from-metal-gold to-metal-bronze border-2 border-metal-gold/50 rounded-lg
-                   text-citadel-obsidian font-bold text-lg tracking-wide
-                   hover:from-yellow-400 hover:to-metal-gold
-                   disabled:from-citadel-granite disabled:to-citadel-carved disabled:text-parchment-dark disabled:cursor-not-allowed
+        className="w-full py-4 bg-gradient-to-b from-stellar-gold to-stellar-amber border-2 border-stellar-gold/50 rounded-lg
+                   text-surface-900 font-bold text-lg tracking-wide
+                   hover:from-yellow-400 hover:to-stellar-gold
+                   disabled:from-surface-700 disabled:to-surface-600 disabled:text-astral-steel disabled:cursor-not-allowed
                    transition-all duration-200 shadow-lg"
         style={{ fontFamily: "'Cinzel', serif" }}
       >
         {isLoading ? (
           <span className="flex items-center justify-center gap-2">
-            <div className="animate-spin w-5 h-5 border-2 border-citadel-obsidian border-t-transparent rounded-full"></div>
+            <div className="animate-spin w-5 h-5 border-2 border-surface-900 border-t-transparent rounded-full"></div>
             Criando Reino...
           </span>
         ) : (
@@ -419,14 +425,14 @@ export const TemplateSelection: React.FC<TemplateSelectionProps> = ({
       setIsLoadingList(false);
     };
 
-    socketService.on("kingdom:templates_list", handleTemplatesList);
-    socketService.on("error", handleError);
+    colyseusService.on("kingdom:templates_list", handleTemplatesList);
+    colyseusService.on("error", handleError);
 
-    socketService.emit("kingdom:list_templates");
+    colyseusService.sendToGlobal("kingdom:list_templates");
 
     return () => {
-      socketService.off("kingdom:templates_list", handleTemplatesList);
-      socketService.off("error", handleError);
+      colyseusService.off("kingdom:templates_list", handleTemplatesList);
+      colyseusService.off("error", handleError);
     };
   }, []);
 
@@ -444,13 +450,13 @@ export const TemplateSelection: React.FC<TemplateSelectionProps> = ({
       setIsLoadingDetails(false);
     };
 
-    socketService.on("kingdom:template_details", handleDetails);
-    socketService.emit("kingdom:get_template", {
+    colyseusService.on("kingdom:template_details", handleDetails);
+    colyseusService.sendToGlobal("kingdom:get_template", {
       templateId: selectedTemplateId,
     });
 
     return () => {
-      socketService.off("kingdom:template_details", handleDetails);
+      colyseusService.off("kingdom:template_details", handleDetails);
     };
   }, [selectedTemplateId]);
 
@@ -469,17 +475,17 @@ export const TemplateSelection: React.FC<TemplateSelectionProps> = ({
       setIsCreating(false);
     };
 
-    socketService.on("kingdom:created_from_template", handleSuccess);
-    socketService.on("error", handleError);
+    colyseusService.on("kingdom:created_from_template", handleSuccess);
+    colyseusService.on("error", handleError);
 
-    socketService.emit("kingdom:create_from_template", {
+    colyseusService.sendToGlobal("kingdom:create_from_template", {
       templateId: selectedTemplateId,
     });
 
     // Cleanup após timeout
     setTimeout(() => {
-      socketService.off("kingdom:created_from_template", handleSuccess);
-      socketService.off("error", handleError);
+      colyseusService.off("kingdom:created_from_template", handleSuccess);
+      colyseusService.off("error", handleError);
     }, 15000);
   };
 
@@ -487,13 +493,13 @@ export const TemplateSelection: React.FC<TemplateSelectionProps> = ({
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <div className="relative w-12 h-12">
-          <div className="absolute inset-0 border-3 border-metal-bronze rounded-full animate-spin border-t-transparent"></div>
+          <div className="absolute inset-0 border-3 border-stellar-amber rounded-full animate-spin border-t-transparent"></div>
           <div
-            className="absolute inset-2 border-2 border-metal-gold rounded-full animate-spin border-b-transparent"
+            className="absolute inset-2 border-2 border-stellar-gold rounded-full animate-spin border-b-transparent"
             style={{ animationDirection: "reverse" }}
           ></div>
         </div>
-        <p className="text-parchment-dark mt-4">Carregando reinos...</p>
+        <p className="text-astral-steel mt-4">Carregando reinos...</p>
       </div>
     );
   }
@@ -502,8 +508,8 @@ export const TemplateSelection: React.FC<TemplateSelectionProps> = ({
     <div className="space-y-6">
       {/* Erro */}
       {error && (
-        <div className="p-3 bg-war-blood/20 border border-war-crimson rounded-lg">
-          <p className="text-war-ember text-sm flex items-center gap-2">
+        <div className="p-3 bg-red-800/20 border border-red-500 rounded-lg">
+          <p className="text-red-400 text-sm flex items-center gap-2">
             <span>⚠️</span> {error}
           </p>
         </div>
@@ -512,12 +518,12 @@ export const TemplateSelection: React.FC<TemplateSelectionProps> = ({
       {/* Título */}
       <div className="text-center">
         <h2
-          className="text-2xl font-bold text-parchment-light mb-2"
+          className="text-2xl font-bold text-astral-chrome mb-2"
           style={{ fontFamily: "'Cinzel', serif" }}
         >
           Escolha seu Destino
         </h2>
-        <p className="text-parchment-dark text-sm">
+        <p className="text-astral-steel text-sm">
           Selecione um reino pré-configurado ou crie o seu próprio
         </p>
       </div>
@@ -544,9 +550,9 @@ export const TemplateSelection: React.FC<TemplateSelectionProps> = ({
       {/* Detalhes do Template Selecionado */}
       {selectedTemplateId &&
         (isLoadingDetails ? (
-          <div className="bg-citadel-slate/30 rounded-xl border border-metal-iron/30 p-8 mt-4 flex items-center justify-center">
-            <div className="animate-spin w-8 h-8 border-2 border-metal-gold border-t-transparent rounded-full"></div>
-            <span className="text-parchment-dark ml-3">
+          <div className="bg-surface-800/30 rounded-xl border border-surface-500/30 p-8 mt-4 flex items-center justify-center">
+            <div className="animate-spin w-8 h-8 border-2 border-stellar-gold border-t-transparent rounded-full"></div>
+            <span className="text-astral-steel ml-3">
               Carregando detalhes...
             </span>
           </div>
@@ -560,26 +566,26 @@ export const TemplateSelection: React.FC<TemplateSelectionProps> = ({
 
       {/* Divisor */}
       <div className="flex items-center gap-4 py-4">
-        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-metal-iron to-transparent"></div>
-        <span className="text-parchment-dark text-xs tracking-widest uppercase">
+        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-surface-500 to-transparent"></div>
+        <span className="text-astral-steel text-xs tracking-widest uppercase">
           ou
         </span>
-        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-metal-iron to-transparent"></div>
+        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-surface-500 to-transparent"></div>
       </div>
 
       {/* Botão de Criação Personalizada */}
       <button
         onClick={onCustomCreate}
-        className="w-full py-4 bg-gradient-to-b from-citadel-granite to-citadel-carved border-2 border-metal-iron rounded-lg
-                   text-parchment-aged font-semibold tracking-wide
-                   hover:from-citadel-weathered hover:to-citadel-granite hover:text-parchment-light
+        className="w-full py-4 bg-gradient-to-b from-surface-700 to-surface-600 border-2 border-surface-500 rounded-lg
+                   text-astral-silver font-semibold tracking-wide
+                   hover:from-surface-600 hover:to-surface-700 hover:text-astral-chrome
                    transition-all duration-200"
         style={{ fontFamily: "'Cinzel', serif" }}
       >
         <span className="flex items-center justify-center gap-2">
           <span>📜</span>
           <span>Criar seu Próprio Reino</span>
-          <span className="text-parchment-dark text-xs">(Personalizado)</span>
+          <span className="text-astral-steel text-xs">(Personalizado)</span>
         </span>
       </button>
     </div>

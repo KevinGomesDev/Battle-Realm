@@ -11,7 +11,6 @@ export const UI_COLORS = {
   hpMedium: "#fbbf24",
   hpLow: "#ef4444",
   protection: "#60a5fa",
-  protectionBroken: "#6b7280",
   turnIndicator: "#ffd700",
   deadUnit: "#4a4a4a",
 } as const;

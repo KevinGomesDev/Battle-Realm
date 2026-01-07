@@ -27,7 +27,8 @@ interface CrisisDefinition {
     combat: number;
     speed: number;
     focus: number;
-    armor: number;
+    resistance: number;
+    will: number;
     vitality: number;
     maxVitality: number;
   };
@@ -43,7 +44,8 @@ export const CRISIS_DEFINITIONS: Record<CrisisType, CrisisDefinition> = {
       combat: 10,
       speed: 20,
       focus: 15,
-      armor: 25,
+      resistance: 25,
+      will: 2,
       vitality: 30,
       maxVitality: 30,
     },
@@ -57,7 +59,8 @@ export const CRISIS_DEFINITIONS: Record<CrisisType, CrisisDefinition> = {
       combat: 10,
       speed: 10,
       focus: 10,
-      armor: 10,
+      resistance: 10,
+      will: 1,
       vitality: 10,
       maxVitality: 10,
     },
@@ -72,7 +75,8 @@ export const CRISIS_DEFINITIONS: Record<CrisisType, CrisisDefinition> = {
       combat: 8,
       speed: 5,
       focus: 3,
-      armor: 20,
+      resistance: 20,
+      will: 1,
       vitality: 50,
       maxVitality: 50,
     },

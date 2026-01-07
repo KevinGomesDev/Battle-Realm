@@ -8,8 +8,10 @@ import {
 import { isAdjacentOmnidirectional } from "../../../shared/types/skills.types";
 import {
   HP_CONFIG,
+  MANA_CONFIG,
   PHYSICAL_PROTECTION_CONFIG,
   MAGICAL_PROTECTION_CONFIG,
+  getMaxMarksByCategory,
   type UnitSize,
 } from "../../../shared/config/global.config";
 import type { BattleUnit } from "../../../shared/types/battle.types";
@@ -109,7 +111,14 @@ export function calculateEidolonSize(totalStats: number): UnitSize {
  * Obtém o total de stats de uma unidade
  */
 export function getTotalStats(unit: BattleUnit): number {
-  return unit.combat + unit.speed + unit.focus + unit.armor + unit.vitality;
+  return (
+    unit.combat +
+    unit.speed +
+    unit.focus +
+    unit.resistance +
+    unit.will +
+    unit.vitality
+  );
 }
 
 /**
@@ -213,13 +222,18 @@ export function createEidolon(
   // Calcular HP e proteções
   const maxHp = stats.vitality * HP_CONFIG.multiplier;
   const maxPhysicalProtection =
-    stats.armor * PHYSICAL_PROTECTION_CONFIG.multiplier;
+    stats.resistance * PHYSICAL_PROTECTION_CONFIG.multiplier;
   const maxMagicalProtection =
-    stats.focus * MAGICAL_PROTECTION_CONFIG.multiplier;
+    stats.will * MAGICAL_PROTECTION_CONFIG.multiplier;
 
   // Calcular tamanho baseado no total de stats
   const totalStats =
-    stats.combat + stats.speed + stats.focus + stats.armor + stats.vitality;
+    stats.combat +
+    stats.speed +
+    stats.focus +
+    stats.resistance +
+    stats.will +
+    stats.vitality;
   const initialSize = calculateEidolonSize(totalStats);
 
   // Extrair ownerKingdomId do summoner (se disponível)
@@ -245,18 +259,21 @@ export function createEidolon(
     combat: stats.combat,
     speed: stats.speed,
     focus: stats.focus,
-    armor: stats.armor,
+    resistance: stats.resistance,
+    will: stats.will,
     vitality: stats.vitality,
     damageReduction: stats.damageReduction,
     currentHp: maxHp,
     maxHp,
+    currentMana: (stats.will || 0) * MANA_CONFIG.multiplier,
+    maxMana: (stats.will || 0) * MANA_CONFIG.multiplier,
     posX: position.x,
     posY: position.y,
     movesLeft: 0,
     actionsLeft: 1,
     attacksLeftThisTurn: 0,
     isAlive: true,
-    actionMarks: 0,
+    actionMarks: getMaxMarksByCategory("SUMMON"),
     physicalProtection: maxPhysicalProtection,
     maxPhysicalProtection,
     magicalProtection: maxMagicalProtection,
@@ -387,13 +404,14 @@ export function processUnitDeathForEidolon(
   killer.combat += 1;
   killer.speed += 1;
   killer.focus += 1;
-  killer.armor += 1;
+  killer.resistance += 1;
+  killer.will += 1;
   killer.vitality += 1;
   killer.currentHp += HP_CONFIG.multiplier; // +2 HP por ponto de vitality
   killer.maxPhysicalProtection =
-    killer.armor * PHYSICAL_PROTECTION_CONFIG.multiplier;
+    killer.resistance * PHYSICAL_PROTECTION_CONFIG.multiplier;
   killer.maxMagicalProtection =
-    killer.focus * MAGICAL_PROTECTION_CONFIG.multiplier;
+    killer.will * MAGICAL_PROTECTION_CONFIG.multiplier;
 
   // Calcular e aplicar novo tamanho baseado no total de stats
   const totalStats = getTotalStats(killer);

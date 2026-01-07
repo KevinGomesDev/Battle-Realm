@@ -73,6 +73,14 @@ export interface ArenaConfig {
     cellMovableEngagementBorder: string;
     cellMovableBlocked: string;
     cellMovableBlockedBorder: string;
+    // Cores de preview de área (spells/skills)
+    areaPreviewEmpty: string;
+    areaPreviewEmptyBorder: string;
+    areaPreviewTarget: string;
+    areaPreviewTargetBorder: string;
+    areaPreviewOutOfRange: string;
+    areaPreviewOutOfRangeBorder: string;
+    areaPreviewCenter: string;
     // Cores dos jogadores (até 8)
     playerColors: { primary: string; secondary: string }[];
   };
@@ -214,6 +222,7 @@ export interface UnitMovedResponse {
   toX: number;
   toY: number;
   movesLeft: number;
+  hasStartedAction?: boolean;
 }
 
 export interface UnitAttackedResponse {
@@ -228,6 +237,7 @@ export interface UnitAttackedResponse {
   targetHpAfter: number;
   attackerActionsLeft: number;
   attackerAttacksLeftThisTurn: number;
+  attackerHasStartedAction?: boolean;
   missed: boolean;
   rawDamage: number;
   damageReduction: number;

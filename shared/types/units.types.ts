@@ -2,18 +2,13 @@
 // Tipos genéricos para unidades (usados em server e client)
 
 import type { PlayerResources } from "./match.types";
+import type { Alignment, Race } from "./kingdom.types";
 
 // =============================================================================
 // CATEGORIAS DE UNIDADE
 // =============================================================================
 
-export type UnitCategory =
-  | "TROOP"
-  | "HERO"
-  | "REGENT"
-  | "PRISONER"
-  | "SUMMON"
-  | "MONSTER";
+export type UnitCategory = "TROOP" | "HERO" | "REGENT" | "SUMMON" | "MONSTER";
 
 // =============================================================================
 // ATRIBUTOS
@@ -23,7 +18,8 @@ export interface UnitStats {
   combat: number;
   speed: number;
   focus: number;
-  armor: number;
+  resistance: number;
+  will: number;
   vitality: number;
 }
 
@@ -54,8 +50,120 @@ export interface TroopTemplateData {
   combat: number;
   speed: number;
   focus: number;
-  armor: number;
+  resistance: number;
+  will: number;
   vitality: number;
+}
+
+// =============================================================================
+// TEMPLATE DE RAÇA
+// =============================================================================
+
+export interface RaceDefinition {
+  id: string; // O Enum do Banco (HUMANOIDE, DRAGAO...)
+  name: string;
+  description: string; // Flavor text
+  passiveName: string;
+  passiveEffect: string; // Regra mecânica
+  passiveConditionId: string; // ID da condição a aplicar
+  color: number; // Cor temática (apenas para UI)
+}
+
+// =============================================================================
+// TEMPLATE DE HERÓI
+// =============================================================================
+
+export interface HeroTemplate {
+  code: string;
+  name: string;
+  description: string;
+  classCode: string;
+  avatar: string;
+  level: number;
+  combat: number;
+  speed: number;
+  focus: number;
+  resistance: number;
+  will: number;
+  vitality: number;
+  initialSkills: string[];
+  initialSpells: string[];
+  recruitCost: {
+    ore?: number;
+    supplies?: number;
+    arcane?: number;
+    devotion?: number;
+  };
+  icon: string;
+  themeColor: string;
+}
+
+// =============================================================================
+// TEMPLATE DE REGENTE
+// =============================================================================
+
+export interface RegentTemplate {
+  code: string;
+  name: string;
+  description: string;
+  avatar: string;
+  initialSkillCode?: string;
+  initialSpells?: string[];
+  combat: number;
+  speed: number;
+  focus: number;
+  resistance: number;
+  will: number;
+  vitality: number;
+  icon: string;
+  themeColor: string;
+  alignment: Alignment;
+  race: Race;
+}
+
+// =============================================================================
+// TEMPLATE DE INVOCAÇÃO (SUMMON)
+// =============================================================================
+
+export type SummonAIBehavior =
+  | "AGGRESSIVE"
+  | "TACTICAL"
+  | "DEFENSIVE"
+  | "SUPPORT"
+  | "RANGED";
+
+export interface SummonTemplate {
+  code: string;
+  name: string;
+  description: string;
+  summoner: string;
+  combat: number;
+  speed: number;
+  focus: number;
+  resistance: number;
+  will: number;
+  vitality: number;
+  damageReduction: number;
+  category: "SUMMON";
+  avatar?: string;
+  actionCodes?: string[];
+  passiveCode?: string;
+  aiBehavior?: SummonAIBehavior;
+  metadata?: Record<string, unknown>;
+}
+
+// =============================================================================
+// TEMPLATE DE REINO
+// =============================================================================
+
+export interface KingdomTemplateDefinition {
+  id: string;
+  name: string;
+  description: string;
+  alignment: Alignment;
+  race: Race;
+  regentCode: string;
+  troopTemplates: TroopTemplateData[];
 }
 
 // =============================================================================

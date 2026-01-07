@@ -27,7 +27,8 @@ export interface ConditionEffects {
   combatMod?: number;
   speedMod?: number;
   focusMod?: number;
-  armorMod?: number;
+  resistanceMod?: number;
+  willMod?: number;
   vitalityMod?: number;
 
   // === MODIFICADORES DE STATS DERIVADOS ===
@@ -80,7 +81,7 @@ export interface ConditionEffects {
   resetsOnDeath?: boolean; // Acúmulos são resetados ao morrer
 
   // === EFEITOS DE MAGO ===
-  learnsVisibleSpells?: boolean; // Aprende magias ao ver outros lançando
+  learnsVisibleSpells?: boolean;
   convertPhysicalToMagical?: boolean; // Converte dano físico em mágico
   arcaneShieldActive?: boolean; // Escudo arcano ativo (redução = Focus/2)
 }
@@ -142,3 +143,24 @@ export type ConditionId =
   | "POISONED"
   | "BLEEDING"
   | "HELPED";
+
+/**
+ * Efeito ativo calculado para exibição no cliente
+ * Representa um efeito agregado de todas as condições da unidade
+ */
+export interface ActiveEffect {
+  /** Chave do efeito (ex: "extraAttacks", "bonusDamage") */
+  key: keyof ConditionEffects;
+  /** Valor numérico agregado (soma de todas as condições) */
+  value: number | boolean;
+  /** IDs das condições que contribuem para este efeito */
+  sources: string[];
+}
+
+/**
+ * Mapa de efeitos ativos por chave
+ * Usado no BattleUnit para enviar efeitos calculados ao cliente
+ */
+export type ActiveEffectsMap = Partial<
+  Record<keyof ConditionEffects, ActiveEffect>
+>;

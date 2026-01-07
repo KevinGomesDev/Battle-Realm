@@ -1,4 +1,5 @@
 import React from "react";
+import { Button, type ButtonVariant, type ButtonSize } from "./Button";
 
 interface AsyncButtonProps {
   onClick: () => Promise<void>;
@@ -10,6 +11,8 @@ interface AsyncButtonProps {
   type?: "button" | "submit" | "reset";
   onSuccess?: () => void;
   onError?: (error: Error) => void;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
 }
 
 /**
@@ -26,6 +29,8 @@ export const AsyncButton: React.FC<AsyncButtonProps> = ({
   type = "button",
   onSuccess,
   onError,
+  variant = "danger",
+  size = "md",
 }) => {
   const [isLoading, setIsLoading] = React.useState(false);
   const [localError, setLocalError] = React.useState<string | null>(null);
@@ -52,16 +57,19 @@ export const AsyncButton: React.FC<AsyncButtonProps> = ({
 
   return (
     <div className="flex flex-col gap-2">
-      <button
+      <Button
+        variant={variant}
+        size={size}
         onClick={handleClick}
         disabled={isDisabled}
         type={type}
-        className={`px-4 py-2 border-none rounded-md bg-medieval-red-700 text-white cursor-pointer font-medium transition-all duration-300 hover:bg-medieval-red-600 hover:not-disabled:hover:bg-medieval-red-600 disabled:opacity-60 disabled:cursor-not-allowed border-2 border-medieval-blood ${className}`}
+        isLoading={isLoading || loading}
+        className={className}
       >
-        {isLoading || loading ? "⏳ Carregando..." : children}
-      </button>
+        {children}
+      </Button>
       {displayError && (
-        <p className="text-medieval-red-400 text-sm m-0">{displayError}</p>
+        <p className="text-red-400 text-sm m-0">{displayError}</p>
       )}
     </div>
   );

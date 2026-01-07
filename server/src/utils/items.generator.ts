@@ -17,8 +17,8 @@ const BASE_TYPES: Array<{ type: string; attribute: AttributeKey }> = [
   { type: "Adaga", attribute: "speed" },
   { type: "Tomo", attribute: "focus" },
   { type: "Cajado", attribute: "focus" },
-  { type: "Manto", attribute: "armor" },
-  { type: "Escudo", attribute: "armor" },
+  { type: "Manto", attribute: "resistance" },
+  { type: "Escudo", attribute: "resistance" },
   { type: "Amuleto", attribute: "vitality" },
   { type: "Anel", attribute: "vitality" },
 ];

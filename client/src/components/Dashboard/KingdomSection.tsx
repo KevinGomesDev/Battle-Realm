@@ -38,25 +38,25 @@ export const KingdomSection: React.FC<KingdomSectionProps> = ({
       {/* Loading */}
       {isLoading && (
         <div className="flex items-center justify-center py-4">
-          <div className="animate-spin w-5 h-5 border-2 border-metal-bronze border-t-transparent rounded-full" />
+          <div className="animate-spin w-5 h-5 border-2 border-stellar-amber border-t-transparent rounded-full" />
         </div>
       )}
 
       {/* Error */}
       {error && (
-        <div className="bg-war-blood/20 border border-war-crimson/50 rounded p-2">
-          <p className="text-war-ember text-xs">⚠️ {error}</p>
+        <div className="bg-red-500/20 border border-red-500/50 rounded p-2">
+          <p className="text-red-400 text-xs">⚠️ {error}</p>
         </div>
       )}
 
       {/* Empty */}
       {!isLoading && !error && kingdoms.length === 0 && (
-        <div className="text-center py-4 bg-citadel-slate/20 rounded border border-dashed border-metal-iron/30">
+        <div className="text-center py-4 bg-surface-800/50 rounded border border-dashed border-surface-500/30">
           <div className="text-2xl mb-1">🏰</div>
-          <p className="text-parchment-dark text-xs mb-2">
+          <p className="text-astral-silver text-xs mb-2">
             Nenhum reino fundado
           </p>
-          <p className="text-parchment-dark/60 text-[10px]">
+          <p className="text-astral-steel text-[10px]">
             Clique em "Fundar Reino" para começar!
           </p>
         </div>
@@ -99,24 +99,24 @@ const KingdomCard: React.FC<{ kingdom: Kingdom }> = ({ kingdom }) => {
   return (
     <div
       className="group flex items-center gap-2 p-2
-                 bg-citadel-slate/30 border border-metal-iron/30 rounded
-                 hover:border-metal-bronze/50 hover:bg-citadel-slate/50
+                 bg-surface-800/50 border border-surface-500/30 rounded
+                 hover:border-stellar-amber/50 hover:bg-surface-700/50
                  transition-all cursor-pointer"
     >
       {/* Ícone */}
-      <div className="w-7 h-7 bg-citadel-obsidian/50 border border-metal-iron/50 rounded flex items-center justify-center">
+      <div className="w-7 h-7 bg-surface-900/50 border border-surface-500/50 rounded flex items-center justify-center">
         <span className="text-sm">{raceIcons[kingdom.race] || "🏰"}</span>
       </div>
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <h4 className="text-xs font-semibold text-parchment-light truncate group-hover:text-metal-gold transition-colors">
+        <h4 className="text-xs font-semibold text-astral-chrome truncate group-hover:text-stellar-amber transition-colors">
           {kingdom.name}
         </h4>
       </div>
 
       {/* Badge */}
-      <div className="text-[10px] text-parchment-dark px-1.5 py-0.5 bg-citadel-obsidian/30 rounded">
+      <div className="text-[10px] text-astral-silver px-1.5 py-0.5 bg-surface-900/30 rounded">
         💰 N/A
       </div>
     </div>

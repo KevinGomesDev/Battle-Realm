@@ -5,7 +5,7 @@ import {
   MAX_CONSTRUCTIONS_PER_TERRITORY,
   MAX_FORTRESSES_PER_TERRITORY,
 } from "../types";
-import { STRUCTURE_DEFINITIONS } from "../../../shared/data/structures";
+import { STRUCTURE_DEFINITIONS } from "../../../shared/data/structures.data";
 import { spendResources } from "./turn.utils";
 import { getResourceName } from "../../../shared/config/global.config";
 

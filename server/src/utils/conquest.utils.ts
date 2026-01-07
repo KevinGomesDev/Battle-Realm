@@ -3,7 +3,7 @@
 import {
   TERRITORY_CHALLENGES,
   TerritoryChallenge,
-} from "../../../shared/data/events";
+} from "../../../shared/data/events.data";
 import {
   ALL_ATTRIBUTE_KEYS,
   AttributeKey,

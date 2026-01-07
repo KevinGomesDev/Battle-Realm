@@ -3,7 +3,11 @@
 // FONTE DE VERDADE para habilidades de classes
 // Re-exporta templates e fornece funções utilitárias
 
-import type { SkillDefinition } from "../types/skills.types";
+import type {
+  SkillDefinition,
+  SkillTargetType,
+  SkillRange,
+} from "../types/skills.types";
 
 // Re-exportar todos os templates de skills
 export {
@@ -223,8 +227,8 @@ export interface SkillInfo {
   color: string;
   requiresTarget: boolean;
   // Novas propriedades para melhorar UX
-  targetType?: "SELF" | "ALLY" | "ENEMY" | "ALL";
-  range?: "SELF" | "ADJACENT" | "RANGED" | "AREA";
+  targetType?: SkillTargetType;
+  range?: SkillRange;
   cooldown?: number;
   consumesAction?: boolean;
 }

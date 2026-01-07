@@ -6,7 +6,7 @@ import type {
   Territory,
 } from "../types/map.types";
 import type { MatchMapData } from "../../match/types/match.types";
-import { socketService } from "../../../services/socket.service";
+import { colyseusService } from "../../../services/colyseus.service";
 
 const initialState: MapState = {
   territories: [],
@@ -42,34 +42,11 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: "SET_LOADING", payload: true });
 
       try {
-        socketService.emit("match:request_map", { matchId });
-
-        const mapData = await new Promise<MatchMapData>((resolve, reject) => {
-          let timeoutId: ReturnType<typeof setTimeout>;
-
-          const successHandler = (data: MatchMapData) => {
-            clearTimeout(timeoutId);
-            socketService.off("match:map_data", successHandler);
-            socketService.off("error", errorHandler);
-            resolve(data);
-          };
-
-          const errorHandler = (data: { message: string }) => {
-            clearTimeout(timeoutId);
-            socketService.off("match:map_data", successHandler);
-            socketService.off("error", errorHandler);
-            reject(new Error(data.message || "Erro ao carregar mapa"));
-          };
-
-          socketService.on("match:map_data", successHandler);
-          socketService.on("error", errorHandler);
-
-          timeoutId = setTimeout(() => {
-            socketService.off("match:map_data", successHandler);
-            socketService.off("error", errorHandler);
-            reject(new Error("Timeout ao carregar mapa"));
-          }, 10000);
-        });
+        const mapData = await colyseusService.sendToMatchAndWait<MatchMapData>(
+          "request_map",
+          { matchId },
+          "match:map_data"
+        );
 
         dispatch({ type: "SET_TERRITORIES", payload: mapData.territories });
         dispatch({ type: "SET_LOADING", payload: false });
@@ -91,31 +68,9 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "SET_LOADING", payload: true });
 
     try {
-      socketService.emit("map:load");
-
-      const mapData = await new Promise<{ territories: Territory[] }>(
-        (resolve, reject) => {
-          const successHandler = (data: { territories: Territory[] }) => {
-            socketService.off("map:loaded", successHandler);
-            socketService.off("error", errorHandler);
-            resolve(data);
-          };
-
-          const errorHandler = (data: { message: string }) => {
-            socketService.off("map:loaded", successHandler);
-            socketService.off("error", errorHandler);
-            reject(new Error(data.message));
-          };
-
-          socketService.on("map:loaded", successHandler);
-          socketService.on("error", errorHandler);
-
-          setTimeout(
-            () => reject(new Error("Timeout ao carregar mapa")),
-            10000
-          );
-        }
-      );
+      const mapData = await colyseusService.sendAndWait<{
+        territories: Territory[];
+      }>("map:load", undefined, "map:loaded");
 
       dispatch({ type: "SET_TERRITORIES", payload: mapData.territories || [] });
       dispatch({ type: "SET_LOADING", payload: false });

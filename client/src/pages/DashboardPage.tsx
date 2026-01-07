@@ -21,7 +21,10 @@ import { Topbar } from "../components/Topbar";
 import MapPage from "./MapPage";
 import { CreateKingdomModal, useKingdom } from "../features/kingdom";
 import { GlobalChat } from "../features/chat";
-import { MAX_KINGDOMS_PER_USER } from "../../../shared/data/units";
+import { CharacterCreatorModal } from "../features/character-creator";
+import type { CharacterConfig } from "../../../shared/types/character.types";
+import { MAX_KINGDOMS_PER_USER } from "../../../shared/data/units.data";
+import { Button } from "../components/Button";
 
 // =============================================================================
 // BOTÕES DE HEADER
@@ -33,21 +36,16 @@ const FundarReinoBtn: React.FC<{
   disabled?: boolean;
   tooltip?: string;
 }> = ({ onClick, disabled, tooltip }) => (
-  <button
+  <Button
+    variant="primary"
+    size="xs"
     onClick={onClick}
     disabled={disabled}
     title={tooltip}
-    className={`px-2 py-0.5 text-[10px] font-semibold
-               border border-metal-iron/50 rounded
-               text-citadel-obsidian transition-all
-               ${
-                 disabled
-                   ? "bg-gradient-to-b from-citadel-slate to-citadel-granite cursor-not-allowed opacity-60"
-                   : "bg-gradient-to-b from-metal-bronze to-metal-copper hover:from-metal-gold hover:to-metal-bronze"
-               }`}
+    icon="✦"
   >
-    ⚒️ Fundar
-  </button>
+    Fundar
+  </Button>
 );
 
 /** Botão compacto para header - Criar Partida */
@@ -55,54 +53,43 @@ const CriarPartidaBtn: React.FC<{
   onClick: () => void;
   disabled?: boolean;
   isLoading?: boolean;
-}> = ({ onClick, disabled, isLoading }) => {
-  const handleClick = () => {
-    console.log("[CriarPartidaBtn] Button clicked", { disabled, isLoading });
-    onClick();
-  };
-
-  return (
-    <button
-      onClick={handleClick}
-      disabled={disabled}
-      className="px-2 py-0.5 text-[10px] font-semibold
-                 bg-gradient-to-b from-war-crimson to-war-blood
-                 border border-metal-iron/50 rounded
-                 hover:from-war-ember hover:to-war-crimson
-                 disabled:from-citadel-slate disabled:to-citadel-granite
-                 text-parchment-light transition-all disabled:cursor-not-allowed"
-    >
-      {isLoading ? "..." : "Criar Partida"}
-    </button>
-  );
-};
+}> = ({ onClick, disabled, isLoading }) => (
+  <Button
+    variant="danger"
+    size="xs"
+    onClick={onClick}
+    disabled={disabled}
+    isLoading={isLoading}
+  >
+    Criar Partida
+  </Button>
+);
 
 /** Botão compacto para header - Criar Arena */
 const CriarArenaBtn: React.FC<{
   onClick: () => void;
   disabled?: boolean;
   isLoading?: boolean;
-}> = ({ onClick, disabled, isLoading }) => {
-  const handleClick = () => {
-    console.log("[CriarArenaBtn] Button clicked", { disabled, isLoading });
-    onClick();
-  };
+}> = ({ onClick, disabled, isLoading }) => (
+  <Button
+    variant="mystic"
+    size="xs"
+    onClick={onClick}
+    disabled={disabled}
+    isLoading={isLoading}
+  >
+    Criar Arena
+  </Button>
+);
 
-  return (
-    <button
-      onClick={handleClick}
-      disabled={disabled}
-      className="px-2 py-0.5 text-[10px] font-semibold
-                 bg-gradient-to-b from-purple-600 to-purple-800
-                 border border-metal-iron/50 rounded
-                 hover:from-purple-500 hover:to-purple-700
-                 disabled:from-citadel-slate disabled:to-citadel-granite
-                 text-parchment-light transition-all disabled:cursor-not-allowed"
-    >
-      {isLoading ? "..." : "Criar Arena"}
-    </button>
-  );
-};
+/** Botão compacto para header - Criar Personagem */
+const CriarPersonagemBtn: React.FC<{
+  onClick: () => void;
+}> = ({ onClick }) => (
+  <Button variant="secondary" size="xs" onClick={onClick} icon="🎨">
+    Criar Avatar
+  </Button>
+);
 
 // =============================================================================
 // COMPONENTE PRINCIPAL
@@ -119,9 +106,9 @@ const ArenaSectionWrapper: React.FC = () => {
     <SectionCard
       title="Arena"
       icon="🏟️"
-      accentColor="purple"
+      accentColor="mystic"
       headerAction={
-        !arenaState.currentLobby && (
+        !arenaState.lobbyId && (
           <div className="flex items-center gap-2">
             {/* Checkbox BOT */}
             <label className="flex items-center gap-1 cursor-pointer">
@@ -129,9 +116,9 @@ const ArenaSectionWrapper: React.FC = () => {
                 type="checkbox"
                 checked={arenaActions.vsBot}
                 onChange={(e) => arenaActions.setVsBot(e.target.checked)}
-                className="w-3 h-3 accent-purple-500 cursor-pointer"
+                className="w-3 h-3 accent-mystic-blue cursor-pointer"
               />
-              <span className="text-[10px] text-parchment-dark">BOT?</span>
+              <span className="text-[10px] text-surface-200">BOT?</span>
             </label>
             <CriarArenaBtn
               onClick={arenaActions.handleCreate}
@@ -142,7 +129,7 @@ const ArenaSectionWrapper: React.FC = () => {
         )
       }
     >
-      {arenaState.currentLobby ? <ArenaLobby /> : <ArenaSection />}
+      {arenaState.lobbyId ? <ArenaLobby /> : <ArenaSection />}
     </SectionCard>
   );
 };
@@ -152,11 +139,12 @@ const ArenaSectionWrapper: React.FC = () => {
  * Visão única com todas as seções lado a lado
  */
 const DashboardPage: React.FC = () => {
-  const { currentMatch } = useMatch();
+  const { state: matchState } = useMatch();
   const { state: arenaState } = useArena();
   const { kingdoms } = useKingdom();
 
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
+  const [isCharacterCreatorOpen, setIsCharacterCreatorOpen] = useState(false);
 
   // Hooks para ações dos headers
   const kingdomActions = useKingdomSectionActions();
@@ -166,21 +154,21 @@ const DashboardPage: React.FC = () => {
   const isKingdomLimitReached = kingdoms.length >= MAX_KINGDOMS_PER_USER;
 
   // Se há uma partida ativa, vai direto para o mapa
-  if (currentMatch) {
+  if (matchState.matchId && matchState.status !== "IDLE") {
     return <MapPage />;
   }
 
   // Se está em batalha de arena, mostrar tela de batalha
-  if (arenaState.battle || arenaState.battleResult) {
+  if (arenaState.isInBattle || arenaState.winnerId) {
     return <ArenaBattleView />;
   }
 
   return (
-    <div className="relative min-h-screen flex flex-col bg-citadel-obsidian">
+    <div className="relative min-h-screen flex flex-col bg-cosmos-void">
       {/* === AMBIENTE === */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-b from-citadel-slate/80 via-citadel-obsidian to-black" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-torch-glow/5 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-cosmos" />
+        <div className="absolute inset-0 bg-cosmos-radial opacity-50" />
       </div>
 
       {/* === TOPBAR === */}
@@ -197,15 +185,20 @@ const DashboardPage: React.FC = () => {
               icon="🏰"
               accentColor="bronze"
               headerAction={
-                <FundarReinoBtn
-                  onClick={kingdomActions.openModal}
-                  disabled={isKingdomLimitReached}
-                  tooltip={
-                    isKingdomLimitReached
-                      ? `Limite de ${MAX_KINGDOMS_PER_USER} reinos atingido`
-                      : undefined
-                  }
-                />
+                <div className="flex items-center gap-2">
+                  <CriarPersonagemBtn
+                    onClick={() => setIsCharacterCreatorOpen(true)}
+                  />
+                  <FundarReinoBtn
+                    onClick={kingdomActions.openModal}
+                    disabled={isKingdomLimitReached}
+                    tooltip={
+                      isKingdomLimitReached
+                        ? `Limite de ${MAX_KINGDOMS_PER_USER} reinos atingido`
+                        : undefined
+                    }
+                  />
+                </div>
               }
             >
               <KingdomSection />
@@ -272,16 +265,21 @@ const DashboardPage: React.FC = () => {
           onClose={kingdomActions.closeModal}
           onSuccess={() => {
             kingdomActions.closeModal();
-            // Forçar recarregar reinos após criação
-            window.location.reload();
+            // A lista de reinos já é atualizada automaticamente pelo KingdomContext
           }}
         />
       )}
 
-      {/* === FONTE === */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap');
-      `}</style>
+      {/* === MODAL DE CRIADOR DE PERSONAGEM === */}
+      <CharacterCreatorModal
+        isOpen={isCharacterCreatorOpen}
+        onClose={() => setIsCharacterCreatorOpen(false)}
+        onSave={(config: CharacterConfig, svgString: string) => {
+          console.log("Personagem salvo:", config);
+          console.log("SVG:", svgString);
+          // TODO: Salvar personagem no backend
+        }}
+      />
     </div>
   );
 };

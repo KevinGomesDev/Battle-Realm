@@ -1,2 +1,3 @@
 export { AttributesDisplay } from "./AttributesDisplay";
-export type { AttributesDisplayProps } from "./types";
+export { AttributeBar } from "./AttributeBar";
+export type { AttributesDisplayProps, AttributeBarProps } from "./types";

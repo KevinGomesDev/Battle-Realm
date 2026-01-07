@@ -1,7 +1,7 @@
 // Kingdom Socket Helper
 // Centraliza chamadas socket com tipagem forte e eventos específicos
 
-import { socketService } from "@/services/socket.service";
+import { colyseusService } from "@/services/colyseus.service";
 import type {
   Kingdom,
   KingdomSummary,
@@ -38,8 +38,8 @@ async function emitWithResponse<T>(
 
     const cleanup = () => {
       clearTimeout(timeoutId);
-      socketService.off(successEvent, successHandler);
-      socketService.off(KINGDOM_ERROR_EVENT, errorHandler);
+      colyseusService.off(successEvent, successHandler);
+      colyseusService.off(KINGDOM_ERROR_EVENT, errorHandler);
     };
 
     const successHandler = (responseData: T) => {
@@ -52,15 +52,15 @@ async function emitWithResponse<T>(
       resolve({ success: false, error: errorData.message });
     };
 
-    socketService.on(successEvent, successHandler);
-    socketService.on(KINGDOM_ERROR_EVENT, errorHandler);
+    colyseusService.on(successEvent, successHandler);
+    colyseusService.on(KINGDOM_ERROR_EVENT, errorHandler);
 
     timeoutId = setTimeout(() => {
       cleanup();
       resolve({ success: false, error: "Timeout na operação" });
     }, timeoutMs);
 
-    socketService.emit(emitEvent, data);
+    colyseusService.sendToGlobal(emitEvent, data);
   });
 }
 

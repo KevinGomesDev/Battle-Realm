@@ -24,11 +24,6 @@ function createLogger(category: string, color: string): LogFn {
 export const arenaLog = createLogger("Arena", "#f472b6");
 
 /**
- * Logger para eventos de batalha
- */
-export const battleLog = createLogger("Battle", "#60a5fa");
-
-/**
  * Logger para eventos de lobby
  */
 export const lobbyLog = createLogger("Lobby", "#34d399");

@@ -5,6 +5,11 @@ import type { SkillDefinition } from "../types/skills.types";
 import type { BattleUnit } from "../types/battle.types";
 import { DEFAULT_RANGE_VALUES } from "../types/skills.types";
 import {
+  resolveDynamicValue,
+  DEFAULT_RANGE_DISTANCE,
+  mapLegacyRange,
+} from "../types/ability.types";
+import {
   getManhattanDistance,
   isAdjacentOmnidirectional,
   isAdjacent,
@@ -42,8 +47,7 @@ export type SkillValidationErrorCode =
   | "SELF_ONLY"
   | "OUT_OF_RANGE"
   | "INVALID_TARGET_TYPE"
-  | "TARGET_NOT_ALLY"
-  | "TARGET_NOT_ENEMY";
+  | "TARGET_DEAD";
 
 // =============================================================================
 // VALIDAÇÃO PRINCIPAL
@@ -127,6 +131,30 @@ export function validateSkillUse(
 }
 
 /**
+ * Calcula o alcance máximo de uma skill baseado no range e no caster
+ * Suporta valores dinâmicos (números ou referências a atributos)
+ */
+export function getSkillMaxRange(
+  skill: SkillDefinition,
+  caster: BattleUnit
+): number {
+  // Se skill tem rangeDistance definido, usar valor dinâmico
+  if (skill.rangeDistance !== undefined) {
+    return resolveDynamicValue(skill.rangeDistance, caster);
+  }
+
+  // Mapear range legado (ADJACENT -> MELEE)
+  const normalizedRange = mapLegacyRange(skill.range || "MELEE");
+
+  // Fallback: usar rangeValue se definido, senão valores padrão
+  if (skill.rangeValue !== undefined) {
+    return skill.rangeValue;
+  }
+
+  return DEFAULT_RANGE_DISTANCE[normalizedRange];
+}
+
+/**
  * Valida o alcance da skill
  */
 export function validateSkillRange(
@@ -134,7 +162,11 @@ export function validateSkillRange(
   skill: SkillDefinition,
   target: BattleUnit | null
 ): SkillValidationResult {
-  if (skill.range === "SELF") {
+  // Calcular alcance máximo dinamicamente
+  const maxRange = getSkillMaxRange(skill, caster);
+  const normalizedRange = mapLegacyRange(skill.range || "MELEE");
+
+  if (normalizedRange === "SELF") {
     // Skills SELF não precisam de alvo ou o alvo é o próprio caster
     if (target && target.id !== caster.id) {
       return {
@@ -143,9 +175,9 @@ export function validateSkillRange(
         errorCode: "SELF_ONLY",
       };
     }
-  } else if (skill.range === "ADJACENT") {
-    // Para skills ALLY, permitir self-cast (target pode ser null)
-    if (!target && skill.targetType !== "ALLY") {
+  } else if (normalizedRange === "MELEE") {
+    // Para skills UNIT, permitir self-cast (target pode ser null)
+    if (!target && skill.targetType !== "UNIT" && skill.targetType !== "SELF") {
       return {
         valid: false,
         error: "Skill requer um alvo",
@@ -154,22 +186,21 @@ export function validateSkillRange(
     }
     // Se há target, validar adjacência (exceto se for self-cast)
     if (target && target.id !== caster.id) {
-      if (
-        !isAdjacentOmnidirectional(
-          caster.posX,
-          caster.posY,
-          target.posX,
-          target.posY
-        )
-      ) {
+      const distance = getChebyshevDistance(
+        caster.posX,
+        caster.posY,
+        target.posX,
+        target.posY
+      );
+      if (distance > maxRange) {
         return {
           valid: false,
-          error: "Alvo não está adjacente",
+          error: `Alvo não está no alcance (máx: ${maxRange})`,
           errorCode: "OUT_OF_RANGE",
         };
       }
     }
-  } else if (skill.range === "RANGED" || skill.range === "AREA") {
+  } else if (normalizedRange === "RANGED" || normalizedRange === "AREA") {
     if (!target && skill.targetType !== "SELF") {
       return {
         valid: false,
@@ -179,17 +210,16 @@ export function validateSkillRange(
     }
     // Se há target, validar alcance (exceto se for self-cast)
     if (target && target.id !== caster.id) {
-      const rangeValue = skill.rangeValue ?? DEFAULT_RANGE_VALUES[skill.range];
       const distance = getManhattanDistance(
         caster.posX,
         caster.posY,
         target.posX,
         target.posY
       );
-      if (distance > rangeValue) {
+      if (distance > maxRange) {
         return {
           valid: false,
-          error: `Alvo fora de alcance (máx: ${rangeValue})`,
+          error: `Alvo fora de alcance (máx: ${maxRange})`,
           errorCode: "OUT_OF_RANGE",
         };
       }
@@ -211,21 +241,12 @@ export function validateSkillTargetType(
     return { valid: true };
   }
 
-  const isSameOwner = caster.ownerId === target.ownerId;
-
-  if (skill.targetType === "ALLY" && !isSameOwner) {
+  // UNIT aceita qualquer unidade viva
+  if (skill.targetType === "UNIT" && !target.isAlive) {
     return {
       valid: false,
-      error: "Skill só pode ser usada em aliados",
-      errorCode: "TARGET_NOT_ALLY",
-    };
-  }
-
-  if (skill.targetType === "ENEMY" && isSameOwner) {
-    return {
-      valid: false,
-      error: "Skill só pode ser usada em inimigos",
-      errorCode: "TARGET_NOT_ENEMY",
+      error: "Alvo não está vivo",
+      errorCode: "TARGET_DEAD",
     };
   }
 
@@ -245,8 +266,11 @@ export function isValidSkillTarget(
   skill: SkillDefinition,
   potentialTarget: BattleUnit
 ): boolean {
-  // Self-cast é sempre válido para skills ALLY
-  if (skill.targetType === "ALLY" && potentialTarget.id === caster.id) {
+  // Self-cast é sempre válido para skills UNIT e SELF
+  if (
+    (skill.targetType === "UNIT" || skill.targetType === "SELF") &&
+    potentialTarget.id === caster.id
+  ) {
     return true;
   }
 

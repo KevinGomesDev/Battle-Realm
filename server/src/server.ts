@@ -1,121 +1,128 @@
 // src/server.ts
+// Battle Realm Server - Colyseus.io
 import express from "express";
 import http from "http";
-import { Server, Socket } from "socket.io";
-import { registerAuthHandlers } from "./lib/auth";
-import { registerKingdomHandlers } from "./handlers/kingdom.handler";
-import { registerMatchHandlers } from "./handlers/match.handler";
-import { registerWorldMapHandlers } from "./worldmap/handlers/worldmap.handler";
-import { registerTurnHandlers } from "./handlers/turn.handler";
-import { registerRegentHandlers } from "./handlers/regent.handler";
-import { registerHeroHandlers } from "./handlers/hero.handler";
-import { registerUnitHandlers } from "./handlers/unit.handler";
-import { registerTroopHandlers } from "./handlers/troop.handler";
+import cors from "cors";
 import {
-  registerBattleHandlers,
-  arenaLobbies,
-  arenaBattles,
-  userToLobby,
-  disconnectedPlayers,
-  socketToUser,
-  initializeArenaState,
-} from "./handlers/battle.handler";
-import { registerItemsHandlers } from "./handlers/items.handler";
-import { registerSummonHandlers } from "./handlers/summon.handler";
-import { registerMovementHandlers } from "./handlers/movement.handler";
-import { registerCrisisHandlers } from "./handlers/crisis.handler";
-import { registerSkillsHandlers } from "./handlers/skills.handler";
-import { registerActionHandlers } from "./handlers/action.handler";
-import { registerRankingHandlers } from "./handlers/ranking.handler";
-import { registerEventHandlers } from "./handlers/event.handler";
-import { registerChatHandlers } from "./handlers/chat.handler";
-import { initEventService, startAutoCleanup } from "./services/event.service";
-import {
-  registerSessionHandlers,
-  injectArenaRefs,
-} from "./handlers/session.handler";
+  Server as ColyseusServer,
+  matchMaker,
+  RoomListingData,
+} from "@colyseus/core";
+import { WebSocketTransport } from "@colyseus/ws-transport";
+import { monitor } from "@colyseus/monitor";
+
+// Colyseus Rooms
+import { ArenaRoom, GlobalRoom, MatchRoom } from "./colyseus/rooms";
+
+// Database
+import { prisma } from "./lib/prisma";
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*" },
+
+// Middleware
+app.use(cors({ origin: "*" }));
+app.use(express.json());
+
+// ============================================
+// COLYSEUS SERVER
+// ============================================
+
+const gameServer = new ColyseusServer({
+  transport: new WebSocketTransport({
+    server,
+    pingInterval: 5000,
+    pingMaxRetries: 3,
+  }),
 });
 
-// Inicializar serviço de eventos com instância do Socket.IO
-initEventService(io);
+// Registrar rooms do Colyseus
+gameServer.define("global", GlobalRoom);
+gameServer.define("arena", ArenaRoom);
+gameServer.define("match", MatchRoom);
 
-app.get("/", (req, res) => {
-  res.send("Backend Battle Realm (Modular) Online!");
+// ============================================
+// ENDPOINTS HTTP
+// ============================================
+
+app.get("/", (_req, res) => {
+  res.json({
+    status: "online",
+    server: "Battle Realm",
+    version: "2.0.0",
+    transport: "Colyseus",
+    rooms: ["global", "arena", "match"],
+  });
 });
 
-// Função principal de inicialização
-async function bootstrap() {
-  // 1. Inicializar estado da arena do banco ANTES de aceitar conexões
-  await initializeArenaState();
-
-  // 2. Injetar referências da arena no session handler (após inicialização)
-  injectArenaRefs(
-    arenaLobbies,
-    arenaBattles,
-    userToLobby,
-    disconnectedPlayers,
-    socketToUser
-  );
-
-  // 3. Configurar handlers de conexão
-  let connectionCount = 0;
-
-  io.on("connection", (socket: Socket) => {
-    connectionCount++;
-    console.log(
-      `[SOCKET] Nova conexão (${connectionCount} ativos): ${socket.id}`
-    );
-
-    // Handler de ping/pong para manter conexão ativa
-    socket.on("ping", () => {
-      socket.emit("pong");
+// Status endpoint
+app.get("/status", async (_req, res) => {
+  try {
+    const rooms = await matchMaker.query({});
+    res.json({
+      status: "online",
+      connectedRooms: rooms.length,
+      rooms: rooms.map((r: RoomListingData) => ({
+        roomId: r.roomId,
+        name: r.name,
+        clients: r.clients,
+        maxClients: r.maxClients,
+        metadata: r.metadata,
+      })),
     });
+  } catch (error) {
+    res.status(500).json({ error: "Erro ao obter status" });
+  }
+});
 
-    registerAuthHandlers(io, socket);
-    registerSessionHandlers(io, socket); // Deve vir logo após auth
-    registerKingdomHandlers(io, socket);
-    registerMatchHandlers(io, socket);
-    registerWorldMapHandlers(io, socket);
-    registerTurnHandlers(io, socket);
-    registerRegentHandlers(io, socket);
-    registerHeroHandlers(io, socket);
-    registerUnitHandlers(io, socket);
-    registerTroopHandlers(io, socket);
-    registerBattleHandlers(io, socket);
-    registerItemsHandlers(io, socket);
-    registerSummonHandlers(io, socket);
-    registerMovementHandlers(io, socket);
-    registerCrisisHandlers(io, socket);
-    registerSkillsHandlers(io, socket);
-    registerActionHandlers(io, socket);
-    registerRankingHandlers(io, socket);
-    registerEventHandlers(io, socket);
-    registerChatHandlers(io, socket);
-
-    socket.on("disconnect", () => {
-      connectionCount--;
-      if (process.env.NODE_ENV !== "production") {
-        console.log(
-          `[SOCKET] Desconectou (${connectionCount} ativos): ${socket.id}`
-        );
-      }
-    });
-  });
-
-  // 4. Iniciar servidor
-  const PORT = 3000;
-  server.listen(PORT, () => {
-    console.log(`Servidor Modular rodando na porta ${PORT}`);
-
-    // 5. Iniciar limpeza automática de eventos (a cada 24h)
-    startAutoCleanup(24);
-  });
+// Monitor (apenas dev)
+if (process.env.NODE_ENV !== "production") {
+  app.use("/monitor", monitor());
+  console.log("[Server] Monitor disponível em /monitor");
 }
+
+// ============================================
+// BOOTSTRAP
+// ============================================
+
+async function bootstrap() {
+  try {
+    // Verificar conexão com banco de dados
+    await prisma.$connect();
+    console.log("[Database] ✅ Conectado ao banco de dados");
+
+    // Iniciar servidor
+    const PORT = parseInt(process.env.PORT || "3000", 10);
+
+    await gameServer.listen(PORT);
+
+    console.log(`[Server] ✅ Servidor rodando na porta ${PORT}`);
+    console.log(`[Colyseus] Rooms disponíveis: global, arena, match`);
+    console.log(`[Server] Endpoint de status: http://localhost:${PORT}/status`);
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`[Server] Monitor: http://localhost:${PORT}/monitor`);
+    }
+  } catch (error) {
+    console.error("[Server] ❌ Falha ao iniciar servidor:", error);
+    process.exit(1);
+  }
+}
+
+// Graceful shutdown
+process.on("SIGTERM", async () => {
+  console.log("[Server] Recebido SIGTERM, encerrando...");
+  await gameServer.gracefullyShutdown();
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  console.log("[Server] Recebido SIGINT, encerrando...");
+  await gameServer.gracefullyShutdown();
+  await prisma.$disconnect();
+  process.exit(0);
+});
 
 // Iniciar aplicação
 bootstrap().catch((err) => {

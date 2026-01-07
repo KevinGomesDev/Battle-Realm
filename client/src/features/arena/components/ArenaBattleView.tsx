@@ -17,8 +17,9 @@ import {
   BattleResultModal,
   BattleHeader,
   PauseMenu,
+  TargetSelectionNotification,
 } from "./battle";
-import { TurnStartModal } from "./shared";
+import { TurnNotification } from "./shared";
 import { FullScreenLoading } from "@/components/FullScreenLoading";
 import { ChatProvider, useChat } from "../../chat";
 import { ChatBox } from "../../chat/components/ChatBox";
@@ -28,6 +29,7 @@ import {
   findSkillByCode,
   isCommonAction,
 } from "../../../../../shared/data/skills.data";
+import { resolveDynamicValue } from "../../../../../shared/types/ability.types";
 import { getFullMovementInfo } from "../../../../../shared/utils/engagement.utils";
 import {
   getValidSkillTargets,
@@ -37,7 +39,7 @@ import {
   isValidSpellTarget,
   isValidSpellPosition,
 } from "../../../../../shared/utils/spell-validation";
-import { socketService } from "../../../services/socket.service";
+import { colyseusService } from "../../../services/colyseus.service";
 import {
   isPlayerControllable,
   getControllableUnits,
@@ -98,32 +100,26 @@ const ArenaBattleViewInner: React.FC = () => {
     direction: SpriteDirection;
   } | null>(null);
   const [isPauseMenuOpen, setIsPauseMenuOpen] = useState(false);
-  const [showTurnStartModal, setShowTurnStartModal] = useState(false);
   const [isRoundStart, setIsRoundStart] = useState(false); // Indica se é início de rodada
-  const [isTurnLocked, setIsTurnLocked] = useState(false); // Trava interações durante o modal de turno
   const [showDelayedBattleResult, setShowDelayedBattleResult] = useState(false); // Delay para mostrar modal de vitória
-  const autoEndTriggeredRef = useRef<boolean>(false); // Evita múltiplos auto-ends
   const isMovingRef = useRef<boolean>(false); // Lock para evitar cliques rápidos
-  const autoEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Timer para debounce do auto-end
-  const turnModalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Timer para delay do modal de turno
-  const unitsRef = useRef(units); // Ref para acessar units atualizado dentro do setTimeout
   const cameraCenteredRef = useRef<string | null>(null); // Controla se já centralizou a câmera neste turno
-  const turnModalShownRef = useRef<string | null>(null); // Controla se já mostrou o modal neste turno
   const lastRoundRef = useRef<number | null>(null); // Rastreia a última rodada para detectar mudança
 
-  // Manter ref sincronizada
-  useEffect(() => {
-    unitsRef.current = units;
-  }, [units]);
-
-  // Ouvir eventos de combate para disparar animações
+  // Ouvir eventos de combate para disparar animações e centralizar câmera
   useEffect(() => {
     // Handler para ataque - anima atacante (Sword) e alvo (Damage)
+    // Também centraliza a câmera no alvo se estiver visível
     const handleUnitAttacked = (data: {
       attackerUnitId: string;
       targetUnitId: string | null;
       missed?: boolean;
     }) => {
+      // Centralizar câmera no alvo se estiver na visão do jogador
+      if (data.targetUnitId && canvasRef.current) {
+        canvasRef.current.centerOnUnitIfVisible(data.targetUnitId);
+      }
+
       // Animação de ataque no atacante
       if (canvasRef.current && data.attackerUnitId) {
         canvasRef.current.playAnimation(data.attackerUnitId, "Sword_1");
@@ -134,6 +130,59 @@ const ArenaBattleViewInner: React.FC = () => {
         setTimeout(() => {
           canvasRef.current?.playAnimation(data.targetUnitId!, "Damage");
         }, 200);
+
+        // Shake da câmera quando uma unidade do jogador receber ou causar dano visível
+        const attackerUnit = units.find((u) => u.id === data.attackerUnitId);
+        const targetUnit = units.find((u) => u.id === data.targetUnitId);
+        const isPlayerInvolved =
+          attackerUnit?.ownerId === user?.id ||
+          targetUnit?.ownerId === user?.id;
+        const isOtherVisible =
+          attackerUnit?.ownerId === user?.id
+            ? canvasRef.current?.isUnitVisible(data.targetUnitId!)
+            : canvasRef.current?.isUnitVisible(data.attackerUnitId);
+
+        if (isPlayerInvolved && isOtherVisible) {
+          setTimeout(() => {
+            canvasRef.current?.shake(5, 150);
+          }, 200);
+        }
+      }
+    };
+
+    // Handler para movimento de unidade - centraliza câmera na nova posição se estiver visível
+    const handleUnitMoved = (data: {
+      unitId: string;
+      toX: number;
+      toY: number;
+    }) => {
+      // Centralizar câmera na nova posição se estiver na visão do jogador
+      if (canvasRef.current) {
+        canvasRef.current.centerOnPositionIfVisible(data.toX, data.toY);
+      }
+    };
+
+    // Handler para skill usada - centraliza câmera no alvo se houver
+    const handleSkillUsed = (data: {
+      casterUnitId: string;
+      targetUnitId?: string | null;
+      skillCode: string;
+    }) => {
+      // Centralizar câmera no alvo se estiver na visão do jogador
+      if (data.targetUnitId && canvasRef.current) {
+        canvasRef.current.centerOnUnitIfVisible(data.targetUnitId);
+      }
+    };
+
+    // Handler para spell cast - centraliza câmera no alvo se houver
+    const handleSpellCast = (data: {
+      casterUnitId: string;
+      targetUnitId?: string | null;
+      spellCode: string;
+    }) => {
+      // Centralizar câmera no alvo se estiver na visão do jogador
+      if (data.targetUnitId && canvasRef.current) {
+        canvasRef.current.centerOnUnitIfVisible(data.targetUnitId);
       }
     };
 
@@ -142,14 +191,20 @@ const ArenaBattleViewInner: React.FC = () => {
       isMovingRef.current = false;
     };
 
-    socketService.on("battle:unit_attacked", handleUnitAttacked);
-    socketService.on("battle:error", handleBattleError);
+    colyseusService.on("battle:unit_attacked", handleUnitAttacked);
+    colyseusService.on("battle:unit_moved", handleUnitMoved);
+    colyseusService.on("battle:skill_used", handleSkillUsed);
+    colyseusService.on("battle:spell_cast", handleSpellCast);
+    colyseusService.on("battle:error", handleBattleError);
 
     return () => {
-      socketService.off("battle:unit_attacked", handleUnitAttacked);
-      socketService.off("battle:error", handleBattleError);
+      colyseusService.off("battle:unit_attacked", handleUnitAttacked);
+      colyseusService.off("battle:unit_moved", handleUnitMoved);
+      colyseusService.off("battle:skill_used", handleSkillUsed);
+      colyseusService.off("battle:spell_cast", handleSpellCast);
+      colyseusService.off("battle:error", handleBattleError);
     };
-  }, []);
+  }, [units, user]);
 
   // Handler para atalhos de teclado (ESC = menu pausa, Espaço = finalizar turno)
   useEffect(() => {
@@ -185,54 +240,30 @@ const ArenaBattleViewInner: React.FC = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isPauseMenuOpen, battle, user, units, endAction]);
 
-  // Resetar flag de auto-end quando muda de turno
+  // Resetar flags quando muda de turno
   useEffect(() => {
-    autoEndTriggeredRef.current = false;
-    cameraCenteredRef.current = null; // Permitir centralizar novamente no novo turno
-    beginActionCalledRef.current = null; // Resetar para permitir novo beginAction
-    // Limpar ação pendente quando o turno muda
+    // Resetar flags de controle
+    cameraCenteredRef.current = null;
+    beginActionCalledRef.current = null;
+
+    // Limpar ação pendente
     setPendingAction(null);
-    // NÃO limpar selectedUnitId aqui - será gerenciado pelo próximo useEffect
   }, [battle?.currentPlayerId, battle?.round]);
 
-  // Mostrar modal de "Turno começou!" quando muda de turno
-  // Delay antes de mostrar o modal de início de turno (ms)
-  // Isso dá tempo para animações do turno anterior terminarem
-  const TURN_MODAL_DELAY = 800;
-  // Delay para mostrar o modal de vitória (ms)
-  const BATTLE_RESULT_DELAY = 2000;
-
+  // Detectar se é início de rodada (para informar TurnNotification)
   useEffect(() => {
-    if (!battle || !user) return;
+    if (!battle) return;
 
-    const turnKey = `${battle.currentPlayerId}-${battle.round}`;
-
-    // Detectar se é início de rodada (rodada mudou)
     const roundChanged =
       lastRoundRef.current !== null && lastRoundRef.current !== battle.round;
     const isFirstRound = lastRoundRef.current === null;
 
-    // Atualizar ref da rodada APÓS detectar mudança
     lastRoundRef.current = battle.round;
+    setIsRoundStart(roundChanged || isFirstRound);
+  }, [battle?.round]);
 
-    // Mostrar modal se ainda não mostrou neste turno (com delay)
-    if (turnModalShownRef.current !== turnKey) {
-      turnModalShownRef.current = turnKey;
-      setIsRoundStart(roundChanged || isFirstRound);
-      setIsTurnLocked(true); // Travar interações durante o modal
-
-      // Cancelar timer anterior se existir
-      if (turnModalTimerRef.current) {
-        clearTimeout(turnModalTimerRef.current);
-      }
-
-      // Delay antes de mostrar o modal (usar ref para evitar cancelamento pelo StrictMode)
-      turnModalTimerRef.current = setTimeout(() => {
-        setShowTurnStartModal(true);
-        turnModalTimerRef.current = null;
-      }, TURN_MODAL_DELAY);
-    }
-  }, [battle?.currentPlayerId, battle?.round, user?.id]);
+  // Delay para mostrar o modal de vitória (ms)
+  const BATTLE_RESULT_DELAY = 2000;
 
   // Delay para mostrar o modal de vitória
   useEffect(() => {
@@ -248,14 +279,10 @@ const ArenaBattleViewInner: React.FC = () => {
 
   // Auto-selecionar a unidade do turno atual quando muda de turno ou monta
   // E guiar câmera para ela APENAS UMA VEZ no início do turno
-  // SÓ EXECUTA APÓS O MODAL DE INÍCIO DE TURNO FECHAR (isTurnLocked = false)
   const beginActionCalledRef = useRef<string | null>(null); // Rastreia se beginAction já foi chamado para este turno
 
   useEffect(() => {
     if (!battle || !user) return;
-
-    // Aguardar o modal de início de turno fechar antes de auto-selecionar
-    if (isTurnLocked) return;
 
     const isMyTurnNow = battle.currentPlayerId === user.id;
     const turnKey = `${battle.currentPlayerId}-${battle.round}`;
@@ -331,79 +358,11 @@ const ArenaBattleViewInner: React.FC = () => {
     units,
     beginAction,
     selectedUnitId,
-    isTurnLocked,
   ]);
 
   // Auto-encerrar turno quando movimentos E ações acabarem
-  // Usa debounce para evitar finalização prematura após skills que restauram movimento (ex: Disparada)
-  useEffect(() => {
-    // Limpar timer anterior se houver
-    if (autoEndTimerRef.current) {
-      clearTimeout(autoEndTimerRef.current);
-      autoEndTimerRef.current = null;
-    }
-
-    if (!battle || !user || autoEndTriggeredRef.current) return;
-
-    const isMyTurnNow = battle.currentPlayerId === user.id;
-    if (!isMyTurnNow) return;
-
-    const myUnit = units.find(
-      (u) => isPlayerControllable(u, user.id) && u.isAlive
-    );
-    if (!myUnit) return;
-
-    // Só verificar se a unidade já começou a ação (tem hasStartedAction)
-    // NÃO auto-encerrar se a unidade ainda tem ações (pode usar Dash para recuperar movimento)
-    if (
-      myUnit.hasStartedAction &&
-      myUnit.movesLeft === 0 &&
-      myUnit.actionsLeft === 0 &&
-      (myUnit.attacksLeftThisTurn ?? 0) === 0
-    ) {
-      // Usar debounce maior para dar tempo de respostas do servidor (ex: Disparada restaura movimento)
-      autoEndTimerRef.current = setTimeout(() => {
-        // Verificar novamente após o delay usando ref para estado atualizado
-        const currentUnits = unitsRef.current;
-        const currentUnit = currentUnits.find(
-          (u) => isPlayerControllable(u, user.id) && u.isAlive
-        );
-        if (
-          currentUnit &&
-          currentUnit.hasStartedAction &&
-          currentUnit.movesLeft === 0 &&
-          currentUnit.actionsLeft === 0 &&
-          (currentUnit.attacksLeftThisTurn ?? 0) === 0
-        ) {
-          console.log(
-            "%c[ArenaBattleView] ✅ Movimentos e ações esgotados - Auto-encerrar turno",
-            "color: #22c55e; font-weight: bold;"
-          );
-          autoEndTriggeredRef.current = true;
-          endAction(currentUnit.id);
-        } else {
-          console.log(
-            "%c[ArenaBattleView] ⏳ Auto-encerrar cancelado - unidade ainda tem recursos",
-            "color: #f59e0b; font-weight: bold;",
-            {
-              movesLeft: currentUnit?.movesLeft,
-              actionsLeft: currentUnit?.actionsLeft,
-              attacksLeftThisTurn: currentUnit?.attacksLeftThisTurn,
-            }
-          );
-        }
-      }, 1000); // 1 segundo de debounce para dar tempo do servidor responder
-    }
-
-    // Cleanup
-    return () => {
-      if (autoEndTimerRef.current) {
-        clearTimeout(autoEndTimerRef.current);
-        autoEndTimerRef.current = null;
-      }
-    };
-  }, [battle?.currentPlayerId, user?.id, units, endAction]);
-
+  // Usa countdown visual de 3 segundos antes de auto-encerrar
+  // Efeito para iniciar countdown quando condições de auto-end são atendidas
   // Resetar lock de movimento quando unidade termina de mover OU quando há erro
   useEffect(() => {
     // Resetar lock quando movesLeft muda (movimento foi processado)
@@ -425,7 +384,7 @@ const ArenaBattleViewInner: React.FC = () => {
   // Se só temos battleResult (sem battle), mostrar apenas o modal de resultado
   if (!battle && battleResult && user) {
     return (
-      <div className="min-h-screen bg-citadel-obsidian flex items-center justify-center">
+      <div className="min-h-screen bg-cosmos-void flex items-center justify-center">
         <BattleResultModal
           result={battleResult}
           units={battleResult.finalUnits}
@@ -451,6 +410,11 @@ const ArenaBattleViewInner: React.FC = () => {
   const selectedUnit = units.find((u) => u.id === selectedUnitId);
   const myUnits = getControllableUnits(units, user.id);
 
+  // Unidade ativa do jogador (para passar pro TurnNotification)
+  const myActiveUnit = units.find(
+    (u) => isPlayerControllable(u, user.id) && u.isAlive
+  );
+
   // Calcular unidades destacadas como alvos válidos para skill/spell pendente
   const highlightedUnitIds = useMemo(() => {
     const highlighted = new Set<string>();
@@ -472,12 +436,69 @@ const ArenaBattleViewInner: React.FC = () => {
     validTargets.forEach((target) => highlighted.add(target.id));
 
     // Incluir self se skill permite
-    if (skill.targetType === "ALLY" || skill.targetType === "SELF") {
+    if (skill.targetType === "UNIT" || skill.targetType === "SELF") {
       highlighted.add(selectedUnit.id);
     }
 
     return highlighted;
   }, [selectedUnit, pendingAction, units]);
+
+  // Preview de área para spells e skills de área
+  const areaPreview = useMemo(() => {
+    if (!pendingAction || !selectedUnit) return null;
+
+    const casterPos = { x: selectedUnit.posX, y: selectedUnit.posY };
+
+    // Verificar se é uma spell de área
+    if (pendingAction.startsWith("spell:")) {
+      const spellCode = pendingAction.replace("spell:", "");
+      const spell = getSpellByCode(spellCode);
+
+      if (spell?.areaSize) {
+        // Resolver rangeDistance dinamicamente
+        const rangeDistance = spell.rangeDistance
+          ? resolveDynamicValue(spell.rangeDistance, selectedUnit)
+          : undefined;
+
+        return {
+          size:
+            typeof spell.areaSize === "number"
+              ? spell.areaSize
+              : resolveDynamicValue(spell.areaSize, selectedUnit),
+          color: spell.color || "#ff6b35",
+          centerOnSelf: spell.range === "SELF",
+          rangeDistance,
+          casterPos,
+        };
+      }
+      return null;
+    }
+
+    // Verificar se é uma skill de área (não é ação comum)
+    if (!isCommonAction(pendingAction)) {
+      const skill = findSkillByCode(pendingAction);
+
+      if (skill?.areaSize) {
+        // Resolver rangeDistance dinamicamente
+        const rangeDistance = skill.rangeDistance
+          ? resolveDynamicValue(skill.rangeDistance, selectedUnit)
+          : undefined;
+
+        return {
+          size:
+            typeof skill.areaSize === "number"
+              ? skill.areaSize
+              : resolveDynamicValue(skill.areaSize, selectedUnit),
+          color: skill.color || "#4ade80",
+          centerOnSelf: skill.range === "SELF",
+          rangeDistance,
+          casterPos,
+        };
+      }
+    }
+
+    return null;
+  }, [pendingAction, selectedUnit]);
 
   // Determinar meu kingdom e oponentes (suporta múltiplos jogadores)
   const myKingdom = battle.kingdoms.find((k) => k.ownerId === user.id);
@@ -488,9 +509,6 @@ const ArenaBattleViewInner: React.FC = () => {
   // === MOVIMENTAÇÃO COM WASD ===
   const handleKeyboardMove = useCallback(
     (direction: "up" | "down" | "left" | "right") => {
-      // Bloquear durante o modal de início de turno
-      if (isTurnLocked) return;
-
       // Bloquear se já há movimento em andamento
       if (isMovingRef.current) return;
 
@@ -619,9 +637,6 @@ const ArenaBattleViewInner: React.FC = () => {
   }, [handleKeyboardMove]);
 
   const handleUnitClick = (unit: BattleUnit) => {
-    // Bloquear durante o modal de início de turno
-    if (isTurnLocked) return;
-
     console.log(
       "%c[ArenaBattleView] 🎯 Clique em unidade",
       "color: #06b6d4; font-weight: bold;",
@@ -635,6 +650,48 @@ const ArenaBattleViewInner: React.FC = () => {
         pendingAction,
       }
     );
+
+    // Se há uma spell de área pendente (targetType: POSITION), tratar como clique de célula
+    // Isso permite usar spells de área em posições ocupadas por unidades
+    if (pendingAction?.startsWith("spell:") && selectedUnit && isMyTurn) {
+      const spellCode = pendingAction.replace("spell:", "");
+      const spell = getSpellByCode(spellCode);
+
+      if (
+        spell &&
+        (spell.targetType === "POSITION" || spell.targetType === "GROUND") &&
+        spell.areaSize
+      ) {
+        console.log(
+          "%c[ArenaBattleView] 🔮 Spell de área: delegando para handleCellClick",
+          "color: #a855f7;",
+          { spellCode, position: { x: unit.posX, y: unit.posY } }
+        );
+        handleCellClick(unit.posX, unit.posY);
+        return;
+      }
+    }
+
+    // Se há uma skill de área pendente (range: AREA com areaSize), tratar como clique de célula
+    if (
+      pendingAction &&
+      !pendingAction.startsWith("spell:") &&
+      !isCommonAction(pendingAction) &&
+      selectedUnit &&
+      isMyTurn
+    ) {
+      const skillDef = findSkillByCode(pendingAction);
+
+      if (skillDef?.range === "AREA" && skillDef.areaSize) {
+        console.log(
+          "%c[ArenaBattleView] ✨ Skill de área: delegando para handleCellClick",
+          "color: #fbbf24;",
+          { skillCode: pendingAction, position: { x: unit.posX, y: unit.posY } }
+        );
+        handleCellClick(unit.posX, unit.posY);
+        return;
+      }
+    }
 
     // Se há uma ação pendente aguardando alvo
     if (pendingAction === "ATTACK" && selectedUnit && isMyTurn) {
@@ -666,9 +723,7 @@ const ArenaBattleViewInner: React.FC = () => {
 
       if (
         spell &&
-        (spell.targetType === "ALLY" ||
-          spell.targetType === "ENEMY" ||
-          spell.targetType === "ALL")
+        (spell.targetType === "UNIT" || spell.targetType === "ALL")
       ) {
         // Usar validação centralizada
         if (isValidSpellTarget(selectedUnit, spell, unit)) {
@@ -739,7 +794,7 @@ const ArenaBattleViewInner: React.FC = () => {
           const spellCode = pendingAction.replace("spell:", "");
           const spell = getSpellByCode(spellCode);
 
-          if (spell && spell.targetType === "ALLY") {
+          if (spell && spell.targetType === "UNIT") {
             console.log(
               "%c[ArenaBattleView] 🔮 Conjurando spell em si mesmo!",
               "color: #a855f7; font-weight: bold;",
@@ -750,11 +805,11 @@ const ArenaBattleViewInner: React.FC = () => {
             return;
           }
         }
-        // Verificar se é skill ALLY
+        // Verificar se é skill UNIT
         else if (pendingAction !== "ATTACK") {
           const skillDef = findSkillByCode(pendingAction);
 
-          if (skillDef && skillDef.targetType === "ALLY") {
+          if (skillDef && skillDef.targetType === "UNIT") {
             console.log(
               "%c[ArenaBattleView] ✨ Executando skill em si mesmo!",
               "color: #fbbf24; font-weight: bold;",
@@ -840,9 +895,6 @@ const ArenaBattleViewInner: React.FC = () => {
   };
 
   const handleCellClick = (x: number, y: number) => {
-    // Bloquear durante o modal de início de turno
-    if (isTurnLocked) return;
-
     console.log(
       "%c[ArenaBattleView] 🗺️ Clique em célula",
       "color: #8b5cf6; font-weight: bold;",
@@ -925,6 +977,45 @@ const ArenaBattleViewInner: React.FC = () => {
           );
         }
         return;
+      }
+    }
+
+    // Se há uma skill de área pendente (range AREA com areaSize)
+    if (
+      pendingAction &&
+      !pendingAction.startsWith("spell:") &&
+      !isCommonAction(pendingAction) &&
+      selectedUnit
+    ) {
+      const skillDef = findSkillByCode(pendingAction);
+
+      // Skills de área podem ser usadas clicando em qualquer posição válida
+      if (skillDef?.range === "AREA" && skillDef.areaSize) {
+        // Verificar se está dentro do alcance
+        const distance =
+          Math.abs(x - selectedUnit.posX) + Math.abs(y - selectedUnit.posY);
+        const maxRange = skillDef.rangeValue ?? 4; // Padrão 4 se não definido
+
+        if (distance <= maxRange) {
+          console.log(
+            "%c[ArenaBattleView] ✨ Executando skill de área em posição!",
+            "color: #fbbf24; font-weight: bold;",
+            { skillCode: pendingAction, position: { x, y } }
+          );
+          executeAction("use_skill", selectedUnit.id, {
+            skillCode: pendingAction,
+            casterUnitId: selectedUnit.id,
+            targetPosition: { x, y },
+          });
+          setPendingAction(null);
+          return;
+        } else {
+          console.log(
+            "%c[ArenaBattleView] ❌ Posição fora do alcance para skill de área",
+            "color: #ef4444;",
+            { skillCode: pendingAction, distance, maxRange }
+          );
+        }
       }
     }
 
@@ -1093,7 +1184,7 @@ const ArenaBattleViewInner: React.FC = () => {
   };
 
   return (
-    <div className="h-screen w-screen bg-citadel-obsidian flex flex-col overflow-hidden">
+    <div className="h-screen w-screen bg-cosmos-void flex flex-col overflow-hidden">
       {/* Menu de Pausa */}
       <PauseMenu
         isOpen={isPauseMenuOpen}
@@ -1101,49 +1192,47 @@ const ArenaBattleViewInner: React.FC = () => {
         onSurrender={handleSurrender}
       />
 
-      {/* Área Principal - Canvas em tela cheia */}
-      <div className="flex-1 flex min-h-0 relative">
-        {/* Canvas do Grid - Área principal (tela cheia) */}
-        <div className="flex-1 p-2 min-w-0">
-          <div className="w-full h-full bg-citadel-granite rounded-xl border-4 border-metal-iron shadow-stone-raised relative">
-            <ArenaBattleCanvas
-              ref={canvasRef}
-              battle={battle}
-              units={units}
-              currentUserId={user.id}
-              selectedUnitId={selectedUnitId}
-              activeUnitId={battle.activeUnitId}
-              onUnitClick={handleUnitClick}
-              onCellClick={handleCellClick}
-              onObstacleClick={handleObstacleClick}
-              unitDirection={unitDirection}
-              pendingAction={pendingAction}
-              activeBubbles={chatState.activeBubbles}
-              highlightedUnitIds={highlightedUnitIds}
-            />
+      {/* Canvas do Grid - Área principal (tela cheia) */}
+      <div className="w-full h-full bg-surface-900  border border-surface-500/30 shadow-cosmic relative">
+        <ArenaBattleCanvas
+          ref={canvasRef}
+          battle={battle}
+          units={units}
+          currentUserId={user.id}
+          selectedUnitId={selectedUnitId}
+          activeUnitId={battle.activeUnitId}
+          onUnitClick={handleUnitClick}
+          onCellClick={handleCellClick}
+          onObstacleClick={handleObstacleClick}
+          onRightClick={() => setPendingAction(null)}
+          unitDirection={unitDirection}
+          pendingAction={pendingAction}
+          activeBubbles={chatState.activeBubbles}
+          highlightedUnitIds={highlightedUnitIds}
+          spellAreaPreview={areaPreview}
+        />
 
-            {/* BattleHeader - Overlay na parte superior (dentro do Canvas) */}
-            <BattleHeader
-              battle={battle}
-              units={units}
-              currentUserId={user.id}
-              selectedUnitId={selectedUnitId ?? undefined}
-              onUnitClick={handleInitiativeUnitClick}
-            />
+        {/* BattleHeader - Overlay na parte superior (dentro do Canvas) */}
+        <BattleHeader
+          battle={battle}
+          units={units}
+          currentUserId={user.id}
+          selectedUnitId={selectedUnitId ?? undefined}
+          onUnitClick={handleInitiativeUnitClick}
+          onEndTurn={handleEndAction}
+          canEndTurn={isMyTurn && !!selectedUnit}
+        />
 
-            {/* UnitPanel - Overlay na parte inferior (dentro do Canvas) */}
-            <UnitPanel
-              selectedUnit={selectedUnit ?? null}
-              activeUnitId={battle.activeUnitId}
-              isMyTurn={isMyTurn}
-              currentUserId={user.id}
-              pendingAction={pendingAction}
-              onSetPendingAction={setPendingAction}
-              onExecuteAction={handleExecuteSkillAction}
-              onEndAction={handleEndAction}
-            />
-          </div>
-        </div>
+        {/* UnitPanel - Overlay na parte inferior (dentro do Canvas) */}
+        <UnitPanel
+          selectedUnit={selectedUnit ?? null}
+          activeUnitId={battle.activeUnitId}
+          isMyTurn={isMyTurn}
+          currentUserId={user.id}
+          pendingAction={pendingAction}
+          onSetPendingAction={setPendingAction}
+          onExecuteAction={handleExecuteSkillAction}
+        />
       </div>
 
       {/* Modal de Resultado da Batalha (com delay de 1s) */}
@@ -1163,21 +1252,28 @@ const ArenaBattleViewInner: React.FC = () => {
         />
       )}
 
-      {/* Modal de Início de Turno */}
-      <TurnStartModal
-        isVisible={showTurnStartModal}
-        onHide={() => {
-          setShowTurnStartModal(false);
-          setIsTurnLocked(false); // Destravar interações quando modal fechar
-        }}
+      {/* Notificação de Turno (Início e Auto-End) */}
+      <TurnNotification
+        currentPlayerId={battle.currentPlayerId}
+        myUserId={user.id}
         round={battle.round}
-        isMyTurn={isMyTurn}
         isRoundStart={isRoundStart}
         currentPlayerKingdomName={
           isMyTurn
             ? myKingdom?.name ?? "Meu Reino"
             : opponentKingdom?.name ?? "Oponente"
         }
+        myUnitHasStartedAction={myActiveUnit?.hasStartedAction ?? false}
+        myUnitMovesLeft={myActiveUnit?.movesLeft ?? 0}
+        myUnitActionsLeft={myActiveUnit?.actionsLeft ?? 0}
+        myUnitAttacksLeft={myActiveUnit?.attacksLeftThisTurn ?? 0}
+        onEndAction={handleEndAction}
+      />
+
+      {/* Notificação de Seleção de Alvo */}
+      <TargetSelectionNotification
+        pendingAction={pendingAction}
+        onCancel={() => setPendingAction(null)}
       />
 
       {/* Chat de Batalha - Abre com Enter (escondido quando modal de resultado está aberto) */}
@@ -1234,10 +1330,10 @@ const BattleChatUI: React.FC<{
           onClick={openChat}
           className="
             flex items-center gap-2 px-3 py-1.5
-            bg-citadel-obsidian/80 backdrop-blur-sm
-            border border-metal-iron/30 rounded-lg
-            text-parchment-dark hover:text-parchment-light
-            hover:border-metal-bronze/50
+            bg-cosmos-deep/80 backdrop-blur-sm
+            border border-surface-500/30 rounded-lg
+            text-astral-dim hover:text-astral-chrome
+            hover:border-stellar-amber/30
             transition-all text-xs
           "
           title="Pressione Enter para abrir o chat"

@@ -278,13 +278,13 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 }) => (
   <div className="flex flex-col items-center justify-center py-12">
     <div className="relative w-12 h-12">
-      <div className="absolute inset-0 border-3 border-metal-bronze rounded-full animate-spin border-t-transparent" />
+      <div className="absolute inset-0 border-3 border-stellar-amber rounded-full animate-spin border-t-transparent" />
       <div
-        className="absolute inset-2 border-2 border-metal-gold rounded-full animate-spin border-b-transparent"
+        className="absolute inset-2 border-2 border-stellar-gold rounded-full animate-spin border-b-transparent"
         style={{ animationDirection: "reverse" }}
       />
     </div>
-    <p className="text-parchment-dark mt-4">{message}</p>
+    <p className="text-astral-steel mt-4">{message}</p>
   </div>
 );
 
@@ -307,8 +307,8 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({
           idx < currentStep
             ? "bg-green-500"
             : idx === currentStep
-            ? "bg-metal-gold"
-            : "bg-citadel-slate"
+            ? "bg-stellar-gold"
+            : "bg-surface-800"
         }`}
       />
     ))}
@@ -332,15 +332,15 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({
         <span
           className={`text-xs ${
             idx === currentIndex
-              ? "text-metal-gold font-bold"
+              ? "text-stellar-gold font-bold"
               : idx < currentIndex
-              ? "text-parchment-aged"
-              : "text-parchment-dark"
+              ? "text-astral-silver"
+              : "text-astral-steel"
           }`}
         >
           {label}
         </span>
-        {idx < items.length - 1 && <span className="text-metal-iron">→</span>}
+        {idx < items.length - 1 && <span className="text-surface-500">→</span>}
       </React.Fragment>
     ))}
   </div>
@@ -357,7 +357,7 @@ interface ResourceButtonsProps {
 const RESOURCES = [
   { id: "ore", name: "Ore", color: "text-amber-400" },
   { id: "supplies", name: "Supplies", color: "text-green-400" },
-  { id: "arcane", name: "Arcane", color: "text-purple-400" },
+  { id: "arcane", name: "Arcane", color: "text-mystic-glow" },
   { id: "experience", name: "Experience", color: "text-blue-400" },
   { id: "devotion", name: "Devotion", color: "text-yellow-400" },
 ] as const;

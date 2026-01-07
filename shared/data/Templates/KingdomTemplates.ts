@@ -1,24 +1,13 @@
 // shared/data/Templates/KingdomTemplates.ts
 // Templates raw de todos os reinos pré-definidos
 
-import type { Alignment, Race } from "../../types/kingdom.types";
+import type { KingdomTemplateDefinition } from "../../types/units.types";
 import type { TroopTemplateDefinition } from "./TroopTemplates";
 import {
   VALDORIA_TROOPS,
   NYXRATH_TROOPS,
   ASHENVALE_TROOPS,
 } from "./TroopTemplates";
-
-export interface KingdomTemplateDefinition {
-  id: string;
-  name: string;
-  description: string;
-  alignment: Alignment;
-  race: Race;
-  /** Código do regente (referência ao regents.data.ts) */
-  regentCode: string;
-  troopTemplates: TroopTemplateDefinition[];
-}
 
 // ============================================
 // REINO 1: IMPÉRIO SOLAR DE VALDORIA
@@ -73,3 +62,13 @@ O Ninho das Eras é uma cidade impossível — construída nas encostas de vulc�
   regentCode: "REGENT_IGNATHARAX",
   troopTemplates: ASHENVALE_TROOPS,
 };
+
+// =============================================================================
+// ARRAY CONSOLIDADO DE TODOS OS REINOS
+// =============================================================================
+
+export const KINGDOM_TEMPLATES: KingdomTemplateDefinition[] = [
+  VALDORIA,
+  NYXRATH,
+  ASHENVALE,
+];

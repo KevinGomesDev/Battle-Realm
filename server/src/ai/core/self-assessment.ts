@@ -95,7 +95,7 @@ export function canAffordToAttack(
 ): boolean {
   // Se está em estado crítico, só atacar se puder matar
   if (assessment.isCritical) {
-    const estimatedDamage = Math.max(1, unit.combat - target.armor);
+    const estimatedDamage = Math.max(1, unit.combat - target.resistance);
     return target.currentHp <= estimatedDamage * 2;
   }
 
@@ -105,10 +105,10 @@ export function canAffordToAttack(
   }
 
   // Se o alvo pode nos matar em um hit, cuidado
-  const targetDamage = Math.max(1, target.combat - unit.armor);
+  const targetDamage = Math.max(1, target.combat - unit.resistance);
   if (targetDamage >= unit.currentHp) {
     // Só atacar se pudermos matar também
-    const ourDamage = Math.max(1, unit.combat - target.armor);
+    const ourDamage = Math.max(1, unit.combat - target.resistance);
     return ourDamage >= target.currentHp;
   }
 

@@ -7,3 +7,4 @@ export * from "./game";
 export * from "./arena";
 export * from "./events";
 export * from "./chat";
+export * from "./character-creator";

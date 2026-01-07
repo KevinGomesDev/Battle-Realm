@@ -12,7 +12,7 @@ export * from "./core";
 export { AppProvider } from "./providers";
 
 // Services
-export { socketService } from "./services/socket.service";
+export { colyseusService } from "./services/colyseus.service";
 
 // Components
 export { AsyncButton } from "./components/AsyncButton";

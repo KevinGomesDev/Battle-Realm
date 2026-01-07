@@ -14,9 +14,12 @@ import {
 import {
   MAX_HERO_LEVEL,
   calculateLevelUpCost,
-} from "../../../../shared/data/units";
+} from "../../../../shared/data/units.data";
 import { spendResources } from "../turn.utils";
-import { getResourceName } from "../../../../shared/config/global.config";
+import {
+  getResourceName,
+  HP_CONFIG,
+} from "../../../../shared/config/global.config";
 
 // =============================================================================
 // SISTEMA DE XP
@@ -142,7 +145,8 @@ export async function processLevelUp(
     combat: number;
     speed: number;
     focus: number;
-    armor: number;
+    resistance: number;
+    will: number;
     vitality: number;
   }
 ): Promise<{ success: boolean; message: string; unit?: any }> {
@@ -175,7 +179,8 @@ export async function processLevelUp(
     attributeDistribution.combat +
     attributeDistribution.speed +
     attributeDistribution.focus +
-    attributeDistribution.armor +
+    attributeDistribution.resistance +
+    attributeDistribution.will +
     attributeDistribution.vitality;
 
   if (totalDistributed !== pointsPerLevel) {
@@ -201,9 +206,12 @@ export async function processLevelUp(
       combat: unit.combat + attributeDistribution.combat,
       speed: unit.speed + attributeDistribution.speed,
       focus: unit.focus + attributeDistribution.focus,
-      armor: unit.armor + attributeDistribution.armor,
+      resistance: unit.resistance + attributeDistribution.resistance,
+      will: unit.will + attributeDistribution.will,
       vitality: unit.vitality + attributeDistribution.vitality,
-      currentHp: unit.currentHp + attributeDistribution.vitality * 2,
+      maxHp: unit.maxHp + attributeDistribution.vitality * HP_CONFIG.multiplier,
+      currentHp:
+        unit.currentHp + attributeDistribution.vitality * HP_CONFIG.multiplier,
     },
   });
 
@@ -483,7 +491,8 @@ export async function purchaseLevelUp(
     combat: number;
     speed: number;
     focus: number;
-    armor: number;
+    resistance: number;
+    will: number;
     vitality: number;
   }
 ): Promise<{ success: boolean; message: string; unit?: any }> {
@@ -514,7 +523,8 @@ export async function purchaseLevelUp(
     attributeDistribution.combat +
     attributeDistribution.speed +
     attributeDistribution.focus +
-    attributeDistribution.armor +
+    attributeDistribution.resistance +
+    attributeDistribution.will +
     attributeDistribution.vitality;
 
   if (totalDistributed !== pointsPerLevel) {
@@ -550,7 +560,8 @@ export async function purchaseLevelUp(
       combat: unit.combat + attributeDistribution.combat,
       speed: unit.speed + attributeDistribution.speed,
       focus: unit.focus + attributeDistribution.focus,
-      armor: unit.armor + attributeDistribution.armor,
+      resistance: unit.resistance + attributeDistribution.resistance,
+      will: unit.will + attributeDistribution.will,
       vitality: unit.vitality + attributeDistribution.vitality,
       currentHp: unit.currentHp + attributeDistribution.vitality,
     },

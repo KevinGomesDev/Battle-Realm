@@ -35,9 +35,12 @@ export const ArenaList: React.FC<ArenaListProps> = () => {
   const [joiningLobbyId, setJoiningLobbyId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadKingdoms().catch(console.error);
-    listLobbies();
-  }, [loadKingdoms, listLobbies]);
+    // Só carregar se servidor validou autenticação
+    if (authState.isServerValidated) {
+      loadKingdoms().catch(console.error);
+      listLobbies();
+    }
+  }, [authState.isServerValidated, loadKingdoms, listLobbies]);
 
   useEffect(() => {
     if (kingdoms.length > 0 && !selectedKingdom) {
@@ -82,25 +85,23 @@ export const ArenaList: React.FC<ArenaListProps> = () => {
   return (
     <div className="space-y-3">
       {/* Seletor de Reino - Compacto */}
-      <div className="bg-citadel-obsidian/30 border border-metal-iron/30 rounded p-2">
-        <label className="block text-parchment-aged text-[10px] font-semibold mb-1 uppercase tracking-wider">
+      <div className="bg-surface-900/30 border border-surface-500/30 rounded p-2">
+        <label className="block text-surface-300 text-[10px] font-semibold mb-1 uppercase tracking-wider">
           Escolha seu Regente:
         </label>
         {isLoadingKingdoms ? (
-          <div className="text-parchment-dark text-xs flex items-center gap-1">
-            <div className="animate-spin w-3 h-3 border border-metal-bronze border-t-transparent rounded-full" />
+          <div className="text-surface-400 text-xs flex items-center gap-1">
+            <div className="animate-spin w-3 h-3 border border-stellar-amber border-t-transparent rounded-full" />
             Carregando...
           </div>
         ) : kingdoms.length === 0 ? (
-          <div className="text-war-ember text-xs">
-            ⚠️ Funde um reino primeiro
-          </div>
+          <div className="text-red-400 text-xs">⚠️ Funde um reino primeiro</div>
         ) : (
           <select
             value={selectedKingdom}
             onChange={(e) => setSelectedKingdom(e.target.value)}
-            className="w-full px-2 py-1.5 text-xs bg-citadel-obsidian border border-metal-iron/50 rounded
-                       text-parchment-light focus:outline-none focus:border-purple-500 transition-colors"
+            className="w-full px-2 py-1.5 text-xs bg-surface-900 border border-surface-500/50 rounded
+                       text-astral-chrome focus:outline-none focus:border-mystic-sky transition-colors"
           >
             {kingdoms.map((kingdom) => (
               <option key={kingdom.id} value={kingdom.id}>
@@ -113,11 +114,11 @@ export const ArenaList: React.FC<ArenaListProps> = () => {
 
       {/* Erro */}
       {error && (
-        <div className="p-2 bg-war-blood/20 border border-war-crimson/50 rounded flex items-center justify-between">
-          <p className="text-war-ember text-xs">⚠️ {error}</p>
+        <div className="p-2 bg-red-900/20 border border-red-600/50 rounded flex items-center justify-between">
+          <p className="text-red-400 text-xs">⚠️ {error}</p>
           <button
             onClick={clearError}
-            className="text-parchment-dark hover:text-parchment-light text-xs"
+            className="text-surface-400 hover:text-astral-chrome text-xs"
           >
             ✕
           </button>
@@ -129,11 +130,11 @@ export const ArenaList: React.FC<ArenaListProps> = () => {
         onClick={handleCreateLobby}
         disabled={isCreating || !selectedKingdom || kingdoms.length === 0}
         className="w-full py-2 text-xs font-bold uppercase tracking-wider
-                   bg-gradient-to-b from-purple-600 to-purple-800
-                   border border-metal-iron rounded
-                   hover:from-purple-500 hover:to-purple-700
-                   disabled:from-citadel-slate disabled:to-citadel-granite disabled:text-parchment-dark
-                   text-parchment-light transition-all disabled:cursor-not-allowed"
+                   bg-gradient-to-b from-mystic-blue to-mystic-deep
+                   border border-surface-500 rounded
+                   hover:from-mystic-sky hover:to-mystic-blue
+                   disabled:from-surface-800 disabled:to-surface-700 disabled:text-surface-400
+                   text-astral-chrome transition-all disabled:cursor-not-allowed"
       >
         {isCreating ? (
           <span className="flex items-center justify-center gap-2">
@@ -147,25 +148,23 @@ export const ArenaList: React.FC<ArenaListProps> = () => {
 
       {/* Divisor */}
       <div className="flex items-center gap-2">
-        <div className="flex-1 h-px bg-metal-iron/30" />
-        <span className="text-parchment-dark text-[10px] uppercase tracking-wider">
+        <div className="flex-1 h-px bg-surface-500/30" />
+        <span className="text-surface-400 text-[10px] uppercase tracking-wider">
           Arenas Abertas
         </span>
-        <div className="flex-1 h-px bg-metal-iron/30" />
+        <div className="flex-1 h-px bg-surface-500/30" />
       </div>
 
       {/* Lista */}
       {isLoading && lobbies.length === 0 ? (
         <div className="flex items-center justify-center py-4">
-          <div className="animate-spin w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full" />
+          <div className="animate-spin w-5 h-5 border-2 border-mystic-blue border-t-transparent rounded-full" />
         </div>
       ) : lobbies.length === 0 ? (
-        <div className="text-center py-4 bg-citadel-slate/10 rounded border border-dashed border-metal-iron/20">
+        <div className="text-center py-4 bg-surface-800/10 rounded border border-dashed border-surface-500/20">
           <div className="text-xl mb-1">🏟️</div>
-          <p className="text-parchment-dark text-xs">
-            Nenhuma arena disponível
-          </p>
-          <p className="text-parchment-dark/60 text-[10px]">
+          <p className="text-surface-400 text-xs">Nenhuma arena disponível</p>
+          <p className="text-surface-400/60 text-[10px]">
             Crie uma para desafiar!
           </p>
         </div>
@@ -174,15 +173,15 @@ export const ArenaList: React.FC<ArenaListProps> = () => {
           {lobbies.map((lobby: ArenaLobby) => (
             <div
               key={lobby.lobbyId}
-              className="flex items-center justify-between p-2 bg-citadel-slate/20 border border-metal-iron/20 rounded
-                         hover:border-purple-500/30 transition-all"
+              className="flex items-center justify-between p-2 bg-surface-800/20 border border-surface-500/20 rounded
+                         hover:border-mystic-sky/30 transition-all"
             >
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-parchment-light truncate flex items-center gap-1">
-                  <span className="text-purple-400">🏟️</span>
+                <div className="text-xs font-semibold text-astral-chrome truncate flex items-center gap-1">
+                  <span className="text-mystic-glow">🏟️</span>
                   {lobby.hostKingdomName}
                 </div>
-                <div className="text-[10px] text-parchment-dark">
+                <div className="text-[10px] text-surface-400">
                   {lobby.hostUsername} • {formatDate(lobby.createdAt)}
                 </div>
               </div>
@@ -190,11 +189,11 @@ export const ArenaList: React.FC<ArenaListProps> = () => {
                 onClick={() => handleJoinLobby(lobby.lobbyId)}
                 disabled={joiningLobbyId === lobby.lobbyId || !selectedKingdom}
                 className="px-2 py-1 text-[10px] font-semibold
-                           bg-gradient-to-b from-purple-600 to-purple-800
-                           border border-metal-iron/50 rounded
-                           hover:from-purple-500 hover:to-purple-700
-                           disabled:from-citadel-slate disabled:to-citadel-granite
-                           text-parchment-light transition-all disabled:cursor-not-allowed"
+                           bg-gradient-to-b from-mystic-blue to-mystic-deep
+                           border border-surface-500/50 rounded
+                           hover:from-mystic-sky hover:to-mystic-blue
+                           disabled:from-surface-800 disabled:to-surface-700
+                           text-astral-chrome transition-all disabled:cursor-not-allowed"
               >
                 {joiningLobbyId === lobby.lobbyId ? "..." : "⚔️ Desafiar"}
               </button>

@@ -2,7 +2,7 @@
 // Componente de log de eventos da batalha (eventos mantidos apenas em memória)
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { socketService } from "../../../../services/socket.service";
+import { colyseusService } from "../../../../services/colyseus.service";
 import type { GameEvent } from "../../../../../../shared/types/events.types";
 import {
   getCategoryIcon,
@@ -11,7 +11,7 @@ import {
 import { getSeverityColors } from "../../../../config/colors.config";
 
 interface BattleEventLogProps {
-  battleId: string;
+  events: GameEvent[];
   className?: string;
 }
 
@@ -27,14 +27,14 @@ function BattleEventItem({ event }: { event: GameEvent }) {
   const icon = getCategoryIcon(event.category);
 
   return (
-    <div className="flex items-start gap-2 py-1.5 px-2 hover:bg-citadel-obsidian/40 rounded transition-colors">
+    <div className="flex items-start gap-2 py-1.5 px-2 hover:bg-cosmos-deep/40 rounded transition-colors">
       <span className="text-sm flex-shrink-0">{icon}</span>
       <div className="flex-1 min-w-0">
         <span className={`text-sm ${severityColors.text}`}>
           {event.message}
         </span>
       </div>
-      <span className="text-xs text-metal-iron/60 flex-shrink-0">
+      <span className="text-xs text-surface-300/60 flex-shrink-0">
         {formatEventTime(event.timestamp)}
       </span>
     </div>
@@ -43,34 +43,17 @@ function BattleEventItem({ event }: { event: GameEvent }) {
 
 /**
  * Lista de eventos da batalha atual
- * Armazena eventos localmente (não persiste no servidor)
+ * Recebe eventos como prop (estado mantido no componente pai)
  */
 export function BattleEventLog({
-  battleId,
+  events,
   className = "",
 }: BattleEventLogProps) {
-  const [events, setEvents] = useState<GameEvent[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Ouvir eventos de batalha via socket
-  useEffect(() => {
-    const handleNewEvent = (event: GameEvent) => {
-      // Só adiciona eventos desta batalha
-      if (event.battleId === battleId) {
-        setEvents((prev) => [event, ...prev]); // Mais recente primeiro
-      }
-    };
-
-    socketService.on("event:new", handleNewEvent);
-
-    return () => {
-      socketService.off("event:new", handleNewEvent);
-    };
-  }, [battleId]);
 
   if (events.length === 0) {
     return (
-      <div className={`text-center text-metal-iron/60 py-4 ${className}`}>
+      <div className={`text-center text-surface-300/60 py-4 ${className}`}>
         <span className="text-2xl mb-2 block">📜</span>
         <span className="text-sm">Nenhum evento registrado ainda</span>
       </div>
@@ -94,29 +77,64 @@ export function BattleEventLog({
 
 /**
  * Botão sutil para abrir o log de eventos da batalha
- * Posicionado no canto superior direito
+ * Mantém o estado dos eventos aqui para persistir entre abrir/fechar
  */
 export function BattleEventLogButton({ battleId }: BattleEventLogButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [eventCount, setEventCount] = useState(0);
+  const [events, setEvents] = useState<GameEvent[]>([]);
   const [hasNewEvents, setHasNewEvents] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Contar eventos e mostrar indicador de novos
+  // Inscrever na sala de eventos de batalha ao montar e carregar eventos existentes
+  useEffect(() => {
+    // Handler para receber eventos existentes ao se inscrever
+    const handleSubscribed = (data: {
+      success: boolean;
+      context?: string;
+      contextId?: string;
+      events?: GameEvent[];
+    }) => {
+      if (
+        data.success &&
+        data.context === "BATTLE" &&
+        data.contextId === battleId &&
+        data.events
+      ) {
+        setEvents(data.events);
+      }
+    };
+
+    colyseusService.on("event:subscribed", handleSubscribed);
+
+    colyseusService.sendToArena("event:subscribe", {
+      context: "BATTLE",
+      contextId: battleId,
+    });
+
+    return () => {
+      colyseusService.off("event:subscribed", handleSubscribed);
+      colyseusService.sendToArena("event:unsubscribe", {
+        context: "BATTLE",
+        contextId: battleId,
+      });
+    };
+  }, [battleId]);
+
+  // Ouvir novos eventos e armazenar aqui (no componente pai)
   useEffect(() => {
     const handleNewEvent = (event: GameEvent) => {
       if (event.battleId === battleId) {
-        setEventCount((prev) => prev + 1);
+        setEvents((prev) => [event, ...prev]); // Mais recente primeiro
         if (!isOpen) {
           setHasNewEvents(true);
         }
       }
     };
 
-    socketService.on("event:new", handleNewEvent);
+    colyseusService.on("event:new", handleNewEvent);
 
     return () => {
-      socketService.off("event:new", handleNewEvent);
+      colyseusService.off("event:new", handleNewEvent);
     };
   }, [battleId, isOpen]);
 
@@ -147,6 +165,8 @@ export function BattleEventLogButton({ battleId }: BattleEventLogButtonProps) {
     };
   }, [isOpen]);
 
+  const eventCount = events.length;
+
   return (
     <div className="relative" ref={panelRef}>
       {/* Botão */}
@@ -154,13 +174,13 @@ export function BattleEventLogButton({ battleId }: BattleEventLogButtonProps) {
         onClick={handleToggle}
         className={`
           flex items-center gap-1.5 px-2.5 py-1.5
-          bg-citadel-obsidian/70 backdrop-blur-sm
+          bg-cosmos-deep/70 backdrop-blur-sm
           border rounded-lg
           transition-all text-xs
           ${
             isOpen
-              ? "border-metal-bronze/60 text-parchment-light"
-              : "border-metal-iron/30 text-metal-iron hover:text-parchment-dark hover:border-metal-iron/50"
+              ? "border-stellar-amber/60 text-astral-chrome"
+              : "border-surface-500/30 text-surface-300 hover:text-surface-200 hover:border-surface-400/50"
           }
         `}
         title="Log de eventos da batalha"
@@ -174,8 +194,8 @@ export function BattleEventLogButton({ battleId }: BattleEventLogButtonProps) {
               rounded-full text-[10px] font-medium
               ${
                 hasNewEvents
-                  ? "bg-blood-red text-parchment-light animate-pulse"
-                  : "bg-metal-iron/40 text-parchment-dark"
+                  ? "bg-red-500 text-white animate-pulse"
+                  : "bg-surface-500/40 text-surface-200"
               }
             `}
           >
@@ -190,25 +210,25 @@ export function BattleEventLogButton({ battleId }: BattleEventLogButtonProps) {
           className="
             absolute top-full right-0 mt-2
             w-80 max-w-[90vw]
-            bg-citadel-obsidian/95 backdrop-blur-md
-            border border-metal-iron/30 rounded-lg
-            shadow-xl shadow-black/50
+            bg-surface-900/95 backdrop-blur-md
+            border border-surface-500/30 rounded-lg
+            shadow-cosmic
             overflow-hidden
             z-50
           "
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-3 py-2 border-b border-metal-iron/20">
-            <span className="text-sm font-medium text-parchment-light">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-surface-500/20">
+            <span className="text-sm font-medium text-astral-chrome">
               📜 Log de Batalha
             </span>
-            <span className="text-xs text-metal-iron/60">
+            <span className="text-xs text-surface-300/60">
               {eventCount} evento{eventCount !== 1 ? "s" : ""}
             </span>
           </div>
 
           {/* Lista de eventos */}
-          <BattleEventLog battleId={battleId} className="p-1" />
+          <BattleEventLog events={events} className="p-1" />
         </div>
       )}
     </div>

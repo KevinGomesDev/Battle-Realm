@@ -1,7 +1,6 @@
 // server/src/ai/core/action-executor.ts
 // Executor de ações da IA - integra com movement-actions e skill-executors
 
-import type { Server } from "socket.io";
 import type { ArenaBattle } from "../../../../shared/types/arena.types";
 import type { BattleUnit } from "../../../../shared/types/battle.types";
 import type { AIDecision } from "../types/ai.types";
@@ -21,9 +20,16 @@ import {
   logAIDecision,
   getAIUnits,
 } from "./ai-controller";
+import {
+  emitAttackHitEvent,
+  emitAttackDodgedEvent,
+} from "../../logic/combat-events";
 
 // Delay padrão entre ações da IA (ms)
 const AI_ACTION_DELAY = 600;
+
+// Callback type para emissão de eventos
+type AIEventEmitter = (eventType: string, data: unknown) => void;
 
 export interface AIExecutionResult {
   decision: AIDecision;
@@ -151,7 +157,8 @@ function executeAttack(
       commonAction: true,
     } as any,
     "FISICO",
-    undefined
+    undefined,
+    battle.battleId
   );
 
   if (result.success) {
@@ -376,12 +383,11 @@ export function executeAIDecision(
 
 /**
  * Executa o turno completo da IA com delays para visualização
- * Emite eventos via Socket.IO para atualizar clientes
+ * Usa callback para emitir eventos para os clientes
  */
 export async function executeFullAITurn(
   battle: ArenaBattle,
-  io: Server,
-  lobbyId: string
+  emit: AIEventEmitter
 ): Promise<AIExecutionResult[]> {
   const results: AIExecutionResult[] = [];
   const aiUnits = getAIUnits(battle);
@@ -389,7 +395,7 @@ export async function executeFullAITurn(
   console.log(`[AI] Executando turno completo - ${aiUnits.length} unidades`);
 
   // Emitir início do turno da IA
-  io.to(lobbyId).emit("battle:ai-turn-start", {
+  emit("battle:ai-turn-start", {
     battleId: battle.battleId,
     aiUnitsCount: aiUnits.length,
   });
@@ -402,7 +408,7 @@ export async function executeFullAITurn(
     unit.attacksLeftThisTurn = 1;
 
     // Emitir que esta unidade está agindo
-    io.to(lobbyId).emit("battle:ai-unit-acting", {
+    emit("battle:ai-unit-acting", {
       battleId: battle.battleId,
       unitId: unit.id,
       unitName: unit.name,
@@ -430,7 +436,7 @@ export async function executeFullAITurn(
 
       if (result.success) {
         // Emitir ação executada
-        io.to(lobbyId).emit("battle:ai-action", {
+        emit("battle:ai-action", {
           battleId: battle.battleId,
           unitId: unit.id,
           action: decision.type,
@@ -444,6 +450,7 @@ export async function executeFullAITurn(
         // === EMITIR EVENTOS DETALHADOS DE ATAQUE ===
         if (decision.type === "ATTACK" && result.stateChanges?.unitAttacked) {
           const attack = result.stateChanges.unitAttacked;
+          const targetUnit = battle.units.find((u) => u.id === attack.targetId);
 
           // Emitir evento detalhado de ataque (igual ao jogador)
           io.to(lobbyId).emit("battle:unit_attacked", {
@@ -477,43 +484,43 @@ export async function executeFullAITurn(
             dodgeRoll: attack.dodgeRoll,
           });
 
-          // === COMBAT TOASTS ===
-          // Toast de esquiva
-          if (attack.missed && attack.dodged) {
-            io.to(lobbyId).emit("battle:toast", {
-              battleId: battle.battleId,
-              type: "success",
-              title: "💨 Esquivou!",
-              message: `${attack.targetName} desviou do ataque de ${attack.attackerName}!`,
-              duration: 2500,
-            });
-          }
-
-          // Toast de dano ao alvo
-          if (!attack.missed && attack.finalDamage > 0) {
-            io.to(lobbyId).emit("battle:toast", {
-              battleId: battle.battleId,
-              type: "error",
-              title: "⚔️ Ataque!",
-              message: `${attack.attackerName} causou ${attack.finalDamage} de dano em ${attack.targetName}!`,
-              duration: 2000,
-            });
-          }
-
-          // Toast de derrota
-          if (attack.defeated) {
-            io.to(lobbyId).emit("battle:toast", {
-              battleId: battle.battleId,
-              type: "error",
-              title: "💀 Derrotado!",
-              message: `${attack.targetName} foi derrotado por ${attack.attackerName}!`,
-              duration: 3000,
-            });
+          // Emitir eventos de combate para o log de batalha (com visibilidade)
+          if (targetUnit) {
+            if (attack.missed && attack.dodged) {
+              emitAttackDodgedEvent(
+                battle.battleId,
+                unit,
+                targetUnit,
+                battle.units,
+                attack.dodgeChance,
+                attack.dodgeRoll
+              );
+            } else if (!attack.missed) {
+              emitAttackHitEvent(
+                battle.battleId,
+                unit,
+                targetUnit,
+                {
+                  success: true,
+                  rawDamage: attack.rawDamage,
+                  finalDamage: attack.finalDamage,
+                  damageType: attack.damageType,
+                  targetHpAfter: attack.targetHpAfter,
+                  targetDefeated: attack.defeated,
+                  damageReduction: attack.damageReduction,
+                  targetPhysicalProtection: attack.targetPhysicalProtection,
+                  targetMagicalProtection: attack.targetMagicalProtection,
+                  dodgeChance: attack.dodgeChance,
+                  dodgeRoll: attack.dodgeRoll,
+                },
+                battle.units
+              );
+            }
           }
         }
 
         // Emitir estado atualizado da batalha
-        io.to(lobbyId).emit("battle:state-updated", {
+        emit("battle:state-updated", {
           battleId: battle.battleId,
           units: battle.units,
         });
@@ -532,7 +539,7 @@ export async function executeFullAITurn(
   }
 
   // Emitir fim do turno da IA
-  io.to(lobbyId).emit("battle:ai-turn-end", {
+  emit("battle:ai-turn-end", {
     battleId: battle.battleId,
     actionsExecuted: results.length,
   });

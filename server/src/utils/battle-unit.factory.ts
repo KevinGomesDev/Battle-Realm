@@ -3,14 +3,17 @@
 
 import { determineUnitActions } from "../logic/unit-actions";
 import { findSkillByCode } from "../../../shared/data/skills.data";
-import { getRacePassiveCondition } from "../../../shared/data/races";
+import { getRacePassiveCondition } from "../../../shared/data/races.data";
+import { calculateActiveEffects } from "../logic/conditions";
 import {
   PHYSICAL_PROTECTION_CONFIG,
   MAGICAL_PROTECTION_CONFIG,
   HP_CONFIG,
+  MANA_CONFIG,
   getRandomArenaSize,
   getGridDimensions,
   calculateUnitVision,
+  getMaxMarksByCategory,
   type UnitSize,
 } from "../../../shared/config/global.config";
 import type {
@@ -38,9 +41,14 @@ interface DBUnit {
   combat: number;
   speed: number;
   focus: number;
-  armor: number;
+  resistance: number;
+  will: number;
   vitality: number;
   damageReduction: number | null;
+  maxHp: number; // HP máximo (persistido)
+  currentHp: number; // HP atual (persistido)
+  maxMana: number; // Mana máxima (persistida)
+  currentMana: number; // Mana atual (persistida)
   size?: UnitSize | null;
 }
 
@@ -76,6 +84,12 @@ export function createBattleUnit(
 
   // Parse spells do JSON
   const spells: string[] = JSON.parse(dbUnit.spells || "[]");
+  console.log("[BATTLE_UNIT_FACTORY] Creating unit with spells:", {
+    unitId: dbUnit.id,
+    unitName: dbUnit.name,
+    rawSpells: dbUnit.spells,
+    parsedSpells: spells,
+  });
 
   // Parse conditions permanentes do Unit (Nexus)
   const unitConditions: string[] = JSON.parse(dbUnit.conditions || "[]");
@@ -90,7 +104,8 @@ export function createBattleUnit(
       combat: dbUnit.combat,
       speed: dbUnit.speed,
       focus: dbUnit.focus,
-      armor: dbUnit.armor,
+      resistance: dbUnit.resistance,
+      will: dbUnit.will,
       vitality: dbUnit.vitality,
       category: dbUnit.category,
       features: learnedSkills, // Passa skills aprendidas para incluir nas features
@@ -134,29 +149,35 @@ export function createBattleUnit(
     combat: dbUnit.combat,
     speed: dbUnit.speed,
     focus: dbUnit.focus,
-    armor: dbUnit.armor,
+    resistance: dbUnit.resistance,
+    will: dbUnit.will,
     vitality: dbUnit.vitality,
     damageReduction: dbUnit.damageReduction || 0,
-    currentHp: dbUnit.vitality * HP_CONFIG.multiplier,
-    maxHp: dbUnit.vitality * HP_CONFIG.multiplier,
+    // Usar valores armazenados ao invés de recalcular
+    currentHp: dbUnit.currentHp,
+    maxHp: dbUnit.maxHp,
+    currentMana: dbUnit.currentMana,
+    maxMana: dbUnit.maxMana,
     posX: position.x,
     posY: position.y,
     movesLeft: 0,
     actionsLeft: 1,
     attacksLeftThisTurn: 0, // Ataques disponíveis (setado ao usar ação de ataque)
     isAlive: true,
-    actionMarks: 0,
-    // Proteção Física = Armor * PHYSICAL_PROTECTION_CONFIG.multiplier
+    // Action Marks: inicia com valor máximo, decrementa ao usar ação
+    actionMarks: getMaxMarksByCategory(dbUnit.category),
+    // Proteção Física = Resistance * PHYSICAL_PROTECTION_CONFIG.multiplier
     physicalProtection:
-      (dbUnit.armor || 0) * PHYSICAL_PROTECTION_CONFIG.multiplier,
+      (dbUnit.resistance || 0) * PHYSICAL_PROTECTION_CONFIG.multiplier,
     maxPhysicalProtection:
-      (dbUnit.armor || 0) * PHYSICAL_PROTECTION_CONFIG.multiplier,
-    // Proteção Mágica = Focus * MAGICAL_PROTECTION_CONFIG.multiplier
+      (dbUnit.resistance || 0) * PHYSICAL_PROTECTION_CONFIG.multiplier,
+    // Proteção Mágica = Will * MAGICAL_PROTECTION_CONFIG.multiplier
     magicalProtection:
-      (dbUnit.focus || 0) * MAGICAL_PROTECTION_CONFIG.multiplier,
+      (dbUnit.will || 0) * MAGICAL_PROTECTION_CONFIG.multiplier,
     maxMagicalProtection:
-      (dbUnit.focus || 0) * MAGICAL_PROTECTION_CONFIG.multiplier,
+      (dbUnit.will || 0) * MAGICAL_PROTECTION_CONFIG.multiplier,
     conditions: initialConditions, // Condições do Unit + passivas de skills/raça
+    activeEffects: calculateActiveEffects(initialConditions), // Efeitos calculados para o cliente
     spells, // Lista de spells da unidade (copiada do DB)
     hasStartedAction: false,
     // Tamanho da unidade (default: NORMAL 1x1)
@@ -407,7 +428,7 @@ export function createMultiPlayerBattleUnits(
 import {
   type KingdomTemplateDefinition,
   resolveKingdomTemplate,
-} from "../../../shared/data/kingdom-templates";
+} from "../../../shared/data/kingdoms.data";
 
 /**
  * Cria unidades de BOT a partir de um template de reino
@@ -444,9 +465,14 @@ export function createBotUnitsFromTemplate(
     combat: regent.combat,
     speed: regent.speed,
     focus: regent.focus,
-    armor: regent.armor,
+    resistance: regent.resistance,
+    will: regent.will,
     vitality: regent.vitality,
     damageReduction: null,
+    maxHp: regent.vitality * HP_CONFIG.multiplier,
+    currentHp: regent.vitality * HP_CONFIG.multiplier,
+    maxMana: regent.will * MANA_CONFIG.multiplier,
+    currentMana: regent.will * MANA_CONFIG.multiplier,
     size: "NORMAL",
   };
 
@@ -465,7 +491,10 @@ export function createBotUnitsFromTemplate(
 export interface UnitSyncData {
   sourceUnitId: string;
   // Estado de vida
+  maxHp: number;
   currentHp: number;
+  maxMana: number;
+  currentMana: number;
   isAlive: boolean;
   // Condições permanentes (filtra as temporárias)
   conditions: string[];
@@ -496,7 +525,10 @@ export function extractSyncData(battleUnit: BattleUnit): UnitSyncData {
 
   return {
     sourceUnitId: battleUnit.sourceUnitId,
+    maxHp: battleUnit.maxHp,
     currentHp: battleUnit.currentHp,
+    maxMana: battleUnit.maxMana,
+    currentMana: battleUnit.currentMana,
     isAlive: battleUnit.isAlive,
     conditions: permanentConditions,
     // NOTA: unitCooldowns NÃO são sincronizados - cooldowns são por batalha
@@ -512,7 +544,10 @@ export function extractSyncData(battleUnit: BattleUnit): UnitSyncData {
  * NOTA: unitCooldowns NÃO são sincronizados - cooldowns são por batalha
  */
 export function getSyncUpdateData(syncData: UnitSyncData): {
+  maxHp: number;
   currentHp: number;
+  maxMana: number;
+  currentMana: number;
   isAlive: boolean;
   conditions: string;
   spells: string;
@@ -520,7 +555,10 @@ export function getSyncUpdateData(syncData: UnitSyncData): {
   equipment: string;
 } {
   return {
+    maxHp: syncData.maxHp,
     currentHp: syncData.currentHp,
+    maxMana: syncData.maxMana,
+    currentMana: syncData.currentMana,
     isAlive: syncData.isAlive,
     conditions: JSON.stringify(syncData.conditions),
     spells: JSON.stringify(syncData.spells),
@@ -537,4 +575,124 @@ export function extractAllSyncData(battleUnits: BattleUnit[]): UnitSyncData[] {
   return battleUnits
     .filter((unit) => unit.sourceUnitId) // Só unidades que vieram do banco
     .map((unit) => extractSyncData(unit));
+}
+
+/**
+ * Cria unidades de batalha para Arena a partir de um reino
+ * @param kingdom - Dados do reino incluindo unidades e regente
+ * @param ownerId - ID do dono (usuário)
+ * @param playerIndex - Índice do jogador (0 = lado esquerdo, 1+ = lado direito)
+ * @param gridWidth - Largura do grid
+ * @param gridHeight - Altura do grid
+ */
+export async function createBattleUnitsForArena(
+  kingdom: {
+    id: string;
+    name: string;
+    race: string;
+    regent?: {
+      id: string;
+      name: string | null;
+      avatar: string | null;
+      category: string;
+      troopSlot: number | null;
+      level: number;
+      classCode: string | null;
+      features: string | null;
+      equipment: string | null;
+      spells: string | null;
+      conditions: string | null;
+      unitCooldowns: string | null;
+      combat: number;
+      speed: number;
+      focus: number;
+      resistance: number;
+      will: number;
+      vitality: number;
+      damageReduction: number | null;
+      maxHp: number;
+      currentHp: number;
+      maxMana: number;
+      currentMana: number;
+      size?: UnitSize | null;
+    } | null;
+    troops?: Array<{
+      id: string;
+      name: string | null;
+      avatar: string | null;
+      category: string;
+      troopSlot: number | null;
+      level: number;
+      classCode: string | null;
+      features: string | null;
+      equipment: string | null;
+      spells: string | null;
+      conditions: string | null;
+      unitCooldowns: string | null;
+      combat: number;
+      speed: number;
+      focus: number;
+      resistance: number;
+      will: number;
+      vitality: number;
+      damageReduction: number | null;
+      maxHp: number;
+      currentHp: number;
+      maxMana: number;
+      currentMana: number;
+      size?: UnitSize | null;
+    }>;
+  },
+  ownerId: string,
+  playerIndex: number,
+  gridWidth: number,
+  gridHeight: number
+): Promise<BattleUnit[]> {
+  const units: BattleUnit[] = [];
+  const kingdomInfo: KingdomInfo = {
+    id: kingdom.id,
+    name: kingdom.name,
+    race: kingdom.race,
+  };
+
+  // Determinar posição inicial baseado no índice do jogador
+  // Player 0: lado esquerdo (x=0 ou x=1)
+  // Player 1+: lado direito (x=gridWidth-1 ou gridWidth-2)
+  const startX = playerIndex === 0 ? 1 : gridWidth - 2;
+
+  // Adicionar regente primeiro
+  if (kingdom.regent) {
+    const regentPosition = { x: startX, y: Math.floor(gridHeight / 2) };
+    const regentUnit = createBattleUnit(
+      kingdom.regent as DBUnit,
+      ownerId,
+      kingdomInfo,
+      regentPosition,
+      "arena"
+    );
+    units.push(regentUnit);
+  }
+
+  // Adicionar tropas
+  if (kingdom.troops) {
+    const troopCount = kingdom.troops.length;
+    const startY = Math.max(0, Math.floor((gridHeight - troopCount) / 2));
+
+    kingdom.troops.forEach((troop, index) => {
+      // Posicionar tropas verticalmente ao lado do regente
+      const troopX = playerIndex === 0 ? startX + 1 : startX - 1;
+      const troopY = startY + index;
+
+      const troopUnit = createBattleUnit(
+        troop as DBUnit,
+        ownerId,
+        kingdomInfo,
+        { x: troopX, y: troopY },
+        "arena"
+      );
+      units.push(troopUnit);
+    });
+  }
+
+  return units;
 }

@@ -29,7 +29,8 @@ export interface RegentFormData {
     combat: number;
     speed: number;
     focus: number;
-    armor: number;
+    resistance: number;
+    will: number;
     vitality: number;
   };
   initialSkillId?: string; // Skill inicial escolhida

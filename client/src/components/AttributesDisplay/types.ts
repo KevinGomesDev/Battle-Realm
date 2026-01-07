@@ -5,7 +5,8 @@ export interface AttributesDisplayProps {
     combat: number;
     speed: number;
     focus: number;
-    armor: number;
+    resistance: number;
+    will: number;
     vitality: number;
   };
   editable?: boolean;
@@ -14,12 +15,10 @@ export interface AttributesDisplayProps {
   max?: number;
 }
 
-export interface AttributeIconProps {
+export interface AttributeBarProps {
   attributeKey: AttributeKey;
   value: number;
   editable?: boolean;
-  isHovered?: boolean;
-  onHover?: (hovered: boolean) => void;
   onIncrement?: () => void;
   onDecrement?: () => void;
   canIncrement?: boolean;

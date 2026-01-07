@@ -4,17 +4,13 @@
 // Re-exporta templates e fornece funções utilitárias
 
 import type { Alignment } from "../types/kingdom.types";
+import type { RegentTemplate } from "../types/units.types";
 
 // Re-exportar tipos e templates
-export type { RegentTemplate } from "./Templates/RegentTemplates";
+export type { RegentTemplate } from "../types/units.types";
 export { SERAPHINA, MALACHAR, IGNATHARAX } from "./Templates/RegentTemplates";
 
-import {
-  SERAPHINA,
-  MALACHAR,
-  IGNATHARAX,
-  type RegentTemplate,
-} from "./Templates/RegentTemplates";
+import { SERAPHINA, MALACHAR, IGNATHARAX } from "./Templates/RegentTemplates";
 
 // =============================================================================
 // LISTA DE TODOS OS REGENTES
@@ -46,11 +42,16 @@ export function getRegentsByAlignment(alignment: Alignment): RegentTemplate[] {
 
 /**
  * Retorna os atributos totais do regente (soma)
- * Regentes devem ter soma = 30
+ * Regentes devem ter soma = 36
  */
 export function getRegentTotalAttributes(regent: RegentTemplate): number {
   return (
-    regent.combat + regent.speed + regent.focus + regent.armor + regent.vitality
+    regent.combat +
+    regent.speed +
+    regent.focus +
+    regent.resistance +
+    regent.will +
+    regent.vitality
   );
 }
 
@@ -63,6 +64,6 @@ export function validateRegentAttributes(regent: RegentTemplate): {
   expected: number;
 } {
   const total = getRegentTotalAttributes(regent);
-  const expected = 30; // Regentes têm 30 pontos de atributo
+  const expected = 36; // Regentes têm 36 pontos de atributo (6 atributos)
   return { valid: total === expected, total, expected };
 }
