@@ -13,9 +13,9 @@
     "composite": true
   },
   "references": [
-    { "path": "./shared" },
-    { "path": "./server" },
-    { "path": "./client" }
+    { "path": "./apps/shared" },
+    { "path": "./apps/server" },
+    { "path": "./apps/client" }
   ],
   "files": []
 }

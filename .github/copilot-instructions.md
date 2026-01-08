@@ -1,4 +1,5 @@
 # Battle Realm - Guia de Desenvolvimento
+LEIA TUDO NESSE ARQUIVO COM ATENÇÃO, SEMPRE.
 
 ## 🎯 Regras Fundamentais
 
@@ -8,7 +9,7 @@
 - Backend calcula, frontend exibe
 - Reutilizar tipos existentes (NUNCA duplicar)
 - Deletar código não usado (não comentar)
-- Colyseus rooms: padrão `{domain}Room` (ex: ArenaRoom, MatchRoom)
+- Colyseus rooms: padrão `{domain}Room` (ex: BattleRoom, MatchRoom)
 - Mensagens Colyseus: `{domain}:{action}` pattern
 
 ### ❌ NÃO FAZER
@@ -18,7 +19,7 @@
 - Comentar código antigo (deletar)
 - Executar `npm run build/dev` (assumir que estão rodando)
 - Manter arquivos/imports não usados
-- Não crie Docs
+- Criar Docs ou instruções
 - Antes de finalizar a tarefa, confira se não existem erros. Se existirem, corrija-os.
 - NUNCA faça sub-componentes dentro do mesmo arquivo. Sempre separe em arquivos diferentes.
 - NUNCA use Socket.IO - usar Colyseus
@@ -68,23 +69,23 @@ import { colyseusService } from "../services/colyseus.service";
 await colyseusService.connect();
 
 // Criar/entrar em room
-const room = await colyseusService.createArenaLobby({ kingdomId });
+const room = await colyseusService.createBattleLobby({ kingdomId });
 
 // Enviar mensagem
-colyseusService.sendToArena("action:fazer_algo", { data });
+colyseusService.sendToBattle("action:fazer_algo", { data });
 
 // Escutar eventos
-colyseusService.on("arena:state_changed", (state) => {});
+colyseusService.on("battle:state_changed", (state) => {});
 ```
 
 **Client (Hooks/Context):**
 
 ```typescript
 // Usar hooks do core
-import { useArena, useMatch, useColyseus } from "../core";
+import { useBattle, useMatch, useColyseus } from "../core";
 
 function MeuComponente() {
-  const { state, createLobby, moveUnit } = useArena();
+  const { state, createLobby, moveUnit } = useBattle();
   // ...
 }
 ```
@@ -101,7 +102,7 @@ shared/
 
 server/src/
   colyseus/
-    rooms/            # Colyseus Rooms (ArenaRoom, MatchRoom, GlobalRoom)
+    rooms/            # Colyseus Rooms (BattleRoom, MatchRoom, GlobalRoom)
     schemas/          # Colyseus Schemas (estado sincronizado)
     index.ts          # Barrel exports
   logic/              # Lógica pura (combat, conditions, round-control)
@@ -114,7 +115,7 @@ client/src/
     colyseus.service.ts  # Serviço singleton de conexão
   core/
     context/          # ColyseusContext (conexão global)
-    hooks/            # useColyseus, useArena, useMatch
+    hooks/            # useColyseus, useBattle, useMatch
   features/{feature}/ # Componentes, context, hooks por feature
 ```
 

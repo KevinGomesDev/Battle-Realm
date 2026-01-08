@@ -3,9 +3,9 @@
   "version": "2.0.0",
   "private": true,
   "workspaces": [
-    "shared",
-    "server",
-    "client"
+    "apps/shared",
+    "apps/server",
+    "apps/client"
   ],
   "scripts": {
     "dev": "concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
