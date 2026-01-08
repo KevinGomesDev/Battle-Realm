@@ -8,11 +8,11 @@ import {
   createConditionEvent,
   createSkillEvent,
 } from "../match/services/event.service";
-import { EVENT_CODES } from "../../../../shared/types/events.types";
+import { EVENT_CODES } from "@boundless/shared/types/events.types";
 import type { AttackActionResult } from "../abilities/executors";
 import type { MoveActionResult } from "./movement-actions";
-import type { AbilityExecutionResult as SpellExecutionResult } from "../../../../shared/types/ability.types";
-import { BattleUnit } from "../../../../shared/types/battle.types";
+import type { AbilityExecutionResult as SpellExecutionResult } from "@boundless/shared/types/ability.types";
+import { BattleUnit } from "@boundless/shared/types/battle.types";
 
 // =============================================================================
 // EVENTOS DE SKILL

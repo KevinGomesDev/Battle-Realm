@@ -6,8 +6,8 @@ import { audioService } from "../services/audio.service";
 import type {
   AudioSettings,
   SoundPlayOptions,
-} from "../../../shared/types/audio.types";
-import type { SoundId } from "../../../shared/data/sounds.data";
+} from "@boundless/shared/types/audio.types";
+import type { SoundId } from "@boundless/shared/data/sounds.data";
 
 /**
  * Hook principal para controle de áudio

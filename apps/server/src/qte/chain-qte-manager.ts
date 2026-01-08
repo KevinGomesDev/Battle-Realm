@@ -2,7 +2,7 @@
 // Gerenciador de Chain QTE (QTEs em cascata/playlist)
 // Orquestra QTEs pré-calculados com validação por step
 
-import type { BattleUnit } from "../../../shared/types/battle.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import { applyDamage } from "../modules/combat/damage.utils";
 import type {
   ChainQTEConfig,
@@ -11,13 +11,13 @@ import type {
   ChainQTEStepResult,
   ChainQTEResult,
   QTEResultGrade,
-} from "../../../shared/qte";
+} from "@boundless/shared/qte";
 import {
   QTE_TIMEOUT_BUFFER,
   QTE_TOLERANCE_MS,
   CHAIN_COMBO_MULTIPLIERS,
   QTE_FEEDBACK_COLORS,
-} from "../../../shared/qte";
+} from "@boundless/shared/qte";
 
 import { calculateZones, determineResultGrade } from "./qte-processor";
 import type { GetServerTimeFn } from "./qte-manager";

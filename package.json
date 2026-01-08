@@ -8,18 +8,18 @@
     "apps/client"
   ],
   "scripts": {
-    "dev": "concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
-    "dev:server": "npm run dev -w server",
-    "dev:client": "npm run dev -w client",
-    "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
-    "build:server": "npm run build -w server",
-    "build:client": "npm run build -w client",
-    "lint": "npm run lint -w client",
+    "dev": "concurrently -n server,client -c blue,green \"npm run dev -w @boundless/server\" \"npm run dev -w @boundless/client\"",
+    "dev:server": "npm run dev -w @boundless/server",
+    "dev:client": "npm run dev -w @boundless/client",
+    "build": "npm run build -w @boundless/shared && npm run build -w @boundless/server && npm run build -w @boundless/client",
+    "build:server": "npm run build -w @boundless/server",
+    "build:client": "npm run build -w @boundless/client",
+    "lint": "npm run lint -w @boundless/client",
     "typecheck": "tsc -b",
     "clean": "rimraf **/dist **/node_modules/.tmp",
-    "prisma:generate": "npm run prisma:generate -w server",
-    "prisma:migrate": "npm run prisma:migrate -w server",
-    "prisma:studio": "npm run prisma:studio -w server"
+    "prisma:generate": "npm run prisma:generate -w @boundless/server",
+    "prisma:migrate": "npm run prisma:migrate -w @boundless/server",
+    "prisma:studio": "npm run prisma:studio -w @boundless/server"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

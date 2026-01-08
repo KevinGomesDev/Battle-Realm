@@ -1,4 +1,4 @@
-import type { AttributeKey } from "../../../../shared/config";
+import type { AttributeKey } from "@boundless/shared/config";
 
 export interface AttributesDisplayProps {
   attributes: {

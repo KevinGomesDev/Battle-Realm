@@ -7,11 +7,11 @@ export type {
   RegisterData,
   LoginData,
   AuthResponse,
-} from "../../../../../shared/types/auth.types";
+} from "@boundless/shared/types/auth.types";
 
 // ============ FRONTEND-SPECIFIC STATE ============
 
-import type { User } from "../../../../../shared/types/auth.types";
+import type { User } from "@boundless/shared/types/auth.types";
 
 export interface AuthState {
   user: User | null;

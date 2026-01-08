@@ -3,11 +3,11 @@
 
 import { useEffect, useRef } from "react";
 import { useEvents } from "../hooks/useEvents";
-import type { GameEvent } from "../../../../../shared/types/events.types";
+import type { GameEvent } from "@boundless/shared/types/events.types";
 import {
   getCategoryIcon,
   formatEventTime,
-} from "../../../../../shared/types/events.types";
+} from "@boundless/shared/types/events.types";
 import { getSeverityColors } from "../../../config/colors.config";
 import { useEscapeKey } from "../../../hooks/useHotkey";
 

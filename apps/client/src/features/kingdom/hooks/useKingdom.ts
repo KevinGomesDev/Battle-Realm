@@ -6,7 +6,6 @@ import { useKingdomStore } from "../../../stores";
 import { kingdomApi, kingdomStaticApi } from "../api";
 import type {
   KingdomWithRelations,
-  CreateTroopTemplateData,
   RaceDefinition,
   AlignmentDefinition,
   TroopPassiveDefinition,
@@ -23,7 +22,6 @@ export function useKingdom() {
   return {
     // Métodos do store
     createKingdom: store.createKingdom,
-    createFromTemplate: store.createFromTemplate,
     loadKingdoms: store.loadKingdoms,
     selectKingdom: store.selectKingdom,
     clearError: store.clearError,
@@ -94,41 +92,11 @@ export function useKingdomDetails(kingdomId: string | null) {
     }
   }, [kingdomId]);
 
-  const updateTroopTemplates = useCallback(
-    async (templates: CreateTroopTemplateData[]) => {
-      if (!kingdomId) return null;
-
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const response = await kingdomApi.setTroopTemplates(
-          kingdomId,
-          templates
-        );
-        if (!response.success) {
-          throw new Error(response.error);
-        }
-        setKingdom(response.data || null);
-        return response.data;
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Erro ao atualizar tropas";
-        setError(message);
-        return null;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [kingdomId]
-  );
-
   return {
     kingdom,
     isLoading,
     error,
     loadDetails,
-    updateTroopTemplates,
   };
 }
 
@@ -179,11 +147,6 @@ export function useKingdomStaticData() {
 }
 
 // ============ TEMPLATES HOOK ============
-
-import type {
-  KingdomTemplateSummary,
-  KingdomTemplateDetails,
-} from "../types/kingdom.types";
 
 interface TemplatesState {
   templates: KingdomTemplateSummary[];

@@ -1,7 +1,7 @@
 import React from "react";
 import { AvatarSelector } from "./AnimatedCharacterSprite";
 import { AttributesPanel } from "./AttributesPanel";
-import type { AbilityDefinition as SkillDefinition } from "../../../../../../shared/types/ability.types";
+import type { AbilityDefinition as SkillDefinition } from "@boundless/shared/types/ability.types";
 
 type SkillOption = SkillDefinition & { className: string; classColor: string };
 

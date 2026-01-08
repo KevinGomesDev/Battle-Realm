@@ -5,15 +5,15 @@
 import {
   isCellVisibleByUnit,
   isCellVisibleByUnitWithLoS,
-} from "../../../shared/config";
+} from "@boundless/shared/config";
 import type {
   BattleUnit,
   BattleObstacle,
-} from "../../../shared/types/battle.types";
+} from "@boundless/shared/types/battle.types";
 import type {
   ObstacleForLoS,
   UnitForLoS,
-} from "../../../shared/utils/line-of-sight.utils";
+} from "@boundless/shared/utils/line-of-sight.utils";
 
 /**
  * Converte BattleUnit para UnitForLoS

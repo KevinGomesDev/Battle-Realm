@@ -5,7 +5,7 @@
 import type {
   BattleUnit,
   BattleObstacle,
-} from "../../../shared/types/battle.types";
+} from "@boundless/shared/types/battle.types";
 import type {
   QTEConfig,
   QTEResponse,
@@ -14,7 +14,7 @@ import type {
   DodgeDirection,
   QTEInput,
   QTECalculationConfig,
-} from "../../../shared/qte";
+} from "@boundless/shared/qte";
 import {
   DIRECTION_DELTAS,
   OPPOSITE_DIRECTION,
@@ -25,7 +25,7 @@ import {
   QTE_DEFAULT_CONFIG,
   QTE_DAMAGE_MULTIPLIERS,
   PERFECT_DODGE_BUFF,
-} from "../../../shared/qte";
+} from "@boundless/shared/qte";
 
 /**
  * Gera um ID único simples para QTE

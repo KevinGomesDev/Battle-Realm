@@ -6,7 +6,7 @@
 // Todos os tipos de dano (físico, mágico, verdadeiro) passam por aqui.
 // =============================================================================
 
-import type { DamageTypeName } from "../../../../shared/config";
+import type { DamageTypeName } from "@boundless/shared/config";
 
 /**
  * Resultado da aplicação de dano

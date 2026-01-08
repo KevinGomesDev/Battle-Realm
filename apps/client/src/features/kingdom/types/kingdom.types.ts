@@ -25,7 +25,7 @@ export type {
   AlignmentDefinition,
   TroopPassiveDefinition,
   GameClassDefinition,
-} from "../../../../../shared/types/kingdom.types";
+} from "@boundless/shared/types/kingdom.types";
 
 // ============ FRONTEND-SPECIFIC STATE ============
 
@@ -33,7 +33,7 @@ import type {
   KingdomWithRelations,
   KingdomSummary,
   CreateKingdomData,
-} from "../../../../../shared/types/kingdom.types";
+} from "@boundless/shared/types/kingdom.types";
 
 export interface KingdomState {
   kingdom: KingdomWithRelations | null;
@@ -45,7 +45,6 @@ export interface KingdomState {
 export interface KingdomContextType {
   state: KingdomState;
   createKingdom: (data: CreateKingdomData) => Promise<KingdomWithRelations>;
-  createFromTemplate: (templateId: string) => Promise<KingdomWithRelations>;
   loadKingdoms: () => Promise<KingdomSummary[]>;
   selectKingdom: (kingdom: KingdomWithRelations | null) => void;
   clearError: () => void;

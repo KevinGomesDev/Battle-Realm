@@ -4,23 +4,23 @@
 import type {
   AbilityDefinition,
   AbilityExecutionResult,
-} from "../../../../../../shared/types/ability.types";
+} from "@boundless/shared/types/ability.types";
 import type {
   BattleObstacle,
   BattleUnit,
-} from "../../../../../../shared/types/battle.types";
+} from "@boundless/shared/types/battle.types";
 import type {
   SkillExecutionContext,
   AttackActionResult,
   AttackContext,
   QTEResultForExecutor,
 } from "../types";
-import { isWithinRange } from "../../../../../../shared/utils/distance.utils";
+import { isWithinRange } from "@boundless/shared/utils/distance.utils";
 import {
   OBSTACLE_CONFIG,
   DEFENSE_CONFIG,
   type DamageTypeName,
-} from "../../../../../../shared/config";
+} from "@boundless/shared/config";
 import {
   shouldTransferDamageToEidolon,
   transferDamageToEidolon,

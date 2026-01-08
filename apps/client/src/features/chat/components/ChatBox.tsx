@@ -4,7 +4,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useChat } from "../hooks/useChat";
 import { useAuth } from "../../auth";
-import { CHAT_CONFIG } from "../../../../../shared/types/chat.types";
+import { CHAT_CONFIG } from "@boundless/shared/types/chat.types";
 import { Button } from "@/components/Button";
 import { useCommands, isCommand } from "../../commands";
 

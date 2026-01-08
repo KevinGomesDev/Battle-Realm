@@ -3,7 +3,7 @@
 
 import { create } from "zustand";
 import { colyseusService } from "../services/colyseus.service";
-import type { User } from "../../../shared/types/auth.types";
+import type { User } from "@boundless/shared/types/auth.types";
 
 // Tipo da resposta do servidor para login/register
 interface AuthServerResponse {

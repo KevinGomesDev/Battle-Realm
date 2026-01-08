@@ -1,8 +1,8 @@
 // src/utils/turn.utils.ts
 import { prisma } from "../../lib/prisma";
-import { TurnType, TURN_ORDER } from "../../../../shared/data/turns.data";
-import type { PlayerResources } from "../../../../shared/types/match.types";
-import { getResourceName, ResourceKey } from "../../../../shared/config";
+import { TurnType, TURN_ORDER } from "@boundless/shared/data/turns.data";
+import type { PlayerResources } from "@boundless/shared/types/match.types";
+import { getResourceName, ResourceKey } from "@boundless/shared/config";
 
 /**
  * Calcula os recursos que um jogador deve receber no início do Turno de Administração

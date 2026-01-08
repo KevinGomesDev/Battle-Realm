@@ -1,7 +1,7 @@
 import React from "react";
 import { useMatch } from "../hooks/useMatch";
 import { useAuth } from "../../auth";
-import { RESOURCE_NAMES } from "../../../../../shared/config";
+import { RESOURCE_NAMES } from "@boundless/shared/config";
 
 /**
  * Componente que exibe os recursos do jogador atual

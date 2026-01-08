@@ -4,9 +4,9 @@ import {
   getAbilityInfo,
   isCommonAction,
   findAbilityByCode,
-} from "../../../../../../shared/data/abilities.data";
+} from "@boundless/shared/data/abilities.data";
 import type { PendingAbility } from "../../types/pending-ability.types";
-import type { BattleUnit } from "../../../../../../shared/types/battle.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import { AttributesDisplay } from "@/components/AttributesDisplay/index";
 import { Tooltip } from "@/components/Tooltip";
 import {

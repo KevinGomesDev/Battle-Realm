@@ -3,7 +3,7 @@ import { colyseusService } from "../../services/colyseus.service";
 import type {
   RankingData,
   RankingTab,
-} from "../../../../shared/types/ranking.types";
+} from "@boundless/shared/types/ranking.types";
 
 export const Ranking: React.FC = () => {
   const [ranking, setRanking] = useState<RankingData | null>(null);

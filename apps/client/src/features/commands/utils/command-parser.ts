@@ -4,11 +4,11 @@
 import type {
   ParsedCommand,
   CommandPayload,
-} from "../../../../../shared/types/commands.types";
+} from "@boundless/shared/types/commands.types";
 import {
   findCommandByCode,
   ALL_COMMANDS,
-} from "../../../../../shared/data/Templates/CommandsTemplates";
+} from "@boundless/shared/data/Templates/CommandsTemplates";
 
 /**
  * Verifica se uma mensagem de chat é um comando

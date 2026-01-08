@@ -14,7 +14,7 @@ import type {
   GameEvent,
   EventContext as EventContextType,
   EventFilter,
-} from "../../../../../shared/types/events.types";
+} from "@boundless/shared/types/events.types";
 import {
   EventToastContainer,
   type EventToastData,

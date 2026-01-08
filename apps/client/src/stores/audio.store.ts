@@ -6,8 +6,8 @@ import { persist } from "zustand/middleware";
 import type {
   AudioSettings,
   SoundCategory,
-} from "../../../shared/types/audio.types";
-import { DEFAULT_AUDIO_SETTINGS } from "../../../shared/types/audio.types";
+} from "@boundless/shared/types/audio.types";
+import { DEFAULT_AUDIO_SETTINGS } from "@boundless/shared/types/audio.types";
 import { audioService } from "../services/audio.service";
 
 interface AudioState extends AudioSettings {

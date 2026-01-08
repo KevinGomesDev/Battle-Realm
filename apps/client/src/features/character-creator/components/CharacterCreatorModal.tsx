@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   type CharacterConfig,
   DEFAULT_CHARACTER_CONFIG,
-} from "../../../../../shared/types/character.types";
+} from "@boundless/shared/types/character.types";
 import {
   SKIN_PALETTES,
   HAIR_PALETTES,
@@ -19,7 +19,7 @@ import {
   PANTS_STYLES,
   SHOES_STYLES,
   ACCESSORY_STYLES,
-} from "../../../../../shared/data/character-creator";
+} from "@boundless/shared/data/character-creator";
 import { PixelCharacterSVG } from "./PixelCharacterSVG";
 import { ColorPicker } from "./ColorPicker";
 import { StylePicker } from "./StylePicker";

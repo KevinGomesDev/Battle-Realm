@@ -7,21 +7,21 @@ import type {
   AbilityCostTier as SkillCostTier,
   AbilityRange as SkillRange,
   AbilityResourceType as SkillResourceType,
-} from "../../../../shared/types/ability.types";
+} from "@boundless/shared/types/ability.types";
 import {
   DEFAULT_RANGE_VALUES,
   COST_VALUES,
   getAbilityCost as getSkillCost,
-} from "../../../../shared/types/ability.types";
-import { getAbilityMaxRange as getSkillEffectiveRange } from "../../../../shared/utils/ability-validation";
+} from "@boundless/shared/types/ability.types";
+import { getAbilityMaxRange as getSkillEffectiveRange } from "@boundless/shared/utils/ability-validation";
 import {
   HERO_CLASSES,
   getClassByCode,
   getAbilityByCode as getSkillByCode,
   getAbilitiesForClass as getSkillsForClass,
   getAllClassesSummary,
-} from "../../../../shared/data/abilities.data";
-import { getResourceName, ResourceKey } from "../../../../shared/config";
+} from "@boundless/shared/data/abilities.data";
+import { getResourceName, ResourceKey } from "@boundless/shared/config";
 import { prisma } from "../../lib/prisma";
 import { spendResources } from "../match/turn.utils";
 

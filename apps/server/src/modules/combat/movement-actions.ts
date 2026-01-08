@@ -8,8 +8,8 @@ import {
 import type {
   BattleObstacle,
   BattleUnit,
-} from "../../../../shared/types/battle.types";
-import { validateMove } from "../../../../shared/utils/engagement.utils";
+} from "@boundless/shared/types/battle.types";
+import { validateMove } from "@boundless/shared/utils/engagement.utils";
 
 // =============================================================================
 // TIPOS

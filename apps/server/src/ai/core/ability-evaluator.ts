@@ -2,16 +2,16 @@
 // Avaliação UNIFICADA de abilities (skills + spells) para a IA
 // Este arquivo unifica skill-evaluator.ts e spell-evaluator.ts
 
-import { BattleUnit } from "../../../../shared/types/battle.types";
-import type { AbilityDefinition } from "../../../../shared/types/ability.types";
-import { getAbilityMaxRange } from "../../../../shared/utils/ability-validation";
-import { getAbilityByCode } from "../../../../shared/data/abilities.data";
+import { BattleUnit } from "@boundless/shared/types/battle.types";
+import type { AbilityDefinition } from "@boundless/shared/types/ability.types";
 import {
+  getAbilityMaxRange,
   validateAbilityUse,
   getValidAbilityTargets,
   isValidAbilityTarget,
-} from "../../../../shared/utils/ability-validation";
-import { getChebyshevDistance } from "../../../../shared/utils/distance.utils";
+} from "@boundless/shared/utils/ability-validation";
+import { getAbilityByCode } from "@boundless/shared/data/abilities.data";
+import { getChebyshevDistance } from "@boundless/shared/utils/distance.utils";
 import type { AIProfile, AISkillPriority } from "../types/ai.types";
 import { manhattanDistance } from "./pathfinding";
 import { getEnemies, getAllies } from "./target-selection";

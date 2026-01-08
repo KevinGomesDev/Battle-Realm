@@ -7,7 +7,7 @@ import type {
   SessionState,
   ActiveSessionFrontend,
   SessionType,
-} from "../../../shared/types/session.types";
+} from "@boundless/shared/types/session.types";
 
 /**
  * Normaliza o tipo de sessão do backend (UPPER_CASE) para frontend
@@ -18,8 +18,8 @@ function normalizeSessionType(type: string): SessionType | null {
     BATTLE_LOBBY: "BATTLE_LOBBY",
     BATTLE_SESSION: "BATTLE_SESSION",
     match: "MATCH",
-    BATTLE_LOBBY: "BATTLE_LOBBY",
-    BATTLE_SESSION: "BATTLE_SESSION",
+    battle_lobby: "BATTLE_LOBBY",
+    battle_session: "BATTLE_SESSION",
   };
   return typeMap[type] || null;
 }

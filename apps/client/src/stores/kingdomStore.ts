@@ -17,8 +17,9 @@ interface KingdomState {
 }
 
 interface KingdomActions {
-  createKingdom: (data: CreateKingdomData) => Promise<KingdomWithRelations>;
-  createFromTemplate: (templateId: string) => Promise<KingdomWithRelations>;
+  createKingdom: (
+    data: CreateKingdomData | { templateId: string }
+  ) => Promise<KingdomWithRelations>;
   loadKingdoms: () => Promise<KingdomSummary[]>;
   selectKingdom: (kingdom: KingdomWithRelations | null) => void;
   clearError: () => void;
@@ -36,103 +37,72 @@ const initialState: KingdomState = {
   error: null,
 };
 
-export const useKingdomStore = create<KingdomState & KingdomActions>(
-  (set, get) => ({
-    ...initialState,
+export const useKingdomStore = create<KingdomState & KingdomActions>((set) => ({
+  ...initialState,
 
-    setKingdom: (kingdom) => set({ kingdom }),
+  setKingdom: (kingdom) => set({ kingdom }),
 
-    setKingdoms: (kingdoms) => set({ kingdoms }),
+  setKingdoms: (kingdoms) => set({ kingdoms }),
 
-    setLoading: (isLoading) => set({ isLoading }),
+  setLoading: (isLoading) => set({ isLoading }),
 
-    setError: (error) => set({ error }),
+  setError: (error) => set({ error }),
 
-    reset: () => set(initialState),
+  reset: () => set(initialState),
 
-    clearError: () => set({ error: null }),
+  clearError: () => set({ error: null }),
 
-    selectKingdom: (kingdom) => set({ kingdom }),
+  selectKingdom: (kingdom) => set({ kingdom }),
 
-    createKingdom: async (data) => {
-      set({ isLoading: true, error: null });
+  createKingdom: async (data) => {
+    set({ isLoading: true, error: null });
 
-      try {
-        const response = await kingdomApi.create(data);
+    try {
+      const response = await kingdomApi.create(data);
 
-        if (!response.success || !response.data) {
-          throw new Error(response.error || "Erro ao criar reino");
-        }
-
-        set({ kingdom: response.data });
-
-        // Atualiza lista de reinos
-        const listResponse = await kingdomApi.list();
-        if (listResponse.success && listResponse.data) {
-          set({ kingdoms: listResponse.data });
-        }
-
-        return response.data;
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Erro ao criar reino";
-        set({ error: message });
-        throw error;
-      } finally {
-        set({ isLoading: false });
+      if (!response.success || !response.data) {
+        throw new Error(response.error || "Erro ao criar reino");
       }
-    },
 
-    createFromTemplate: async (templateId) => {
-      set({ isLoading: true, error: null });
+      set({ kingdom: response.data.kingdom });
 
-      try {
-        const response = await kingdomApi.createFromTemplate(templateId);
-
-        if (!response.success || !response.data) {
-          throw new Error(response.error || "Erro ao criar reino do template");
-        }
-
-        set({ kingdom: response.data.kingdom });
-
-        // Atualiza lista de reinos
-        const listResponse = await kingdomApi.list();
-        if (listResponse.success && listResponse.data) {
-          set({ kingdoms: listResponse.data });
-        }
-
-        return response.data.kingdom;
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Erro ao criar reino";
-        set({ error: message });
-        throw error;
-      } finally {
-        set({ isLoading: false });
+      // Atualiza lista de reinos
+      const listResponse = await kingdomApi.list();
+      if (listResponse.success && listResponse.data) {
+        set({ kingdoms: listResponse.data });
       }
-    },
 
-    loadKingdoms: async () => {
-      set({ isLoading: true, error: null });
+      return response.data.kingdom;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Erro ao criar reino";
+      set({ error: message });
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
 
-      try {
-        const response = await kingdomApi.list();
+  loadKingdoms: async () => {
+    set({ isLoading: true, error: null });
 
-        if (!response.success) {
-          throw new Error(response.error || "Erro ao carregar reinos");
-        }
+    try {
+      const response = await kingdomApi.list();
 
-        const kingdoms = response.data || [];
-        set({ kingdoms });
-        return kingdoms;
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Erro ao carregar reinos";
-        set({ error: message });
-        throw error;
-      } finally {
-        set({ isLoading: false });
+      if (!response.success) {
+        throw new Error(response.error || "Erro ao carregar reinos");
       }
-    },
-  })
-);
+
+      const kingdoms = response.data || [];
+      set({ kingdoms });
+      return kingdoms;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Erro ao carregar reinos";
+      set({ error: message });
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+}));

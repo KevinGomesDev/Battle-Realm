@@ -14,17 +14,17 @@ import type {
   BattleUnitState,
   BattleObstacleState,
 } from "@/services/colyseus.service";
-import type { ObstacleType } from "../../../../../../shared/types/battle.types";
-import { getObstacleVisualConfig } from "../../../../../../shared/config";
+import type { ObstacleType } from "@boundless/shared/types/battle.types";
+import { getObstacleVisualConfig } from "@boundless/shared/config";
 import {
   getFullMovementInfo,
   type MovementCellInfo,
-} from "../../../../../../shared/utils/engagement.utils";
+} from "@boundless/shared/utils/engagement.utils";
 import {
   hasLineOfSight,
   obstaclesToBlockers,
   unitsToBlockers,
-} from "../../../../../../shared/utils/line-of-sight.utils";
+} from "@boundless/shared/utils/line-of-sight.utils";
 import { useSprites, updateSpriteFrame } from "./useSprites";
 import { useUnitAnimations } from "./useUnitAnimations";
 import { UI_COLORS, UNIT_RENDER_CONFIG } from "./canvas.constants";
@@ -34,7 +34,7 @@ import {
   type CameraControllerRef,
 } from "../../../../components/CameraController";
 import { isPlayerControllable } from "../../utils/unit-control";
-import type { TargetingPreview } from "../../../../../../shared/utils/targeting.utils";
+import type { TargetingPreview } from "@boundless/shared/utils/targeting.utils";
 
 // Re-export SpriteDirection for external use
 export type { SpriteDirection };

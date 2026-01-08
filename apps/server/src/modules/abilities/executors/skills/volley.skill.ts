@@ -4,11 +4,11 @@
 import type {
   AbilityDefinition,
   AbilityExecutionResult,
-} from "../../../../../../shared/types/ability.types";
-import { resolveDynamicValue } from "../../../../../../shared/types/ability.types";
-import type { BattleUnit } from "../../../../../../shared/types/battle.types";
+} from "@boundless/shared/types/ability.types";
+import { resolveDynamicValue } from "@boundless/shared/types/ability.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import type { SkillExecutionContext } from "../types";
-import { getManhattanDistance } from "../../../../../../shared/utils/distance.utils";
+import { getManhattanDistance } from "@boundless/shared/utils/distance.utils";
 import { applyDamage } from "../../../combat/damage.utils";
 import { processUnitDeath } from "../../../combat/death-logic";
 

@@ -52,10 +52,12 @@ export function KingdomProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(kingdomReducer, initialState);
 
   /**
-   * Cria um novo reino customizado
+   * Cria um novo reino (customizado ou a partir de template)
    */
   const createKingdom = useCallback(
-    async (data: CreateKingdomData): Promise<KingdomWithRelations> => {
+    async (
+      data: CreateKingdomData | { templateId: string }
+    ): Promise<KingdomWithRelations> => {
       dispatch({ type: "SET_LOADING", payload: true });
       dispatch({ type: "SET_ERROR", payload: null });
 
@@ -64,42 +66,6 @@ export function KingdomProvider({ children }: { children: React.ReactNode }) {
 
         if (!response.success || !response.data) {
           throw new Error(response.error || "Erro ao criar reino");
-        }
-
-        dispatch({ type: "SET_KINGDOM", payload: response.data });
-
-        // Atualiza lista de reinos
-        const listResponse = await kingdomApi.list();
-        if (listResponse.success && listResponse.data) {
-          dispatch({ type: "SET_KINGDOMS", payload: listResponse.data });
-        }
-
-        return response.data;
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Erro ao criar reino";
-        dispatch({ type: "SET_ERROR", payload: message });
-        throw error;
-      } finally {
-        dispatch({ type: "SET_LOADING", payload: false });
-      }
-    },
-    []
-  );
-
-  /**
-   * Cria um reino a partir de um template pré-definido
-   */
-  const createFromTemplate = useCallback(
-    async (templateId: string): Promise<KingdomWithRelations> => {
-      dispatch({ type: "SET_LOADING", payload: true });
-      dispatch({ type: "SET_ERROR", payload: null });
-
-      try {
-        const response = await kingdomApi.createFromTemplate(templateId);
-
-        if (!response.success || !response.data) {
-          throw new Error(response.error || "Erro ao criar reino do template");
         }
 
         dispatch({ type: "SET_KINGDOM", payload: response.data.kingdom });
@@ -169,19 +135,11 @@ export function KingdomProvider({ children }: { children: React.ReactNode }) {
     () => ({
       state,
       createKingdom,
-      createFromTemplate,
       loadKingdoms,
       selectKingdom,
       clearError,
     }),
-    [
-      state,
-      createKingdom,
-      createFromTemplate,
-      loadKingdoms,
-      selectKingdom,
-      clearError,
-    ]
+    [state, createKingdom, loadKingdoms, selectKingdom, clearError]
   );
 
   return (

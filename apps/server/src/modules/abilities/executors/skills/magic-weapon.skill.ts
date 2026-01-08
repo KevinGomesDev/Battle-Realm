@@ -4,9 +4,9 @@
 import type {
   AbilityDefinition,
   AbilityExecutionResult,
-} from "../../../../../../shared/types/ability.types";
-import type { BattleUnit } from "../../../../../../shared/types/battle.types";
-import { isAdjacentOmnidirectional } from "../../../../../../shared/utils/distance.utils";
+} from "@boundless/shared/types/ability.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
+import { isAdjacentOmnidirectional } from "@boundless/shared/utils/distance.utils";
 
 /**
  * MAGIC_WEAPON: Imbuí a arma de uma Unidade adjacente com Magia

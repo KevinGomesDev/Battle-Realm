@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { ErrorAlert, SuccessAlert } from "@/components/Alerts";
 import { Button } from "@/components/Button";
-import type { AuthFormData } from "../../../shared/types/auth.types";
+import type { AuthFormData } from "@boundless/shared/types/auth.types";
 
 // Re-export for backwards compatibility
-export type { AuthFormData } from "../../../shared/types/auth.types";
+export type { AuthFormData } from "@boundless/shared/types/auth.types";
 
 interface AuthFormProps {
   mode: "login" | "register";

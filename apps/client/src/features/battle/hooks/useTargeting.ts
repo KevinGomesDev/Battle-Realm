@@ -12,7 +12,7 @@ import {
   type GridContext,
   type UnitStats,
   type TargetingCell,
-} from "../../../../../shared/utils/targeting.utils";
+} from "@boundless/shared/utils/targeting.utils";
 import type { PendingAbility } from "../types/pending-ability.types";
 
 /**

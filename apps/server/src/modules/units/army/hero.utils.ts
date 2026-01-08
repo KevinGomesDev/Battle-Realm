@@ -7,13 +7,13 @@ import {
   getResourceName,
   HP_CONFIG,
   MANA_CONFIG,
-} from "../../../../../shared/config";
-import { MAX_HEROES_PER_KINGDOM } from "../../../../../shared/data/units.data";
+} from "@boundless/shared/config";
+import { MAX_HEROES_PER_KINGDOM } from "@boundless/shared/data/units.data";
 import {
   HERO_TEMPLATES,
   getHeroTemplate,
   type HeroTemplate,
-} from "../../../../../shared/data/heroes.data";
+} from "@boundless/shared/data/heroes.data";
 
 // Re-export funções genéricas de unit.utils.ts para compatibilidade
 export {

@@ -1,7 +1,7 @@
 // server/src/ai/behaviors/defensive.behavior.ts
 // Comportamento Defensivo: Protege posição, contra-ataca
 
-import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
+import type { AbilityDefinition as SkillDefinition } from "@boundless/shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,
@@ -19,7 +19,7 @@ import {
   countThreatsAtPosition,
 } from "../core/target-selection";
 import { selectBestSkill } from "../core/skill-evaluator";
-import { BattleUnit } from "../../../../shared/types/battle.types";
+import { BattleUnit } from "@boundless/shared/types/battle.types";
 import {
   tryRetreat,
   tryDash,

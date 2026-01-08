@@ -1,7 +1,7 @@
 // server/src/logic/MapGenerator.ts
 import { Delaunay } from "d3-delaunay";
 import { BiomeGenerator } from "./BiomeGenerator";
-import { type TerrainType } from "../../../../shared/config";
+import { type TerrainType } from "@boundless/shared/config";
 
 // Tipos de tamanho compatíveis com o enum do Prisma
 export type TerritorySize = "SMALL" | "MEDIUM" | "LARGE";

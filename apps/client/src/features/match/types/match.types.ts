@@ -12,10 +12,10 @@ export type {
   CompleteMatchState,
   MatchMapData,
   PreparationData,
-} from "../../../../../shared/types/match.types";
+} from "@boundless/shared/types/match.types";
 
 // Re-export Territory from map.types for backwards compatibility
-export type { Territory } from "../../../../../shared/types/map.types";
+export type { Territory } from "@boundless/shared/types/map.types";
 
 // ============ FRONTEND-SPECIFIC STATE ============
 
@@ -25,7 +25,7 @@ import type {
   PreparationData,
   MatchMapData,
   CompleteMatchState,
-} from "../../../../../shared/types/match.types";
+} from "@boundless/shared/types/match.types";
 
 export interface MatchState {
   currentMatch: Match | null;

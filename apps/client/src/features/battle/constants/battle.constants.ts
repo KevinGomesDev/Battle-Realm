@@ -6,7 +6,7 @@
 export {
   CONDITIONS_INFO,
   getConditionInfo,
-} from "../../../../../shared/data/conditions.data";
+} from "@boundless/shared/data/conditions.data";
 
 // Re-exportar funções de skills/ações do shared (fonte de verdade)
 export {
@@ -14,7 +14,7 @@ export {
   getCommonActions,
   getCommonActionCodes,
   getSkillInfo,
-} from "../../../../../shared/data/abilities.data";
+} from "@boundless/shared/data/abilities.data";
 
 // Importar cores centralizadas
 import {
@@ -26,7 +26,7 @@ import {
 import {
   COMMON_ACTIONS,
   getSkillInfo,
-} from "../../../../../shared/data/abilities.data";
+} from "@boundless/shared/data/abilities.data";
 
 /**
  * Informações sobre ações disponíveis (formato legado para compatibilidade)

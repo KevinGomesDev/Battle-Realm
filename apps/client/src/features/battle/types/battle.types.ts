@@ -26,9 +26,9 @@ export type {
   UnitMovedResponse,
   UnitAttackedResponse,
   BattleEndedResponse,
-} from "../../../../../shared/types/battle-lobby.types";
+} from "@boundless/shared/types/battle-lobby.types";
 
-export type { BattleUnit } from "../../../../../shared/types/battle.types";
+export type { BattleUnit } from "@boundless/shared/types/battle.types";
 
 // =============================================================================
 // TIPOS ESPECÍFICOS DO CLIENTE
@@ -39,8 +39,8 @@ import type {
   BattleLobbyStatus,
   BattleSession,
   BattleSessionResult,
-} from "../../../../../shared/types/battle-lobby.types";
-import type { BattleUnit } from "../../../../../shared/types/battle.types";
+} from "@boundless/shared/types/battle-lobby.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 
 /**
  * Estado global do contexto Battle

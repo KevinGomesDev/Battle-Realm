@@ -3,7 +3,7 @@
 // Simplificado: não tenta seguir unidades no canvas, mas mostra nome da unidade
 
 import React, { useMemo, useEffect, useState } from "react";
-import type { BattleUnit } from "../../../../../shared/types/battle.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 
 interface ActiveBubble {
   message: string;

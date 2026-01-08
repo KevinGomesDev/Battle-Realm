@@ -4,10 +4,10 @@ import {
   CONSTRUCTION_COSTS,
   MAX_CONSTRUCTIONS_PER_TERRITORY,
   MAX_FORTRESSES_PER_TERRITORY,
-} from "../../../../shared/data/turns.data";
-import { STRUCTURE_DEFINITIONS } from "../../../../shared/data/structures.data";
+} from "@boundless/shared/data/turns.data";
+import { STRUCTURE_DEFINITIONS } from "@boundless/shared/data/structures.data";
 import { spendResources } from "./turn.utils";
-import { getResourceName } from "../../../../shared/config";
+import { getResourceName } from "@boundless/shared/config";
 
 /**
  * Verifica se um jogador pode construir em um território

@@ -2,7 +2,7 @@
 import jwt from "jsonwebtoken";
 
 // Em produção, use uma variável de ambiente segura
-const JWT_SECRET = process.env.JWT_SECRET!;
+const JWT_SECRET = process.env.JWT_SECRET || "battle-realm-dev-secret";
 const JWT_EXPIRES_IN = "7d"; // Token expira em 7 dias
 
 export interface JwtPayload {

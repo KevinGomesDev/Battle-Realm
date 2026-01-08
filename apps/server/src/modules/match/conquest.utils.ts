@@ -3,8 +3,8 @@
 import {
   TERRITORY_CHALLENGES,
   TerritoryChallenge,
-} from "../../../../shared/data/events.data";
-import { ALL_ATTRIBUTE_KEYS, AttributeKey } from "../../../../shared/config";
+} from "@boundless/shared/data/events.data";
+import { ALL_ATTRIBUTE_KEYS, AttributeKey } from "@boundless/shared/config";
 
 // Attributes usable for conquest tests (usa config global)
 export const CONQUEST_ATTRIBUTES = ALL_ATTRIBUTE_KEYS;

@@ -1,14 +1,14 @@
 // server/src/ai/core/spell-evaluator.ts
 // Avalia��o e sele��o de spells para a IA
 
-import { BattleUnit } from "../../../../shared/types/battle.types";
-import type { AbilityDefinition as SpellDefinition } from "../../../../shared/types/ability.types";
-import { getAbilityByCode as getSpellByCode } from "../../../../shared/data/abilities.data";
+import { BattleUnit } from "@boundless/shared/types/battle.types";
+import type { AbilityDefinition as SpellDefinition } from "@boundless/shared/types/ability.types";
+import { getAbilityByCode as getSpellByCode } from "@boundless/shared/data/abilities.data";
 import {
   validateAbilityUse as validateSpellUse,
   getValidAbilityTargets as getValidSpellTargets,
-} from "../../../../shared/utils/ability-validation";
-import { getChebyshevDistance } from "../../../../shared/utils/distance.utils";
+} from "@boundless/shared/utils/ability-validation";
+import { getChebyshevDistance } from "@boundless/shared/utils/distance.utils";
 import type { AIProfile } from "../types/ai.types";
 import { getEnemies, getAllies } from "./target-selection";
 

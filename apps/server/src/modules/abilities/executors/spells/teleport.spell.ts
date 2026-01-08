@@ -5,8 +5,8 @@ import type {
   AbilityDefinition,
   AbilityExecutionResult,
   AbilityExecutionContext,
-} from "../../../../../../shared/types/ability.types";
-import type { BattleUnit } from "../../../../../../shared/types/battle.types";
+} from "@boundless/shared/types/ability.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 
 /**
  * 🌀 TELEPORT - Move instantaneamente para uma posição

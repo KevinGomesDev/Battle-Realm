@@ -3,7 +3,7 @@ import { prisma } from "../../lib/prisma";
 import {
   MOVEMENT_COST_BETWEEN_TERRITORIES,
   MOVEMENT_WITHIN_TERRITORY_COST,
-} from "../../../../shared/data/turns.data";
+} from "@boundless/shared/data/turns.data";
 import { spendResources } from "./turn.utils";
 
 /**

@@ -25,14 +25,14 @@ import { FullScreenLoading } from "@/components/FullScreenLoading";
 import { useChatStore } from "../../../stores";
 import { useChat } from "../../chat";
 import { ChatBox } from "../../chat/components/ChatBox";
-import type { BattleUnit } from "../../../../../shared/types/battle.types";
-import { findAbilityByCode } from "../../../../../shared/data/abilities.data";
-import { resolveDynamicValue } from "../../../../../shared/types/ability.types";
-import { getFullMovementInfo } from "../../../../../shared/utils/engagement.utils";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
+import { findAbilityByCode } from "@boundless/shared/data/abilities.data";
+import { resolveDynamicValue } from "@boundless/shared/types/ability.types";
+import { getFullMovementInfo } from "@boundless/shared/utils/engagement.utils";
 import {
   isValidAbilityTarget,
   isValidAbilityPosition,
-} from "../../../../../shared/utils/ability-validation";
+} from "@boundless/shared/utils/ability-validation";
 import { useTargeting } from "../hooks/useTargeting";
 import { colyseusService } from "../../../services/colyseus.service";
 import {

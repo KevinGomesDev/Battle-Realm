@@ -7,11 +7,11 @@ import type {
   CommandPayload,
   CommandResult,
   CommandDefinition,
-} from "../../../../../shared/types/commands.types";
+} from "@boundless/shared/types/commands.types";
 import {
   findCommandByCode,
   COMMANDS_MAP,
-} from "../../../../../shared/data/Templates/CommandsTemplates";
+} from "@boundless/shared/data/Templates/CommandsTemplates";
 
 // Forward declaration - será importado pelo index
 let COMMAND_EXECUTORS: Record<string, CommandExecutorFn> = {};

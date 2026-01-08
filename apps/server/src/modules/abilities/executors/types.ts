@@ -4,11 +4,11 @@
 import type {
   AbilityDefinition,
   AbilityExecutionResult,
-} from "../../../../../shared/types/ability.types";
+} from "@boundless/shared/types/ability.types";
 import type {
   BattleObstacle,
   BattleUnit,
-} from "../../../../../shared/types/battle.types";
+} from "@boundless/shared/types/battle.types";
 
 // =============================================================================
 // SKILL TYPES

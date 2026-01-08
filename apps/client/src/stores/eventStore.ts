@@ -7,7 +7,7 @@ import type {
   GameEvent,
   EventContext,
   EventFilter,
-} from "../../../shared/types/events.types";
+} from "@boundless/shared/types/events.types";
 
 export interface EventToastData {
   id: string;

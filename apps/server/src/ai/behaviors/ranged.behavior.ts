@@ -1,8 +1,8 @@
 // server/src/ai/behaviors/ranged.behavior.ts
 // Comportamento Ranged: Mantém distância, ataca de longe
 
-import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
-import { resolveDynamicValue } from "../../../../shared/types/ability.types";
+import type { AbilityDefinition as SkillDefinition } from "@boundless/shared/types/ability.types";
+import { resolveDynamicValue } from "@boundless/shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,
@@ -12,7 +12,7 @@ import type {
 import { manhattanDistance, findPositionAtRange } from "../core/pathfinding";
 import { selectBestTarget, findNearestEnemy } from "../core/target-selection";
 import { selectBestSkill } from "../core/skill-evaluator";
-import { BattleUnit } from "../../../../shared/types/battle.types";
+import { BattleUnit } from "@boundless/shared/types/battle.types";
 import {
   tryRetreat,
   tryDash,

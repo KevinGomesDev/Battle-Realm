@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useSession } from "./useSession";
 import { useAuth } from "../../features/auth";
 import { useBattleOptional } from "../../features/battle";
-import type { SessionGuardState } from "../../../../shared/types/session.types";
+import type { SessionGuardState } from "@boundless/shared/types/session.types";
 
 // ============================================
 // Types

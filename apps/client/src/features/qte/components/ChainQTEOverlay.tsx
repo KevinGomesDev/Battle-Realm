@@ -10,7 +10,7 @@ import type {
   ChainQTEStepResult,
   QTEInput,
   QTEResultGrade,
-} from "../../../../../shared/qte";
+} from "@boundless/shared/qte";
 
 // =============================================================================
 // PROPS

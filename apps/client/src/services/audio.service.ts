@@ -7,9 +7,9 @@ import type {
   SoundPlayOptions,
   AudioSettings,
   SoundCategory,
-} from "../../../shared/types/audio.types";
-import { DEFAULT_AUDIO_SETTINGS } from "../../../shared/types/audio.types";
-import { ALL_SOUNDS, type SoundId } from "../../../shared/data/sounds.data";
+} from "@boundless/shared/types/audio.types";
+import { DEFAULT_AUDIO_SETTINGS } from "@boundless/shared/types/audio.types";
+import { ALL_SOUNDS, type SoundId } from "@boundless/shared/data/sounds.data";
 
 const STORAGE_KEY = "boundless-audio-settings";
 

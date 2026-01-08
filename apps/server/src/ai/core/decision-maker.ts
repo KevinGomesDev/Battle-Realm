@@ -1,7 +1,7 @@
 // server/src/ai/core/decision-maker.ts
 // Tomador de decisões principal da IA
 
-import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
+import type { AbilityDefinition as SkillDefinition } from "@boundless/shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,
@@ -34,7 +34,7 @@ import {
   safetyLogger,
   SafeIterator,
 } from "./safety-guards";
-import { BattleUnit } from "../../../../shared/types/battle.types";
+import { BattleUnit } from "@boundless/shared/types/battle.types";
 
 /**
  * Determina o perfil de IA para uma unidade baseado no seu tipo

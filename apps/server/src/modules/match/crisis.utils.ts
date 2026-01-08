@@ -3,14 +3,14 @@ import { prisma } from "../../lib/prisma";
 import {
   TributeDecision,
   CRISIS_METER_MAX,
-} from "../../../../shared/data/crisis.data";
+} from "@boundless/shared/data/crisis.data";
 import type {
   TributeSubmission,
   TributePileResult,
-} from "../../../../shared/types/match.types";
-import type { ResourceType } from "../../../../shared/types/kingdom.types";
+} from "@boundless/shared/types/match.types";
+import type { ResourceType } from "@boundless/shared/types/kingdom.types";
 import { restorePlayerResources } from "./turn.utils";
-import { getResourceName, ResourceKey } from "../../../../shared/config";
+import { getResourceName, ResourceKey } from "@boundless/shared/config";
 
 /**
  * Calcula o resultado da Pilha de Tributo baseado nas decisões dos jogadores

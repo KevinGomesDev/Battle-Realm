@@ -2,7 +2,7 @@ import React from "react";
 import {
   ATTRIBUTE_NAMES,
   type AttributeKey,
-} from "../../../../../../shared/config";
+} from "@boundless/shared/config";
 
 type AttributeInfo = {
   name: string;

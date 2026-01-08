@@ -1,8 +1,8 @@
 // server/src/logic/death-logic.ts
 // Lógica centralizada de morte de unidades
 
-import type { BattleUnit } from "../../../../shared/types/battle.types";
-import { type UnitSize } from "../../../../shared/config";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
+import { type UnitSize } from "@boundless/shared/config";
 import {
   processSummonerDeath,
   processUnitDeathForEidolon,

@@ -3,8 +3,8 @@
 
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
 import { ActiveEffectSchema } from "../../../../colyseus/schemas/common.schema";
-import type { BattleUnit } from "../../../../../../shared/types/battle.types";
-import type { ActiveEffect } from "../../../../../../shared/types/conditions.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
+import type { ActiveEffect } from "@boundless/shared/types/conditions.types";
 
 /**
  * Cooldowns de habilidades da unidade

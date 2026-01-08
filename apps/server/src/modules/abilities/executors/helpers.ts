@@ -1,12 +1,12 @@
 // server/src/modules/abilities/executors/helpers.ts
 // Funções auxiliares compartilhadas entre executores
 
-import type { BattleUnit } from "../../../../../shared/types/battle.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import {
   resolveDynamicValue,
   type DynamicValue,
-} from "../../../../../shared/types/ability.types";
-import { isAdjacentOmnidirectional } from "../../../../../shared/utils/distance.utils";
+} from "@boundless/shared/types/ability.types";
+import { isAdjacentOmnidirectional } from "@boundless/shared/utils/distance.utils";
 
 // =============================================================================
 // SPELL HELPERS

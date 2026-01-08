@@ -6,8 +6,8 @@ import { Schema } from "@colyseus/schema";
 import type {
   BattleUnit,
   BattleObstacle,
-} from "../../../shared/types/battle.types";
-import type { BattlePlayer } from "../../../shared/types/session.types";
+} from "@boundless/shared/types/battle.types";
+import type { BattlePlayer } from "@boundless/shared/types/session.types";
 
 // Re-exportar tipos do shared para compatibilidade
 export type BattleUnitState = BattleUnit;
@@ -326,6 +326,13 @@ class ColyseusService {
 
       this.setupGlobalRoomListeners();
 
+      // Reautenticar automaticamente se houver token salvo
+      const savedToken = localStorage.getItem("auth_token");
+      if (savedToken) {
+        console.log("[Colyseus] 🔐 Reautenticando com token salvo...");
+        this.globalRoom.send("auth:validate", { token: savedToken });
+      }
+
       this.reconnectAttempts = 0;
       this.isConnecting = false;
 
@@ -415,6 +422,7 @@ class ColyseusService {
     this.globalRoom.onMessage(
       "*",
       (type: string | number | Schema, message: unknown) => {
+        console.log(`[Colyseus] 📩 Mensagem recebida: ${type}`, message);
         this.emit(`global:${type}`, message);
         this.emit(type as string, message);
       }
@@ -1007,30 +1015,39 @@ class ColyseusService {
 
     return new Promise<T>((resolve, reject) => {
       let timeoutId: ReturnType<typeof setTimeout>;
+      let resolved = false;
 
       const cleanup = () => {
+        if (resolved) return;
+        resolved = true;
         clearTimeout(timeoutId);
         this.off(successEvent, successHandler);
         this.off(errorEvent, errorHandler);
       };
 
       const successHandler = (responseData: T) => {
+        console.log(`[Colyseus] ✅ Recebido ${successEvent}:`, responseData);
         cleanup();
         resolve(responseData);
       };
 
       const errorHandler = (error: { message?: string; error?: string }) => {
+        console.log(`[Colyseus] ❌ Recebido ${errorEvent}:`, error);
         cleanup();
         reject(new Error(error.message || error.error || "Request failed"));
       };
 
       timeoutId = setTimeout(() => {
+        console.log(`[Colyseus] ⏰ Timeout esperando ${successEvent}`);
         cleanup();
         reject(new Error(`Timeout waiting for ${successEvent}`));
       }, timeout);
 
+      // IMPORTANTE: Registrar listeners ANTES de enviar a mensagem
       this.on(successEvent, successHandler);
       this.on(errorEvent, errorHandler);
+
+      console.log(`[Colyseus] 📤 Enviando ${emitEvent}:`, data);
 
       // Envia diretamente já que verificamos conexão acima
       if (this.globalRoom) {

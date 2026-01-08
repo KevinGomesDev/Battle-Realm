@@ -1,8 +1,8 @@
 // server/src/ai/behaviors/shared.behavior.ts
 // Funções reutilizáveis compartilhadas entre todos os behaviors
 
-import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
-import type { AbilityDefinition as SpellDefinition } from "../../../../shared/types/ability.types";
+import type { AbilityDefinition as SkillDefinition } from "@boundless/shared/types/ability.types";
+import type { AbilityDefinition as SpellDefinition } from "@boundless/shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,
@@ -20,7 +20,7 @@ import {
 } from "../core/target-selection";
 import { selectBestSkill } from "../core/skill-evaluator";
 import { selectBestSpell } from "../core/spell-evaluator";
-import { BattleUnit } from "../../../../shared/types/battle.types";
+import { BattleUnit } from "@boundless/shared/types/battle.types";
 import { scanConditionsForAction } from "../../modules/conditions/conditions";
 
 // =============================================================================

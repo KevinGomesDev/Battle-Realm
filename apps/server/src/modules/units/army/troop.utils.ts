@@ -2,27 +2,27 @@
 
 import { PrismaClient } from "@prisma/client";
 import { prisma } from "../../../lib/prisma";
-import { TROOP_ABILITY_MAP as TROOP_SKILLS_MAP } from "../../../../../shared/data/abilities.data";
+import { TROOP_ABILITY_MAP as TROOP_SKILLS_MAP } from "@boundless/shared/data/abilities.data";
 import {
   TROOP_RECRUITMENT_BASE_COST,
   TROOP_LEVELUP_COSTS,
   TROOP_ATTRIBUTE_POINTS_PER_LEVEL,
   MAX_TROOP_LEVEL,
-} from "../../../../../shared/data/units.data";
-import type { PlayerResources } from "../../../../../shared/types/match.types";
+} from "@boundless/shared/data/units.data";
+import type { PlayerResources } from "@boundless/shared/types/match.types";
 import {
   getResourceName,
   HP_CONFIG,
   MANA_CONFIG,
-} from "../../../../../shared/config";
+} from "@boundless/shared/config";
 import {
   TroopTemplateData,
   TROOP_INITIAL_ATTRIBUTE_POINTS,
   TROOP_MAX_ATTRIBUTE_VALUE,
-} from "../../../../../shared/types/units.types";
+} from "@boundless/shared/types/units.types";
 
 // Re-export para compatibilidade
-export type { TroopTemplateData } from "../../../../../shared/types/units.types";
+export type { TroopTemplateData } from "@boundless/shared/types/units.types";
 
 // Tipo para transação Prisma
 type PrismaTransaction = Omit<

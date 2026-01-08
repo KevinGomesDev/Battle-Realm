@@ -5,7 +5,7 @@ import type {
   CommandExecutorFn,
   CommandExecutionContext,
 } from "../command-handler";
-import type { CommandResult } from "../../../../../../shared/types/commands.types";
+import type { CommandResult } from "@boundless/shared/types/commands.types";
 
 /**
  * Executor do comando /godmode

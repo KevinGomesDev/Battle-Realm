@@ -10,7 +10,7 @@ import type {
   ChainQTEResult,
   ChainQTEClientState,
   QTEInput,
-} from "../../../../../shared/qte";
+} from "@boundless/shared/qte";
 import { colyseusService } from "../../../services/colyseus.service";
 
 // =============================================================================

@@ -2,7 +2,7 @@
 // Seletor de estilos (cabelo, roupa, etc) para o criador de personagem
 
 import React from "react";
-import type { StyleOption } from "../../../../../shared/types/character.types";
+import type { StyleOption } from "@boundless/shared/types/character.types";
 
 interface StylePickerProps {
   styles: StyleOption[];

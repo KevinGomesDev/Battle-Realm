@@ -5,14 +5,14 @@
 export type {
   TerrainTypeConfig as TerrainType,
   StructureInfo,
-} from "../../../../../shared/types/map.types";
+} from "@boundless/shared/types/map.types";
 
 // ============ FRONTEND-SPECIFIC STATE ============
 
 import type {
   TerrainTypeConfig,
   StructureInfo,
-} from "../../../../../shared/types/map.types";
+} from "@boundless/shared/types/map.types";
 
 export interface GameDataState {
   terrains: Record<string, TerrainTypeConfig>;

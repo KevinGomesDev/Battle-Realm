@@ -2,7 +2,7 @@
 import {
   TERRAIN_DEFINITIONS,
   type TerrainType,
-} from "../../../../shared/config";
+} from "@boundless/shared/config";
 import { MathUtils } from "../../utils/math";
 
 interface BioSeed {

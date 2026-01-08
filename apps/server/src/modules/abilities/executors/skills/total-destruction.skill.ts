@@ -4,8 +4,8 @@
 import type {
   AbilityDefinition,
   AbilityExecutionResult,
-} from "../../../../../../shared/types/ability.types";
-import type { BattleUnit } from "../../../../../../shared/types/battle.types";
+} from "@boundless/shared/types/ability.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import type { SkillExecutionContext } from "../types";
 import { applyDamage } from "../../../combat/damage.utils";
 import { processUnitDeath } from "../../../combat/death-logic";

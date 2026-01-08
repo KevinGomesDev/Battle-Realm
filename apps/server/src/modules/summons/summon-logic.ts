@@ -4,8 +4,8 @@
 import {
   getSummonByCode,
   createSummonStats,
-} from "../../../../shared/data/summons.data";
-import { isAdjacentOmnidirectional } from "../../../../shared/utils/distance.utils";
+} from "@boundless/shared/data/summons.data";
+import { isAdjacentOmnidirectional } from "@boundless/shared/utils/distance.utils";
 import {
   HP_CONFIG,
   MANA_CONFIG,
@@ -13,8 +13,8 @@ import {
   MAGICAL_PROTECTION_CONFIG,
   getMaxMarksByCategory,
   type UnitSize,
-} from "../../../../shared/config";
-import type { BattleUnit } from "../../../../shared/types/battle.types";
+} from "@boundless/shared/config";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import { applyDamage } from "../combat/damage.utils";
 
 // =============================================================================

@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   getAbilityInfo,
   findAbilityByCode,
-} from "../../../../../../shared/data/abilities.data";
+} from "@boundless/shared/data/abilities.data";
 
 interface TargetSelectionNotificationProps {
   /** Código da ability pendente (ou "ATTACK" para ataque) */

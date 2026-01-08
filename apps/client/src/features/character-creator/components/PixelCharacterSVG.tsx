@@ -5,8 +5,8 @@ import React, { useMemo } from "react";
 import type {
   CharacterConfig,
   PixelPosition,
-} from "../../../../../shared/types/character.types";
-import { CHARACTER_GRID } from "../../../../../shared/types/character.types";
+} from "@boundless/shared/types/character.types";
+import { CHARACTER_GRID } from "@boundless/shared/types/character.types";
 import {
   HEAD_SHAPE,
   EYES_POSITIONS,
@@ -22,7 +22,7 @@ import {
   SHOES_STYLES,
   ACCESSORY_STYLES,
   SKIN_SHADOW_MAP,
-} from "../../../../../shared/data/character-creator";
+} from "@boundless/shared/data/character-creator";
 
 interface PixelCharacterSVGProps {
   config: CharacterConfig;

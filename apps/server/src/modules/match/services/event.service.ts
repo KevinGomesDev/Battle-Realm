@@ -9,11 +9,11 @@ import type {
   EventFilter,
   EventContext,
   EventsPageResponse,
-} from "../../../../../shared/types/events.types";
+} from "@boundless/shared/types/events.types";
 import type {
   BattleUnit,
   BattleObstacle,
-} from "../../../../../shared/types/battle.types";
+} from "@boundless/shared/types/battle.types";
 import {
   getPlayersWithVisionAt,
   getPlayersWithVisionAtAny,

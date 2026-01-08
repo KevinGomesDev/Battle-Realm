@@ -16,4 +16,4 @@ export type {
   SessionType,
   ActiveSessionFrontend,
   SessionGuardState,
-} from "../../../shared/types/session.types";
+} from "@boundless/shared/types/session.types";

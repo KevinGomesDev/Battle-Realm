@@ -1,7 +1,7 @@
 // server/src/ai/core/self-assessment.ts
 // Avaliação do estado próprio da unidade IA
 
-import { BattleUnit } from "../../../../shared/types/battle.types";
+import { BattleUnit } from "@boundless/shared/types/battle.types";
 import type { AISelfAssessment, AIProfile } from "../types/ai.types";
 
 /**

@@ -7,8 +7,8 @@ import type {
   ChatMessage,
   ChatContext,
   SendChatPayload,
-} from "../../../shared/types/chat.types";
-import { CHAT_CONFIG } from "../../../shared/types/chat.types";
+} from "@boundless/shared/types/chat.types";
+import { CHAT_CONFIG } from "@boundless/shared/types/chat.types";
 
 interface ChatBubble {
   message: string;

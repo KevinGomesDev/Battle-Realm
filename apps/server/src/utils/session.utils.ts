@@ -7,7 +7,7 @@ import type {
   ActiveSession,
   BattleLobbyData,
   BattleSessionData,
-} from "../../../shared/types/session.types";
+} from "@boundless/shared/types/session.types";
 
 // ============================================
 // Types para os Maps em memória

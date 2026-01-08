@@ -7,7 +7,7 @@ import type {
   ConditionDefinition,
   ConditionExpiry,
   ConditionInfo,
-} from "../../../../shared/types/conditions.types";
+} from "@boundless/shared/types/conditions.types";
 
 // Importar definições centralizadas do shared
 import {
@@ -21,7 +21,7 @@ import {
   getConditionColorsMap,
   getCondition,
   hasConditionDefinition,
-} from "../../../../shared/data/conditions.data";
+} from "@boundless/shared/data/conditions.data";
 
 // Re-exportar tipos para uso em outros arquivos do server
 export type {
@@ -481,7 +481,7 @@ export function getMinAttackSuccesses(conditions: string[]): number {
 import type {
   ActiveEffectsMap,
   ActiveEffect,
-} from "../../../../shared/types/conditions.types";
+} from "@boundless/shared/types/conditions.types";
 
 /**
  * Calcula todos os efeitos ativos agregados das condições de uma unidade

@@ -2,8 +2,8 @@
 // Factory para criação de BattleUnits - elimina duplicação de código
 
 import { determineUnitActions } from "./unit-actions";
-import { findAbilityByCode as findSkillByCode } from "../../../../shared/data/abilities.data";
-import { getRacePassiveCondition } from "../../../../shared/data/races.data";
+import { findAbilityByCode as findSkillByCode } from "@boundless/shared/data/abilities.data";
+import { getRacePassiveCondition } from "@boundless/shared/data/races.data";
 import { calculateActiveEffects } from "../conditions/conditions";
 import {
   PHYSICAL_PROTECTION_CONFIG,
@@ -15,14 +15,14 @@ import {
   calculateUnitVision,
   getMaxMarksByCategory,
   type UnitSize,
-} from "../../../../shared/config";
+} from "@boundless/shared/config";
 import type {
   TerritorySize,
   BattleUnit,
-} from "../../../../shared/types/battle.types";
+} from "@boundless/shared/types/battle.types";
 
 // Re-exportar BattleUnit para compatibilidade com imports existentes
-export type { BattleUnit } from "../../../../shared/types/battle.types";
+export type { BattleUnit } from "@boundless/shared/types/battle.types";
 
 // Tipo para unidade do banco de dados (Nexus - fonte de verdade)
 interface DBUnit {
@@ -428,7 +428,7 @@ export function createMultiPlayerBattleUnits(
 import {
   type KingdomTemplateDefinition,
   resolveKingdomTemplate,
-} from "../../../../shared/data/kingdoms.data";
+} from "@boundless/shared/data/kingdoms.data";
 
 /**
  * Cria unidades de BOT a partir de um template de reino

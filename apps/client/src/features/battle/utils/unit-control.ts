@@ -1,4 +1,4 @@
-import type { BattleUnit } from "../../../../../shared/types";
+import type { BattleUnit } from "@boundless/shared/types";
 
 /**
  * Categorias de unidades controladas por IA (não pelo jogador)

@@ -5,8 +5,8 @@ import React, { useState, useRef } from "react";
 import type {
   ActiveEffectsMap,
   ConditionEffects,
-} from "../../../../../../shared/types/conditions.types";
-import { EFFECT_METADATA } from "../../../../../../shared/data/effect-metadata.data";
+} from "@boundless/shared/types/conditions.types";
+import { EFFECT_METADATA } from "@boundless/shared/data/effect-metadata.data";
 import { Tooltip } from "@/components/Tooltip";
 import { usePopupContainer } from "./PanelStrip";
 

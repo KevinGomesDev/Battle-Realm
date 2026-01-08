@@ -9,11 +9,11 @@ export type {
   Territory,
   TerrainTypeConfig,
   StructureInfo,
-} from "../../../../../shared/types/map.types";
+} from "@boundless/shared/types/map.types";
 
 // ============ FRONTEND-SPECIFIC STATE ============
 
-import type { Territory } from "../../../../../shared/types/map.types";
+import type { Territory } from "@boundless/shared/types/map.types";
 
 export interface MapState {
   territories: Territory[];

@@ -4,8 +4,8 @@
 import type {
   AbilityDefinition,
   AbilityExecutionResult,
-} from "../../../../../../shared/types/ability.types";
-import type { BattleUnit } from "../../../../../../shared/types/battle.types";
+} from "@boundless/shared/types/ability.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 
 /**
  * WARRIOR_SECOND_WIND: Recupera HP igual à Vitalidade

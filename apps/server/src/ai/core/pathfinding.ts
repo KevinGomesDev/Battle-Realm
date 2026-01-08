@@ -5,8 +5,8 @@ import PF from "pathfinding";
 import type {
   BattleObstacle,
   BattleUnit,
-} from "../../../../shared/types/battle.types";
-import { getManhattanDistance } from "../../../../shared/utils/distance.utils";
+} from "@boundless/shared/types/battle.types";
+import { getManhattanDistance } from "@boundless/shared/utils/distance.utils";
 
 interface Position {
   x: number;

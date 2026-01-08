@@ -4,14 +4,14 @@
 import {
   BattleUnit,
   BattleObstacle,
-} from "../../../../shared/types/battle.types";
+} from "@boundless/shared/types/battle.types";
 import type { AIBehaviorType, AIProfile } from "../types/ai.types";
 import { manhattanDistance } from "./pathfinding";
 import {
   hasLineOfSightFull,
   type UnitForLoS,
   type ObstacleForLoS,
-} from "../../../../shared/utils/line-of-sight.utils";
+} from "@boundless/shared/utils/line-of-sight.utils";
 
 interface Position {
   x: number;

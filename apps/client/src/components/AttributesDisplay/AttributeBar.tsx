@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { ATTRIBUTE_NAMES } from "../../../../shared/config";
+import { ATTRIBUTE_NAMES } from "@boundless/shared/config";
 import { Tooltip } from "@/components/Tooltip";
 import type { AttributeBarProps } from "./types";
 

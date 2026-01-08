@@ -3,11 +3,11 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { colyseusService } from "../../../../services/colyseus.service";
-import type { GameEvent } from "../../../../../../shared/types/events.types";
+import type { GameEvent } from "@boundless/shared/types/events.types";
 import {
   getCategoryIcon,
   formatEventTime,
-} from "../../../../../../shared/types/events.types";
+} from "@boundless/shared/types/events.types";
 import { getSeverityColors } from "../../../../config/colors.config";
 
 interface BattleEventLogProps {

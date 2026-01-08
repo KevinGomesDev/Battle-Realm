@@ -6,7 +6,7 @@ import { colyseusService } from "../../../services/colyseus.service";
 import type {
   CommandResponse,
   CommandResult,
-} from "../../../../../shared/types/commands.types";
+} from "@boundless/shared/types/commands.types";
 import {
   parseCommand,
   createCommandPayload,

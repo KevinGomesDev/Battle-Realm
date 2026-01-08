@@ -11,8 +11,8 @@ import {
 } from "../schemas";
 import { prisma } from "../../../../lib/prisma";
 import { MapGenerator, GeneratedTerritory } from "../../../map/MapGenerator";
-import { CRISIS_DEFINITIONS } from "../../../../../../shared/data/crisis.data";
-import type { CrisisType } from "../../../../../../shared/types/match.types";
+import { CRISIS_DEFINITIONS } from "@boundless/shared/data/crisis.data";
+import type { CrisisType } from "@boundless/shared/types/match.types";
 import { pauseMatch } from "../../services/battle-persistence.service";
 
 const PLAYER_COLORS = [

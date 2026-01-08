@@ -3,20 +3,20 @@
 // XP, Level Up, Skills e Spells
 
 import { prisma } from "../../../lib/prisma";
-import { getClassByCode } from "../../../../../shared/data/abilities.data";
+import { getClassByCode } from "@boundless/shared/data/abilities.data";
 import {
   XP_THRESHOLDS,
   XP_REWARDS,
   ATTRIBUTE_POINTS_PER_LEVEL,
   calculateLevelFromXP,
   getXPToNextLevel,
-} from "../../../../../shared/data/heroes.data";
+} from "@boundless/shared/data/heroes.data";
 import {
   MAX_HERO_LEVEL,
   calculateLevelUpCost,
-} from "../../../../../shared/data/units.data";
+} from "@boundless/shared/data/units.data";
 import { spendResources } from "../../match/turn.utils";
-import { getResourceName, HP_CONFIG } from "../../../../../shared/config";
+import { getResourceName, HP_CONFIG } from "@boundless/shared/config";
 
 // =============================================================================
 // SISTEMA DE XP

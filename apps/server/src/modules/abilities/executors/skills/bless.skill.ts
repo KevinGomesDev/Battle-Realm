@@ -4,10 +4,10 @@
 import type {
   AbilityDefinition,
   AbilityExecutionResult,
-} from "../../../../../../shared/types/ability.types";
-import { resolveDynamicValue } from "../../../../../../shared/types/ability.types";
-import type { BattleUnit } from "../../../../../../shared/types/battle.types";
-import { getManhattanDistance } from "../../../../../../shared/utils/distance.utils";
+} from "@boundless/shared/types/ability.types";
+import { resolveDynamicValue } from "@boundless/shared/types/ability.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
+import { getManhattanDistance } from "@boundless/shared/utils/distance.utils";
 
 /**
  * CLERIC_BLESS: Aliados em área ganham BLESSED

@@ -1,14 +1,14 @@
 // server/src/qte/qte-processor.ts
 // Processamento de respostas e resultados de QTE
 
-import type { BattleUnit } from "../../../shared/types/battle.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import type {
   QTEConfig,
   QTEResponse,
   QTEResult,
   QTEResultGrade,
   DodgeDirection,
-} from "../../../shared/qte";
+} from "@boundless/shared/qte";
 import {
   DIRECTION_DELTAS,
   OPPOSITE_DIRECTION,
@@ -16,7 +16,7 @@ import {
   QTE_FEEDBACK_MESSAGES,
   QTE_DAMAGE_MULTIPLIERS,
   PERFECT_DODGE_BUFF,
-} from "../../../shared/qte";
+} from "@boundless/shared/qte";
 
 // =============================================================================
 // FUNÇÕES AUXILIARES

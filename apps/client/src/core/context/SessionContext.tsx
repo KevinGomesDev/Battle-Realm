@@ -13,7 +13,7 @@ import type {
   SessionAction,
   ActiveSessionFrontend,
   SessionType,
-} from "../../../../shared/types/session.types";
+} from "@boundless/shared/types/session.types";
 import { colyseusService } from "../../services/colyseus.service";
 
 // ============================================

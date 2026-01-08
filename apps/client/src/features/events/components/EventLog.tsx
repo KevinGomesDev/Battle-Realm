@@ -6,11 +6,11 @@ import { useEvents } from "../hooks/useEvents";
 import type {
   GameEvent,
   EventContext as EventContextType,
-} from "../../../../../shared/types/events.types";
+} from "@boundless/shared/types/events.types";
 import {
   getCategoryIcon,
   formatEventTime,
-} from "../../../../../shared/types/events.types";
+} from "@boundless/shared/types/events.types";
 import { getSeverityColors } from "../../../config/colors.config";
 
 // =============================================================================

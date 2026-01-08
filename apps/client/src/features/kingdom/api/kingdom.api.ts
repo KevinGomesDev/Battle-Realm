@@ -7,7 +7,6 @@ import type {
   KingdomSummary,
   KingdomWithRelations,
   CreateKingdomData,
-  CreateTroopTemplateData,
   KingdomTemplateSummary,
   KingdomTemplateDetails,
   RaceDefinition,
@@ -34,8 +33,6 @@ async function emitWithResponse<T>(
   timeoutMs: number = DEFAULT_TIMEOUT
 ): Promise<SocketResponse<T>> {
   return new Promise((resolve) => {
-    let timeoutId: ReturnType<typeof setTimeout>;
-
     const cleanup = () => {
       clearTimeout(timeoutId);
       colyseusService.off(successEvent, successHandler);
@@ -55,7 +52,7 @@ async function emitWithResponse<T>(
     colyseusService.on(successEvent, successHandler);
     colyseusService.on(KINGDOM_ERROR_EVENT, errorHandler);
 
-    timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       cleanup();
       resolve({ success: false, error: "Timeout na operação" });
     }, timeoutMs);
@@ -68,12 +65,15 @@ async function emitWithResponse<T>(
 
 export const kingdomApi = {
   /**
-   * Cria um novo reino
+   * Cria um novo reino (manual ou a partir de template)
+   * @param data - Dados do reino OU { templateId } para criar a partir de template
    */
   async create(
-    data: CreateKingdomData
-  ): Promise<SocketResponse<KingdomWithRelations>> {
-    return emitWithResponse<KingdomWithRelations>(
+    data: CreateKingdomData | { templateId: string }
+  ): Promise<
+    SocketResponse<{ kingdom: KingdomWithRelations; message: string }>
+  > {
+    return emitWithResponse<{ kingdom: KingdomWithRelations; message: string }>(
       "kingdom:create",
       "kingdom:created",
       data
@@ -100,20 +100,6 @@ export const kingdomApi = {
       "kingdom:get_details",
       "kingdom:details",
       { kingdomId }
-    );
-  },
-
-  /**
-   * Define templates de tropas
-   */
-  async setTroopTemplates(
-    kingdomId: string,
-    templates: CreateTroopTemplateData[]
-  ): Promise<SocketResponse<KingdomWithRelations>> {
-    return emitWithResponse<KingdomWithRelations>(
-      "kingdom:set_troop_templates",
-      "kingdom:set_troop_templates_success",
-      { kingdomId, templates }
     );
   },
 
@@ -152,22 +138,6 @@ export const kingdomApi = {
     return emitWithResponse<{ template: KingdomTemplateDetails }>(
       "kingdom:get_template",
       "kingdom:template_details",
-      { templateId }
-    );
-  },
-
-  /**
-   * Cria reino a partir de template
-   */
-  async createFromTemplate(templateId: string): Promise<
-    SocketResponse<{
-      kingdom: KingdomWithRelations;
-      message: string;
-    }>
-  > {
-    return emitWithResponse<{ kingdom: KingdomWithRelations; message: string }>(
-      "kingdom:create_from_template",
-      "kingdom:created_from_template",
       { templateId }
     );
   },

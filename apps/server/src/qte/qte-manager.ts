@@ -6,9 +6,9 @@
 import type {
   BattleUnit,
   BattleObstacle,
-} from "../../../shared/types/battle.types";
-import type { QTEConfig, QTEResponse, QTEResult } from "../../../shared/qte";
-import { QTE_TIMEOUT_BUFFER } from "../../../shared/qte";
+} from "@boundless/shared/types/battle.types";
+import type { QTEConfig, QTEResponse, QTEResult } from "@boundless/shared/qte";
+import { QTE_TIMEOUT_BUFFER } from "@boundless/shared/qte";
 
 import { generateAttackQTE, generateDefenseQTE } from "./qte-calculator";
 import {

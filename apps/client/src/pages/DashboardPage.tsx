@@ -21,8 +21,8 @@ import { Topbar } from "../components/Topbar";
 import { CreateKingdomModal, useKingdom } from "../features/kingdom";
 import { GlobalChat } from "../features/chat";
 import { CharacterCreatorModal } from "../features/character-creator";
-import type { CharacterConfig } from "../../../shared/types/character.types";
-import { MAX_KINGDOMS_PER_USER } from "../../../shared/data/units.data";
+import type { CharacterConfig } from "@boundless/shared/types/character.types";
+import { MAX_KINGDOMS_PER_USER } from "@boundless/shared/data/units.data";
 import { Button } from "../components/Button";
 
 // =============================================================================
@@ -141,7 +141,7 @@ const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { state: matchState } = useMatch();
   const { state: BattleState } = useBattle();
-  const { kingdoms } = useKingdom();
+  const { kingdoms, loadKingdoms } = useKingdom();
 
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
   const [isCharacterCreatorOpen, setIsCharacterCreatorOpen] = useState(false);
@@ -268,8 +268,8 @@ const DashboardPage: React.FC = () => {
         <CreateKingdomModal
           onClose={kingdomActions.closeModal}
           onSuccess={() => {
+            loadKingdoms();
             kingdomActions.closeModal();
-            // A lista de reinos já é atualizada automaticamente pelo KingdomContext
           }}
         />
       )}

@@ -8,14 +8,14 @@ import type {
   AbilityCostTier,
   AbilityRange,
   AbilityResourceType,
-} from "../../../../shared/types/ability.types";
-import type { BattleUnit } from "../../../../shared/types/battle.types";
+} from "@boundless/shared/types/ability.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import {
   DEFAULT_RANGE_VALUES,
   COST_VALUES,
   getAbilityCost,
-} from "../../../../shared/types/ability.types";
-import { getAbilityMaxRange } from "../../../../shared/utils/ability-validation";
+} from "@boundless/shared/types/ability.types";
+import { getAbilityMaxRange } from "@boundless/shared/utils/ability-validation";
 import {
   HERO_CLASSES,
   getClassByCode,
@@ -23,8 +23,8 @@ import {
   getAbilitiesForClass,
   getAllClassesSummary,
   findAbilityByCode,
-} from "../../../../shared/data/abilities.data";
-import { getResourceName, ResourceKey } from "../../../../shared/config";
+} from "@boundless/shared/data/abilities.data";
+import { getResourceName, ResourceKey } from "@boundless/shared/config";
 import { prisma } from "../../lib/prisma";
 import { spendResources } from "../match/turn.utils";
 

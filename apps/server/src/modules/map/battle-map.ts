@@ -6,16 +6,16 @@ import type {
   TerritorySize,
   BattleObstacle,
   ObstacleType,
-} from "../../../../shared/types/battle.types";
+} from "@boundless/shared/types/battle.types";
 import {
   getRandomTerrain,
   getRandomTerritorySize,
   getObstacleCount,
   TERRAIN_DEFINITIONS,
   getRandomObstacleType,
-} from "../../../../shared/types/battle.types";
-import type { BattleMapConfig } from "../../../../shared/types/battle-lobby.types";
-import { OBSTACLE_CONFIG } from "../../../../shared/config";
+} from "@boundless/shared/types/battle.types";
+import type { BattleMapConfig } from "@boundless/shared/types/battle-lobby.types";
+import { OBSTACLE_CONFIG } from "@boundless/shared/config";
 
 // Função simples para gerar ID único
 function generateObstacleId(): string {

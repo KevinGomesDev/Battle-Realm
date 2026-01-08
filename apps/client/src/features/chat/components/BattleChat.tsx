@@ -6,7 +6,7 @@ import { useChatStore } from "../../../stores";
 import { useChat } from "../hooks/useChat";
 import { ChatBox } from "./ChatBox";
 import { BattleBubbles } from "./BattleBubbles";
-import type { BattleUnit } from "../../../../../shared/types/battle.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import { useEnterKey } from "../../../hooks/useHotkey";
 
 interface BattleChatProps {

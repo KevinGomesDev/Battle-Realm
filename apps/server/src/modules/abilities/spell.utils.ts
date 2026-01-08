@@ -2,7 +2,7 @@
 // Utilitários para gerenciar spells de unidades
 
 import { prisma } from "../../lib/prisma";
-import { getAbilityByCode as getSpellByCode } from "../../../../shared/data/abilities.data";
+import { getAbilityByCode as getSpellByCode } from "@boundless/shared/data/abilities.data";
 
 /**
  * Adiciona uma spell a uma unidade (persiste no banco)

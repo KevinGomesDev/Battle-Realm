@@ -5,10 +5,10 @@
 import type {
   AbilityExecutionResult,
   AbilityDefinition,
-} from "../../../../../shared/types/ability.types";
-import type { BattleUnit } from "../../../../../shared/types/battle.types";
+} from "@boundless/shared/types/ability.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import type { AbilityExecutionContext } from "./types";
-import { findAbilityByCode as findSkillByCode } from "../../../../../shared/data/abilities.data";
+import { findAbilityByCode as findSkillByCode } from "@boundless/shared/data/abilities.data";
 import {
   getAbilityExecutor,
   SKILL_EXECUTORS,

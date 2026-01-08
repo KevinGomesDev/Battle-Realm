@@ -10,7 +10,6 @@ export {
   useBattleSession,
 } from "./hooks/useBattle";
 export { useBattleKeyboard } from "./hooks/useBattleKeyboard";
-export { useQTE, useActiveQTE } from "./hooks/useQTE";
 
 // Components - Main View
 export { BattleView } from "./components";

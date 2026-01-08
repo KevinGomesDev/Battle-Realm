@@ -5,14 +5,14 @@ import type {
   CommandExecutorFn,
   CommandExecutionContext,
 } from "../command-handler";
-import type { CommandResult } from "../../../../../../shared/types/commands.types";
+import type { CommandResult } from "@boundless/shared/types/commands.types";
 import { BattleUnitSchema } from "../../../battle/colyseus/schemas";
-import { RACE_DEFINITIONS } from "../../../../../../shared/data/Templates/RacesTemplates";
-import { HERO_CLASSES } from "../../../../../../shared/data/abilities.data";
+import { RACE_DEFINITIONS } from "@boundless/shared/data/Templates/RacesTemplates";
+import { HERO_CLASSES } from "@boundless/shared/data/abilities.data";
 import { determineUnitActions } from "../../../units/unit-actions";
 import { calculateActiveEffects } from "../../../conditions/conditions";
-import { findAbilityByCode as findSkillByCode } from "../../../../../../shared/data/abilities.data";
-import { getRacePassiveCondition } from "../../../../../../shared/data/races.data";
+import { findAbilityByCode as findSkillByCode } from "@boundless/shared/data/abilities.data";
+import { getRacePassiveCondition } from "@boundless/shared/data/races.data";
 import {
   PHYSICAL_PROTECTION_CONFIG,
   MAGICAL_PROTECTION_CONFIG,
@@ -20,7 +20,7 @@ import {
   MANA_CONFIG,
   calculateUnitVision,
   getMaxMarksByCategory,
-} from "../../../../../../shared/config";
+} from "@boundless/shared/config";
 
 /**
  * Gera um ID único para a unidade

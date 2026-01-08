@@ -1,8 +1,8 @@
 // server/src/ai/core/ai-controller.ts
 // Controlador principal da IA de batalha
 
-import type { BattleSession } from "../../../../shared/types/battle-lobby.types";
-import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
+import type { BattleSession } from "@boundless/shared/types/battle-lobby.types";
+import type { AbilityDefinition as SkillDefinition } from "@boundless/shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,
@@ -18,11 +18,11 @@ import {
   safetyLogger,
   limitArray,
 } from "./safety-guards";
-import { BattleUnit } from "../../../../shared/types/battle.types";
+import { BattleUnit } from "@boundless/shared/types/battle.types";
 import {
   findSkillByCode,
   isCommonAction,
-} from "../../../../shared/data/abilities.data";
+} from "@boundless/shared/data/abilities.data";
 import { filterVisibleUnitsWithLoS } from "./target-selection";
 
 // ID especial para o "jogador" IA

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { colyseusService } from "../../../../services/colyseus.service";
 import type { KingdomTemplateSummary, KingdomTemplateDetails } from "./types";
-import { RESOURCE_NAMES as GLOBAL_RESOURCE_NAMES } from "../../../../../../shared/config";
+import { RESOURCE_NAMES as GLOBAL_RESOURCE_NAMES } from "@boundless/shared/config";
 
 interface TemplateCardProps {
   template: KingdomTemplateSummary;
@@ -475,17 +475,17 @@ export const TemplateSelection: React.FC<TemplateSelectionProps> = ({
       setIsCreating(false);
     };
 
-    colyseusService.on("kingdom:created_from_template", handleSuccess);
-    colyseusService.on("error", handleError);
+    colyseusService.on("kingdom:created", handleSuccess);
+    colyseusService.on("kingdom:error", handleError);
 
-    colyseusService.sendToGlobal("kingdom:create_from_template", {
+    colyseusService.sendToGlobal("kingdom:create", {
       templateId: selectedTemplateId,
     });
 
     // Cleanup após timeout
     setTimeout(() => {
-      colyseusService.off("kingdom:created_from_template", handleSuccess);
-      colyseusService.off("error", handleError);
+      colyseusService.off("kingdom:created", handleSuccess);
+      colyseusService.off("kingdom:error", handleError);
     }, 15000);
   };
 

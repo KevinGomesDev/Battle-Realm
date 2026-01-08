@@ -2,19 +2,19 @@
 // Calculadora de Chain QTE (QTEs em cascata/playlist)
 // Usado para skills como Chain Lightning, Omnislash, Meteor Shower
 
-import type { BattleUnit } from "../../../shared/types/battle.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import type {
   ChainQTEConfig,
   ChainQTEStep,
   ChainQTEType,
   ChainFailMode,
   ChainStepDifficulty,
-} from "../../../shared/qte";
+} from "@boundless/shared/qte";
 import {
   QTE_FUTURE_DELAY,
   CHAIN_DIFFICULTY_CONFIG,
   CHAIN_COMBO_MULTIPLIERS,
-} from "../../../shared/qte";
+} from "@boundless/shared/qte";
 
 import {
   calculateQTEDuration,

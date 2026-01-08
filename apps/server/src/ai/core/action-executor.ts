@@ -1,8 +1,8 @@
 // server/src/ai/core/action-executor.ts
 // Executor de ações da IA - integra com movement-actions e skill-executors
 
-import type { BattleSession } from "../../../../shared/types/battle-lobby.types";
-import type { BattleUnit } from "../../../../shared/types/battle.types";
+import type { BattleSession } from "@boundless/shared/types/battle-lobby.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import type { AIDecision } from "../types/ai.types";
 import {
   executeMoveAction,
@@ -13,7 +13,7 @@ import {
   executeAttack as executeAttackLogic,
 } from "../../modules/abilities/executors";
 import { executeSpell as executeSpellLogic } from "../../modules/abilities/executors";
-import { getAbilityByCode as getSpellByCode } from "../../../../shared/data/abilities.data";
+import { getAbilityByCode as getSpellByCode } from "@boundless/shared/data/abilities.data";
 import {
   processAIUnit,
   aiActionDelay,

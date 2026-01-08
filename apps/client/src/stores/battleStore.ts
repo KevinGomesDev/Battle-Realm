@@ -10,7 +10,7 @@ import {
   type BattlePlayerState,
   type BattleObstacleState,
 } from "../services/colyseus.service";
-import { BATTLE_COLORS } from "../../../shared/config";
+import { BATTLE_COLORS } from "@boundless/shared/config";
 import { CONDITION_COLORS } from "../config/colors.config";
 
 // ============================================

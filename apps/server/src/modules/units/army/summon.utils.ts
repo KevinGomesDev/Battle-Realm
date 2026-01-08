@@ -4,8 +4,8 @@ import {
   HERO_CLASSES,
   getAbilitiesForClass as getSkillsForClass,
   TROOP_SKILLS,
-} from "../../../../../shared/data/abilities.data";
-import { HP_CONFIG, MANA_CONFIG } from "../../../../../shared/config";
+} from "@boundless/shared/data/abilities.data";
+import { HP_CONFIG, MANA_CONFIG } from "@boundless/shared/config";
 
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];

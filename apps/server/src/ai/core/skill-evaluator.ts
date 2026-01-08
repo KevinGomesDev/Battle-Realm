@@ -1,16 +1,16 @@
 // server/src/ai/core/skill-evaluator.ts
 // Avalia��o e sele��o de skills para a IA
 
-import { BattleUnit } from "../../../../shared/types/battle.types";
-import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
-import { getAbilityMaxRange as getSkillRangeShared } from "../../../../shared/utils/ability-validation";
+import { BattleUnit } from "@boundless/shared/types/battle.types";
+import type { AbilityDefinition as SkillDefinition } from "@boundless/shared/types/ability.types";
+import {
+  getAbilityMaxRange as getSkillRangeShared,
+  isValidAbilityTarget as isValidSkillTarget,
+  getValidAbilityTargets as getValidSkillTargets,
+} from "@boundless/shared/utils/ability-validation";
 import type { AISkillPriority, AIProfile } from "../types/ai.types";
 import { manhattanDistance } from "./pathfinding";
 import { getEnemies, getAllies } from "./target-selection";
-import {
-  isValidAbilityTarget as isValidSkillTarget,
-  getValidAbilityTargets as getValidSkillTargets,
-} from "../../../../shared/utils/ability-validation";
 
 interface SkillEvaluation {
   skill: SkillDefinition;

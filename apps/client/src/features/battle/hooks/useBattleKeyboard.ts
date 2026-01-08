@@ -1,4 +1,4 @@
-import type { BattleUnit } from "../../../../../shared/types/battle.types";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import { useMovementKeys } from "../../../hooks/useHotkey";
 
 interface UseBattleKeyboardOptions {

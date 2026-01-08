@@ -9,7 +9,7 @@ import type {
   QTEResult,
   QTEInput,
   QTEClientState,
-} from "../../../../../shared/qte";
+} from "@boundless/shared/qte";
 import { colyseusService } from "../../../services/colyseus.service";
 
 // =============================================================================

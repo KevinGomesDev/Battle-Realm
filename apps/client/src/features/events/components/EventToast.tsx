@@ -2,8 +2,8 @@
 // Componente de toast para eventos - sobe da tela e desaparece
 
 import { useEffect, useState } from "react";
-import type { GameEvent } from "../../../../../shared/types/events.types";
-import { getCategoryIcon } from "../../../../../shared/types/events.types";
+import type { GameEvent } from "@boundless/shared/types/events.types";
+import { getCategoryIcon } from "@boundless/shared/types/events.types";
 import { getSeverityColors } from "../../../config/colors.config";
 
 // =============================================================================

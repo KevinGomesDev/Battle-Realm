@@ -8,7 +8,7 @@ import {
   BattleConfigSchema,
   BattleLogEntry,
 } from "../../../../colyseus/schemas/common.schema";
-import { GRID_CONFIG } from "../../../../../../shared/config";
+import { GRID_CONFIG } from "@boundless/shared/config";
 
 /**
  * Jogador em um lobby de batalha

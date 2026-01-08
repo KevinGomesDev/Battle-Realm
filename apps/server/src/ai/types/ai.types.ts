@@ -4,7 +4,7 @@
 import type {
   BattleObstacle,
   BattleUnit,
-} from "../../../../shared/types/battle.types";
+} from "@boundless/shared/types/battle.types";
 
 /**
  * Comportamento base da IA

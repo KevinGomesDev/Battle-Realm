@@ -1,16 +1,16 @@
-import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
-import { COST_VALUES } from "../../../../shared/types/ability.types";
+import type { AbilityDefinition as SkillDefinition } from "@boundless/shared/types/ability.types";
+import { COST_VALUES } from "@boundless/shared/types/ability.types";
 import { calculateActiveEffects } from "../conditions/conditions";
-import type { ActiveEffectsMap } from "../../../../shared/types/conditions.types";
+import type { ActiveEffectsMap } from "@boundless/shared/types/conditions.types";
 
 // Re-exportar do global.config para manter compatibilidade
-export { getMaxMarksByCategory } from "../../../../shared/config";
+export { getMaxMarksByCategory } from "@boundless/shared/config";
 
 // Re-exportar de engagement.utils para manter compatibilidade
 export {
   calculateEngagementCost,
   validateMove,
-} from "../../../../shared/utils/engagement.utils";
+} from "@boundless/shared/utils/engagement.utils";
 
 export function calculateSkillCost(
   skill: SkillDefinition,

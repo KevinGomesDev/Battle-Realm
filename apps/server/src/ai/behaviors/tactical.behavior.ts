@@ -1,7 +1,7 @@
 // server/src/ai/behaviors/tactical.behavior.ts
 // Comportamento Tático: Equilibrado, considera posicionamento
 
-import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
+import type { AbilityDefinition as SkillDefinition } from "@boundless/shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,
@@ -14,7 +14,7 @@ import {
   isUnitInDanger,
   countThreatsAtPosition,
 } from "../core/target-selection";
-import { BattleUnit } from "../../../../shared/types/battle.types";
+import { BattleUnit } from "@boundless/shared/types/battle.types";
 import {
   tryExplore,
   tryAnySkill,

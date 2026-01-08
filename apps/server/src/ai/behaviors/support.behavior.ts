@@ -1,7 +1,7 @@
 // server/src/ai/behaviors/support.behavior.ts
 // Comportamento Support: Prioriza curar e buffar aliados
 
-import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
+import type { AbilityDefinition as SkillDefinition } from "@boundless/shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,
@@ -19,7 +19,7 @@ import {
   getValidTargetsForSkill,
   getSkillEffectiveRange,
 } from "../core/skill-evaluator";
-import { BattleUnit } from "../../../../shared/types/battle.types";
+import { BattleUnit } from "@boundless/shared/types/battle.types";
 import {
   tryRetreat,
   tryDash,
