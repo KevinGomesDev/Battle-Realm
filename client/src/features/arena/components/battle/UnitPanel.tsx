@@ -4,8 +4,8 @@ import {
   getSkillInfo,
   isCommonAction,
   findSkillByCode,
-} from "../../../../../../shared/data/skills.data";
-import { getSpellByCode } from "../../../../../../shared/data/spells.data";
+  getSpellByCode,
+} from "../../../../../../shared/data/abilities.data";
 import type { BattleUnit } from "../../../../../../shared/types/battle.types";
 import { AttributesDisplay } from "@/components/AttributesDisplay/index";
 import { Tooltip } from "@/components/Tooltip";
@@ -334,7 +334,7 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
           // Skills de classe - só adiciona se for ATIVA (passivas já aparecem como condições)
           const skillInfo = getSkillInfo(featureCode);
           const skillDef = findSkillByCode(featureCode);
-          if (skillInfo && skillDef && skillDef.category === "ACTIVE") {
+          if (skillInfo && skillDef && skillDef.activationType === "ACTIVE") {
             skills.push(featureCode);
           }
         }

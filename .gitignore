@@ -1,44 +1,111 @@
-# Dependencies
+# ===========================================
+# DEPENDENCIES
+# ===========================================
 node_modules/
-npm-debug.log
-yarn-error.log
-pnpm-debug.log
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
+.pnp
+.pnp.js
 
-# Build outputs
+# ===========================================
+# BUILD OUTPUTS
+# ===========================================
 dist/
 build/
 out/
 .next/
 *.tsbuildinfo
+tsconfig.tsbuildinfo
 
-# Environment
+# ===========================================
+# LOGS
+# ===========================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ===========================================
+# ENVIRONMENT VARIABLES
+# ===========================================
 .env
 .env.local
 .env.*.local
+.env.development
+.env.test
+.env.production
 
-# IDE
-.vscode/
+# ===========================================
+# IDE / EDITORS
+# ===========================================
 .idea/
 *.swp
 *.swo
 *~
-.DS_Store
+*.sublime-workspace
+*.sublime-project
 
-# Testing
+# Keep VS Code settings
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# ===========================================
+# OS GENERATED FILES
+# ===========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ===========================================
+# TESTING
+# ===========================================
 coverage/
 .nyc_output/
+*.lcov
 
-# Cache
+# ===========================================
+# CACHE
+# ===========================================
 .eslintcache
 .cache/
+*.cache
+.parcel-cache/
+.turbo/
 
-# Temp
+# ===========================================
+# TEMP FILES
+# ===========================================
 tmp/
 temp/
 *.tmp
+*.temp
 
-# Prisma
-.env.local
+# ===========================================
+# PRISMA
+# ===========================================
+server/prisma/*.db
+server/prisma/*.db-journal
+
+# ===========================================
+# ELECTRON
+# ===========================================
+client/release/
+
+# ===========================================
+# MISC
+# ===========================================
+*.pem
+*.local
+dist-ssr/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln

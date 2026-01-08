@@ -328,7 +328,9 @@ export async function addUnitFeature(
   if (validateClass && unit.classCode && target === "features") {
     const unitClass = getClassByCode(unit.classCode);
     if (unitClass) {
-      const isValidSkill = unitClass.skills.some((s) => s.code === featureCode);
+      const isValidSkill = unitClass.abilities.some(
+        (s: { code: string }) => s.code === featureCode
+      );
 
       if (!isValidSkill) {
         return {

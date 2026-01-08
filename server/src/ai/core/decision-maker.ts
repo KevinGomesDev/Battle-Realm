@@ -19,7 +19,7 @@ import {
   makeDefensiveDecision,
 } from "../behaviors";
 
-import { getUnitSpells } from "./spell-evaluator";
+import { getUnitSpells } from "./ability-evaluator";
 
 import {
   assessSelf,

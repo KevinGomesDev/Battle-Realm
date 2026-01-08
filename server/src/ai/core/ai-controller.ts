@@ -127,12 +127,14 @@ export function getUnitSkills(unit: BattleUnit): SkillDefinition[] {
     .map((skillCode: string) => findSkillByCode(skillCode))
     .filter(
       (skill): skill is SkillDefinition =>
-        skill !== undefined && skill !== null && skill.category === "ACTIVE"
+        skill !== undefined &&
+        skill !== null &&
+        skill.activationType === "ACTIVE"
     );
 }
 
-// Re-exportar getUnitSpells do spell-evaluator
-export { getUnitSpells } from "./spell-evaluator";
+// Re-exportar getUnitSpells do ability-evaluator (unificado)
+export { getUnitSpells } from "./ability-evaluator";
 
 // =============================================================================
 // PROCESSAMENTO DO TURNO DA IA

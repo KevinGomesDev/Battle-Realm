@@ -1,5 +1,5 @@
 {
-  "name": "battle-realm",
+  "name": "@battle-realm/client",
   "private": true,
   "version": "2.0.0",
   "type": "module",
@@ -9,11 +9,13 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
     "electron": "electron .",
     "electron:dev": "cross-env NODE_ENV=development electron .",
     "electron:build": "npm run build && electron-builder"
   },
   "dependencies": {
+    "@battle-realm/shared": "*",
     "@tailwindcss/postcss": "^4.1.18",
     "colyseus.js": "^0.15.0",
     "framer-motion": "^12.24.0",

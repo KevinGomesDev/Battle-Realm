@@ -9,7 +9,7 @@ import type {
   QTEResult,
   QTEInput,
   QTEClientState,
-} from "../../../../../shared/types/qte.types";
+} from "../../../../../shared/qte";
 import { colyseusService } from "../../../services/colyseus.service";
 
 // =============================================================================

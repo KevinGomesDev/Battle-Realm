@@ -15,7 +15,7 @@ import type { BattleUnit } from "../units/battle-unit.factory";
 import { CONDITIONS, removeNextTurnConditions } from "../conditions/conditions";
 import { getMaxMarksByCategory } from "./battle.utils";
 import { applyDamage } from "./damage.utils";
-import { tickUnitCooldowns } from "../abilities/executors/skill-executors";
+import { tickUnitCooldowns } from "../abilities/executors";
 
 // =============================================================================
 // TIPOS

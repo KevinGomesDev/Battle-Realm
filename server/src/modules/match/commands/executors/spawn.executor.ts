@@ -166,9 +166,9 @@ export const executeSpawnCommand: CommandExecutorFn = (
     const magicalProtection = will * MAGICAL_PROTECTION_CONFIG.multiplier;
 
     // Skills: pegar 1-2 skills aleatórias da classe
-    const classSkills = heroClass.skills
+    const classSkills = heroClass.abilities
       .slice(0, randomBetween(1, 2))
-      .map((s) => s.code);
+      .map((s: { code: string }) => s.code);
 
     // Determinar ações disponíveis
     const unitFeatures = determineUnitActions(
@@ -190,7 +190,11 @@ export const executeSpawnCommand: CommandExecutorFn = (
 
     for (const skillCode of classSkills) {
       const skill = findSkillByCode(skillCode);
-      if (skill && skill.category === "PASSIVE" && skill.conditionApplied) {
+      if (
+        skill &&
+        skill.activationType === "PASSIVE" &&
+        skill.conditionApplied
+      ) {
         if (!initialConditions.includes(skill.conditionApplied)) {
           initialConditions.push(skill.conditionApplied);
         }

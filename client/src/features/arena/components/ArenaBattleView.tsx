@@ -26,18 +26,18 @@ import { useChatStore } from "../../../stores";
 import { useChat } from "../../chat";
 import { ChatBox } from "../../chat/components/ChatBox";
 import type { BattleUnit } from "../../../../../shared/types/battle.types";
-import { getSpellByCode } from "../../../../../shared/data/spells.data";
 import {
+  getSpellByCode,
   findSkillByCode,
   isCommonAction,
-} from "../../../../../shared/data/skills.data";
+} from "../../../../../shared/data/abilities.data";
 import { resolveDynamicValue } from "../../../../../shared/types/ability.types";
 import { getFullMovementInfo } from "../../../../../shared/utils/engagement.utils";
-import { isValidSkillTarget } from "../../../../../shared/utils/skill-validation";
 import {
+  isValidSkillTarget,
   isValidSpellTarget,
   isValidSpellPosition,
-} from "../../../../../shared/utils/spell-validation";
+} from "../../../../../shared/utils/ability-validation";
 import { useTargeting } from "../hooks/useTargeting";
 import { colyseusService } from "../../../services/colyseus.service";
 import {
@@ -146,17 +146,15 @@ const ArenaBattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
 
   // Encontrar nomes das unidades do QTE
   const qteAttackerUnit = useMemo(() => {
-    if (!qteState.activeQTE?.attackerUnitId) return null;
-    return (
-      units.find((u) => u.id === qteState.activeQTE?.attackerUnitId) ?? null
-    );
-  }, [qteState.activeQTE?.attackerUnitId, units]);
+    if (!qteState.activeQTE?.attackerId) return null;
+    return units.find((u) => u.id === qteState.activeQTE?.attackerId) ?? null;
+  }, [qteState.activeQTE?.attackerId, units]);
 
   const qteResponderUnit = useMemo(() => {
     if (!qteState.activeQTE?.responderId) return null;
-    // O responder pode ser o defensor (unitId diferente do attackerUnitId)
-    return units.find((u) => u.id === qteState.activeQTE?.unitId) ?? null;
-  }, [qteState.activeQTE?.responderId, qteState.activeQTE?.unitId, units]);
+    // O responder pode ser o defensor (targetId diferente do attackerId)
+    return units.find((u) => u.id === qteState.activeQTE?.targetId) ?? null;
+  }, [qteState.activeQTE?.responderId, qteState.activeQTE?.targetId, units]);
 
   // Ouvir eventos de combate para disparar animações e centralizar câmera
   useEffect(() => {
@@ -1132,7 +1130,10 @@ const ArenaBattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
         // Verificar se está dentro do alcance
         const distance =
           Math.abs(x - selectedUnit.posX) + Math.abs(y - selectedUnit.posY);
-        const maxRange = skillDef.rangeValue ?? 4; // Padrão 4 se não definido
+        // Usar rangeDistance se disponível, senão padrão 4
+        const maxRange = skillDef.rangeDistance
+          ? resolveDynamicValue(skillDef.rangeDistance, selectedUnit)
+          : 4;
 
         if (distance <= maxRange) {
           console.log(

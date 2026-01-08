@@ -9,7 +9,7 @@ import {
   createSkillEvent,
 } from "../match/services/event.service";
 import { EVENT_CODES } from "../../../../shared/types/events.types";
-import type { AttackActionResult } from "../abilities/executors/skill-executors";
+import type { AttackActionResult } from "../abilities/executors";
 import type { MoveActionResult } from "./movement-actions";
 import type { AbilityExecutionResult as SpellExecutionResult } from "../../../../shared/types/ability.types";
 import { BattleUnit } from "../../../../shared/types/battle.types";

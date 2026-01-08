@@ -19,7 +19,9 @@
     /* Path alias */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@shared/*": ["../shared/*"],
+      "@shared": ["../shared"]
     },
 
     /* Linting */
@@ -30,5 +32,6 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "references": [{ "path": "../shared" }]
 }

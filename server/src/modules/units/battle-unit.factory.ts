@@ -119,7 +119,7 @@ export function createBattleUnit(
   // Adicionar condições de skills passivas (se ainda não estiverem)
   for (const skillCode of learnedSkills) {
     const skill = findSkillByCode(skillCode);
-    if (skill && skill.category === "PASSIVE" && skill.conditionApplied) {
+    if (skill && skill.activationType === "PASSIVE" && skill.conditionApplied) {
       if (!initialConditions.includes(skill.conditionApplied)) {
         initialConditions.push(skill.conditionApplied);
       }

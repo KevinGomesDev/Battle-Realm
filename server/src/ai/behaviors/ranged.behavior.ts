@@ -2,6 +2,7 @@
 // Comportamento Ranged: Mantém distância, ataca de longe
 
 import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
+import { resolveDynamicValue } from "../../../../shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,
@@ -79,7 +80,9 @@ export function makeRangedDecision(
 
     // 3. Tentar usar skill ranged
     const rangedSkills = availableSkills.filter(
-      (s) => s.range === "RANGED" || (s.rangeValue && s.rangeValue > 1)
+      (s) =>
+        s.range === "RANGED" ||
+        (s.rangeDistance && resolveDynamicValue(s.rangeDistance, unit) > 1)
     );
 
     if (rangedSkills.length > 0) {

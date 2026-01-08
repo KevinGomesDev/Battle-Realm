@@ -1,5 +1,5 @@
 // server/src/ai/core/spell-evaluator.ts
-// Avaliação e seleção de spells para a IA
+// Avaliaï¿½ï¿½o e seleï¿½ï¿½o de spells para a IA
 
 import { BattleUnit } from "../../../../shared/types/battle.types";
 import type { AbilityDefinition as SpellDefinition } from "../../../../shared/types/ability.types";
@@ -26,11 +26,11 @@ interface SpellEvaluation {
 }
 
 // =============================================================================
-// OBTENÇÃO DE SPELLS
+// OBTENï¿½ï¿½O DE SPELLS
 // =============================================================================
 
 /**
- * Obtém as spells disponíveis para uma unidade
+ * ObtÃ©m as spells disponÃ­veis para uma unidade
  */
 export function getUnitSpells(unit: BattleUnit): SpellDefinition[] {
   if (!unit.spells || unit.spells.length === 0) {
@@ -38,16 +38,19 @@ export function getUnitSpells(unit: BattleUnit): SpellDefinition[] {
   }
 
   return unit.spells
-    .map((spellCode) => getSpellByCode(spellCode))
+    .map((spellCode) => {
+      const result = getSpellByCode(spellCode);
+      return result?.ability;
+    })
     .filter((spell): spell is SpellDefinition => spell !== undefined);
 }
 
 // =============================================================================
-// AVALIAÇÃO DE SPELLS
+// AVALIAï¿½ï¿½O DE SPELLS
 // =============================================================================
 
 /**
- * Avalia uma spell de dano em área
+ * Avalia uma spell de dano em ï¿½rea
  */
 function evaluateDamageSpell(
   caster: BattleUnit,
@@ -64,19 +67,19 @@ function evaluateDamageSpell(
     return { score: 0, bestTarget: null, reason: "Sem inimigos" };
   }
 
-  // Para spells de área (FIRE), encontrar posição que atinge mais inimigos
+  // Para spells de ï¿½rea (FIRE), encontrar posiï¿½ï¿½o que atinge mais inimigos
   if (spell.targetType === "POSITION") {
     let bestPos: { x: number; y: number } | null = null;
     let bestScore = 0;
     let bestHitCount = 0;
 
-    // Avaliar posição de cada inimigo como centro
+    // Avaliar posiï¿½ï¿½o de cada inimigo como centro
     for (const enemy of enemies) {
       const pos = { x: enemy.posX, y: enemy.posY };
       let hitCount = 0;
       let damageScore = 0;
 
-      // Contar quantos inimigos seriam atingidos em área 3x3
+      // Contar quantos inimigos seriam atingidos em ï¿½rea 3x3
       for (const target of enemies) {
         const dist = getChebyshevDistance(
           pos.x,
@@ -92,7 +95,7 @@ function evaluateDamageSpell(
         }
       }
 
-      // Verificar se não atinge aliados
+      // Verificar se nï¿½o atinge aliados
       const allies = getAllies(caster, allUnits);
       let allyHit = false;
       for (const ally of allies) {
@@ -126,7 +129,7 @@ function evaluateDamageSpell(
     }
   }
 
-  // Para spells de alvo único com dano (UNIT ofensivo)
+  // Para spells de alvo ï¿½nico com dano (UNIT ofensivo)
   if (spell.targetType === "UNIT" && spell.baseDamage !== undefined) {
     const targetsWithScores = enemies.map((enemy) => {
       const hpPercent = enemy.currentHp / enemy.maxHp;
@@ -154,7 +157,7 @@ function evaluateDamageSpell(
     };
   }
 
-  return { score: 0, bestTarget: null, reason: "Tipo de alvo não suportado" };
+  return { score: 0, bestTarget: null, reason: "Tipo de alvo nï¿½o suportado" };
 }
 
 /**
@@ -168,7 +171,7 @@ function evaluateSupportSpell(
   const allies = getAllies(caster, allUnits);
 
   if (spell.targetType === "SELF") {
-    // Self-buff sempre é válido
+    // Self-buff sempre ï¿½ vï¿½lido
     return {
       score: 35,
       bestTarget: caster,
@@ -181,7 +184,7 @@ function evaluateSupportSpell(
     const validAllies = allies.filter((a) => a.id !== caster.id);
 
     if (validAllies.length === 0) {
-      return { score: 0, bestTarget: null, reason: "Sem aliados válidos" };
+      return { score: 0, bestTarget: null, reason: "Sem aliados vï¿½lidos" };
     }
 
     // Para EMPOWER, priorizar aliados com mais Combat (para maximizar dano)
@@ -203,7 +206,7 @@ function evaluateSupportSpell(
     };
   }
 
-  return { score: 0, bestTarget: null, reason: "Tipo de alvo não suportado" };
+  return { score: 0, bestTarget: null, reason: "Tipo de alvo nï¿½o suportado" };
 }
 
 /**
@@ -228,7 +231,7 @@ function evaluateMovementSpell(
     };
   }
 
-  // Teleport é útil para:
+  // Teleport ï¿½ ï¿½til para:
   // 1. Se aproximar de inimigos quando longe
   // 2. Fugir quando HP baixo
   // 3. Flanquear
@@ -256,22 +259,22 @@ function evaluateMovementSpell(
     nearestEnemy.posY
   );
 
-  // Se já está adjacente, não precisa teleportar
+  // Se jï¿½ estï¿½ adjacente, nï¿½o precisa teleportar
   if (distToNearest <= 1) {
     return {
       score: 0,
       bestTarget: null,
-      reason: "Já está adjacente ao inimigo",
+      reason: "Jï¿½ estï¿½ adjacente ao inimigo",
     };
   }
 
-  // Se está longe, teleportar para adjacente ao inimigo
+  // Se estï¿½ longe, teleportar para adjacente ao inimigo
   const targetPos = {
     x: nearestEnemy.posX + (caster.posX > nearestEnemy.posX ? 1 : -1),
     y: nearestEnemy.posY,
   };
 
-  // Verificar se posição é válida (não ocupada)
+  // Verificar se posiï¿½ï¿½o ï¿½ vï¿½lida (nï¿½o ocupada)
   const isOccupied = allUnits.some(
     (u) => u.isAlive && u.posX === targetPos.x && u.posY === targetPos.y
   );
@@ -280,7 +283,7 @@ function evaluateMovementSpell(
     return {
       score: 0,
       bestTarget: null,
-      reason: "Posição de teleporte ocupada",
+      reason: "Posiï¿½ï¿½o de teleporte ocupada",
     };
   }
 
@@ -292,7 +295,7 @@ function evaluateMovementSpell(
 }
 
 /**
- * Avalia uma spell única
+ * Avalia uma spell ï¿½nica
  */
 function evaluateSpell(
   caster: BattleUnit,
@@ -309,14 +312,14 @@ function evaluateSpell(
       validTargets: [],
       bestTarget: null,
       canUse: false,
-      reason: validation.error || "Não pode usar spell",
+      reason: validation.error || "Nï¿½o pode usar spell",
     };
   }
 
   // Avaliar baseado no effectType da spell
   let evalResult: { score: number; bestTarget: any; reason: string };
 
-  // Usar effectType diretamente para decisões de IA
+  // Usar effectType diretamente para decisï¿½es de IA
   const effectType = spell.effectType;
 
   switch (effectType) {
@@ -343,7 +346,7 @@ function evaluateSpell(
         evalResult = {
           score: 0,
           bestTarget: null,
-          reason: "Spell não avaliada",
+          reason: "Spell nï¿½o avaliada",
         };
       }
   }

@@ -3,7 +3,11 @@
 
 export * from "./pathfinding";
 export * from "./target-selection";
-export * from "./skill-evaluator";
+export * from "./ability-evaluator";
 export * from "./decision-maker";
 export * from "./ai-controller";
 export * from "./action-executor";
+
+// NOTA: skill-evaluator e spell-evaluator mantidos para compatibilidade
+// mas não re-exportados aqui para evitar duplicação
+// Use ability-evaluator para novas implementações

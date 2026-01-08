@@ -9,7 +9,7 @@ import type {
   QTEConfig,
   QTEInput,
   QTEResultGrade,
-} from "../../../../../shared/types/qte.types";
+} from "../../../../../shared/qte";
 
 // =============================================================================
 // PROPS

@@ -520,3 +520,7 @@ export const getValidSpellTargets = getValidAbilityTargets;
 export const getSkillMaxRange = getAbilityMaxRange;
 /** @deprecated Use getAbilityMaxRange */
 export const getSpellMaxRange = getAbilityMaxRange;
+/** @deprecated Use isValidAbilityPosition */
+export const isValidSkillPosition = isValidAbilityPosition;
+/** @deprecated Use isValidAbilityPosition */
+export const isValidSpellPosition = isValidAbilityPosition;

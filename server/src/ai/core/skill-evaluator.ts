@@ -1,10 +1,8 @@
 // server/src/ai/core/skill-evaluator.ts
-// Avaliação e seleção de skills para a IA
+// Avaliaï¿½ï¿½o e seleï¿½ï¿½o de skills para a IA
 
 import { BattleUnit } from "../../../../shared/types/battle.types";
-import type {
-  AbilityDefinition as SkillDefinition,
-} from "../../../../shared/types/ability.types";
+import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
 import { getAbilityMaxRange as getSkillRangeShared } from "../../../../shared/utils/ability-validation";
 import type { AISkillPriority, AIProfile } from "../types/ai.types";
 import { manhattanDistance } from "./pathfinding";
@@ -24,15 +22,28 @@ interface SkillEvaluation {
 }
 
 /**
- * Obtém o range efetivo de uma skill
- * Wrapper para manter compatibilidade com código existente
+ * ObtÃ©m o range efetivo de uma skill
+ * Wrapper para manter compatibilidade com cÃ³digo existente
  */
-export function getSkillEffectiveRange(skill: SkillDefinition): number {
-  return getSkillRangeShared(skill);
+export function getSkillEffectiveRange(
+  skill: SkillDefinition,
+  caster?: BattleUnit
+): number {
+  // Se nÃ£o tiver caster, usar valores padrÃ£o
+  if (!caster) {
+    const DEFAULT_RANGE_VALUES: Record<string, number> = {
+      SELF: 0,
+      MELEE: 1,
+      RANGED: 5,
+      AREA: 5,
+    };
+    return DEFAULT_RANGE_VALUES[skill.range || "MELEE"] || 1;
+  }
+  return getSkillRangeShared(skill, caster);
 }
 
 /**
- * Verifica se uma skill pode ser usada em um alvo específico
+ * Verifica se uma skill pode ser usada em um alvo especï¿½fico
  * @deprecated Use isValidAbilityTarget de shared/utils/ability-validation
  */
 export function canUseSkillOnTarget(
@@ -45,7 +56,7 @@ export function canUseSkillOnTarget(
 }
 
 /**
- * Obtém todos os alvos válidos para uma skill
+ * Obtï¿½m todos os alvos vï¿½lidos para uma skill
  */
 export function getValidTargetsForSkill(
   caster: BattleUnit,
@@ -64,7 +75,7 @@ function evaluateDamageSkill(
   validTargets: BattleUnit[]
 ): { score: number; bestTarget: BattleUnit | null; reason: string } {
   if (validTargets.length === 0) {
-    return { score: 0, bestTarget: null, reason: "Sem alvos válidos" };
+    return { score: 0, bestTarget: null, reason: "Sem alvos vï¿½lidos" };
   }
 
   // Priorizar alvos com HP baixo (para finalizar)
@@ -76,7 +87,7 @@ function evaluateDamageSkill(
     if (hpPercentage <= 0.3) score += 30;
     else if (hpPercentage <= 0.5) score += 15;
 
-    // Bonus se o alvo está com HP muito baixo (potencial de kill)
+    // Bonus se o alvo estï¿½ com HP muito baixo (potencial de kill)
     if (target.currentHp <= caster.combat * 2) {
       score += 25; // Pode matar
     }
@@ -106,7 +117,7 @@ function evaluateHealSkill(
   const needsHealing = validTargets.filter((t) => t.currentHp < t.maxHp * 0.8);
 
   if (needsHealing.length === 0) {
-    return { score: 0, bestTarget: null, reason: "Ninguém precisa de cura" };
+    return { score: 0, bestTarget: null, reason: "Ninguï¿½m precisa de cura" };
   }
 
   // Priorizar aliados com HP mais baixo
@@ -117,7 +128,7 @@ function evaluateHealSkill(
     // Quanto menor o HP, maior a prioridade
     score += (1 - hpPercentage) * 50;
 
-    // Bonus extra se estiver crítico
+    // Bonus extra se estiver crï¿½tico
     if (hpPercentage <= 0.3) score += 20;
 
     return { target, score };
@@ -145,7 +156,7 @@ function evaluateBuffSkill(
     return { score: 0, bestTarget: null, reason: "Sem alvos para buff" };
   }
 
-  // Por enquanto, priorizar aliados com mais HP (que vão durar mais)
+  // Por enquanto, priorizar aliados com mais HP (que vï¿½o durar mais)
   const targetsWithScores = validTargets.map((target) => {
     const hpPercentage = target.currentHp / target.maxHp;
     let score = 30;
@@ -202,7 +213,7 @@ export function evaluateSkill(
   allUnits: BattleUnit[],
   skillPriority: AISkillPriority
 ): SkillEvaluation {
-  // Se prioridade é NONE, não avaliar skills
+  // Se prioridade ï¿½ NONE, nï¿½o avaliar skills
   if (skillPriority === "NONE") {
     return {
       skill,
@@ -210,7 +221,7 @@ export function evaluateSkill(
       validTargets: [],
       bestTarget: null,
       canUse: false,
-      reason: "IA não usa skills",
+      reason: "IA nï¿½o usa skills",
     };
   }
 
@@ -223,7 +234,7 @@ export function evaluateSkill(
       validTargets: [],
       bestTarget: null,
       canUse: false,
-      reason: "Sem alvos válidos",
+      reason: "Sem alvos vï¿½lidos",
     };
   }
 
@@ -234,7 +245,7 @@ export function evaluateSkill(
     reason: string;
   };
 
-  // Usar effectType diretamente para decisões de IA
+  // Usar effectType diretamente para decisï¿½es de IA
   const effectType = skill.effectType;
 
   switch (effectType) {
@@ -251,11 +262,11 @@ export function evaluateSkill(
       evaluation = evaluateDebuffSkill(caster, skill, validTargets);
       break;
     case "UTILITY":
-      // Skills utilitárias (movimento, etc) têm score base menor
+      // Skills utilitï¿½rias (movimento, etc) tï¿½m score base menor
       evaluation = {
         score: 15,
         bestTarget: caster, // Geralmente afeta a si mesmo
-        reason: "Skill utilitária",
+        reason: "Skill utilitï¿½ria",
       };
       break;
     default:
@@ -263,7 +274,7 @@ export function evaluateSkill(
       evaluation = {
         score: 20,
         bestTarget: validTargets[0],
-        reason: "Skill genérica",
+        reason: "Skill genï¿½rica",
       };
   }
 

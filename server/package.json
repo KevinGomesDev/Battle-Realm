@@ -1,15 +1,23 @@
 {
-  "name": "server",
+  "name": "@battle-realm/server",
   "version": "2.0.0",
-  "main": "index.js",
+  "type": "module",
+  "main": "dist/server.js",
   "scripts": {
-    "dev": "nodemon src/server.ts"
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@battle-realm/shared": "*",
     "@colyseus/core": "^0.15.0",
     "@colyseus/monitor": "^0.15.0",
     "@colyseus/schema": "^2.0.0",
@@ -32,9 +40,8 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.10.4",
     "@types/pathfinding": "^0.1.0",
-    "nodemon": "^3.1.11",
     "prisma": "^5.22.0",
-    "ts-node": "^10.9.2",
+    "tsx": "^4.19.4",
     "typescript": "^5.9.3"
   }
 }

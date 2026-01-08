@@ -2,8 +2,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   getSkillInfo,
   findSkillByCode,
-} from "../../../../../../shared/data/skills.data";
-import { getSpellByCode } from "../../../../../../shared/data/spells.data";
+  getSpellByCode,
+} from "../../../../../../shared/data/abilities.data";
 
 interface TargetSelectionNotificationProps {
   pendingAction: string | null;
@@ -44,9 +44,9 @@ export function TargetSelectionNotification({
     const skill = getSkillInfo(actionCode);
     const skillDef = findSkillByCode(actionCode);
     if (skill && skillDef) {
-      // Texto de alvo baseado no range da skill
+      // Texto de alvo baseado no range da skill (ADJACENT foi mapeado para MELEE)
       let targetText = "uma unidade alvo";
-      if (skillDef.range === "MELEE" || skillDef.range === "ADJACENT") {
+      if (skillDef.range === "MELEE") {
         targetText = "um alvo adjacente";
       } else if (skillDef.range === "RANGED") {
         targetText = "um alvo no alcance";

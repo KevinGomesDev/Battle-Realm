@@ -11,8 +11,8 @@ import {
 import {
   executeSkill as executeSkillLogic,
   executeAttack as executeAttackLogic,
-} from "../../modules/abilities/executors/skill-executors";
-import { executeSpell as executeSpellLogic } from "../../modules/abilities/executors/spell-executors";
+} from "../../modules/abilities/executors";
+import { executeSpell as executeSpellLogic } from "../../modules/abilities/executors";
 import { getAbilityByCode as getSpellByCode } from "../../../../shared/data/abilities.data";
 import {
   processAIUnit,
@@ -318,14 +318,15 @@ function executeSpellAction(
     };
   }
 
-  const spell = getSpellByCode(decision.spellCode);
-  if (!spell) {
+  const spellResult = getSpellByCode(decision.spellCode);
+  if (!spellResult) {
     return {
       decision,
       success: false,
       error: `Spell não encontrada: ${decision.spellCode}`,
     };
   }
+  const spell = spellResult.ability;
 
   // Determinar o alvo (pode ser unidade ou posição)
   let target: BattleUnit | { x: number; y: number } | null = null;
@@ -452,8 +453,8 @@ export async function executeFullAITurn(
           const attack = result.stateChanges.unitAttacked;
           const targetUnit = battle.units.find((u) => u.id === attack.targetId);
 
-          // Emitir evento detalhado de ataque (igual ao jogador)
-          io.to(lobbyId).emit("battle:unit_attacked", {
+          // Emitir evento detalhado de ataque via callback (Colyseus)
+          emit("battle:unit_attacked", {
             battleId: battle.battleId,
             attackerUnitId: attack.attackerId,
             targetUnitId: attack.targetId,

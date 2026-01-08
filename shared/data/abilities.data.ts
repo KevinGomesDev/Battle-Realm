@@ -958,7 +958,7 @@ export function getAbilityInfoWithState(
     reason = "Sem ações";
   }
   // Verificar mana para spells
-  else if (ability.category === "SPELL" && ability.manaCost) {
+  else if ((ability.category as string) === "SPELL" && ability.manaCost) {
     const currentMana = unit.currentMana ?? 0;
     if (currentMana < ability.manaCost) {
       canUse = false;

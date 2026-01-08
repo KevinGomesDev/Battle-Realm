@@ -13,13 +13,14 @@ export async function grantSpellToUnit(
 ): Promise<{ success: boolean; message: string }> {
   try {
     // Verificar se spell existe
-    const spell = getSpellByCode(spellCode);
-    if (!spell) {
+    const spellResult = getSpellByCode(spellCode);
+    if (!spellResult) {
       return {
         success: false,
         message: `Spell não encontrada: ${spellCode}`,
       };
     }
+    const spell = spellResult.ability;
 
     // Buscar unidade
     const unit = await prisma.unit.findUnique({
@@ -108,10 +109,12 @@ export async function removeSpellFromUnit(
       data: { spells: JSON.stringify(currentSpells) },
     });
 
-    const spell = getSpellByCode(spellCode);
+    const spellResult = getSpellByCode(spellCode);
     return {
       success: true,
-      message: `${spell?.name || spellCode} removida de ${unit.name}`,
+      message: `${spellResult?.ability.name || spellCode} removida de ${
+        unit.name
+      }`,
     };
   } catch (error) {
     console.error("[SPELLS] Erro ao remover spell:", error);
