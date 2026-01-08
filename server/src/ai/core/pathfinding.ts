@@ -6,7 +6,7 @@ import type {
   BattleObstacle,
   BattleUnit,
 } from "../../../../shared/types/battle.types";
-import { getManhattanDistance } from "../../../../shared/types/skills.types";
+import { getManhattanDistance } from "../../../../shared/utils/distance.utils";
 
 interface Position {
   x: number;

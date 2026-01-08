@@ -1,7 +1,7 @@
 // server/src/ai/behaviors/defensive.behavior.ts
 // Comportamento Defensivo: Protege posição, contra-ataca
 
-import type { SkillDefinition } from "../../../../shared/types/skills.types";
+import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,

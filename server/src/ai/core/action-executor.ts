@@ -13,7 +13,7 @@ import {
   executeAttack as executeAttackLogic,
 } from "../../logic/skill-executors";
 import { executeSpell as executeSpellLogic } from "../../spells/executors";
-import { getSpellByCode } from "../../../../shared/data/spells.data";
+import { getAbilityByCode as getSpellByCode } from "../../../../shared/data/abilities.data";
 import {
   processAIUnit,
   aiActionDelay,

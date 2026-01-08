@@ -2,7 +2,7 @@
 
 import { PrismaClient } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
-import { TROOP_SKILLS_MAP } from "../../../../shared/data/skills.data";
+import { TROOP_ABILITY_MAP as TROOP_SKILLS_MAP } from "../../../../shared/data/abilities.data";
 import {
   TROOP_RECRUITMENT_BASE_COST,
   TROOP_LEVELUP_COSTS,

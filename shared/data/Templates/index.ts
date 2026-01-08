@@ -1,17 +1,9 @@
 // shared/data/Templates/index.ts
 // Barrel export para todos os templates
-
-// Skills
-export * from "./SkillsTemplates";
-
-// Spells
-export * from "./SpellsTemplates";
+// Nota: Skills, Spells e Classes agora estão em abilities.data.ts
 
 // Summons
 export * from "./SummonsTemplates";
-
-// Classes
-export * from "./ClassesTemplates";
 
 // Races
 export * from "./RacesTemplates";

@@ -8,10 +8,10 @@ import type {
 import type { CommandResult } from "../../../../shared/types/commands.types";
 import { BattleUnitSchema } from "../../colyseus/schemas";
 import { RACE_DEFINITIONS } from "../../../../shared/data/Templates/RacesTemplates";
-import { HERO_CLASSES } from "../../../../shared/data/Templates/ClassesTemplates";
+import { HERO_CLASSES } from "../../../../shared/data/abilities.data";
 import { determineUnitActions } from "../../logic/unit-actions";
 import { calculateActiveEffects } from "../../logic/conditions";
-import { findSkillByCode } from "../../../../shared/data/skills.data";
+import { findAbilityByCode as findSkillByCode } from "../../../../shared/data/abilities.data";
 import { getRacePassiveCondition } from "../../../../shared/data/races.data";
 import {
   PHYSICAL_PROTECTION_CONFIG,

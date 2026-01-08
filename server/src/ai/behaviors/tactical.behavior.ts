@@ -1,7 +1,7 @@
 // server/src/ai/behaviors/tactical.behavior.ts
 // Comportamento Tático: Equilibrado, considera posicionamento
 
-import type { SkillDefinition } from "../../../../shared/types/skills.types";
+import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,

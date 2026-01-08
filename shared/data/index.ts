@@ -1,9 +1,13 @@
 // shared/data/index.ts
 // Barrel export para dados compartilhados
-// Nota: spells.data N√ÉO √© exportado aqui para evitar conflito de nomes
-// Import diretamente de "./spells.data" quando necess√°rio
+
+// === SISTEMA UNIFICADO DE ABILITIES ===
+// Fonte de verdade para skills e spells
+export * from "./abilities.data";
+
+// === OUTROS DADOS ===
 export * from "./races.data";
-export * from "./classes.data";
+// export * from "./classes.data"; // Agora em abilities.data
 export * from "./units.data";
 export * from "./heroes.data";
 export * from "./regents.data";
@@ -19,3 +23,8 @@ export * from "./turns.data";
 export * from "./crisis.data";
 export * from "./effect-metadata.data";
 export * from "./sounds.data";
+
+// @deprecated - Estes mÛdulos s„o wrappers de compatibilidade
+// Skills e Spells agora est„o unificados em abilities.data.ts
+// export * from "./skills.data"; // Use abilities.data
+// export * from "./spells.data"; // Use abilities.data

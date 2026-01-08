@@ -1,27 +1,26 @@
 // src/utils/skills.utils.ts
 // Utilitários para o sistema de skills - usando dados estáticos
 
-import { prisma } from "../lib/prisma";
-import { spendResources } from "./turn.utils";
+import type {
+  AbilityDefinition as SkillDefinition,
+  HeroClassDefinition,
+} from "../../../shared/types/ability.types";
+import { DEFAULT_RANGE_VALUES } from "../../../shared/types/ability.types";
+import { getAbilityEffectiveRange as getSkillEffectiveRange } from "../../../shared/utils/ability-validation";
 import {
   HERO_CLASSES,
   getClassByCode,
-  getSkillByCode,
-  getSkillsForClass,
+  getAbilityByCode as getSkillByCode,
+  getAbilitiesForClass as getSkillsForClass,
   getAllClassesSummary,
-} from "../../../shared/data/classes.data";
+} from "../../../shared/data/abilities.data";
 import {
-  SkillCategory,
-  SkillCostTier,
-  SkillRange,
-  SkillResourceType,
-  SkillDefinition,
-  HeroClassDefinition,
-  COST_VALUES,
-  DEFAULT_RANGE_VALUES,
-  getSkillCost,
-  getSkillEffectiveRange,
-} from "../../../shared/types/skills.types";
+  HERO_CLASSES,
+  getClassByCode,
+  getAbilityByCode as getSkillByCode,
+  getAbilitiesForClass as getSkillsForClass,
+  getAllClassesSummary,
+} from "../../../shared/data/abilities.data";
 import {
   getResourceName,
   ResourceKey,

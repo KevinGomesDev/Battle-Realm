@@ -1,8 +1,8 @@
 // server/src/ai/behaviors/shared.behavior.ts
 // Funções reutilizáveis compartilhadas entre todos os behaviors
 
-import type { SkillDefinition } from "../../../../shared/types/skills.types";
-import type { SpellDefinition } from "../../../../shared/types/spells.types";
+import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
+import type { AbilityDefinition as SpellDefinition } from "../../../../shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,

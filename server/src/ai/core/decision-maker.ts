@@ -1,7 +1,7 @@
 // server/src/ai/core/decision-maker.ts
 // Tomador de decisões principal da IA
 
-import type { SkillDefinition } from "../../../../shared/types/skills.types";
+import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,

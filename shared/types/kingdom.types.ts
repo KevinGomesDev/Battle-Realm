@@ -1,4 +1,4 @@
-import type { SkillDefinition } from "./skills.types";
+import type { AbilityDefinition as SkillDefinition } from "./ability.types";
 import type { ResourceKey, AttributeKey } from "../config/global.config";
 
 // Re-exporta tipos do config global para uso em kingdom

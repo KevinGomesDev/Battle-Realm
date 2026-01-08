@@ -11,7 +11,7 @@ import {
 import { EVENT_CODES } from "../../../shared/types/events.types";
 import type { AttackActionResult } from "./skill-executors";
 import type { MoveActionResult } from "./movement-actions";
-import type { SpellExecutionResult } from "../../../shared/types/spells.types";
+import type { AbilityExecutionResult as SpellExecutionResult } from "../../../shared/types/ability.types";
 import { BattleUnit } from "../../../shared/types/battle.types";
 
 // =============================================================================

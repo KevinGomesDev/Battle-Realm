@@ -1,10 +1,5 @@
 // src/utils/army/summon.utils.ts
-import { prisma } from "../../lib/prisma";
-import { TROOP_SKILLS } from "../../../../shared/data/skills.data";
-import {
-  HERO_CLASSES,
-  getSkillsForClass,
-} from "../../../../shared/data/classes.data";
+import { HERO_CLASSES, getAbilitiesForClass as getSkillsForClass } from "../../../../shared/data/abilities.data";
 import {
   HP_CONFIG,
   MANA_CONFIG,

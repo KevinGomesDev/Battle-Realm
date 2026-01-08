@@ -1,21 +1,21 @@
 // client/src/features/arena/hooks/useSkillExecution.ts
-// Hook dedicado para execu√ß√£o de skills com valida√ß√£o, feedback visual e update otimista
+// Hook dedicado para execuÁ„o de skills com validaÁ„o, feedback visual e update otimista
 
 import { useCallback, useMemo, useState } from "react";
 import { useArena } from "./useArena";
 import {
-  findSkillByCode,
-  getSkillInfoWithState,
-  type SkillInfoWithState,
-} from "../../../../../shared/data/skills.data";
+  findAbilityByCode as findSkillByCode,
+  getAbilityInfoWithState as getSkillInfoWithState,
+  type AbilityInfoWithState as SkillInfoWithState,
+} from "../../../../../shared/data/abilities.data";
 import {
-  validateSkillUse,
-  isValidSkillTarget,
-  getValidSkillTargets,
-  canUseSkill,
-} from "../../../../../shared/utils/skill-validation";
+  validateAbilityUse as validateSkillUse,
+  isValidAbilityTarget as isValidSkillTarget,
+  getValidAbilityTargets as getValidSkillTargets,
+  canUseAbility as canUseSkill,
+} from "../../../../../shared/utils/ability-validation";
 import type { BattleUnit } from "../../../../../shared/types/battle.types";
-import type { SkillDefinition } from "../../../../../shared/types/skills.types";
+import type { AbilityDefinition as SkillDefinition } from "../../../../../shared/types/ability.types";
 
 // =============================================================================
 // TIPOS
@@ -27,7 +27,7 @@ export interface UseSkillExecutionReturn {
   validTargets: BattleUnit[];
   canSelfCast: boolean;
 
-  // A√ß√µes
+  // AÁıes
   selectSkill: (skillCode: string, caster: BattleUnit) => boolean;
   cancelSkill: () => void;
   executeSkillOnTarget: (
@@ -58,13 +58,13 @@ export function useSkillExecution(
   // Estado interno da skill pendente
   const [pendingSkillCode, setPendingSkillCode] = useState<string | null>(null);
 
-  // Derivar skill pendente do c√≥digo
+  // Derivar skill pendente do cÛdigo
   const pendingSkill = useMemo(() => {
     if (!pendingSkillCode) return null;
     return findSkillByCode(pendingSkillCode) ?? null;
   }, [pendingSkillCode]);
 
-  // Calcular alvos v√°lidos para a skill pendente
+  // Calcular alvos v·lidos para a skill pendente
   const validTargets = useMemo(() => {
     if (!pendingSkill || !selectedUnit) return [];
     return getValidSkillTargets(selectedUnit, pendingSkill, units);
@@ -86,7 +86,7 @@ export function useSkillExecution(
     (skillCode: string, caster: BattleUnit): boolean => {
       const skill = findSkillByCode(skillCode);
       if (!skill) {
-        console.error(`[useSkillExecution] Skill n√£o encontrada: ${skillCode}`);
+        console.error(`[useSkillExecution] Skill n„o encontrada: ${skillCode}`);
         return false;
       }
 
@@ -94,12 +94,12 @@ export function useSkillExecution(
       const { canUse, reason } = canUseSkill(caster, skill);
       if (!canUse) {
         console.warn(
-          `[useSkillExecution] N√£o pode usar ${skillCode}: ${reason}`
+          `[useSkillExecution] N„o pode usar ${skillCode}: ${reason}`
         );
         return false;
       }
 
-      // Skills SELF s√£o executadas imediatamente
+      // Skills SELF s„o executadas imediatamente
       if (skill.range === "SELF" || skill.targetType === "SELF") {
         executeAction("use_skill", caster.id, {
           skillCode,
@@ -124,7 +124,7 @@ export function useSkillExecution(
   }, []);
 
   /**
-   * Executa a skill em um alvo espec√≠fico
+   * Executa a skill em um alvo especÌfico
    */
   const executeSkillOnTarget = useCallback(
     async (caster: BattleUnit, target: BattleUnit): Promise<boolean> => {
@@ -137,7 +137,7 @@ export function useSkillExecution(
       const validation = validateSkillUse(caster, pendingSkill, target);
       if (!validation.valid) {
         console.warn(
-          `[useSkillExecution] Valida√ß√£o falhou: ${validation.error}`
+          `[useSkillExecution] ValidaÁ„o falhou: ${validation.error}`
         );
         return false;
       }
@@ -170,7 +170,7 @@ export function useSkillExecution(
       }
 
       if (!canSelfCast) {
-        console.warn("[useSkillExecution] Skill n√£o permite self-cast");
+        console.warn("[useSkillExecution] Skill n„o permite self-cast");
         return false;
       }
 
@@ -180,7 +180,7 @@ export function useSkillExecution(
   );
 
   /**
-   * Obt√©m lista de skills com estado para uma unidade
+   * ObtÈm lista de skills com estado para uma unidade
    */
   const getSkillsForUnit = useCallback(
     (unit: BattleUnit): SkillInfoWithState[] => {
@@ -204,7 +204,7 @@ export function useSkillExecution(
   );
 
   /**
-   * Verifica se uma unidade √© alvo v√°lido
+   * Verifica se uma unidade È alvo v·lido
    */
   const isValidTarget = useCallback(
     (

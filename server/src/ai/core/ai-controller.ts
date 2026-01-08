@@ -2,7 +2,7 @@
 // Controlador principal da IA de batalha
 
 import type { ArenaBattle } from "../../../../shared/types/arena.types";
-import type { SkillDefinition } from "../../../../shared/types/skills.types";
+import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,
@@ -22,7 +22,7 @@ import { BattleUnit } from "../../../../shared/types/battle.types";
 import {
   findSkillByCode,
   isCommonAction,
-} from "../../../../shared/data/skills.data";
+} from "../../../../shared/data/abilities.data";
 import { filterVisibleUnitsWithLoS } from "./target-selection";
 
 // ID especial para o "jogador" IA

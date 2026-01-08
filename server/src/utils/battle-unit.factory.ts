@@ -2,7 +2,7 @@
 // Factory para criação de BattleUnits - elimina duplicação de código
 
 import { determineUnitActions } from "../logic/unit-actions";
-import { findSkillByCode } from "../../../shared/data/skills.data";
+import { findAbilityByCode as findSkillByCode } from "../../../shared/data/abilities.data";
 import { getRacePassiveCondition } from "../../../shared/data/races.data";
 import { calculateActiveEffects } from "../logic/conditions";
 import {

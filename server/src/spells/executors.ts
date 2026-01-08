@@ -1,9 +1,8 @@
-import { BattleUnit } from "../../../shared/types/battle.types";
-import {
-  SpellDefinition,
-  SpellExecutionResult,
-  SpellExecutorFn,
-} from "../../../shared/types/spells.types";
+import type {
+  AbilityDefinition as SpellDefinition,
+  AbilityExecutionResult as SpellExecutionResult,
+  AbilityExecutorFn as SpellExecutorFn,
+} from "../../../shared/types/ability.types";
 import {
   resolveDynamicValue,
   type DynamicValue,

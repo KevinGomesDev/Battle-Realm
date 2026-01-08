@@ -2,7 +2,7 @@
 import {
   findSkillByCode,
   getCommonActionCodes,
-} from "../../../shared/data/skills.data";
+} from "../../../shared/data/abilities.data";
 
 // Ações comuns disponíveis para todas unidades
 const COMMON_ACTION_CODES = getCommonActionCodes();

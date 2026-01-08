@@ -1,7 +1,7 @@
 // server/src/ai/behaviors/ranged.behavior.ts
 // Comportamento Ranged: Mantém distância, ataca de longe
 
-import type { SkillDefinition } from "../../../../shared/types/skills.types";
+import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,

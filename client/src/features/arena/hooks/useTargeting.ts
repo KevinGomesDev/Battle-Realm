@@ -17,8 +17,8 @@ import {
 import {
   findSkillByCode,
   isCommonAction,
-} from "../../../../../shared/data/skills.data";
-import { getSpellByCode } from "../../../../../shared/data/spells.data";
+} from "../../../../../shared/data/abilities.data";
+import { getAbilityByCode as getSpellByCode } from "../../../../../shared/data/abilities.data";
 
 /**
  * Props para o hook de targeting

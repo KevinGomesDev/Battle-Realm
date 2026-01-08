@@ -3,16 +3,15 @@
 // FONTE DE VERDADE para execução de habilidades ativas
 
 import type {
-  SkillExecutionResult,
-  SkillDefinition,
-} from "../../../shared/types/skills.types";
-import { resolveDynamicValue } from "../../../shared/types/ability.types";
+  AbilityExecutionResult as SkillExecutionResult,
+  AbilityDefinition as SkillDefinition,
+} from "../../../shared/types/ability.types";
 import {
   getManhattanDistance,
   isAdjacentOmnidirectional,
   isWithinRange,
-} from "../../../shared/utils/spell-validation";
-import { findSkillByCode } from "../../../shared/data/skills.data";
+} from "../../../shared/utils/distance.utils";
+import { findAbilityByCode as findSkillByCode } from "../../../shared/data/abilities.data";
 import type {
   BattleObstacle,
   BattleUnit,

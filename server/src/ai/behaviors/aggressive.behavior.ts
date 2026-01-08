@@ -1,7 +1,7 @@
 // server/src/ai/behaviors/aggressive.behavior.ts
 // Comportamento Agressivo: Foca em atacar, persegue inimigos
 
-import type { SkillDefinition } from "../../../../shared/types/skills.types";
+import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,

@@ -1,7 +1,7 @@
 // server/src/ai/behaviors/support.behavior.ts
 // Comportamento Support: Prioriza curar e buffar aliados
 
-import type { SkillDefinition } from "../../../../shared/types/skills.types";
+import type { AbilityDefinition as SkillDefinition } from "../../../../shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,

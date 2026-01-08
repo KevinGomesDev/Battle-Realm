@@ -14,7 +14,7 @@ export {
   getCommonActions,
   getCommonActionCodes,
   getSkillInfo,
-} from "../../../../../shared/data/skills.data";
+} from "../../../../../shared/data/abilities.data";
 
 // Importar cores centralizadas
 import {
@@ -26,7 +26,7 @@ import {
 import {
   COMMON_ACTIONS,
   getSkillInfo,
-} from "../../../../../shared/data/skills.data";
+} from "../../../../../shared/data/abilities.data";
 
 /**
  * Informações sobre ações disponíveis (formato legado para compatibilidade)

@@ -2,7 +2,7 @@
 // Templates de Invocações (Summons) - Criaturas invocadas por classes
 // Re-exporta templates e fornece funções utilitárias
 
-import { getCommonActionCodes } from "./skills.data";
+import { getCommonActionCodes } from "./abilities.data";
 import type { SummonAIBehavior, SummonTemplate } from "../types/units.types";
 
 // Re-exportar tipos e templates

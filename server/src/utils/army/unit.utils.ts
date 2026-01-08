@@ -3,7 +3,7 @@
 // XP, Level Up, Skills e Spells
 
 import { prisma } from "../../lib/prisma";
-import { getClassByCode } from "../../../../shared/data/classes.data";
+import { getClassByCode } from "../../../../shared/data/abilities.data";
 import {
   XP_THRESHOLDS,
   XP_REWARDS,

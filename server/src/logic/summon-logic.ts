@@ -5,7 +5,7 @@ import {
   getSummonByCode,
   createSummonStats,
 } from "../../../shared/data/summons.data";
-import { isAdjacentOmnidirectional } from "../../../shared/types/skills.types";
+import { isAdjacentOmnidirectional } from "../../../shared/utils/distance.utils";
 import {
   HP_CONFIG,
   MANA_CONFIG,
