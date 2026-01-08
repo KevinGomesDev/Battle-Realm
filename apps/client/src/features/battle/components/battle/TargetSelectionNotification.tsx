@@ -1,11 +1,11 @@
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  getSkillInfo,
-  findSkillByCode,
-  getSpellByCode,
+  getAbilityInfo,
+  findAbilityByCode,
 } from "../../../../../../shared/data/abilities.data";
 
 interface TargetSelectionNotificationProps {
+  /** Código da ability pendente (ou "ATTACK" para ataque) */
   pendingAction: string | null;
   onCancel: () => void;
 }
@@ -16,48 +16,41 @@ export function TargetSelectionNotification({
 }: TargetSelectionNotificationProps) {
   if (!pendingAction) return null;
 
-  // Determinar informações da ação pendente
-  const isSpell = pendingAction.startsWith("spell:");
-  const actionCode = isSpell
-    ? pendingAction.replace("spell:", "")
-    : pendingAction;
-
+  // Determinar informações da ação pendente usando API unificada
   let actionInfo: { icon: string; name: string; targetText: string } | null =
     null;
 
-  if (isSpell) {
-    const spell = getSpellByCode(actionCode);
-    if (spell) {
-      const targetText =
-        spell.targetType === "POSITION" || spell.targetType === "GROUND"
-          ? "uma posição no mapa"
-          : spell.targetType === "UNIT"
-          ? "uma unidade alvo"
-          : "um alvo";
-      actionInfo = {
-        icon: spell.icon ?? "🔮",
-        name: spell.name,
-        targetText,
-      };
-    }
+  // Caso especial: ATTACK
+  if (pendingAction === "ATTACK" || pendingAction === "attack") {
+    actionInfo = {
+      icon: "⚔️",
+      name: "Ataque",
+      targetText: "um alvo adjacente",
+    };
   } else {
-    const skill = getSkillInfo(actionCode);
-    const skillDef = findSkillByCode(actionCode);
-    if (skill && skillDef) {
-      // Texto de alvo baseado no range da skill (ADJACENT foi mapeado para MELEE)
+    // Buscar ability pela API unificada
+    const abilityDef = findAbilityByCode(pendingAction);
+    const abilityInfo = getAbilityInfo(pendingAction);
+
+    if (abilityDef && abilityInfo) {
+      // Texto de alvo baseado no targetType
       let targetText = "uma unidade alvo";
-      if (skillDef.range === "MELEE") {
-        targetText = "um alvo adjacente";
-      } else if (skillDef.range === "RANGED") {
-        targetText = "um alvo no alcance";
-      } else if (skillDef.range === "AREA") {
-        targetText = "uma posição para a área";
-      } else if (skillDef.targetType === "GROUND") {
+      if (
+        abilityDef.targetType === "POSITION" ||
+        abilityDef.targetType === "GROUND"
+      ) {
         targetText = "uma posição no mapa";
+      } else if (abilityDef.range === "MELEE") {
+        targetText = "um alvo adjacente";
+      } else if (abilityDef.range === "RANGED") {
+        targetText = "um alvo no alcance";
+      } else if (abilityDef.range === "AREA") {
+        targetText = "uma posição para a área";
       }
+
       actionInfo = {
-        icon: skill.icon,
-        name: skill.name,
+        icon: abilityInfo.icon,
+        name: abilityInfo.name,
         targetText,
       };
     }

@@ -982,14 +982,15 @@ export function getAreaTargeting(
 }
 
 // =============================================================================
-// CONVERSÃO DE SKILL/SPELL PARA TARGETING CONFIG
+// CONVERSÃO DE ABILITY PARA TARGETING CONFIG
 // =============================================================================
 
 /**
- * Converte uma SkillDefinition para TargetingConfig
+ * Converte uma AbilityDefinition para TargetingConfig
+ * Unifica skills e spells - ambos usam a mesma estrutura
  */
-export function skillToTargetingConfig(
-  skill: {
+export function abilityToTargetingConfig(
+  ability: {
     range?: AbilityRange | "ADJACENT";
     rangeDistance?: DynamicValue;
     rangeValue?: number;
@@ -999,18 +1000,18 @@ export function skillToTargetingConfig(
   },
   attackRangeMod: number = 0
 ): TargetingConfig {
-  // Mapear range legado
+  // Mapear range legado (ADJACENT → MELEE)
   let range: AbilityRange = "MELEE";
-  if (skill.range) {
-    range = skill.range === "ADJACENT" ? "MELEE" : skill.range;
+  if (ability.range) {
+    range = ability.range === "ADJACENT" ? "MELEE" : ability.range;
   }
 
   // Calcular distância
   let rangeDistance: DynamicValue = DEFAULT_RANGE_DISTANCE[range];
-  if (skill.rangeDistance !== undefined) {
-    rangeDistance = skill.rangeDistance;
-  } else if (skill.rangeValue !== undefined) {
-    rangeDistance = skill.rangeValue;
+  if (ability.rangeDistance !== undefined) {
+    rangeDistance = ability.rangeDistance;
+  } else if (ability.rangeValue !== undefined) {
+    rangeDistance = ability.rangeValue;
   }
 
   // Aplicar modificador de range (de condições)
@@ -1021,36 +1022,24 @@ export function skillToTargetingConfig(
   return {
     range,
     rangeDistance,
-    targetType: skill.targetType || "UNIT",
-    shape: skill.targetingShape || "SINGLE",
-    areaSize: skill.areaSize,
+    targetType: ability.targetType || "UNIT",
+    shape: ability.targetingShape || "SINGLE",
+    areaSize: ability.areaSize,
     includeSelf: range === "SELF" || range === "AREA",
   };
 }
 
-/**
- * Converte uma SpellDefinition para TargetingConfig
- */
-export function spellToTargetingConfig(spell: {
+/** @deprecated Use abilityToTargetingConfig */
+export const skillToTargetingConfig = abilityToTargetingConfig;
+
+/** @deprecated Use abilityToTargetingConfig */
+export const spellToTargetingConfig = (spell: {
   range: AbilityRange | "ADJACENT";
   rangeDistance?: DynamicValue;
   targetType: AbilityTargetType;
   targetingShape?: TargetingShape;
   areaSize?: DynamicValue;
-}): TargetingConfig {
-  // Mapear range legado
-  const range: AbilityRange =
-    spell.range === "ADJACENT" ? "MELEE" : spell.range;
-
-  return {
-    range,
-    rangeDistance: spell.rangeDistance || DEFAULT_RANGE_DISTANCE[range],
-    targetType: spell.targetType,
-    shape: spell.targetingShape || "SINGLE",
-    areaSize: spell.areaSize,
-    includeSelf: range === "SELF" || range === "AREA",
-  };
-}
+}): TargetingConfig => abilityToTargetingConfig(spell);
 
 // =============================================================================
 // PLACEHOLDER PARA QTE
@@ -1058,14 +1047,14 @@ export function spellToTargetingConfig(spell: {
 
 /**
  * Handler para Quick Time Event após confirmar alvo
- * @param actionType Tipo de ação (ATTACK, SKILL, SPELL)
+ * @param actionType Tipo de ação (ATTACK ou ABILITY - unificado)
  * @param unitId ID da unidade executando
  * @param targetX Coordenada X do alvo
  * @param targetY Coordenada Y do alvo
- * @param abilityCode Código da skill/spell (opcional)
+ * @param abilityCode Código da ability (opcional para ATTACK)
  */
 export function handleQTE(
-  actionType: "ATTACK" | "SKILL" | "SPELL",
+  actionType: "ATTACK" | "ABILITY",
   unitId: string,
   targetX: number,
   targetY: number,

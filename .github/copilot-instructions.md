@@ -1,4 +1,5 @@
 # Battle Realm - Guia de Desenvolvimento
+
 LEIA TUDO NESSE ARQUIVO COM ATENÇÃO, SEMPRE.
 
 ## 🎯 Regras Fundamentais
@@ -338,3 +339,12 @@ BattleUnit {
 ```
 
 **Arquivo:** `shared/types/battle.types.ts`
+
+## Boas Práticas
+
+1. Sempre importar do @stacking/shared usando o índice principal
+2. Manter tipos no pacote shared quando forem compartilhados
+3. Reutilizar componentes e utilitários existentes
+4. Seguir a estrutura de pastas estabelecida
+5. Usar TypeScript para tipagem completa
+6. Testar componentes e funcionalidades críticas

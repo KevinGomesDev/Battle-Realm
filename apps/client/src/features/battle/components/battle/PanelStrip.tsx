@@ -278,7 +278,8 @@ export interface ActionStripButtonProps {
   color: string;
   hoverColor: string;
   items: ActionStripItem[];
-  pendingAction: string | null;
+  /** Código da ability pendente (ou null) */
+  pendingAbilityCode: string | null;
   onExecuteAction: (code: string, requiresTarget: boolean) => void;
   disabled?: boolean;
 }
@@ -289,7 +290,7 @@ export const ActionStripButton: React.FC<ActionStripButtonProps> = ({
   color,
   hoverColor,
   items,
-  pendingAction,
+  pendingAbilityCode,
   onExecuteAction,
   disabled = false,
 }) => {
@@ -343,12 +344,12 @@ export const ActionStripButton: React.FC<ActionStripButtonProps> = ({
     }
   }, [isOpen]);
 
-  // Fechar quando ação pendente é selecionada
+  // Fechar quando ability pendente é selecionada
   useEffect(() => {
-    if (pendingAction) {
+    if (pendingAbilityCode) {
       setIsOpen(false);
     }
-  }, [pendingAction]);
+  }, [pendingAbilityCode]);
 
   if (items.length === 0) return null;
 
@@ -444,10 +445,7 @@ export const ActionStripButton: React.FC<ActionStripButtonProps> = ({
                 color={color}
                 hoverColor={hoverColor}
                 popupContainerRef={popupRef}
-                isActive={
-                  pendingAction === item.code ||
-                  pendingAction === `spell:${item.code}`
-                }
+                isActive={pendingAbilityCode === item.code}
                 onClick={() => {
                   onExecuteAction(item.code, item.requiresTarget ?? false);
                   if (!item.requiresTarget) {

@@ -26,17 +26,12 @@ import { useChatStore } from "../../../stores";
 import { useChat } from "../../chat";
 import { ChatBox } from "../../chat/components/ChatBox";
 import type { BattleUnit } from "../../../../../shared/types/battle.types";
-import {
-  getSpellByCode,
-  findSkillByCode,
-  isCommonAction,
-} from "../../../../../shared/data/abilities.data";
+import { findAbilityByCode } from "../../../../../shared/data/abilities.data";
 import { resolveDynamicValue } from "../../../../../shared/types/ability.types";
 import { getFullMovementInfo } from "../../../../../shared/utils/engagement.utils";
 import {
-  isValidSkillTarget,
-  isValidSpellTarget,
-  isValidSpellPosition,
+  isValidAbilityTarget,
+  isValidAbilityPosition,
 } from "../../../../../shared/utils/ability-validation";
 import { useTargeting } from "../hooks/useTargeting";
 import { colyseusService } from "../../../services/colyseus.service";
@@ -50,6 +45,10 @@ import {
   useEnterKey,
 } from "../../../hooks/useHotkey";
 import { useQTE, QTEOverlay } from "../../qte";
+import {
+  type PendingAbility,
+  createPendingAbility,
+} from "../types/pending-ability.types";
 
 /**
  * BattleView - Wrapper com ChatProvider
@@ -110,14 +109,16 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     attackUnit,
     endAction,
     executeAction,
-    castSpell,
     surrender,
     requestRematch,
     dismissBattleResult,
   } = useBattle();
 
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
-  const [pendingAction, setPendingAction] = useState<string | null>(null); // Ação aguardando alvo
+  const [pendingAbility, setPendingAbility] = useState<PendingAbility | null>(
+    null
+  ); // Ability aguardando alvo
+
   const [hoveredCell, setHoveredCell] = useState<{
     x: number;
     y: number;
@@ -295,9 +296,9 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     // Resetar flags de controle
     cameraCenteredRef.current = null;
 
-    // Limpar ação pendente e tracking de beginAction (agendado para evitar cascade)
+    // Limpar ability pendente e tracking de beginAction (agendado para evitar cascade)
     queueMicrotask(() => {
-      setPendingAction(null);
+      setPendingAbility(null);
       setBeginActionCalledFor(null);
     });
   }, [battle?.currentPlayerId, battle?.round]);
@@ -427,8 +428,8 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       // Selecionar a unidade se for do jogador (controlável)
       if (user && isPlayerControllable(unit, user.id)) {
         setSelectedUnitId(unit.id);
-        // Limpar ação pendente ao trocar de unidade
-        setPendingAction(null);
+        // Limpar ability pendente ao trocar de unidade
+        setPendingAbility(null);
         // Sempre centralizar câmera na unidade do jogador
         canvasRef.current?.centerOnUnit(unit.id);
       } else {
@@ -448,7 +449,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
   // Chamado ANTES dos early returns para seguir as regras de hooks
   const { targetingPreview } = useTargeting({
     selectedUnit,
-    pendingAction,
+    pendingAbility,
     hoveredCell,
     units,
     gridConfig: battle
@@ -491,62 +492,31 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     ? units.find((u) => isPlayerControllable(u, user.id) && u.isAlive)
     : undefined;
 
-  // Preview de área para spells e skills de área (legado - mantido para compatibilidade)
+  // Preview de área para abilities de área
   const areaPreview = useMemo(() => {
-    if (!pendingAction || !selectedUnit) return null;
+    if (!pendingAbility || !selectedUnit) return null;
+
+    const { ability } = pendingAbility;
+    if (!ability.areaSize) return null;
 
     const casterPos = { x: selectedUnit.posX, y: selectedUnit.posY };
 
-    // Verificar se é uma spell de área
-    if (pendingAction.startsWith("spell:")) {
-      const spellCode = pendingAction.replace("spell:", "");
-      const spell = getSpellByCode(spellCode);
+    // Resolver rangeDistance dinamicamente
+    const rangeDistance = ability.rangeDistance
+      ? resolveDynamicValue(ability.rangeDistance, selectedUnit)
+      : undefined;
 
-      if (spell?.areaSize) {
-        // Resolver rangeDistance dinamicamente
-        const rangeDistance = spell.rangeDistance
-          ? resolveDynamicValue(spell.rangeDistance, selectedUnit)
-          : undefined;
-
-        return {
-          size:
-            typeof spell.areaSize === "number"
-              ? spell.areaSize
-              : resolveDynamicValue(spell.areaSize, selectedUnit),
-          color: spell.color || "#ff6b35",
-          centerOnSelf: spell.range === "SELF",
-          rangeDistance,
-          casterPos,
-        };
-      }
-      return null;
-    }
-
-    // Verificar se é uma skill de área (não é ação comum)
-    if (!isCommonAction(pendingAction)) {
-      const skill = findSkillByCode(pendingAction);
-
-      if (skill?.areaSize) {
-        // Resolver rangeDistance dinamicamente
-        const rangeDistance = skill.rangeDistance
-          ? resolveDynamicValue(skill.rangeDistance, selectedUnit)
-          : undefined;
-
-        return {
-          size:
-            typeof skill.areaSize === "number"
-              ? skill.areaSize
-              : resolveDynamicValue(skill.areaSize, selectedUnit),
-          color: skill.color || "#4ade80",
-          centerOnSelf: skill.range === "SELF",
-          rangeDistance,
-          casterPos,
-        };
-      }
-    }
-
-    return null;
-  }, [pendingAction, selectedUnit]);
+    return {
+      size:
+        typeof ability.areaSize === "number"
+          ? ability.areaSize
+          : resolveDynamicValue(ability.areaSize, selectedUnit),
+      color: ability.color || "#4ade80",
+      centerOnSelf: ability.range === "SELF",
+      rangeDistance,
+      casterPos,
+    };
+  }, [pendingAbility, selectedUnit]);
 
   // Determinar meu kingdom e oponentes (suporta múltiplos jogadores)
   const myKingdom = battle?.kingdoms.find((k) => k.ownerId === user?.id);
@@ -656,29 +626,43 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     { ignoreInputs: true }
   );
 
-  // Wrapper para executar skills/ações do UnitPanel
+  // Wrapper para executar abilities sem alvo (self-cast)
   // Movido para ANTES dos early returns para seguir as regras de hooks
-  const handleExecuteSkillAction = useCallback(
-    (skillCode: string, unitId: string) => {
-      const isCommon = isCommonAction(skillCode);
-
+  const handleExecuteAbility = useCallback(
+    (abilityCode: string, unitId: string) => {
       console.log(
-        `%c[BattleView] 🎯 Executando ${
-          isCommon ? "ação comum" : "skill"
-        } sem alvo`,
-        `color: ${isCommon ? "#10b981" : "#fbbf24"}; font-weight: bold;`,
-        { skillCode, unitId, isCommonAction: isCommon }
+        "%c[BattleView] 🎯 Executando ability sem alvo (self-cast)",
+        "color: #10b981; font-weight: bold;",
+        { abilityCode, unitId }
       );
 
-      // Tudo é enviado como use_skill agora
-      executeAction("use_skill", unitId, {
-        skillCode,
+      // Tudo é enviado como use_ability agora (unificado)
+      executeAction("use_ability", unitId, {
+        abilityCode,
         casterUnitId: unitId,
         // targetUnitId omitido = self-cast
       });
     },
     [executeAction]
   );
+
+  // Handler para selecionar uma ability (quando clica em ação que requer alvo)
+  const handleSelectAbility = useCallback((abilityCode: string) => {
+    const ability = findAbilityByCode(abilityCode);
+    if (!ability) {
+      console.error(`[BattleView] Ability não encontrada: ${abilityCode}`);
+      return;
+    }
+
+    const pending = createPendingAbility(ability);
+    setPendingAbility(pending);
+
+    console.log(
+      "%c[BattleView] 🎯 Ability selecionada, aguardando alvo",
+      "color: #f59e0b; font-weight: bold;",
+      { abilityCode, ability: ability.name, targetType: ability.targetType }
+    );
+  }, []);
 
   // === EARLY RETURNS (após todos os hooks) ===
 
@@ -718,54 +702,47 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
         isMyUnit: unit.ownerId === user.id,
         isMyTurn,
         currentlySelected: selectedUnitId,
-        pendingAction,
+        pendingAbility: pendingAbility?.code,
       }
     );
 
-    // Se há uma spell de área pendente (targetType: POSITION), tratar como clique de célula
-    // Isso permite usar spells de área em posições ocupadas por unidades
-    if (pendingAction?.startsWith("spell:") && selectedUnit && isMyTurn) {
-      const spellCode = pendingAction.replace("spell:", "");
-      const spell = getSpellByCode(spellCode);
-
+    // Se há uma ability de área pendente (targetType: POSITION/GROUND), tratar como clique de célula
+    if (pendingAbility && selectedUnit && isMyTurn) {
+      const ability = pendingAbility.ability;
       if (
-        spell &&
-        (spell.targetType === "POSITION" || spell.targetType === "GROUND") &&
-        spell.areaSize
+        (ability.targetType === "POSITION" ||
+          ability.targetType === "GROUND") &&
+        ability.areaSize
       ) {
         console.log(
-          "%c[BattleView] 🔮 Spell de área: delegando para handleCellClick",
+          "%c[BattleView] 🔮 Ability de área: delegando para handleCellClick",
           "color: #a855f7;",
-          { spellCode, position: { x: unit.posX, y: unit.posY } }
+          {
+            abilityCode: pendingAbility.code,
+            position: { x: unit.posX, y: unit.posY },
+          }
         );
         handleCellClick(unit.posX, unit.posY);
         return;
       }
-    }
 
-    // Se há uma skill de área pendente (range: AREA com areaSize), tratar como clique de célula
-    if (
-      pendingAction &&
-      !pendingAction.startsWith("spell:") &&
-      !isCommonAction(pendingAction) &&
-      selectedUnit &&
-      isMyTurn
-    ) {
-      const skillDef = findSkillByCode(pendingAction);
-
-      if (skillDef?.range === "AREA" && skillDef.areaSize) {
+      // Skills de área com range: AREA
+      if (ability.range === "AREA" && ability.areaSize) {
         console.log(
-          "%c[BattleView] ✨ Skill de área: delegando para handleCellClick",
+          "%c[BattleView] ✨ Ability de área: delegando para handleCellClick",
           "color: #fbbf24;",
-          { skillCode: pendingAction, position: { x: unit.posX, y: unit.posY } }
+          {
+            abilityCode: pendingAbility.code,
+            position: { x: unit.posX, y: unit.posY },
+          }
         );
         handleCellClick(unit.posX, unit.posY);
         return;
       }
     }
 
-    // Se há uma ação pendente aguardando alvo
-    if (pendingAction === "ATTACK" && selectedUnit && isMyTurn) {
+    // Se há uma ação de ATTACK pendente
+    if (pendingAbility?.type === "ATTACK" && selectedUnit && isMyTurn) {
       const dx = Math.abs(unit.posX - selectedUnit.posX);
       const dy = Math.abs(unit.posY - selectedUnit.posY);
 
@@ -777,7 +754,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           { targetId: unit.id, targetName: unit.name }
         );
         attackUnit(selectedUnit.id, { x: unit.posX, y: unit.posY });
-        setPendingAction(null); // Limpa ação pendente
+        setPendingAbility(null);
       } else {
         console.log(
           "%c[BattleView] ❌ Alvo fora de alcance",
@@ -787,68 +764,38 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       return;
     }
 
-    // Se há uma spell pendente aguardando alvo (spell que targetiza unidade)
-    if (pendingAction?.startsWith("spell:") && selectedUnit && isMyTurn) {
-      const spellCode = pendingAction.replace("spell:", "");
-      const spell = getSpellByCode(spellCode);
-
-      if (
-        spell &&
-        (spell.targetType === "UNIT" || spell.targetType === "ALL")
-      ) {
-        // Usar validação centralizada
-        if (isValidSpellTarget(selectedUnit, spell, unit)) {
-          console.log(
-            "%c[BattleView] 🔮 Conjurando spell em unidade!",
-            "color: #a855f7; font-weight: bold;",
-            { spellCode, targetId: unit.id, targetName: unit.name }
-          );
-          castSpell(selectedUnit.id, spellCode, unit.id);
-          setPendingAction(null);
-        } else {
-          console.log(
-            "%c[BattleView] ❌ Alvo inválido para spell",
-            "color: #ef4444;",
-            { spell: spellCode, target: unit.name }
-          );
-        }
-        return;
-      }
-    }
-
-    // Se há uma skill pendente aguardando alvo (ex: HEAL)
+    // Se há uma ability pendente aguardando alvo (targetType: UNIT ou ALL)
     if (
-      pendingAction &&
-      !pendingAction.startsWith("spell:") &&
-      pendingAction !== "ATTACK" &&
+      pendingAbility &&
+      pendingAbility.type === "ABILITY" &&
       selectedUnit &&
       isMyTurn
     ) {
-      const skillDef = findSkillByCode(pendingAction);
+      const ability = pendingAbility.ability;
 
-      if (skillDef && skillDef.targetType && skillDef.targetType !== "SELF") {
-        // Usar validação centralizada ao invés de cálculo manual
-        if (isValidSkillTarget(selectedUnit, skillDef, unit)) {
+      if (ability.targetType === "UNIT" || ability.targetType === "ALL") {
+        // Usar validação centralizada
+        if (isValidAbilityTarget(selectedUnit, ability, unit)) {
           console.log(
-            "%c[BattleView] ✨ Executando skill em unidade!",
-            "color: #fbbf24; font-weight: bold;",
+            "%c[BattleView] ✨ Executando ability em unidade!",
+            "color: #a855f7; font-weight: bold;",
             {
-              skillCode: pendingAction,
+              abilityCode: pendingAbility.code,
               targetId: unit.id,
               targetName: unit.name,
             }
           );
-          executeAction("use_skill", selectedUnit.id, {
-            skillCode: pendingAction,
+          executeAction("use_ability", selectedUnit.id, {
+            abilityCode: pendingAbility.code,
             casterUnitId: selectedUnit.id,
             targetUnitId: unit.id,
           });
-          setPendingAction(null);
+          setPendingAbility(null);
         } else {
           console.log(
-            "%c[BattleView] ❌ Alvo inválido para skill",
+            "%c[BattleView] ❌ Alvo inválido para ability",
             "color: #ef4444;",
-            { skill: pendingAction, target: unit.name }
+            { ability: pendingAbility.code, target: unit.name }
           );
         }
         return;
@@ -858,56 +805,41 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     // Comportamento padrão: selecionar unidade
     // Só permite selecionar unidades controláveis (não SUMMON/MONSTER)
     if (isPlayerControllable(unit, user.id)) {
-      // Se clicar na mesma unidade E há uma ação pendente do tipo ALLY → self-cast
-      if (selectedUnitId === unit.id && pendingAction && isMyTurn) {
-        // Verificar se é spell ALLY
-        if (pendingAction?.startsWith("spell:")) {
-          const spellCode = pendingAction.replace("spell:", "");
-          const spell = getSpellByCode(spellCode);
+      // Se clicar na mesma unidade E há uma ability pendente → self-cast
+      if (selectedUnitId === unit.id && pendingAbility && isMyTurn) {
+        const ability = pendingAbility.ability;
 
-          if (spell && spell.targetType === "UNIT") {
-            console.log(
-              "%c[BattleView] 🔮 Conjurando spell em si mesmo!",
-              "color: #a855f7; font-weight: bold;",
-              { spellCode, unitId: unit.id, unitName: unit.name }
-            );
-            castSpell(unit.id, spellCode, unit.id);
-            setPendingAction(null);
-            return;
-          }
-        }
-        // Verificar se é skill UNIT
-        else if (pendingAction !== "ATTACK") {
-          const skillDef = findSkillByCode(pendingAction);
-
-          if (skillDef && skillDef.targetType === "UNIT") {
-            console.log(
-              "%c[BattleView] ✨ Executando skill em si mesmo!",
-              "color: #fbbf24; font-weight: bold;",
-              { skillCode: pendingAction, unitId: unit.id, unitName: unit.name }
-            );
-            executeAction("use_skill", unit.id, {
-              skillCode: pendingAction,
-              casterUnitId: unit.id,
-              targetUnitId: unit.id,
-            });
-            setPendingAction(null);
-            return;
-          }
+        if (ability.targetType === "UNIT") {
+          console.log(
+            "%c[BattleView] ✨ Executando ability em si mesmo!",
+            "color: #a855f7; font-weight: bold;",
+            {
+              abilityCode: pendingAbility.code,
+              unitId: unit.id,
+              unitName: unit.name,
+            }
+          );
+          executeAction("use_ability", unit.id, {
+            abilityCode: pendingAbility.code,
+            casterUnitId: unit.id,
+            targetUnitId: unit.id,
+          });
+          setPendingAbility(null);
+          return;
         }
 
-        // Se não era skill/spell ALLY, faz toggle normal
+        // Se não era ability que aceita self-cast, faz toggle normal
         console.log(
           "%c[BattleView] 🔄 Desselecionando unidade (toggle)",
           "color: #f59e0b;",
           { unitId: unit.id }
         );
         setSelectedUnitId(null);
-        setPendingAction(null);
+        setPendingAbility(null);
         return;
       }
 
-      // Toggle: clicar na mesma unidade desseleciona (quando não há pendingAction)
+      // Toggle: clicar na mesma unidade desseleciona (quando não há pendingAbility)
       if (selectedUnitId === unit.id) {
         console.log(
           "%c[BattleView] 🔄 Desselecionando unidade (toggle)",
@@ -915,7 +847,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           { unitId: unit.id }
         );
         setSelectedUnitId(null);
-        setPendingAction(null);
+        setPendingAbility(null);
         return;
       }
 
@@ -931,7 +863,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
         }
       );
       setSelectedUnitId(unit.id);
-      setPendingAction(null); // Limpa ação pendente ao trocar unidade
+      setPendingAbility(null); // Limpa ability pendente ao trocar unidade
 
       // Se é meu turno E não há unidade ativa ainda E esta unidade não começou ação
       // → iniciar ação desta unidade
@@ -994,7 +926,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       // Desselecionar ao clicar fora quando não pode mover
       if (selectedUnitId) {
         setSelectedUnitId(null);
-        setPendingAction(null);
+        setPendingAbility(null);
       }
       return;
     }
@@ -1014,9 +946,9 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     }
 
     // === SISTEMA DE MIRA DIRECIONAL ===
-    // Se há uma ação pendente com targeting preview, confirmar na célula apontada
+    // Se há uma ability pendente com targeting preview, confirmar na célula apontada
     if (
-      pendingAction &&
+      pendingAbility &&
       targetingPreview &&
       targetingPreview.isValidTarget &&
       targetingPreview.affectedCells.length > 0
@@ -1024,8 +956,8 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       // Usar a primeira célula afetada como alvo (ou todas para ações de área)
       const targetCell = targetingPreview.affectedCells[0];
 
-      // Verificar se é ATTACK (ação comum)
-      if (pendingAction === "ATTACK" || pendingAction === "attack") {
+      // Verificar se é ATTACK
+      if (pendingAbility.type === "ATTACK") {
         // Verificar se há uma unidade ou obstáculo na célula alvo
         const targetUnit = units.find(
           (u) => u.isAlive && u.posX === targetCell.x && u.posY === targetCell.y
@@ -1047,131 +979,105 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
 
         // Executar ataque - mesmo que não haja alvo, a ação é gasta
         attackUnit(selectedUnit.id, { x: targetCell.x, y: targetCell.y });
-        setPendingAction(null);
+        setPendingAbility(null);
         return;
       }
 
-      // Se é uma spell
-      if (pendingAction.startsWith("spell:")) {
-        const spellCode = pendingAction.replace("spell:", "");
-
-        // Verificar se há unidade alvo
+      // Se é uma ability (skill ou spell)
+      if (pendingAbility.type === "ABILITY") {
         const targetUnit = units.find(
           (u) => u.isAlive && u.posX === targetCell.x && u.posY === targetCell.y
         );
 
         console.log(
-          "%c[BattleView] 🔮 Confirmando spell direcional!",
+          "%c[BattleView] ✨ Confirmando ability direcional!",
           "color: #a855f7; font-weight: bold;",
-          { spellCode, targetCell, hasUnit: !!targetUnit }
+          {
+            abilityCode: pendingAbility.code,
+            targetCell,
+            hasUnit: !!targetUnit,
+          }
         );
 
-        castSpell(selectedUnit.id, spellCode, targetUnit?.id, {
-          x: targetCell.x,
-          y: targetCell.y,
-        });
-        setPendingAction(null);
-        return;
-      }
-
-      // Se é uma skill (não ação comum)
-      if (!isCommonAction(pendingAction)) {
-        const targetUnit = units.find(
-          (u) => u.isAlive && u.posX === targetCell.x && u.posY === targetCell.y
-        );
-
-        console.log(
-          "%c[BattleView] ✨ Confirmando skill direcional!",
-          "color: #fbbf24; font-weight: bold;",
-          { skillCode: pendingAction, targetCell, hasUnit: !!targetUnit }
-        );
-
-        executeAction("use_skill", selectedUnit.id, {
-          skillCode: pendingAction,
+        executeAction("use_ability", selectedUnit.id, {
+          abilityCode: pendingAbility.code,
           casterUnitId: selectedUnit.id,
           targetUnitId: targetUnit?.id,
           targetPosition: { x: targetCell.x, y: targetCell.y },
         });
-        setPendingAction(null);
+        setPendingAbility(null);
         return;
       }
     }
 
-    // Se há uma spell pendente que targetiza posição (fallback para sistema antigo)
-    if (pendingAction?.startsWith("spell:") && selectedUnit) {
-      const spellCode = pendingAction.replace("spell:", "");
-      const spell = getSpellByCode(spellCode);
+    // Se há uma ability pendente que targetiza posição (POSITION/GROUND)
+    if (pendingAbility && pendingAbility.type === "ABILITY" && selectedUnit) {
+      const ability = pendingAbility.ability;
 
       if (
-        spell &&
-        (spell.targetType === "POSITION" || spell.targetType === "GROUND")
+        ability.targetType === "POSITION" ||
+        ability.targetType === "GROUND"
       ) {
         // Usar validação centralizada
-        const isValidPosition = isValidSpellPosition(
+        const isValid = isValidAbilityPosition(
           selectedUnit,
-          spell,
+          ability,
           { x, y },
           units,
           battle.config.grid.width,
           battle.config.grid.height
         );
 
-        if (isValidPosition) {
+        if (isValid) {
           console.log(
-            "%c[BattleView] 🔮 Conjurando spell em posição!",
+            "%c[BattleView] ✨ Executando ability em posição!",
             "color: #a855f7; font-weight: bold;",
-            { spellCode, position: { x, y } }
+            { abilityCode: pendingAbility.code, position: { x, y } }
           );
-          castSpell(selectedUnit.id, spellCode, undefined, { x, y });
-          setPendingAction(null);
+          executeAction("use_ability", selectedUnit.id, {
+            abilityCode: pendingAbility.code,
+            casterUnitId: selectedUnit.id,
+            targetPosition: { x, y },
+          });
+          setPendingAbility(null);
         } else {
           console.log(
-            "%c[BattleView] ❌ Posição inválida para spell",
+            "%c[BattleView] ❌ Posição inválida para ability",
             "color: #ef4444;",
-            { spellCode, position: { x, y } }
+            { abilityCode: pendingAbility.code, position: { x, y } }
           );
         }
         return;
       }
-    }
 
-    // Se há uma skill de área pendente (range AREA com areaSize)
-    if (
-      pendingAction &&
-      !pendingAction.startsWith("spell:") &&
-      !isCommonAction(pendingAction) &&
-      selectedUnit
-    ) {
-      const skillDef = findSkillByCode(pendingAction);
-
-      // Skills de área podem ser usadas clicando em qualquer posição válida
-      if (skillDef?.range === "AREA" && skillDef.areaSize) {
+      // Skills de área (range: AREA com areaSize)
+      if (ability?.range === "AREA" && ability.areaSize) {
         // Verificar se está dentro do alcance
         const distance =
           Math.abs(x - selectedUnit.posX) + Math.abs(y - selectedUnit.posY);
         // Usar rangeDistance se disponível, senão padrão 4
-        const maxRange = skillDef.rangeDistance
-          ? resolveDynamicValue(skillDef.rangeDistance, selectedUnit)
+        const maxRange = ability.rangeDistance
+          ? resolveDynamicValue(ability.rangeDistance, selectedUnit)
           : 4;
 
         if (distance <= maxRange) {
           console.log(
-            "%c[BattleView] ✨ Executando skill de área em posição!",
+            "%c[BattleView] ✨ Executando ability de área em posição!",
             "color: #fbbf24; font-weight: bold;",
-            { skillCode: pendingAction, position: { x, y } }
+            { abilityCode: pendingAbility.code, position: { x, y } }
           );
-          executeAction("use_skill", selectedUnit.id, {
-            skillCode: pendingAction,
+          executeAction("use_ability", selectedUnit.id, {
+            abilityCode: pendingAbility.code,
             casterUnitId: selectedUnit.id,
             targetPosition: { x, y },
           });
-          setPendingAction(null);
+          setPendingAbility(null);
           return;
         } else {
           console.log(
-            "%c[BattleView] ❌ Posição fora do alcance para skill de área",
+            "%c[BattleView] ❌ Posição fora do alcance para ability de área",
             "color: #ef4444;",
-            { skillCode: pendingAction, distance, maxRange }
+            { abilityCode: pendingAbility.code, distance, maxRange }
           );
         }
       }
@@ -1260,12 +1166,12 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
         position: { x: obstacle.posX, y: obstacle.posY },
         hasSelectedUnit: !!selectedUnit,
         isMyTurn,
-        pendingAction,
+        pendingAbility: pendingAbility?.code,
       }
     );
 
     // Se há ação de ataque pendente e estou adjacente (8 direções)
-    if (pendingAction === "ATTACK" && selectedUnit && isMyTurn) {
+    if (pendingAbility?.type === "ATTACK" && selectedUnit && isMyTurn) {
       const dx = Math.abs(obstacle.posX - selectedUnit.posX);
       const dy = Math.abs(obstacle.posY - selectedUnit.posY);
 
@@ -1277,7 +1183,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           { obstacleId: obstacle.id }
         );
         attackUnit(selectedUnit.id, { x: obstacle.posX, y: obstacle.posY });
-        setPendingAction(null);
+        setPendingAbility(null);
       } else {
         console.log(
           "%c[BattleView] ❌ Obstáculo fora de alcance",
@@ -1332,10 +1238,10 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           onUnitClick={handleUnitClick}
           onCellClick={handleCellClick}
           onObstacleClick={handleObstacleClick}
-          onRightClick={() => setPendingAction(null)}
+          onRightClick={() => setPendingAbility(null)}
           onCellHover={setHoveredCell}
           unitDirection={unitDirection}
-          pendingAction={pendingAction}
+          pendingAction={pendingAbility?.code ?? null}
           activeBubbles={activeBubbles}
           spellAreaPreview={areaPreview}
           targetingPreview={targetingPreview}
@@ -1358,9 +1264,9 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           activeUnitId={battle.activeUnitId}
           isMyTurn={isMyTurn}
           currentUserId={user.id}
-          pendingAction={pendingAction}
-          onSetPendingAction={setPendingAction}
-          onExecuteAction={handleExecuteSkillAction}
+          pendingAbility={pendingAbility}
+          onSelectAbility={handleSelectAbility}
+          onExecuteAbility={handleExecuteAbility}
         />
       </div>
 
@@ -1418,8 +1324,8 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
 
       {/* Notificação de Seleção de Alvo */}
       <TargetSelectionNotification
-        pendingAction={pendingAction}
-        onCancel={() => setPendingAction(null)}
+        pendingAction={pendingAbility?.code ?? null}
+        onCancel={() => setPendingAbility(null)}
       />
 
       {/* Chat de Batalha - Abre com Enter (escondido quando modal de resultado está aberto) */}

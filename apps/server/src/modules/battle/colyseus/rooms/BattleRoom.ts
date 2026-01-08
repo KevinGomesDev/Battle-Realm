@@ -49,25 +49,23 @@ import type {
 } from "../../../../../../shared/qte";
 import type { CommandPayload } from "../../../../../../shared/types/commands.types";
 import { handleCommand, parseCommandArgs } from "../../../match/commands";
-import { findCommandByCode } from "../../../../../../shared/data/Templates/CommandsTemplates";
-import {
-  getExtraAttacksFromConditions,
-  scanConditionsForAction,
-  applyConditionScanResult,
-} from "../../../conditions/conditions";
-import { applyDamage } from "../../../combat/damage.utils";
 import { processUnitDeath } from "../../../combat/death-logic";
-import {
-  shouldTransferDamageToEidolon,
-  transferDamageToEidolon,
-  processEidolonDeath,
-} from "../../../summons/summon-logic";
 import { isWithinRange } from "../../../../../../shared/utils/distance.utils";
-import { DEFENSE_CONFIG } from "../../../../../../shared/config";
 import {
   createAndEmitEvent,
   setEventEmitter,
 } from "../../../match/services/event.service";
+import {
+  executeSkill,
+  executeAttack,
+  prepareAttackContext,
+  executeAttackFromQTEResult,
+} from "../../../abilities/executors";
+import { findAbilityByCode } from "../../../../../../shared/data/abilities.data";
+import type {
+  AttackActionResult,
+  QTEResultForExecutor,
+} from "../../../abilities/executors/types";
 
 // Configurar o callback de emissão de eventos uma vez
 let eventEmitterConfigured = false;
@@ -752,19 +750,6 @@ export class BattleRoom extends Room<BattleSessionState> {
       }
     );
 
-    this.onMessage(
-      "battle:cast_spell",
-      (client, { unitId, spellCode, targetId, targetPosition }) => {
-        this.handleCastSpell(
-          client,
-          unitId,
-          spellCode,
-          targetId,
-          targetPosition
-        );
-      }
-    );
-
     // Handler para respostas de QTE
     this.onMessage("qte:response", (client, response: QTEResponse) => {
       const userData = client.userData as { userId: string } | undefined;
@@ -1269,7 +1254,12 @@ export class BattleRoom extends Room<BattleSessionState> {
         Math.abs(enemy.posX - unit.posX) + Math.abs(enemy.posY - unit.posY);
       if (newDist <= 1 && this.canAttack(unit)) {
         console.log(`[BattleRoom] 🤖 IA: ${unit.name} atacando ${enemy.name}`);
-        this.performAttack(unit, enemy);
+        // IA ataca sem QTE (modificadores padrão)
+        this.executeAttackAndBroadcast(unit, enemy, {
+          dodged: false,
+          attackerDamageModifier: 1.0,
+          defenderDamageModifier: 1.0,
+        });
       } else {
         console.log(
           `[BattleRoom] 🤖 IA: Distância ${newDist}, ataques restantes: ${unit.attacksLeftThisTurn}, ações: ${unit.actionsLeft}, não atacou`
@@ -1312,40 +1302,6 @@ export class BattleRoom extends Room<BattleSessionState> {
   }
 
   /**
-   * Verifica se a unidade pode atacar e consome recursos corretamente.
-   * @returns true se o ataque pode ser executado, false se não há recursos
-   */
-  private consumeAttackResource(attacker: BattleUnitSchema): boolean {
-    // Se já tem ataques restantes (ex: ataques extras), apenas decrementa
-    if (attacker.attacksLeftThisTurn > 0) {
-      attacker.attacksLeftThisTurn--;
-      return true;
-    }
-
-    // Se não tem ataques restantes, precisa usar uma ação
-    if (attacker.actionsLeft <= 0) {
-      return false;
-    }
-
-    // Consumir ação e calcular ataques extras baseados em condições
-    attacker.actionsLeft--;
-    const conditions = Array.from(attacker.conditions).filter(
-      (c): c is string => typeof c === "string"
-    );
-    const hasProtection = attacker.physicalProtection > 0;
-    const extraAttacks = getExtraAttacksFromConditions(
-      conditions,
-      hasProtection
-    );
-
-    // O primeiro ataque da ação é consumido imediatamente
-    // Os extras ficam disponíveis em attacksLeftThisTurn
-    attacker.attacksLeftThisTurn = extraAttacks;
-
-    return true;
-  }
-
-  /**
    * Verifica se a unidade tem recursos para atacar (sem consumir)
    */
   private canAttack(attacker: BattleUnitSchema): boolean {
@@ -1353,190 +1309,155 @@ export class BattleRoom extends Room<BattleSessionState> {
   }
 
   /**
-   * Executa o ataque com modificadores do QTE
-   * REFATORADO: Usa scanConditionsForAction para bônus de condições
-   * @param attacker Unidade atacante
-   * @param target Unidade alvo
-   * @param attackModifier Modificador de dano do atacante (QTE) - padrão 1.0
-   * @param defenseModifier Modificador de redução do defensor (QTE) - padrão 1.0
+   * Consome recurso de ataque (para casos especiais como ataque no ar)
+   * Nota: Para ataques normais, o executor faz isso automaticamente
    */
-  private performAttack(
-    attacker: BattleUnitSchema,
-    target: BattleUnitSchema,
-    attackModifier: number = 1.0,
-    defenseModifier: number = 1.0
+  private consumeAttackResourceSimple(attacker: BattleUnitSchema): void {
+    if (attacker.attacksLeftThisTurn > 0) {
+      attacker.attacksLeftThisTurn--;
+    } else if (attacker.actionsLeft > 0) {
+      attacker.actionsLeft--;
+    }
+  }
+
+  /**
+   * Sincroniza resultado do ataque de volta para os schemas Colyseus
+   */
+  private syncAttackResultToSchemas(
+    attackerSchema: BattleUnitSchema,
+    targetSchema: BattleUnitSchema,
+    attackerUnit: BattleUnit,
+    targetUnit: BattleUnit,
+    allUnits: BattleUnit[],
+    result: AttackActionResult
   ) {
-    // Converter condições de Schema (ArraySchema) para array
-    const attackerConditions = Array.from(attacker.conditions).filter(
-      (c): c is string => c !== undefined
-    );
-    const targetConditions = Array.from(target.conditions).filter(
-      (c): c is string => c !== undefined
-    );
+    // Sincronizar recursos de ataque consumidos pelo executor
+    attackerSchema.actionsLeft = attackerUnit.actionsLeft;
+    attackerSchema.attacksLeftThisTurn = attackerUnit.attacksLeftThisTurn;
 
-    // Varredura de condições do atacante (bônus de dano, etc)
-    const attackerScan = scanConditionsForAction(attackerConditions, "ATTACK");
-    const bonusDamage = attackerScan.modifiers.bonusDamage || 0;
+    // Sincronizar condições do atacante
+    attackerSchema.conditions.clear();
+    attackerUnit.conditions.forEach((c) => attackerSchema.conditions.push(c));
 
-    // Varredura de condições do alvo (redução de dano)
-    const targetScan = scanConditionsForAction(targetConditions, "ATTACK");
-    const conditionDamageReduction = targetScan.modifiers.damageReduction || 0;
+    // Sincronizar alvo
+    targetSchema.currentHp = targetUnit.currentHp;
+    targetSchema.physicalProtection = targetUnit.physicalProtection;
+    targetSchema.magicalProtection = targetUnit.magicalProtection;
+    targetSchema.isAlive = targetUnit.isAlive;
+    targetSchema.conditions.clear();
+    targetUnit.conditions.forEach((c) => targetSchema.conditions.push(c));
 
-    // Determinar tipo de dano (MAGIC_WEAPON converte para mágico)
-    const isMagicDamage = attackerConditions.includes("MAGIC_WEAPON");
-    const damageType = isMagicDamage ? "MAGICO" : "FISICO";
-
-    // Cálculo de dano base: Combat + bônus de condições
-    const rawDamage = Math.max(1, attacker.combat) + bonusDamage;
-
-    // Aplicar modificadores do QTE
-    const qteModifiedDamage = Math.floor(
-      rawDamage * attackModifier * defenseModifier
-    );
-
-    // Aplicar redução de dano por condições
-    const damageAfterReduction = Math.max(
-      0,
-      qteModifiedDamage - conditionDamageReduction
-    );
-
-    // Converter para BattleUnit para verificar Eidolon
-    const allUnits = this.getAllUnitsAsBattleUnits();
-    const targetUnit = allUnits.find((u) => u.id === target.id);
-
-    // Verificar transferência de dano para Eidolon
-    let eidolonDefeated = false;
-    let damageTransferredToEidolon = false;
-    let finalDamageToTarget = damageAfterReduction;
-
-    if (targetUnit) {
-      const eidolonToTransfer = shouldTransferDamageToEidolon(
-        targetUnit,
-        allUnits
+    // Se houve transferência para Eidolon, sincronizar Eidolon
+    if (result.damageTransferredToEidolon) {
+      // Eidolon é identificado por category SUMMON e condição EIDOLON_GROWTH
+      const eidolon = allUnits.find(
+        (u) =>
+          u.ownerId === targetUnit.ownerId &&
+          u.category === "SUMMON" &&
+          u.conditions.includes("EIDOLON_GROWTH")
       );
-
-      if (eidolonToTransfer) {
-        const transferResult = transferDamageToEidolon(
-          eidolonToTransfer,
-          damageAfterReduction
-        );
-        eidolonDefeated = transferResult.eidolonDefeated;
-        damageTransferredToEidolon = true;
-        finalDamageToTarget = 0; // Alvo não recebe dano
-
-        // Atualizar HP do Eidolon no schema
-        const eidolonSchema = this.state.units.get(eidolonToTransfer.id);
+      if (eidolon) {
+        const eidolonSchema = this.state.units.get(eidolon.id);
         if (eidolonSchema) {
-          eidolonSchema.currentHp = eidolonToTransfer.currentHp;
-          if (eidolonDefeated) {
-            eidolonSchema.isAlive = false;
-            processEidolonDeath(eidolonToTransfer, "battle");
-          }
-        }
-
-        console.log(
-          `[BattleRoom] 🛡️ Dano transferido para Eidolon: ${damageAfterReduction}`
-        );
-      }
-    }
-
-    // Aplicar dano ao alvo (se não foi transferido)
-    let targetDefeated = false;
-    if (!damageTransferredToEidolon && finalDamageToTarget > 0) {
-      const result = applyDamage(
-        target.physicalProtection,
-        target.magicalProtection,
-        target.currentHp,
-        finalDamageToTarget,
-        damageType
-      );
-      target.physicalProtection = result.newPhysicalProtection;
-      target.magicalProtection = result.newMagicalProtection;
-      target.currentHp = result.newHp;
-
-      targetDefeated = target.currentHp <= 0;
-      if (targetDefeated) {
-        target.isAlive = false;
-        // Processar morte (para summons, etc)
-        if (targetUnit) {
-          processUnitDeath(
-            targetUnit,
-            allUnits,
-            this.schemaUnitToBattleUnit(attacker),
-            "battle",
-            this.state.battleId
-          );
+          eidolonSchema.currentHp = eidolon.currentHp;
+          eidolonSchema.isAlive = eidolon.isAlive;
         }
       }
     }
 
-    // Aplicar expiração de condições do atacante (ex: ON_ACTION)
-    const updatedAttackerConditions = applyConditionScanResult(
-      attackerConditions,
-      attackerScan
+    // Sincronizar summons mortos
+    if (result.killedSummonIds && result.killedSummonIds.length > 0) {
+      for (const summonId of result.killedSummonIds) {
+        const summonSchema = this.state.units.get(summonId);
+        if (summonSchema) {
+          summonSchema.isAlive = false;
+          summonSchema.currentHp = 0;
+        }
+      }
+    }
+  }
+
+  /**
+   * Executa ataque em obstáculo usando o executor centralizado
+   */
+  private performObstacleAttack(
+    attacker: BattleUnitSchema,
+    obstacle: BattleObstacleSchema
+  ) {
+    // Converter para BattleUnit e BattleObstacle
+    const attackerUnit = this.schemaUnitToBattleUnit(attacker);
+    const obstacleData = {
+      id: obstacle.id,
+      posX: obstacle.posX,
+      posY: obstacle.posY,
+      type: obstacle.type as import("../../../../../../shared/config").ObstacleType,
+      hp: obstacle.hp,
+      destroyed: obstacle.destroyed,
+    };
+
+    // Usar o executor para atacar o obstáculo
+    const result = executeAttack(
+      attackerUnit,
+      null,
+      [],
+      { code: "ATTACK" } as any,
+      "FISICO",
+      obstacleData,
+      this.state.battleId
     );
-    // Sincronizar condições de volta para o schema
+
+    if (!result.success) {
+      console.error("[BattleRoom] performObstacleAttack falhou:", result.error);
+      return;
+    }
+
+    // Sincronizar recursos de ataque consumidos pelo executor
+    attacker.actionsLeft = attackerUnit.actionsLeft;
+    attacker.attacksLeftThisTurn = attackerUnit.attacksLeftThisTurn;
+
+    // Sincronizar condições do atacante
     attacker.conditions.clear();
-    updatedAttackerConditions.forEach((c) => attacker.conditions.push(c));
+    attackerUnit.conditions.forEach((c) => attacker.conditions.push(c));
 
-    // Consumir recurso de ataque
-    this.consumeAttackResource(attacker);
+    // Sincronizar obstáculo
+    obstacle.hp = result.targetHpAfter ?? obstacle.hp;
+    obstacle.destroyed = result.obstacleDestroyed ?? false;
 
-    this.broadcast("battle:unit_attacked", {
+    // Broadcast resultado
+    this.broadcast("battle:obstacle_attacked", {
       attackerId: attacker.id,
-      targetId: target.id,
-      damage: damageTransferredToEidolon ? 0 : finalDamageToTarget,
-      rawDamage,
-      bonusDamage,
-      damageReduction: conditionDamageReduction,
-      attackModifier,
-      defenseModifier,
-      damageType,
-      targetHpAfter: target.currentHp,
-      targetDefeated,
-      damageTransferredToEidolon,
-      eidolonDefeated,
+      obstacleId: obstacle.id,
+      damage: result.finalDamage,
+      destroyed: obstacle.destroyed,
     });
 
-    // Criar evento de ataque
-    const damageMsg = damageTransferredToEidolon
-      ? `(transferido para Eidolon)`
-      : `causando ${finalDamageToTarget} de dano`;
+    // Criar evento de ataque a obstáculo
     createAndEmitEvent({
       context: "BATTLE",
       scope: "GLOBAL",
       category: "COMBAT",
-      severity: "WARNING",
+      severity: "INFO",
       battleId: this.roomId,
       sourceUserId: attacker.ownerId,
-      targetUserIds: [target.ownerId],
-      message: `${attacker.name} atacou ${target.name} ${damageMsg}${
-        targetDefeated ? " - DERROTADO!" : ""
-      }`,
-      code: "UNIT_ATTACKED",
+      message: `${attacker.name} atacou um obstáculo causando ${
+        result.finalDamage
+      } de dano${obstacle.destroyed ? " - DESTRUÍDO!" : ""}`,
+      code: "OBSTACLE_ATTACKED",
       data: {
-        damage: finalDamageToTarget,
-        rawDamage,
-        bonusDamage,
-        targetHp: target.currentHp,
-        targetDefeated,
-        attackModifier,
-        defenseModifier,
-        damageType,
-        damageTransferredToEidolon,
-        eidolonDefeated,
+        damage: result.finalDamage,
+        obstacleHp: obstacle.hp,
+        destroyed: obstacle.destroyed,
       },
       actorId: attacker.id,
       actorName: attacker.name,
-      targetId: target.id,
-      targetName: target.name,
+      targetId: obstacle.id,
+      targetName: "Obstáculo",
     }).catch((err) =>
-      console.error("[BattleRoom] Erro ao criar evento de ataque:", err)
+      console.error(
+        "[BattleRoom] Erro ao criar evento de ataque a obstáculo:",
+        err
+      )
     );
-
-    if (targetDefeated || eidolonDefeated) {
-      this.checkBattleEnd();
-    }
   }
 
   /**
@@ -1697,7 +1618,7 @@ export class BattleRoom extends Room<BattleSessionState> {
       // Iniciar QTE de ataque em vez de atacar diretamente
       this.startAttackQTE(client, attacker, target);
     } else if (targetObstacleId) {
-      // Atacar obstáculo
+      // Atacar obstáculo usando o executor
       const obstacle = this.state.obstacles.find(
         (o) => o.id === targetObstacleId
       );
@@ -1720,49 +1641,8 @@ export class BattleRoom extends Room<BattleSessionState> {
         return;
       }
 
-      // Consumir recurso de ataque
-      this.consumeAttackResource(attacker);
-
-      obstacle.hp -= attacker.combat;
-
-      if (obstacle.hp <= 0) {
-        obstacle.destroyed = true;
-      }
-
-      this.broadcast("battle:obstacle_attacked", {
-        attackerId,
-        obstacleId: targetObstacleId,
-        damage: attacker.combat,
-        destroyed: obstacle.destroyed,
-      });
-
-      // Criar evento de ataque a obstáculo
-      createAndEmitEvent({
-        context: "BATTLE",
-        scope: "GLOBAL",
-        category: "COMBAT",
-        severity: "INFO",
-        battleId: this.roomId,
-        sourceUserId: attacker.ownerId,
-        message: `${attacker.name} atacou um obstáculo causando ${
-          attacker.combat
-        } de dano${obstacle.destroyed ? " - DESTRUÍDO!" : ""}`,
-        code: "OBSTACLE_ATTACKED",
-        data: {
-          damage: attacker.combat,
-          obstacleHp: obstacle.hp,
-          destroyed: obstacle.destroyed,
-        },
-        actorId: attacker.id,
-        actorName: attacker.name,
-        targetId: targetObstacleId,
-        targetName: "Obstáculo",
-      }).catch((err) =>
-        console.error(
-          "[BattleRoom] Erro ao criar evento de ataque a obstáculo:",
-          err
-        )
-      );
+      // Usar o executor para atacar o obstáculo
+      this.performObstacleAttack(attacker, obstacle);
     } else if (targetPosition) {
       // Ataque direcional - verificar se há unidade ou obstáculo na posição
       // Attack range base é 1 (melee), considera 8 direções (diagonais)
@@ -1810,7 +1690,7 @@ export class BattleRoom extends Room<BattleSessionState> {
 
       // Nenhum alvo na posição - ataque no ar (miss)
       // Consumir recurso de ataque
-      this.consumeAttackResource(attacker);
+      this.consumeAttackResourceSimple(attacker);
       attacker.hasStartedAction = true;
 
       // Notificar que o ataque foi no ar (miss)
@@ -1871,8 +1751,6 @@ export class BattleRoom extends Room<BattleSessionState> {
     unitId: string,
     params?: Record<string, unknown>
   ) {
-    // Implementação de ações especiais (skills)
-    // Delegar para sistema de skills existente
     const userData = client.userData as { userId: string } | undefined;
     if (!userData) return;
 
@@ -1882,40 +1760,189 @@ export class BattleRoom extends Room<BattleSessionState> {
       return;
     }
 
-    // TODO: Integrar com sistema de skills existente
-    this.broadcast("battle:action_executed", {
-      actionName,
-      unitId,
-      params,
-      success: true,
-    });
-  }
+    // Handler unificado para abilities (use_ability)
+    if (actionName === "use_ability") {
+      const abilityCode = params?.abilityCode as string;
+      if (!abilityCode) {
+        client.send("error", { message: "abilityCode é obrigatório" });
+        return;
+      }
 
-  private handleCastSpell(
-    client: Client,
-    unitId: string,
-    spellCode: string,
-    targetId?: string,
-    targetPosition?: { x: number; y: number }
-  ) {
-    // Implementação de magias
-    const userData = client.userData as { userId: string } | undefined;
-    if (!userData) return;
+      // ATTACK usa o handler separado (tem QTE e ataque a obstáculos)
+      if (abilityCode === "ATTACK") {
+        this.handleAttack(
+          client,
+          unitId,
+          params?.targetUnitId as string | undefined,
+          undefined,
+          params?.targetPosition as { x: number; y: number } | undefined
+        );
+        return;
+      }
 
-    const unit = this.state.units.get(unitId);
-    if (!unit || unit.ownerId !== userData.userId) {
-      client.send("error", { message: "Não pode lançar magia" });
+      // Buscar definição da ability
+      const ability = findAbilityByCode(abilityCode);
+      if (!ability) {
+        client.send("error", {
+          message: `Ability não encontrada: ${abilityCode}`,
+        });
+        return;
+      }
+
+      // Verificar se é o turno ativo da unidade
+      if (this.state.activeUnitId !== unitId) {
+        client.send("error", { message: "Não é o turno desta unidade" });
+        return;
+      }
+
+      // Converter unidades do state para array de BattleUnit
+      const allUnits: BattleUnit[] = Array.from(this.state.units.values()).map(
+        (u) => this.schemaUnitToBattleUnit(u)
+      );
+      const casterUnit = this.schemaUnitToBattleUnit(unit);
+
+      // Resolver alvo (targetUnitId ou targetPosition)
+      let target: BattleUnit | { x: number; y: number } | null = null;
+
+      if (params?.targetUnitId) {
+        const targetSchema = this.state.units.get(
+          params.targetUnitId as string
+        );
+        if (targetSchema) {
+          target = this.schemaUnitToBattleUnit(targetSchema);
+        }
+      } else if (params?.targetPosition) {
+        target = params.targetPosition as { x: number; y: number };
+      }
+
+      // Contexto de execução
+      const obstacleArray = Array.from(this.state.obstacles).filter(
+        (o): o is NonNullable<typeof o> => o != null
+      );
+      const context = {
+        obstacles: obstacleArray.map((o) => ({
+          x: o.posX,
+          y: o.posY,
+          type: o.type || "default",
+        })),
+        gridWidth: this.state.gridWidth,
+        gridHeight: this.state.gridHeight,
+        targetPosition: params?.targetPosition as
+          | { x: number; y: number }
+          | undefined,
+      };
+
+      // Executar a ability via sistema unificado
+      const result = executeSkill(
+        casterUnit,
+        abilityCode,
+        target as BattleUnit | null,
+        allUnits,
+        true, // isBattle = true (cooldowns dobrados)
+        context
+      );
+
+      if (!result.success) {
+        client.send("error", {
+          message: result.error || "Falha ao executar ability",
+        });
+        return;
+      }
+
+      // Sincronizar mudanças de volta para o schema
+      this.syncUnitFromResult(unit, casterUnit, result);
+
+      // Se houve alvo e mudanças nele, sincronizar também
+      if (target && "id" in target && result.targetHpAfter !== undefined) {
+        const targetSchema = this.state.units.get(target.id);
+        if (targetSchema) {
+          const targetUnit = allUnits.find((u) => u.id === target.id);
+          if (targetUnit) {
+            this.syncUnitFromResult(targetSchema, targetUnit, result);
+          }
+        }
+      }
+
+      // Broadcast de sucesso
+      this.broadcast("battle:skill_used", {
+        casterUnitId: unitId,
+        skillCode: abilityCode,
+        targetUnitId: params?.targetUnitId,
+        targetPosition: params?.targetPosition,
+        result,
+      });
+
+      // Criar evento de log
+      createAndEmitEvent({
+        context: "BATTLE",
+        scope: "GLOBAL",
+        category: "SKILL",
+        severity: "INFO",
+        battleId: this.roomId,
+        sourceUserId: unit.ownerId,
+        message: `${unit.name} usou ${ability.name}`,
+        code: "ABILITY_USED",
+        actorId: unitId,
+        actorName: unit.name,
+        targetId: params?.targetUnitId as string | undefined,
+        targetName: params?.targetUnitId
+          ? this.state.units.get(params.targetUnitId as string)?.name
+          : undefined,
+      }).catch((err) =>
+        console.error("[BattleRoom] Erro ao criar evento de ability:", err)
+      );
+
       return;
     }
 
-    // TODO: Integrar com sistema de spells existente
-    this.broadcast("battle:spell_cast", {
-      unitId,
-      spellCode,
-      targetId,
-      targetPosition,
-      success: true,
-    });
+    // Fallback para outras ações não reconhecidas
+    client.send("error", { message: `Ação desconhecida: ${actionName}` });
+  }
+
+  /**
+   * Sincroniza mudanças do resultado da execução de volta para o schema Colyseus
+   */
+  private syncUnitFromResult(
+    schema: BattleUnitSchema,
+    unit: BattleUnit,
+    result: {
+      casterActionsLeft?: number;
+      targetHpAfter?: number;
+      targetDefeated?: boolean;
+    }
+  ) {
+    // Sincronizar ações restantes
+    if (result.casterActionsLeft !== undefined) {
+      schema.actionsLeft = result.casterActionsLeft;
+    }
+
+    // Sincronizar HP
+    schema.currentHp = unit.currentHp;
+    schema.currentMana = unit.currentMana;
+
+    // Sincronizar cooldowns
+    if (unit.unitCooldowns) {
+      for (const [code, value] of Object.entries(unit.unitCooldowns)) {
+        schema.unitCooldowns.set(code, value);
+      }
+    }
+
+    // Sincronizar condições
+    schema.conditions.clear();
+    for (const cond of unit.conditions) {
+      schema.conditions.push(cond);
+    }
+
+    // Verificar morte
+    if (unit.currentHp <= 0 && schema.isAlive) {
+      schema.isAlive = false;
+      processUnitDeath(
+        unit,
+        Array.from(this.state.units.values()).map((u) =>
+          this.schemaUnitToBattleUnit(u)
+        )
+      );
+    }
   }
 
   /**
@@ -2233,46 +2260,48 @@ export class BattleRoom extends Room<BattleSessionState> {
 
   /**
    * Inicia um QTE de ataque
+   * REFATORADO: Usa prepareAttackContext do executor
    */
   private startAttackQTE(
     client: Client,
     attacker: BattleUnitSchema,
     target: BattleUnitSchema
   ) {
+    // Converter para BattleUnit
+    const attackerUnit = this.schemaUnitToBattleUnit(attacker);
+    const targetUnit = this.schemaUnitToBattleUnit(target);
+
+    // Usar executor para preparar contexto de ataque
+    const attackContext = prepareAttackContext(attackerUnit);
+
+    if (!attackContext.canAttack) {
+      client.send("error", { message: attackContext.blockReason });
+      return;
+    }
+
     if (!this.qteManager) {
       // Fallback: se QTE não está disponível, atacar diretamente
       console.warn(
         "[BattleRoom] QTE Manager não inicializado, atacando diretamente"
       );
-      this.performAttack(attacker, target);
+      this.executeAttackAndBroadcast(attacker, target, {
+        dodged: false,
+        attackerDamageModifier: 1.0,
+        defenderDamageModifier: 1.0,
+      });
       return;
     }
 
     // Atualizar unidades no QTE Manager
     this.updateQTEManagerUnits();
 
-    // Converter para BattleUnit
-    const attackerUnit = this.schemaUnitToBattleUnit(attacker);
-    const targetUnit = this.schemaUnitToBattleUnit(target);
-
-    // Calcular dano base considerando condições do atacante
-    const attackerConditions = Array.from(attacker.conditions).filter(
-      (c): c is string => c !== undefined
-    );
-    const attackerScan = scanConditionsForAction(attackerConditions, "ATTACK");
-    const bonusDamage = attackerScan.modifiers.bonusDamage || 0;
-    const baseDamage = Math.max(1, attacker.combat) + bonusDamage;
-
-    // Verificar se é dano mágico (MAGIC_WEAPON)
-    const isMagicAttack = attackerConditions.includes("MAGIC_WEAPON");
-
     // Iniciar o fluxo de QTE com callback de conclusão
     this.qteManager.initiateAttack(
       attackerUnit,
       targetUnit,
       this.state.battleId,
-      baseDamage,
-      isMagicAttack,
+      attackContext.baseDamage,
+      attackContext.isMagicAttack,
       (result) => {
         // Callback quando o QTE completa
         this.handleQTECombatComplete(attacker.id, target.id, result);
@@ -2282,6 +2311,7 @@ export class BattleRoom extends Room<BattleSessionState> {
 
   /**
    * Callback chamado quando um combate QTE completa
+   * REFATORADO: Delega toda lógica para executeAttackFromQTEResult
    */
   private handleQTECombatComplete(
     attackerId: string,
@@ -2293,45 +2323,105 @@ export class BattleRoom extends Room<BattleSessionState> {
 
     if (!attacker || !target) return;
 
-    if (result.dodged) {
-      // A esquiva foi bem-sucedida - atualizar posição
-      if (result.newDefenderPosition) {
-        const fromX = target.posX;
-        const fromY = target.posY;
-        target.posX = result.newDefenderPosition.x;
-        target.posY = result.newDefenderPosition.y;
+    // Converter resultado do QTE para o formato do executor
+    const qteResult: QTEResultForExecutor = {
+      dodged: result.dodged,
+      attackerDamageModifier: result.attackerDamageModifier,
+      defenderDamageModifier: result.defenderDamageModifier,
+      newDefenderPosition: result.newDefenderPosition,
+      defenderGrade: result.defenderQTE?.grade,
+    };
 
+    // Executar ataque e broadcast
+    this.executeAttackAndBroadcast(attacker, target, qteResult, {
+      attackerQTE: result.attackerQTE,
+      defenderQTE: result.defenderQTE,
+    });
+  }
+
+  /**
+   * Executa ataque usando o executor e faz broadcast dos resultados
+   * Método unificado para atacar com ou sem QTE
+   */
+  private executeAttackAndBroadcast(
+    attacker: BattleUnitSchema,
+    target: BattleUnitSchema,
+    qteResult: QTEResultForExecutor,
+    qteData?: { attackerQTE?: unknown; defenderQTE?: unknown }
+  ) {
+    // Converter schemas para BattleUnits
+    const allUnits = this.getAllUnitsAsBattleUnits();
+    const attackerUnit = allUnits.find((u) => u.id === attacker.id);
+    const targetUnit = allUnits.find((u) => u.id === target.id);
+
+    if (!attackerUnit || !targetUnit) {
+      console.error(
+        "[BattleRoom] executeAttackAndBroadcast: Unidade não encontrada"
+      );
+      return;
+    }
+
+    // Executar ataque usando o executor centralizado
+    const result = executeAttackFromQTEResult(
+      attackerUnit,
+      targetUnit,
+      allUnits,
+      qteResult,
+      this.state.battleId
+    );
+
+    if (!result.success) {
+      console.error(
+        "[BattleRoom] executeAttackAndBroadcast falhou:",
+        result.error
+      );
+      return;
+    }
+
+    // Sincronizar mudanças de volta para os schemas
+    this.syncAttackResultToSchemas(
+      attacker,
+      target,
+      attackerUnit,
+      targetUnit,
+      allUnits,
+      result
+    );
+
+    // Broadcast apropriado baseado no resultado
+    if (result.dodged) {
+      // Esquiva - broadcast específico
+      if (result.newDefenderPosition) {
         this.broadcast("battle:unit_dodged", {
-          unitId: targetId,
-          fromX,
-          fromY,
+          unitId: target.id,
+          fromX: target.posX,
+          fromY: target.posY,
           toX: result.newDefenderPosition.x,
           toY: result.newDefenderPosition.y,
         });
+        // Sincronizar posição no schema
+        target.posX = result.newDefenderPosition.x;
+        target.posY = result.newDefenderPosition.y;
       }
 
-      // Se foi esquiva perfeita, aplicar buff
-      if (result.defenderQTE?.grade === "PERFECT") {
-        target.conditions.push("ADRENALINE_RUSH");
+      if (result.perfectDodgeBuff) {
         this.broadcast("battle:condition_applied", {
-          unitId: targetId,
-          conditionId: "ADRENALINE_RUSH",
+          unitId: target.id,
+          conditionId: result.perfectDodgeBuff,
         });
       }
 
-      // Descontar ataque do atacante mesmo com esquiva
-      this.consumeAttackResource(attacker);
-
       this.broadcast("battle:attack_dodged", {
-        attackerId,
-        targetId,
-        attackerQTE: result.attackerQTE,
-        defenderQTE: result.defenderQTE,
+        attackerId: attacker.id,
+        targetId: target.id,
+        attackerQTE: qteData?.attackerQTE,
+        defenderQTE: qteData?.defenderQTE,
       });
 
       // Criar evento de esquiva
-      const perfeitaMsg =
-        result.defenderQTE?.grade === "PERFECT" ? " com esquiva PERFEITA!" : "";
+      const perfeitaMsg = result.perfectDodgeBuff
+        ? " com esquiva PERFEITA!"
+        : "";
       createAndEmitEvent({
         context: "BATTLE",
         scope: "GLOBAL",
@@ -2343,9 +2433,9 @@ export class BattleRoom extends Room<BattleSessionState> {
         message: `${target.name} esquivou do ataque de ${attacker.name}${perfeitaMsg}`,
         code: "ATTACK_DODGED",
         data: {
-          attackerQTE: result.attackerQTE,
-          defenderQTE: result.defenderQTE,
-          isPerfect: result.defenderQTE?.grade === "PERFECT",
+          attackerQTE: qteData?.attackerQTE,
+          defenderQTE: qteData?.defenderQTE,
+          isPerfect: !!result.perfectDodgeBuff,
           newPosition: result.newDefenderPosition,
         },
         actorId: target.id,
@@ -2356,13 +2446,62 @@ export class BattleRoom extends Room<BattleSessionState> {
         console.error("[BattleRoom] Erro ao criar evento de esquiva:", err)
       );
     } else {
-      // Aplicar dano com modificadores
-      this.performAttack(
-        attacker,
-        target,
-        result.attackerDamageModifier,
-        result.defenderDamageModifier
+      // Ataque acertou - broadcast de dano
+      this.broadcast("battle:unit_attacked", {
+        attackerId: attacker.id,
+        targetId: target.id,
+        damage: result.damageTransferredToEidolon ? 0 : result.finalDamage,
+        rawDamage: result.rawDamage,
+        bonusDamage: result.bonusDamage,
+        damageReduction: result.damageReduction,
+        attackModifier: result.attackModifier,
+        defenseModifier: result.defenseModifier,
+        damageType: result.damageType,
+        targetHpAfter: result.targetHpAfter,
+        targetDefeated: result.targetDefeated,
+        damageTransferredToEidolon: result.damageTransferredToEidolon,
+        eidolonDefeated: result.eidolonDefeated,
+      });
+
+      // Criar evento de ataque
+      const damageMsg = result.damageTransferredToEidolon
+        ? `(transferido para Eidolon)`
+        : `causando ${result.finalDamage} de dano`;
+      createAndEmitEvent({
+        context: "BATTLE",
+        scope: "GLOBAL",
+        category: "COMBAT",
+        severity: "WARNING",
+        battleId: this.roomId,
+        sourceUserId: attacker.ownerId,
+        targetUserIds: [target.ownerId],
+        message: `${attacker.name} atacou ${target.name} ${damageMsg}${
+          result.targetDefeated ? " - DERROTADO!" : ""
+        }`,
+        code: "UNIT_ATTACKED",
+        data: {
+          damage: result.finalDamage,
+          rawDamage: result.rawDamage,
+          bonusDamage: result.bonusDamage,
+          targetHp: result.targetHpAfter,
+          targetDefeated: result.targetDefeated,
+          attackModifier: result.attackModifier,
+          defenseModifier: result.defenseModifier,
+          damageType: result.damageType,
+          damageTransferredToEidolon: result.damageTransferredToEidolon,
+          eidolonDefeated: result.eidolonDefeated,
+        },
+        actorId: attacker.id,
+        actorName: attacker.name,
+        targetId: target.id,
+        targetName: target.name,
+      }).catch((err) =>
+        console.error("[BattleRoom] Erro ao criar evento de ataque:", err)
       );
+
+      if (result.targetDefeated || result.eidolonDefeated) {
+        this.checkBattleEnd();
+      }
     }
   }
 

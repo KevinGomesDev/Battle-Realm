@@ -9,7 +9,12 @@ import type {
   BattleObstacle,
   BattleUnit,
 } from "../../../../../../shared/types/battle.types";
-import type { SkillExecutionContext, AttackActionResult } from "../types";
+import type {
+  SkillExecutionContext,
+  AttackActionResult,
+  AttackContext,
+  QTEResultForExecutor,
+} from "../types";
 import { isWithinRange } from "../../../../../../shared/utils/distance.utils";
 import {
   OBSTACLE_CONFIG,
@@ -376,4 +381,506 @@ export function executeAttackSkill(
     undefined,
     context?.battleId
   );
+}
+
+/**
+ * Executa ataque com modificadores de QTE
+ * Esta função centraliza TODA a lógica de combate com suporte a QTE
+ *
+ * @param attacker Unidade atacante (será modificada in-place)
+ * @param target Unidade alvo (será modificada in-place)
+ * @param allUnits Todas as unidades (para verificar Eidolon, etc)
+ * @param attackModifier Multiplicador de dano do atacante (QTE) - padrão 1.0
+ * @param defenseModifier Multiplicador de redução do defensor (QTE) - padrão 1.0
+ * @param battleId ID da batalha (para eventos)
+ */
+export function executeAttackWithQTEModifiers(
+  attacker: BattleUnit,
+  target: BattleUnit,
+  allUnits: BattleUnit[],
+  attackModifier: number = 1.0,
+  defenseModifier: number = 1.0,
+  battleId?: string
+): AttackActionResult {
+  if (!attacker.features.includes("ATTACK")) {
+    return { success: false, error: "Unit cannot attack" };
+  }
+  if (!attacker.isAlive) {
+    return { success: false, error: "Dead unit cannot attack" };
+  }
+  if (!target.isAlive) {
+    return { success: false, error: "Target unit is not alive" };
+  }
+
+  // === MAGIC_WEAPON: Converter dano físico em mágico ===
+  let effectiveDamageType: DamageTypeName = "FISICO";
+  if (attacker.conditions.includes("MAGIC_WEAPON")) {
+    effectiveDamageType = "MAGICO";
+  }
+
+  // Varredura de condições do atacante
+  const attackerScan = scanConditionsForAction(attacker.conditions, "ATTACK");
+  if (!attackerScan.canPerform) {
+    return { success: false, error: attackerScan.blockReason };
+  }
+
+  // Varredura de condições do alvo
+  const targetScan = scanConditionsForAction(target.conditions, "ATTACK");
+
+  // === CÁLCULO DE DANO COM QTE ===
+  const bonusDamage = attackerScan.modifiers.bonusDamage || 0;
+  const rawDamage = Math.max(1, attacker.combat) + bonusDamage;
+
+  // Aplicar modificadores do QTE
+  const qteModifiedDamage = Math.floor(
+    rawDamage * attackModifier * defenseModifier
+  );
+
+  // Redução de dano por condições do alvo
+  const conditionDamageReduction = targetScan.modifiers.damageReduction || 0;
+  const damageAfterReduction = Math.max(
+    0,
+    qteModifiedDamage - conditionDamageReduction
+  );
+
+  console.log("[COMBAT] Aplicando dano (com QTE):", {
+    targetName: target.name,
+    targetRace: target.race,
+    rawDamage,
+    bonusDamage,
+    attackModifier,
+    defenseModifier,
+    qteModifiedDamage,
+    conditionDamageReduction,
+    damageAfterReduction,
+    damageType: effectiveDamageType,
+  });
+
+  // === VERIFICAR TRANSFERÊNCIA DE DANO PARA EIDOLON ===
+  const eidolonToTransfer = shouldTransferDamageToEidolon(target, allUnits);
+
+  let eidolonDefeated = false;
+  let damageTransferredToEidolon = false;
+
+  if (eidolonToTransfer) {
+    const transferResult = transferDamageToEidolon(
+      eidolonToTransfer,
+      damageAfterReduction
+    );
+    eidolonDefeated = transferResult.eidolonDefeated;
+    damageTransferredToEidolon = true;
+
+    console.log(
+      `[COMBAT] 🛡️ Dano transferido para Eidolon: ${damageAfterReduction} (Verdadeiro)`
+    );
+
+    if (eidolonDefeated) {
+      processEidolonDeath(eidolonToTransfer, "battle");
+    }
+
+    // Aplicar expiração de condições
+    attacker.conditions = applyConditionScanResult(
+      attacker.conditions,
+      attackerScan
+    );
+    target.conditions = applyConditionScanResult(target.conditions, targetScan);
+
+    return {
+      success: true,
+      targetType: "unit",
+      rawDamage,
+      bonusDamage,
+      damageReduction: conditionDamageReduction,
+      finalDamage: damageAfterReduction,
+      damageType: effectiveDamageType,
+      targetHpAfter: target.currentHp,
+      targetPhysicalProtection: target.physicalProtection,
+      targetMagicalProtection: target.magicalProtection,
+      targetDefeated: false,
+      attackModifier,
+      defenseModifier,
+      damageTransferredToEidolon: true,
+      eidolonDefeated,
+    };
+  }
+
+  // === APLICAR DANO NORMAL ===
+  const protectionResult = applyDamage(
+    target.physicalProtection,
+    target.magicalProtection,
+    target.currentHp,
+    damageAfterReduction,
+    effectiveDamageType
+  );
+
+  target.physicalProtection = protectionResult.newPhysicalProtection;
+  target.magicalProtection = protectionResult.newMagicalProtection;
+  target.currentHp = protectionResult.newHp;
+
+  // Aplicar expiração de condições
+  attacker.conditions = applyConditionScanResult(
+    attacker.conditions,
+    attackerScan
+  );
+  target.conditions = applyConditionScanResult(target.conditions, targetScan);
+
+  let targetDefeated = false;
+  let killedSummons: BattleUnit[] = [];
+  if (target.currentHp <= 0) {
+    targetDefeated = true;
+    target.isAlive = false;
+    const deathResult = processUnitDeath(
+      target,
+      allUnits,
+      attacker,
+      "battle",
+      battleId
+    );
+    killedSummons = deathResult.killedSummons;
+  }
+
+  return {
+    success: true,
+    targetType: "unit",
+    rawDamage,
+    bonusDamage,
+    damageReduction: conditionDamageReduction,
+    finalDamage: damageAfterReduction,
+    damageType: effectiveDamageType,
+    targetHpAfter: target.currentHp,
+    targetPhysicalProtection: target.physicalProtection,
+    targetMagicalProtection: target.magicalProtection,
+    targetDefeated,
+    attackModifier,
+    defenseModifier,
+    killedSummonIds: killedSummons.map((s) => s.id),
+  };
+}
+
+// =============================================================================
+// FUNÇÕES PARA FLUXO QTE CENTRALIZADO
+// =============================================================================
+
+/**
+ * Prepara o contexto de ataque para o QTE
+ * Esta função NÃO executa o ataque, apenas calcula os dados necessários
+ * para o QTEManager iniciar o fluxo de QTE
+ *
+ * @param attacker Unidade atacante
+ * @returns Contexto com dados para QTE
+ */
+export function prepareAttackContext(attacker: BattleUnit): AttackContext {
+  // Verificar se pode atacar
+  if (!attacker.features.includes("ATTACK")) {
+    return {
+      baseDamage: 0,
+      bonusDamage: 0,
+      isMagicAttack: false,
+      damageType: "FISICO",
+      canAttack: false,
+      blockReason: "Unit cannot attack",
+    };
+  }
+
+  if (!attacker.isAlive) {
+    return {
+      baseDamage: 0,
+      bonusDamage: 0,
+      isMagicAttack: false,
+      damageType: "FISICO",
+      canAttack: false,
+      blockReason: "Dead unit cannot attack",
+    };
+  }
+
+  // Verificar recursos
+  const hasAttacksRemaining = attacker.attacksLeftThisTurn > 0;
+  if (!hasAttacksRemaining && attacker.actionsLeft <= 0) {
+    return {
+      baseDamage: 0,
+      bonusDamage: 0,
+      isMagicAttack: false,
+      damageType: "FISICO",
+      canAttack: false,
+      blockReason: "No actions left this turn",
+    };
+  }
+
+  // Varredura de condições
+  const attackerScan = scanConditionsForAction(attacker.conditions, "ATTACK");
+  if (!attackerScan.canPerform) {
+    return {
+      baseDamage: 0,
+      bonusDamage: 0,
+      isMagicAttack: false,
+      damageType: "FISICO",
+      canAttack: false,
+      blockReason: attackerScan.blockReason,
+    };
+  }
+
+  // Calcular dano base
+  const bonusDamage = attackerScan.modifiers.bonusDamage || 0;
+  const baseDamage = Math.max(1, attacker.combat) + bonusDamage;
+
+  // Verificar MAGIC_WEAPON
+  const isMagicAttack = attacker.conditions.includes("MAGIC_WEAPON");
+  const damageType = isMagicAttack ? "MAGICO" : "FISICO";
+
+  return {
+    baseDamage,
+    bonusDamage,
+    isMagicAttack,
+    damageType: damageType as "FISICO" | "MAGICO",
+    canAttack: true,
+  };
+}
+
+/**
+ * Executa ataque completo com resultado do QTE
+ * Esta função centraliza TODA a lógica de combate, incluindo:
+ * - Esquiva e movimentação
+ * - Buff de esquiva perfeita
+ * - Aplicação de dano
+ * - Transferência para Eidolon
+ * - Processamento de morte
+ * - Consumo de recursos de ataque
+ *
+ * @param attacker Unidade atacante (será modificada in-place)
+ * @param target Unidade alvo (será modificada in-place)
+ * @param allUnits Todas as unidades
+ * @param qteResult Resultado do QTE (ou valores padrão se sem QTE)
+ * @param battleId ID da batalha
+ */
+export function executeAttackFromQTEResult(
+  attacker: BattleUnit,
+  target: BattleUnit,
+  allUnits: BattleUnit[],
+  qteResult: QTEResultForExecutor,
+  battleId?: string
+): AttackActionResult {
+  // Validações básicas
+  if (!attacker.features.includes("ATTACK")) {
+    return { success: false, error: "Unit cannot attack" };
+  }
+  if (!attacker.isAlive) {
+    return { success: false, error: "Dead unit cannot attack" };
+  }
+  if (!target.isAlive) {
+    return { success: false, error: "Target unit is not alive" };
+  }
+
+  // === CONSUMO DE RECURSO DE ATAQUE ===
+  // Mover para cá para garantir que é sempre consumido
+  const hasAttacksRemaining = attacker.attacksLeftThisTurn > 0;
+  if (!hasAttacksRemaining) {
+    if (attacker.actionsLeft <= 0) {
+      return { success: false, error: "No actions left this turn" };
+    }
+    attacker.actionsLeft = Math.max(0, attacker.actionsLeft - 1);
+    const hasProtection = attacker.physicalProtection > 0;
+    const extraAttacks = getExtraAttacksFromConditions(
+      attacker.conditions,
+      hasProtection
+    );
+    attacker.attacksLeftThisTurn = extraAttacks;
+  } else {
+    attacker.attacksLeftThisTurn = Math.max(
+      0,
+      attacker.attacksLeftThisTurn - 1
+    );
+  }
+
+  // === ESQUIVA BEM-SUCEDIDA ===
+  if (qteResult.dodged) {
+    // Aplicar movimentação de esquiva
+    let newDefenderPosition: { x: number; y: number } | undefined;
+    if (qteResult.newDefenderPosition) {
+      target.posX = qteResult.newDefenderPosition.x;
+      target.posY = qteResult.newDefenderPosition.y;
+      newDefenderPosition = qteResult.newDefenderPosition;
+    }
+
+    // Aplicar buff de esquiva perfeita
+    let perfectDodgeBuff: string | undefined;
+    if (qteResult.defenderGrade === "PERFECT") {
+      target.conditions.push("ADRENALINE_RUSH");
+      perfectDodgeBuff = "ADRENALINE_RUSH";
+    }
+
+    // Varredura de condições do atacante para expiração
+    const attackerScan = scanConditionsForAction(attacker.conditions, "ATTACK");
+    attacker.conditions = applyConditionScanResult(
+      attacker.conditions,
+      attackerScan
+    );
+
+    return {
+      success: true,
+      dodged: true,
+      missed: true,
+      targetType: "unit",
+      rawDamage: 0,
+      bonusDamage: 0,
+      damageReduction: 0,
+      finalDamage: 0,
+      damageType: attacker.conditions.includes("MAGIC_WEAPON")
+        ? "MAGICO"
+        : "FISICO",
+      targetHpAfter: target.currentHp,
+      targetPhysicalProtection: target.physicalProtection,
+      targetMagicalProtection: target.magicalProtection,
+      targetDefeated: false,
+      attacksLeftThisTurn: attacker.attacksLeftThisTurn,
+      attackModifier: qteResult.attackerDamageModifier,
+      defenseModifier: qteResult.defenderDamageModifier,
+      newDefenderPosition,
+      perfectDodgeBuff,
+    };
+  }
+
+  // === ATAQUE ACERTOU - CALCULAR DANO ===
+
+  // Tipo de dano
+  let effectiveDamageType: DamageTypeName = "FISICO";
+  if (attacker.conditions.includes("MAGIC_WEAPON")) {
+    effectiveDamageType = "MAGICO";
+  }
+
+  // Varredura de condições
+  const attackerScan = scanConditionsForAction(attacker.conditions, "ATTACK");
+  const targetScan = scanConditionsForAction(target.conditions, "ATTACK");
+
+  // Cálculo de dano
+  const bonusDamage = attackerScan.modifiers.bonusDamage || 0;
+  const rawDamage = Math.max(1, attacker.combat) + bonusDamage;
+
+  // Aplicar modificadores do QTE
+  const qteModifiedDamage = Math.floor(
+    rawDamage *
+      qteResult.attackerDamageModifier *
+      qteResult.defenderDamageModifier
+  );
+
+  // Redução de dano por condições
+  const conditionDamageReduction = targetScan.modifiers.damageReduction || 0;
+  const damageAfterReduction = Math.max(
+    0,
+    qteModifiedDamage - conditionDamageReduction
+  );
+
+  console.log("[COMBAT] executeAttackFromQTEResult:", {
+    targetName: target.name,
+    rawDamage,
+    bonusDamage,
+    attackerMod: qteResult.attackerDamageModifier,
+    defenderMod: qteResult.defenderDamageModifier,
+    qteModifiedDamage,
+    conditionDamageReduction,
+    damageAfterReduction,
+    damageType: effectiveDamageType,
+  });
+
+  // === VERIFICAR TRANSFERÊNCIA PARA EIDOLON ===
+  const eidolonToTransfer = shouldTransferDamageToEidolon(target, allUnits);
+
+  let eidolonDefeated = false;
+  let damageTransferredToEidolon = false;
+
+  if (eidolonToTransfer) {
+    const transferResult = transferDamageToEidolon(
+      eidolonToTransfer,
+      damageAfterReduction
+    );
+    eidolonDefeated = transferResult.eidolonDefeated;
+    damageTransferredToEidolon = true;
+
+    console.log(
+      `[COMBAT] 🛡️ Dano transferido para Eidolon: ${damageAfterReduction}`
+    );
+
+    if (eidolonDefeated) {
+      processEidolonDeath(eidolonToTransfer, "battle");
+    }
+
+    // Aplicar expiração de condições
+    attacker.conditions = applyConditionScanResult(
+      attacker.conditions,
+      attackerScan
+    );
+    target.conditions = applyConditionScanResult(target.conditions, targetScan);
+
+    return {
+      success: true,
+      targetType: "unit",
+      rawDamage,
+      bonusDamage,
+      damageReduction: conditionDamageReduction,
+      finalDamage: damageAfterReduction,
+      damageType: effectiveDamageType,
+      targetHpAfter: target.currentHp,
+      targetPhysicalProtection: target.physicalProtection,
+      targetMagicalProtection: target.magicalProtection,
+      targetDefeated: false,
+      attacksLeftThisTurn: attacker.attacksLeftThisTurn,
+      attackModifier: qteResult.attackerDamageModifier,
+      defenseModifier: qteResult.defenderDamageModifier,
+      damageTransferredToEidolon: true,
+      eidolonDefeated,
+    };
+  }
+
+  // === APLICAR DANO NORMAL ===
+  const protectionResult = applyDamage(
+    target.physicalProtection,
+    target.magicalProtection,
+    target.currentHp,
+    damageAfterReduction,
+    effectiveDamageType
+  );
+
+  target.physicalProtection = protectionResult.newPhysicalProtection;
+  target.magicalProtection = protectionResult.newMagicalProtection;
+  target.currentHp = protectionResult.newHp;
+
+  // Aplicar expiração de condições
+  attacker.conditions = applyConditionScanResult(
+    attacker.conditions,
+    attackerScan
+  );
+  target.conditions = applyConditionScanResult(target.conditions, targetScan);
+
+  // Processar morte
+  let targetDefeated = false;
+  let killedSummons: BattleUnit[] = [];
+  if (target.currentHp <= 0) {
+    targetDefeated = true;
+    target.isAlive = false;
+    const deathResult = processUnitDeath(
+      target,
+      allUnits,
+      attacker,
+      "battle",
+      battleId
+    );
+    killedSummons = deathResult.killedSummons;
+  }
+
+  return {
+    success: true,
+    targetType: "unit",
+    rawDamage,
+    bonusDamage,
+    damageReduction: conditionDamageReduction,
+    finalDamage: damageAfterReduction,
+    damageType: effectiveDamageType,
+    targetHpAfter: target.currentHp,
+    targetPhysicalProtection: target.physicalProtection,
+    targetMagicalProtection: target.magicalProtection,
+    targetDefeated,
+    attacksLeftThisTurn: attacker.attacksLeftThisTurn,
+    attackModifier: qteResult.attackerDamageModifier,
+    defenseModifier: qteResult.defenderDamageModifier,
+    killedSummonIds: killedSummons.map((s) => s.id),
+  };
 }

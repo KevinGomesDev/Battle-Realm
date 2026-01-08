@@ -5,8 +5,7 @@ import { useMemo, useCallback } from "react";
 import type { BattleUnitState } from "@/services/colyseus.service";
 import {
   calculateTargetingPreview,
-  skillToTargetingConfig,
-  spellToTargetingConfig,
+  abilityToTargetingConfig,
   handleQTE,
   type TargetingConfig,
   type TargetingPreview,
@@ -14,11 +13,7 @@ import {
   type UnitStats,
   type TargetingCell,
 } from "../../../../../shared/utils/targeting.utils";
-import {
-  findSkillByCode,
-  isCommonAction,
-} from "../../../../../shared/data/abilities.data";
-import { getAbilityByCode as getSpellByCode } from "../../../../../shared/data/abilities.data";
+import type { PendingAbility } from "../types/pending-ability.types";
 
 /**
  * Props para o hook de targeting
@@ -26,8 +21,8 @@ import { getAbilityByCode as getSpellByCode } from "../../../../../shared/data/a
 interface UseTargetingProps {
   /** Unidade atualmente selecionada */
   selectedUnit: BattleUnitState | undefined;
-  /** Ação pendente (skill code, "spell:CODE" ou ação comum) */
-  pendingAction: string | null;
+  /** Ability pendente aguardando alvo (tipado) */
+  pendingAbility: PendingAbility | null;
   /** Célula sob o mouse */
   hoveredCell: { x: number; y: number } | null;
   /** Todas as unidades na batalha */
@@ -81,7 +76,7 @@ function extractUnitStats(unit: BattleUnitState): UnitStats {
  */
 export function useTargeting({
   selectedUnit,
-  pendingAction,
+  pendingAbility,
   hoveredCell,
   units,
   gridConfig,
@@ -104,20 +99,21 @@ export function useTargeting({
     [gridConfig, units]
   );
 
-  // Calcular configuração de targeting baseada na ação pendente
+  // Calcular configuração de targeting baseada na ability pendente
   const targetingConfig: TargetingConfig | null = useMemo(() => {
-    if (!pendingAction || !selectedUnit) return null;
+    if (!pendingAbility || !selectedUnit) return null;
 
-    // Ignorar ações comuns que não precisam de targeting visual
-    // (DODGE não precisa de targeting, é self-target)
-    if (pendingAction === "DODGE") return null;
+    const { ability, code } = pendingAbility;
 
-    // Ataque básico
-    if (pendingAction === "ATTACK" || pendingAction === "attack") {
-      // attackRange vem da unidade (default 1 para melee)
-      // Usamos type assertion pois o schema pode não ter essa prop exposta
-      const baseRange =
-        (selectedUnit as unknown as { attackRange?: number }).attackRange ?? 1;
+    // DODGE é self-target, não precisa de preview
+    if (code === "DODGE") return null;
+
+    // SELF abilities não precisam de targeting visual
+    if (ability.targetType === "SELF" || ability.range === "SELF") return null;
+
+    // ATTACK usa rangeDistance da ability (base 1) + attackRangeMod de condições
+    if (code === "ATTACK") {
+      const baseRange = ability.rangeDistance ?? 1;
       const finalRange = baseRange + attackRangeMod;
       return {
         range: finalRange <= 1 ? "MELEE" : "RANGED",
@@ -128,8 +124,8 @@ export function useTargeting({
       } as TargetingConfig;
     }
 
-    // DASH
-    if (pendingAction === "DASH" || pendingAction === "dash") {
+    // DASH usa speed da unidade
+    if (code === "DASH") {
       const dashRange = selectedUnit.speed ?? 3;
       return {
         range: "RANGED",
@@ -140,44 +136,9 @@ export function useTargeting({
       } as TargetingConfig;
     }
 
-    // Spell
-    if (pendingAction.startsWith("spell:")) {
-      const spellCode = pendingAction.replace("spell:", "");
-      const spell = getSpellByCode(spellCode);
-      if (!spell) return null;
-
-      return spellToTargetingConfig({
-        range: spell.range,
-        rangeDistance: spell.rangeDistance,
-        targetType: spell.targetType,
-        targetingShape: spell.targetingShape,
-        areaSize: spell.areaSize,
-      });
-    }
-
-    // Skill (não é ação comum)
-    if (!isCommonAction(pendingAction)) {
-      const skill = findSkillByCode(pendingAction);
-      if (!skill) return null;
-
-      // Skills SELF não precisam de targeting visual (auto-target)
-      if (skill.targetType === "SELF") return null;
-
-      return skillToTargetingConfig(
-        {
-          range: skill.range,
-          rangeDistance: skill.rangeDistance,
-          rangeValue: skill.rangeValue,
-          targetType: skill.targetType,
-          targetingShape: skill.targetingShape,
-          areaSize: skill.areaSize,
-        },
-        attackRangeMod
-      );
-    }
-
-    return null;
-  }, [pendingAction, selectedUnit, attackRangeMod]);
+    // Todas as outras abilities usam a função unificada
+    return abilityToTargetingConfig(ability, attackRangeMod);
+  }, [pendingAbility, selectedUnit, attackRangeMod]);
 
   // Calcular preview de targeting
   const targetingPreview: TargetingPreview | null = useMemo(() => {
@@ -224,35 +185,17 @@ export function useTargeting({
   const confirmTarget = useCallback(() => {
     if (!selectedUnit || !hoveredCell || !targetingPreview?.isValidTarget)
       return;
+    if (!pendingAbility) return;
 
-    // Determinar tipo de ação
-    let actionType: "ATTACK" | "SKILL" | "SPELL" = "SKILL";
-    let abilityCode: string | undefined;
-
-    if (
-      pendingAction === "ATTACK" ||
-      pendingAction === "attack" ||
-      pendingAction === "DASH" ||
-      pendingAction === "dash"
-    ) {
-      actionType = "ATTACK";
-    } else if (pendingAction?.startsWith("spell:")) {
-      actionType = "SPELL";
-      abilityCode = pendingAction.replace("spell:", "");
-    } else if (pendingAction) {
-      actionType = "SKILL";
-      abilityCode = pendingAction;
-    }
-
-    // Chamar handleQTE (placeholder por enquanto)
+    // Chamar handleQTE com tipo unificado ABILITY
     handleQTE(
-      actionType,
+      pendingAbility.type === "ATTACK" ? "ATTACK" : "ABILITY",
       selectedUnit.id,
       hoveredCell.x,
       hoveredCell.y,
-      abilityCode
+      pendingAbility.code
     );
-  }, [selectedUnit, hoveredCell, targetingPreview, pendingAction]);
+  }, [selectedUnit, hoveredCell, targetingPreview, pendingAbility]);
 
   return {
     targetingPreview,

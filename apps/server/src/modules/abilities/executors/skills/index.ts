@@ -2,7 +2,13 @@
 // Barrel exports de todos os executores de skills
 
 // === Common Actions ===
-export { executeAttackSkill, executeAttack } from "./attack.skill";
+export {
+  executeAttackSkill,
+  executeAttack,
+  executeAttackWithQTEModifiers,
+  prepareAttackContext,
+  executeAttackFromQTEResult,
+} from "./attack.skill";
 export { executeDash } from "./dash.skill";
 export { executeDodge } from "./dodge.skill";
 

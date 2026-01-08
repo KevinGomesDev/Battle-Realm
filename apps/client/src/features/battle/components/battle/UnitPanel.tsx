@@ -1,11 +1,11 @@
 import React, { useState, useRef, useMemo } from "react";
 import { getConditionInfo } from "../../constants";
 import {
-  getSkillInfo,
+  getAbilityInfo,
   isCommonAction,
-  findSkillByCode,
-  getSpellByCode,
+  findAbilityByCode,
 } from "../../../../../../shared/data/abilities.data";
+import type { PendingAbility } from "../../types/pending-ability.types";
 import type { BattleUnit } from "../../../../../../shared/types/battle.types";
 import { AttributesDisplay } from "@/components/AttributesDisplay/index";
 import { Tooltip } from "@/components/Tooltip";
@@ -302,9 +302,9 @@ interface UnitPanelProps {
   activeUnitId: string | null | undefined;
   isMyTurn: boolean;
   currentUserId: string;
-  pendingAction: string | null;
-  onSetPendingAction: (action: string | null) => void;
-  onExecuteAction: (actionKey: string, unitId: string) => void;
+  pendingAbility: PendingAbility | null;
+  onSelectAbility: (abilityCode: string) => void;
+  onExecuteAbility: (abilityCode: string, unitId: string) => void;
 }
 
 export const UnitPanel: React.FC<UnitPanelProps> = ({
@@ -312,43 +312,44 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
   activeUnitId,
   isMyTurn,
   currentUserId,
-  pendingAction,
-  onSetPendingAction,
-  onExecuteAction,
+  pendingAbility,
+  onSelectAbility,
+  onExecuteAbility,
 }) => {
-  // Categorizar ações (fora do render condicional)
-  // Ações comuns são skills com commonAction: true
-  // Skills passivas NÃO devem aparecer (já aparecem como condições)
-  const categorizedActions = useMemo(() => {
+  // Categorizar abilities (ações comuns, skills de classe, spells)
+  // Skills passivas NÃO aparecem (já mostradas como condições)
+  const categorizedAbilities = useMemo(() => {
     const commonActions: string[] = [];
-    const skills: string[] = [];
-    const spells: string[] = [];
+    const classAbilities: string[] = [];
+    const spellAbilities: string[] = [];
 
     if (selectedUnit) {
       // Features da unidade (ações comuns + skills de classe)
       selectedUnit.features?.forEach((featureCode) => {
-        // Ações comuns (ATTACK, DASH, DODGE) vão para a aba de ações
         if (isCommonAction(featureCode)) {
           commonActions.push(featureCode);
         } else {
-          // Skills de classe - só adiciona se for ATIVA (passivas já aparecem como condições)
-          const skillInfo = getSkillInfo(featureCode);
-          const skillDef = findSkillByCode(featureCode);
-          if (skillInfo && skillDef && skillDef.activationType === "ACTIVE") {
-            skills.push(featureCode);
+          // Abilities de classe - só adiciona se for ATIVA
+          const abilityDef = findAbilityByCode(featureCode);
+          if (abilityDef && abilityDef.activationType === "ACTIVE") {
+            classAbilities.push(featureCode);
           }
         }
       });
 
-      // Spells (magias)
+      // Spells (também são Abilities, só com category diferente)
       if (selectedUnit.spells && selectedUnit.spells.length > 0) {
         selectedUnit.spells.forEach((spellCode) => {
-          spells.push(spellCode);
+          spellAbilities.push(spellCode);
         });
       }
     }
 
-    return { actions: commonActions, skills, spells };
+    return {
+      actions: commonActions,
+      abilities: classAbilities,
+      spells: spellAbilities,
+    };
   }, [selectedUnit]);
 
   // Se activeUnitId está undefined mas é meu turno e a unidade é minha (e controlável),
@@ -435,65 +436,71 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
     isPlayerControllable(selectedUnit, currentUserId) &&
     isActiveOrPending;
 
-  // Preparar items das ações
-  const actionItems: ActionStripItem[] = categorizedActions.actions
-    .map((actionKey) => {
-      const skillInfo = getSkillInfo(actionKey);
-      if (!skillInfo) return null;
+  // Preparar items das ações comuns
+  const actionItems: ActionStripItem[] = categorizedAbilities.actions
+    .map((actionCode) => {
+      const abilityInfo = getAbilityInfo(actionCode);
+      if (!abilityInfo) return null;
 
-      const isAttackAction = actionKey === "ATTACK";
+      const isAttackAction = actionCode === "ATTACK";
       const hasExtraAttacks = (selectedUnit.attacksLeftThisTurn ?? 0) > 0;
       const canExecute = isAttackAction
         ? selectedUnit.actionsLeft > 0 || hasExtraAttacks
         : selectedUnit.actionsLeft > 0;
 
       return {
-        code: actionKey,
-        icon: skillInfo.icon,
-        name: skillInfo.name,
-        description: skillInfo.description,
-        requiresTarget: skillInfo.requiresTarget,
+        code: actionCode,
+        icon: abilityInfo.icon,
+        name: abilityInfo.name,
+        description: abilityInfo.description,
+        requiresTarget: abilityInfo.requiresTarget,
         disabled: !canExecute,
       };
     })
     .filter(Boolean) as ActionStripItem[];
 
-  const skillItems: ActionStripItem[] = categorizedActions.skills
-    .map((skillCode) => {
-      const skillInfo = getSkillInfo(skillCode);
-      if (!skillInfo) return null;
+  // Preparar items de abilities de classe
+  const abilityItems: ActionStripItem[] = categorizedAbilities.abilities
+    .map((abilityCode) => {
+      const abilityInfo = getAbilityInfo(abilityCode);
+      if (!abilityInfo) return null;
 
-      const cooldownLeft = selectedUnit.unitCooldowns?.[skillCode] ?? 0;
+      const cooldownLeft = selectedUnit.unitCooldowns?.[abilityCode] ?? 0;
       const isOnCooldown = cooldownLeft > 0;
       const canExecute = selectedUnit.actionsLeft > 0 && !isOnCooldown;
 
       return {
-        code: skillCode,
-        icon: skillInfo.icon,
-        name: skillInfo.name,
-        description: skillInfo.description,
-        requiresTarget: skillInfo.requiresTarget,
+        code: abilityCode,
+        icon: abilityInfo.icon,
+        name: abilityInfo.name,
+        description: abilityInfo.description,
+        requiresTarget: abilityInfo.requiresTarget,
         cooldown: cooldownLeft,
         disabled: !canExecute,
       };
     })
     .filter(Boolean) as ActionStripItem[];
 
-  const spellItems: ActionStripItem[] = categorizedActions.spells
+  // Preparar items de spells (também Abilities, category=SPELL)
+  const spellItems: ActionStripItem[] = categorizedAbilities.spells
     .map((spellCode) => {
-      const spellInfo = getSpellByCode(spellCode);
-      if (!spellInfo) return null;
+      const abilityInfo = getAbilityInfo(spellCode);
+      if (!abilityInfo) return null;
 
       const cooldownLeft = selectedUnit.unitCooldowns?.[spellCode] ?? 0;
       const isOnCooldown = cooldownLeft > 0;
-      const canExecute = selectedUnit.actionsLeft > 0 && !isOnCooldown;
+      const currentMana = selectedUnit.currentMana ?? 0;
+      const manaCost = abilityInfo.manaCost ?? 0;
+      const hasEnoughMana = currentMana >= manaCost;
+      const canExecute =
+        selectedUnit.actionsLeft > 0 && !isOnCooldown && hasEnoughMana;
 
       return {
         code: spellCode,
-        icon: spellInfo.icon ?? "🔮",
-        name: spellInfo.name,
-        description: spellInfo.description,
-        requiresTarget: true,
+        icon: abilityInfo.icon,
+        name: abilityInfo.name,
+        description: abilityInfo.description,
+        requiresTarget: abilityInfo.requiresTarget,
         cooldown: cooldownLeft,
         disabled: !canExecute,
       };
@@ -684,12 +691,12 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
               color={ACTION_COLORS.action.main}
               hoverColor={ACTION_COLORS.action.hover}
               items={actionItems}
-              pendingAction={pendingAction}
+              pendingAbilityCode={pendingAbility?.code ?? null}
               onExecuteAction={(code, requiresTarget) => {
                 if (requiresTarget) {
-                  onSetPendingAction(code);
+                  onSelectAbility(code);
                 } else {
-                  onExecuteAction(code, selectedUnit.id);
+                  onExecuteAbility(code, selectedUnit.id);
                 }
               }}
             />
@@ -699,13 +706,13 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
               label="Habilidades"
               color={ACTION_COLORS.skill.main}
               hoverColor={ACTION_COLORS.skill.hover}
-              items={skillItems}
-              pendingAction={pendingAction}
+              items={abilityItems}
+              pendingAbilityCode={pendingAbility?.code ?? null}
               onExecuteAction={(code, requiresTarget) => {
                 if (requiresTarget) {
-                  onSetPendingAction(code);
+                  onSelectAbility(code);
                 } else {
-                  onExecuteAction(code, selectedUnit.id);
+                  onExecuteAbility(code, selectedUnit.id);
                 }
               }}
             />
@@ -716,9 +723,13 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
               color={ACTION_COLORS.spell.main}
               hoverColor={ACTION_COLORS.spell.hover}
               items={spellItems}
-              pendingAction={pendingAction}
-              onExecuteAction={(code, _requiresTarget) => {
-                onSetPendingAction(`spell:${code}`);
+              pendingAbilityCode={pendingAbility?.code ?? null}
+              onExecuteAction={(code, requiresTarget) => {
+                if (requiresTarget) {
+                  onSelectAbility(code);
+                } else {
+                  onExecuteAbility(code, selectedUnit.id);
+                }
               }}
             />
           </div>
