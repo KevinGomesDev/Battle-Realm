@@ -59,6 +59,10 @@ import {
 
 // Components
 import { MovementTooltip, HoverTooltip } from "./components";
+import {
+  useProjectileAnimations,
+  ProjectileTrajectory,
+} from "./components/ProjectileTrajectory";
 
 // Types
 import type { BattleCanvasProps, BattleCanvasRef, GridColors } from "./types";
@@ -140,6 +144,15 @@ export const BattleCanvas = memo(
         hasActiveAnimations,
         updateAnimations,
       } = useUnitAnimations();
+
+      // === HOOK DE PROJÉTEIS ===
+      const {
+        getActiveProjectiles,
+        getTrailParticles,
+        fireProjectile,
+        updateProjectiles,
+        hasActiveProjectiles,
+      } = useProjectileAnimations();
 
       // === HELPER FUNCTIONS ===
       const getPlayerColors = useCallback(
@@ -489,6 +502,19 @@ export const BattleCanvas = memo(
           }
         });
 
+        // Projéteis em movimento
+        const activeProjectiles = getActiveProjectiles();
+        const trailParticles = getTrailParticles();
+        if (activeProjectiles.length > 0 || trailParticles.length > 0) {
+          ProjectileTrajectory.render({
+            ctx,
+            cellSize,
+            projectiles: activeProjectiles,
+            trailParticles,
+            animationTime: animationTimeRef.current,
+          });
+        }
+
         // Fog of War
         drawFogOfWar({
           ctx,
@@ -549,6 +575,8 @@ export const BattleCanvas = memo(
         getPlayerColors,
         updateGridCache,
         gridCacheRef,
+        getActiveProjectiles,
+        getTrailParticles,
       ]);
 
       // === ANIMATION LOOP ===
@@ -562,6 +590,8 @@ export const BattleCanvas = memo(
         hasActiveAnimations,
         needsRedrawRef,
         animationTimeRef,
+        updateProjectiles,
+        hasActiveProjectiles,
       });
 
       // === REF API ===
@@ -637,6 +667,10 @@ export const BattleCanvas = memo(
           ) => {
             startMoveAnimation(unitId, fromX, fromY, toX, toY);
           },
+          fireProjectile: (params) => {
+            fireProjectile(params);
+            needsRedrawRef.current = true;
+          },
         }),
         [
           centerOnUnit,
@@ -646,6 +680,7 @@ export const BattleCanvas = memo(
           isPositionVisible,
           startSpriteAnimation,
           startMoveAnimation,
+          fireProjectile,
         ]
       );
 

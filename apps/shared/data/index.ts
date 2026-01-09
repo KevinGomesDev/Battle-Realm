@@ -5,6 +5,10 @@
 // Fonte de verdade para skills e spells
 export * from "./abilities.data";
 
+// === TARGETING PATTERNS ===
+// PadrÃµes de Ã¡rea de efeito baseados em coordenadas
+export * from "./targeting-patterns.data";
+
 // === OUTROS DADOS ===
 export * from "./races.data";
 // export * from "./classes.data"; // Agora em abilities.data
@@ -24,7 +28,7 @@ export * from "./crisis.data";
 export * from "./effect-metadata.data";
 export * from "./sounds.data";
 
-// @deprecated - Estes módulos são wrappers de compatibilidade
-// Skills e Spells agora estão unificados em abilities.data.ts
+// @deprecated - Estes mï¿½dulos sï¿½o wrappers de compatibilidade
+// Skills e Spells agora estï¿½o unificados em abilities.data.ts
 // export * from "./skills.data"; // Use abilities.data
 // export * from "./spells.data"; // Use abilities.data

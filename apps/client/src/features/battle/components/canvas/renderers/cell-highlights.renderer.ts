@@ -64,14 +64,5 @@ export function drawCellHighlights({
     ctx.strokeRect(cellX, cellY, cellSize, cellSize);
   });
 
-  // Hover (apenas se não há preview de área)
-  if (hoveredCell && !hasSpellAreaPreview) {
-    const cellX = hoveredCell.x * cellSize;
-    const cellY = hoveredCell.y * cellSize;
-    ctx.fillStyle = gridColors.cellHover;
-    ctx.fillRect(cellX, cellY, cellSize, cellSize);
-    ctx.strokeStyle = gridColors.gridLine;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(cellX, cellY, cellSize, cellSize);
-  }
+  // Hover removido - não exibe highlight ao passar o mouse
 }

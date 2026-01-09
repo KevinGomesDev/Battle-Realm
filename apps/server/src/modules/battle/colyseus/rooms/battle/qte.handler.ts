@@ -138,6 +138,54 @@ export function startAttackQTE(
   );
 }
 
+import type { ProjectileDodgeResult } from "../../../../../qte/qte-manager";
+
+/**
+ * Inicia QTE de DODGE para projétil de área
+ *
+ * Usado quando um projétil de área (ex: FIRE, METEOR) intercepta uma unidade.
+ * A unidade pode tentar esquivar - se falhar, projétil explode nela.
+ *
+ * @param caster - Schema da unidade que lançou o projétil
+ * @param target - Schema da unidade interceptada
+ * @param state - Estado da batalha
+ * @param qteManager - Gerenciador de QTE
+ * @param onDodgeComplete - Callback com resultado do dodge
+ */
+export function startProjectileDodgeQTE(
+  caster: BattleUnitSchema,
+  target: BattleUnitSchema,
+  state: BattleSessionState,
+  qteManager: QTEManager | null,
+  onDodgeComplete: (result: ProjectileDodgeResult) => void
+): void {
+  if (!qteManager) {
+    console.warn(
+      "[BattleRoom] QTE Manager não inicializado para dodge de projétil"
+    );
+    // Sem QTE manager, projétil acerta diretamente
+    onDodgeComplete({
+      success: true,
+      dodged: false,
+      projectileContinues: false,
+    });
+    return;
+  }
+
+  const casterUnit = schemaUnitToBattleUnit(caster);
+  const targetUnit = schemaUnitToBattleUnit(target);
+
+  updateQTEManagerUnits(qteManager, state);
+
+  qteManager.initiateProjectileDodge(
+    casterUnit,
+    targetUnit,
+    state.battleId,
+    true, // Projéteis de área são tipicamente mágicos
+    onDodgeComplete
+  );
+}
+
 /**
  * Processa a resposta de um QTE
  */

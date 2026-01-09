@@ -41,11 +41,7 @@ Seraphina jurou erradicar a corrupção que se espalha pelas terras selvagens, m
 export const MALACHAR: RegentTemplate = {
   code: "REGENT_MALACHAR",
   name: "Archlich Malachar, O Eterno",
-  description: `Malachar foi um arquimago élfico há 2.000 anos, obcecado em desvendar os segredos da imortalidade. Após sacrificar sua própria família em um ritual proibido, ele ascendeu como o primeiro Lich de Nyxrath.
-
-Seu corpo é uma carcaça ressecada envolta em mantos de escuridão pura. Onde seus olhos deveriam estar, apenas chamas verdes e frias queimam com conhecimento acumulado de eras. Ele carrega o Grimório Vazio, um livro que consome as almas de seus inimigos.
-
-Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento absoluto, e está disposto a destruir mundos para obtê-lo.`,
+  description: `Malachar foi um arquimago élfico há 2.000 anos, obcecado em desvendar os segredos da imortalidade. Após sacrificar sua própria família em um ritual proibido, ele ascendeu como o primeiro Lich de Nyxrath. Seu corpo é uma carcaça ressecada envolta em mantos de escuridão pura. Onde seus olhos deveriam estar, apenas chamas verdes e frias queimam com conhecimento acumulado de eras. Ele carrega o Grimório Vazio, um livro que consome as almas de seus inimigos. Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento absoluto, e está disposto a destruir mundos para obtê-lo.`,
   avatar: "9",
   initialSkillCode: "GRIMOIRE", // Skill de Wizard
   initialSpells: ["FIRE"],
@@ -68,13 +64,9 @@ Malachar não busca poder — ele já o tem. O que ele deseja é conhecimento ab
 export const IGNATHARAX: RegentTemplate = {
   code: "REGENT_IGNATHARAX",
   name: "Ignatharax, O Primordial",
-  description: `Ignatharax é um dos Cinco Anciões, um dragão vermelho de proporções titânicas que dormiu por 500 anos antes de despertar na última década. Ele é o guardião do Fogo Eterno, a chama primordial que arde no coração do mundo.
-
-Com escamas que brilham como metal derretido e olhos que são brasas de pura energia, Ignatharax é tanto uma força da natureza quanto um ser senciente. Sua voz é o rugido de vulcões, e seu sopro pode derreter montanhas.
-
-Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância ou raiva. Ele vê o mundo com a perspectiva de eras, e protege Ashenvale porque sabe que o equilíbrio é a única coisa que impede a extinção de todas as coisas.`,
+  description: `Ignatharax é um dos Cinco Anciões, um dragão vermelho de proporções titânicas que dormiu por 500 anos antes de despertar na última década. Ele é o guardião do Fogo Eterno, a chama primordial que arde no coração do mundo. Com escamas que brilham como metal derretido e olhos que são brasas de pura energia, Ignatharax é tanto uma força da natureza quanto um ser senciente. Sua voz é o rugido de vulcões, e seu sopro pode derreter montanhas. Diferente de muitos dragões vermelhos, Ignatharax não é movido por ganância ou raiva. Ele vê o mundo com a perspectiva de eras, e protege Ashenvale porque sabe que o equilíbrio é a única coisa que impede a extinção de todas as coisas.`,
   avatar: "7",
-  initialSkillCode: "RECKLESS_ATTACK", // Skill de Barbarian
+  initialSkillCode: "ACTION_SURGE", // Skill de Barbarian
   initialSpells: [],
   combat: 8,
   speed: 4,

@@ -20,6 +20,10 @@ export interface SkillExecutionContext {
   obstacles?: BattleObstacle[];
   /** ID da batalha (para eventos) */
   battleId?: string;
+  /** Largura do grid de batalha */
+  gridWidth?: number;
+  /** Altura do grid de batalha */
+  gridHeight?: number;
 }
 
 export type SkillExecutorFn = (
@@ -34,12 +38,27 @@ export type SkillExecutorFn = (
 // SPELL TYPES
 // =============================================================================
 
+/** Contexto para execução de spells */
+export interface SpellExecutionContext {
+  targetPosition?: { x: number; y: number };
+  obstacles?: BattleObstacle[];
+  battleId?: string;
+  /** Largura do grid de batalha */
+  gridWidth?: number;
+  /** Altura do grid de batalha */
+  gridHeight?: number;
+  /** Flag para pular QTE (usado após QTE falhar) */
+  skipQTE?: boolean;
+  /** Ponto de impacto forçado (quando definido pelo QTE) */
+  forcedImpactPoint?: { x: number; y: number };
+}
+
 export type SpellExecutorFn = (
   caster: BattleUnit,
   target: BattleUnit | { x: number; y: number } | null,
   allUnits: BattleUnit[],
   spell: AbilityDefinition,
-  context?: AbilityExecutionContext
+  context?: SpellExecutionContext
 ) => AbilityExecutionResult;
 
 // =============================================================================

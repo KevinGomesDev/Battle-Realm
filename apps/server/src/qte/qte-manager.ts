@@ -37,6 +37,8 @@ export interface PendingQTE {
   attackQTEResult?: QTEResult;
   /** Timeout para expiração */
   timeoutId?: NodeJS.Timeout;
+  /** Flag para QTE de DODGE de projétil de área (sem fase ATTACK) */
+  isProjectileDodge?: boolean;
 }
 
 /**
@@ -62,6 +64,25 @@ export interface QTECombatResult {
 export type QTECompletionCallback = (result: QTECombatResult) => void;
 
 /**
+ * Resultado de um DODGE de projétil de área
+ */
+export interface ProjectileDodgeResult {
+  success: boolean;
+  dodged: boolean;
+  /** Nova posição do defensor após esquiva */
+  newDefenderPosition?: { x: number; y: number };
+  /** Se esquivou, projétil continua */
+  projectileContinues: boolean;
+  /** Resultado do QTE de defesa */
+  defenderQTE?: QTEResult;
+}
+
+/**
+ * Callback quando DODGE de projétil é completado
+ */
+export type ProjectileDodgeCallback = (result: ProjectileDodgeResult) => void;
+
+/**
  * Função para obter o tempo atual do servidor
  */
 export type GetServerTimeFn = () => number;
@@ -76,6 +97,9 @@ export class QTEManager {
 
   /** Callbacks de conclusão */
   private completionCallbacks = new Map<string, QTECompletionCallback>();
+
+  /** Callbacks de DODGE de projétil (separado para manter tipos) */
+  private projectileDodgeCallbacks = new Map<string, ProjectileDodgeCallback>();
 
   /** Referência para todas as unidades (para cascata) */
   private allUnits: BattleUnit[] = [];
@@ -188,6 +212,91 @@ export class QTEManager {
     this.broadcastFn("qte:start", attackQTE);
 
     return attackQTE;
+  }
+
+  /**
+   * Inicia um QTE de DODGE para projétil de área
+   * Pula a fase de ATTACK - vai direto para DEFENSE
+   *
+   * Usado quando um projétil de área (ex: FIRE, METEOR) intercepta uma unidade
+   * durante o trajeto. A unidade pode tentar esquivar do projétil.
+   *
+   * @param caster - Unidade que lançou o projétil
+   * @param target - Unidade interceptada pelo projétil
+   * @param battleId - ID da batalha
+   * @param isMagicAttack - Se é ataque mágico
+   * @param onComplete - Callback chamado quando o QTE termina
+   * @returns QTEConfig gerado para o DODGE
+   */
+  initiateProjectileDodge(
+    caster: BattleUnit,
+    target: BattleUnit,
+    battleId: string,
+    isMagicAttack: boolean = true,
+    onComplete: ProjectileDodgeCallback
+  ): QTEConfig {
+    const serverTime = this.getServerTime();
+
+    // Gerar QTE de defesa diretamente (sem fase de ATTACK)
+    const dodgeQTE = generateDefenseQTE(
+      caster,
+      target,
+      battleId,
+      this.allUnits,
+      this.obstacles,
+      this.gridWidth,
+      this.gridHeight,
+      isMagicAttack,
+      false, // Não é cascata - é o primeiro dodge
+      serverTime
+    );
+
+    // Criar resultado de ataque fictício (projétil viajando não tem QTE de ataque)
+    const fakeAttackResult: QTEResult = {
+      qteId: `proj-${battleId}-${Date.now()}`,
+      battleId,
+      grade: "HIT",
+      actionType: "ATTACK",
+      responderId: caster.id,
+      damageModifier: 1.0,
+      feedbackMessage: "Projétil se aproximando!",
+      feedbackColor: "#f97316",
+      timedOut: false,
+    };
+
+    // Armazenar estado pendente
+    const pending: PendingQTE = {
+      config: dodgeQTE,
+      attackerUnit: caster,
+      targetUnit: target,
+      baseDamage: 0, // Não usado - dano será aplicado pela explosão
+      isMagicAttack,
+      phase: "DEFENSE",
+      attackQTEResult: fakeAttackResult,
+      isProjectileDodge: true,
+    };
+
+    this.pendingQTEs.set(dodgeQTE.qteId, pending);
+    this.projectileDodgeCallbacks.set(dodgeQTE.qteId, onComplete);
+
+    // Configurar timeout baseado no serverEndTime + buffer
+    const timeUntilExpiry =
+      dodgeQTE.serverEndTime - serverTime + QTE_TIMEOUT_BUFFER;
+    const timeout = setTimeout(() => {
+      this.handleQTETimeout(dodgeQTE.qteId);
+    }, timeUntilExpiry);
+
+    pending.timeoutId = timeout;
+
+    // Broadcast QTE de DODGE para todos os jogadores
+    this.broadcastFn("qte:projectile_dodge", {
+      config: dodgeQTE,
+      casterId: caster.id,
+      casterName: caster.name,
+      projectileType: "area", // Pode ser expandido para diferentes tipos
+    });
+
+    return dodgeQTE;
   }
 
   /**
@@ -327,7 +436,28 @@ export class QTEManager {
     // Limpar estado
     this.pendingQTEs.delete(response.qteId);
 
-    // Chamar callback de conclusão
+    // Se é QTE de DODGE de projétil de área, usar callback específico
+    if (pending.isProjectileDodge) {
+      const projectileCallback = this.projectileDodgeCallbacks.get(
+        response.qteId
+      );
+      if (projectileCallback) {
+        this.projectileDodgeCallbacks.delete(response.qteId);
+
+        const projectileResult: ProjectileDodgeResult = {
+          success: true,
+          dodged: defenseApplication.dodged,
+          newDefenderPosition: defenseApplication.newPosition,
+          projectileContinues: defenseApplication.dodged, // Projétil continua se esquivou
+          defenderQTE: defenseResult,
+        };
+
+        projectileCallback(projectileResult);
+      }
+      return;
+    }
+
+    // Chamar callback de conclusão (fluxo normal de combate)
     const callback = this.completionCallbacks.get(response.qteId);
     if (callback) {
       this.completionCallbacks.delete(response.qteId);
@@ -473,6 +603,7 @@ export class QTEManager {
     }
     this.pendingQTEs.clear();
     this.completionCallbacks.clear();
+    this.projectileDodgeCallbacks.clear();
   }
 
   /**

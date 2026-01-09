@@ -10,8 +10,15 @@ export * from "./distance.utils";
 // Engagement
 export * from "./engagement.utils";
 
-// Line of sight
-export * from "./line-of-sight.utils";
+// Line of sight - export seletivo para evitar re-export de unitsToBlockers
+export {
+  hasLineOfSight,
+  hasLineOfSightFull,
+  hasLineOfSightFromUnit,
+  hasLineOfSightFromUnitFull,
+  isCellVisibleWithLoS,
+  getBresenhamLine,
+} from "./line-of-sight.utils";
 
 // Ability validation - export selectivo para evitar re-export de distance functions
 export {
@@ -39,34 +46,42 @@ export {
   getSpellMaxRange,
 } from "./ability-validation";
 
-// Targeting - export seletivo para evitar re-export de distance functions
+// Targeting - export seletivo (novo sistema baseado em CoordinatePattern)
 export {
-  type TargetingConfig,
   type TargetingCell,
   type TargetingPreview,
   type GridContext,
+  type UnitStats,
   type TargetingDirection,
-  type TargetingShape,
+  type CoordinatePattern,
+  type PatternCoordinate,
+  // Funções utilitárias
   isInBounds,
   isCellBlocked,
   isCellOccupied,
-  getDiamondCells,
-  getSquareCells,
-  getLineCells,
-  getCrossCells,
-  getRingCells,
   getDirectionDelta,
   getDirectionBetweenPoints,
+  // Sistema de CoordinatePattern
+  calculatePatternCells,
   calculateSelectableCells,
   calculateAffectedCells,
   calculateTargetingPreview,
-  getBasicAttackTargeting,
-  // Projectile system
+  // Sistema de projétil
   type ProjectileUnit,
-  type ProjectileConfig,
-  type ProjectileFilterResult,
-  sortUnitsByDistance,
-  filterCellsByProjectile,
-  getProjectileTargets,
-  abilityToProjectileConfig,
+  type ProjectileTrajectory,
+  type ProjectileProcessResult,
+  orderCoordinatesForProjectile,
+  calculateProjectileTrajectory,
+  findNextProjectileTarget,
+  continueProjectileAfterDodge,
+  processProjectileForPattern,
+  // Sistema de viagem + explosão
+  type TravelObstacle,
+  type TravelResult,
+  type AreaAbilityResult,
+  calculateProjectileTravel,
+  processAreaAbility,
+  getTargetsInArea,
+  // QTE
+  handleQTE,
 } from "./targeting.utils";

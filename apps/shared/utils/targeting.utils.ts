@@ -1,48 +1,21 @@
 // shared/utils/targeting.utils.ts
-// Sistema unificado de targeting para Skills e Spells
-// Calcula preview de alcance, células afetadas e validação de alvos
+// Sistema de targeting baseado em CoordinatePattern
+// Substitui completamente o sistema antigo de TargetingShape
 
 import type {
-  AbilityRange,
-  AbilityTargetType,
-  DynamicValue,
-  TargetingShape,
   TargetingDirection,
+  CoordinatePattern,
+  PatternCoordinate,
 } from "../types/ability.types";
-import {
-  DEFAULT_RANGE_DISTANCE,
-  resolveDynamicValue,
-} from "../types/ability.types";
+import { resolveDynamicValue } from "../types/ability.types";
 import { isCellBlockedByObstacle as _isCellBlockedByObstacle } from "./blocking.utils";
 
 // Re-exportar tipos para conveniência
-export type { TargetingShape, TargetingDirection };
+export type { TargetingDirection, CoordinatePattern, PatternCoordinate };
 
 // =============================================================================
 // TIPOS DE TARGETING
 // =============================================================================
-
-/**
- * Configuração de targeting de uma habilidade
- */
-export interface TargetingConfig {
-  /** Tipo de alcance base */
-  range: AbilityRange;
-  /** Distância máxima (pode ser dinâmica baseada em atributo) */
-  rangeDistance?: DynamicValue;
-  /** Tipo de alvo */
-  targetType: AbilityTargetType;
-  /** Forma do padrão de targeting */
-  shape: TargetingShape;
-  /** Tamanho da área de efeito (para SQUARE, DIAMOND, etc) */
-  areaSize?: DynamicValue;
-  /** Se pode atravessar obstáculos */
-  piercing?: boolean;
-  /** Se inclui a célula do próprio usuário */
-  includeSelf?: boolean;
-  /** Número de alvos máximos (para multi-target) */
-  maxTargets?: number;
-}
 
 /**
  * Célula do preview de targeting
@@ -103,6 +76,18 @@ export interface UnitStats {
   level: number;
 }
 
+/**
+ * Unidade para sistema de projétil
+ */
+export interface ProjectileUnit {
+  id: string;
+  posX: number;
+  posY: number;
+  isAlive: boolean;
+  /** Owner ID para filtrar aliados/inimigos */
+  ownerId?: string;
+}
+
 // =============================================================================
 // FUNÇÕES DE CÁLCULO DE DISTÂNCIA
 // =============================================================================
@@ -145,7 +130,6 @@ export function isInBounds(
 
 /**
  * Verifica se uma célula está bloqueada por obstáculo
- * Usa funções unificadas de blocking.utils.ts
  */
 export function isCellBlocked(
   x: number,
@@ -169,171 +153,11 @@ export function isCellOccupied(
 }
 
 // =============================================================================
-// FUNÇÕES DE GERAÇÃO DE CÉLULAS
+// FUNÇÕES DE DIREÇÃO
 // =============================================================================
 
 /**
- * Gera células em um padrão de diamante (distância Manhattan)
- */
-export function getDiamondCells(
-  centerX: number,
-  centerY: number,
-  radius: number,
-  gridWidth: number,
-  gridHeight: number,
-  includeSelf: boolean = true
-): TargetingCell[] {
-  const cells: TargetingCell[] = [];
-
-  for (let dx = -radius; dx <= radius; dx++) {
-    for (let dy = -radius; dy <= radius; dy++) {
-      const distance = Math.abs(dx) + Math.abs(dy);
-      if (distance > radius) continue;
-      if (!includeSelf && dx === 0 && dy === 0) continue;
-
-      const x = centerX + dx;
-      const y = centerY + dy;
-
-      if (isInBounds(x, y, gridWidth, gridHeight)) {
-        cells.push({ x, y, type: "RANGE", distance });
-      }
-    }
-  }
-
-  return cells;
-}
-
-/**
- * Gera células em um padrão quadrado
- */
-export function getSquareCells(
-  centerX: number,
-  centerY: number,
-  size: number,
-  gridWidth: number,
-  gridHeight: number,
-  includeSelf: boolean = true
-): TargetingCell[] {
-  const cells: TargetingCell[] = [];
-  const halfSize = Math.floor(size / 2);
-
-  for (let dx = -halfSize; dx <= halfSize; dx++) {
-    for (let dy = -halfSize; dy <= halfSize; dy++) {
-      if (!includeSelf && dx === 0 && dy === 0) continue;
-
-      const x = centerX + dx;
-      const y = centerY + dy;
-      const distance = getChebyshevDistance(centerX, centerY, x, y);
-
-      if (isInBounds(x, y, gridWidth, gridHeight)) {
-        cells.push({ x, y, type: "AREA", distance });
-      }
-    }
-  }
-
-  return cells;
-}
-
-/**
- * Gera células em uma linha reta
- */
-export function getLineCells(
-  startX: number,
-  startY: number,
-  direction: TargetingDirection,
-  length: number,
-  gridWidth: number,
-  gridHeight: number
-): TargetingCell[] {
-  const cells: TargetingCell[] = [];
-  const deltas = getDirectionDelta(direction);
-
-  for (let i = 1; i <= length; i++) {
-    const x = startX + deltas.dx * i;
-    const y = startY + deltas.dy * i;
-    const distance = i;
-
-    if (isInBounds(x, y, gridWidth, gridHeight)) {
-      cells.push({ x, y, type: "RANGE", distance });
-    } else {
-      break; // Parar se sair do grid
-    }
-  }
-
-  return cells;
-}
-
-/**
- * Gera células em padrão de cruz (+)
- */
-export function getCrossCells(
-  centerX: number,
-  centerY: number,
-  radius: number,
-  gridWidth: number,
-  gridHeight: number,
-  includeSelf: boolean = true
-): TargetingCell[] {
-  const cells: TargetingCell[] = [];
-
-  // Centro
-  if (includeSelf) {
-    cells.push({ x: centerX, y: centerY, type: "RANGE", distance: 0 });
-  }
-
-  // 4 direções cardinais
-  const directions: TargetingDirection[] = ["NORTH", "SOUTH", "EAST", "WEST"];
-  for (const dir of directions) {
-    const lineCells = getLineCells(
-      centerX,
-      centerY,
-      dir,
-      radius,
-      gridWidth,
-      gridHeight
-    );
-    cells.push(...lineCells);
-  }
-
-  return cells;
-}
-
-/**
- * Gera células em anel (ring) ao redor de um ponto
- */
-export function getRingCells(
-  centerX: number,
-  centerY: number,
-  innerRadius: number,
-  outerRadius: number,
-  gridWidth: number,
-  gridHeight: number
-): TargetingCell[] {
-  const cells: TargetingCell[] = [];
-
-  for (let dx = -outerRadius; dx <= outerRadius; dx++) {
-    for (let dy = -outerRadius; dy <= outerRadius; dy++) {
-      const distance = Math.abs(dx) + Math.abs(dy);
-      if (distance < innerRadius || distance > outerRadius) continue;
-
-      const x = centerX + dx;
-      const y = centerY + dy;
-
-      if (isInBounds(x, y, gridWidth, gridHeight)) {
-        cells.push({ x, y, type: "RANGE", distance });
-      }
-    }
-  }
-
-  return cells;
-}
-
-// =============================================================================
-// HELPERS DE DIREÇÃO
-// =============================================================================
-
-/**
- * Obtém o delta de movimento para uma direção
+ * Retorna delta de movimento para uma direção
  */
 export function getDirectionDelta(direction: TargetingDirection): {
   dx: number;
@@ -386,205 +210,199 @@ export function getDirectionBetweenPoints(
 }
 
 // =============================================================================
-// FUNÇÃO PRINCIPAL DE CÁLCULO DE TARGETING PREVIEW
+// SISTEMA DE COORDINATE PATTERN
 // =============================================================================
 
 /**
- * Calcula as células selecionáveis para uma habilidade baseado na configuração
+ * Rotaciona uma coordenada baseado na direção
+ * O pattern original assume que NORTH é a direção padrão (y negativo = frente)
  */
-export function calculateSelectableCells(
-  config: TargetingConfig,
-  unitX: number,
-  unitY: number,
-  unitStats: UnitStats,
-  grid: GridContext
-): TargetingCell[] {
-  // Resolver distância do range
-  const rangeDistance = config.rangeDistance
-    ? resolveDynamicValue(config.rangeDistance, unitStats)
-    : DEFAULT_RANGE_DISTANCE[config.range];
+function rotateCoordinateByDirection(
+  coord: PatternCoordinate,
+  direction: TargetingDirection
+): PatternCoordinate {
+  const { x, y } = coord;
 
-  let cells: TargetingCell[] = [];
-
-  switch (config.range) {
-    case "SELF":
-      // Apenas a própria célula
-      cells = [{ x: unitX, y: unitY, type: "RANGE", distance: 0 }];
-      break;
-
-    case "MELEE":
-      // Células adjacentes (distância 1) - usando Chebyshev para 8 direções
-      cells = getSquareCells(
-        unitX,
-        unitY,
-        3, // 3x3 para incluir todas as 8 células adjacentes
-        grid.gridWidth,
-        grid.gridHeight,
-        false // Não inclui self em melee
-      ).map((c) => ({ ...c, type: "RANGE" as const }));
-      break;
-
-    case "RANGED":
-      // Todas as células dentro do range (exceto self)
-      cells = getDiamondCells(
-        unitX,
-        unitY,
-        rangeDistance,
-        grid.gridWidth,
-        grid.gridHeight,
-        false
-      );
-      break;
-
-    case "AREA":
-      // Todas as células dentro do range (pode incluir self)
-      cells = getDiamondCells(
-        unitX,
-        unitY,
-        rangeDistance,
-        grid.gridWidth,
-        grid.gridHeight,
-        config.includeSelf ?? true
-      );
-      break;
+  switch (direction) {
+    case "NORTH":
+      return { x, y };
+    case "SOUTH":
+      return { x: -x, y: -y };
+    case "EAST":
+      return { x: -y, y: x };
+    case "WEST":
+      return { x: y, y: -x };
+    case "NORTHEAST":
+      return { x: x - y, y: x + y };
+    case "NORTHWEST":
+      return { x: x + y, y: -x + y };
+    case "SOUTHEAST":
+      return { x: -x - y, y: x - y };
+    case "SOUTHWEST":
+      return { x: -x + y, y: -x - y };
+    default:
+      return { x, y };
   }
-
-  // Filtrar células bloqueadas (se não tiver piercing)
-  if (!config.piercing) {
-    cells = cells.filter(
-      (cell) => !isCellBlocked(cell.x, cell.y, grid.obstacles)
-    );
-  }
-
-  return cells;
 }
 
 /**
- * Calcula as células que serão afetadas quando o mouse está sobre uma célula alvo
+ * Calcula as células absolutas afetadas por um CoordinatePattern
  */
-export function calculateAffectedCells(
-  config: TargetingConfig,
-  unitX: number,
-  unitY: number,
+export function calculatePatternCells(
+  pattern: CoordinatePattern,
+  casterX: number,
+  casterY: number,
   targetX: number,
   targetY: number,
+  gridWidth: number,
+  gridHeight: number
+): PatternCoordinate[] {
+  // Determinar origem das coordenadas
+  let originX: number;
+  let originY: number;
+
+  switch (pattern.origin) {
+    case "CASTER":
+      originX = casterX;
+      originY = casterY;
+      break;
+    case "TARGET":
+      originX = targetX;
+      originY = targetY;
+      break;
+    case "DIRECTION":
+      originX = casterX;
+      originY = casterY;
+      break;
+    default:
+      originX = casterX;
+      originY = casterY;
+  }
+
+  // Calcular direção se o pattern for rotacionável
+  let direction: TargetingDirection = "NORTH";
+  if (pattern.rotatable && (casterX !== targetX || casterY !== targetY)) {
+    direction = getDirectionBetweenPoints(casterX, casterY, targetX, targetY);
+  }
+
+  // Converter coordenadas relativas para absolutas
+  const absoluteCells: PatternCoordinate[] = [];
+
+  for (const coord of pattern.coordinates) {
+    const rotated = pattern.rotatable
+      ? rotateCoordinateByDirection(coord, direction)
+      : coord;
+
+    const absX = originX + rotated.x;
+    const absY = originY + rotated.y;
+
+    if (absX >= 0 && absX < gridWidth && absY >= 0 && absY < gridHeight) {
+      absoluteCells.push({ x: absX, y: absY });
+    }
+  }
+
+  // Incluir origem se especificado
+  if (pattern.includeOrigin) {
+    const hasOrigin = absoluteCells.some(
+      (c) => c.x === originX && c.y === originY
+    );
+    if (
+      !hasOrigin &&
+      originX >= 0 &&
+      originX < gridWidth &&
+      originY >= 0 &&
+      originY < gridHeight
+    ) {
+      absoluteCells.unshift({ x: originX, y: originY });
+    }
+  }
+
+  return absoluteCells;
+}
+
+/**
+ * Calcula células selecionáveis baseado no maxRange do pattern
+ */
+export function calculateSelectableCells(
+  pattern: CoordinatePattern,
+  casterX: number,
+  casterY: number,
   unitStats: UnitStats,
-  grid: GridContext
+  gridWidth: number,
+  gridHeight: number
 ): TargetingCell[] {
-  // Resolver tamanho da área
-  const areaSize = config.areaSize
-    ? resolveDynamicValue(config.areaSize, unitStats)
+  // Se pattern é SELF (origin=CASTER sem range), apenas a célula do caster
+  if (pattern.origin === "CASTER" && !pattern.maxRange) {
+    return [{ x: casterX, y: casterY, type: "RANGE", distance: 0 }];
+  }
+
+  // Resolver maxRange
+  const maxRange = pattern.maxRange
+    ? resolveDynamicValue(pattern.maxRange, unitStats)
     : 1;
 
-  let cells: TargetingCell[] = [];
+  const cells: TargetingCell[] = [];
 
-  switch (config.shape) {
-    case "SINGLE":
-      // Apenas a célula alvo
-      cells = [
-        {
-          x: targetX,
-          y: targetY,
-          type: "IMPACT",
-          distance: 0,
-        },
-      ];
-      break;
+  // Gerar células dentro do range (diamante Manhattan)
+  for (let dx = -maxRange; dx <= maxRange; dx++) {
+    for (let dy = -maxRange; dy <= maxRange; dy++) {
+      const distance = Math.abs(dx) + Math.abs(dy);
+      if (distance > maxRange || distance === 0) continue;
 
-    case "LINE":
-      // Linha do usuário até o alvo (e além, se areaSize > 1)
-      const direction = getDirectionBetweenPoints(
-        unitX,
-        unitY,
-        targetX,
-        targetY
-      );
-      cells = getLineCells(
-        unitX,
-        unitY,
-        direction,
-        areaSize,
-        grid.gridWidth,
-        grid.gridHeight
-      );
-      // Marcar todas como IMPACT
-      cells = cells.map((c) => ({ ...c, type: "IMPACT" as const }));
-      break;
+      const x = casterX + dx;
+      const y = casterY + dy;
 
-    case "CROSS":
-      cells = getCrossCells(
-        targetX,
-        targetY,
-        areaSize,
-        grid.gridWidth,
-        grid.gridHeight,
-        true
-      );
-      cells = cells.map((c) => ({ ...c, type: "IMPACT" as const }));
-      break;
-
-    case "DIAMOND":
-      cells = getDiamondCells(
-        targetX,
-        targetY,
-        areaSize,
-        grid.gridWidth,
-        grid.gridHeight,
-        true
-      );
-      cells = cells.map((c) => ({ ...c, type: "IMPACT" as const }));
-      break;
-
-    case "SQUARE":
-      cells = getSquareCells(
-        targetX,
-        targetY,
-        areaSize,
-        grid.gridWidth,
-        grid.gridHeight,
-        true
-      );
-      break;
-
-    case "RING":
-      // Anel ao redor do alvo
-      cells = getRingCells(
-        targetX,
-        targetY,
-        1, // inner radius
-        areaSize, // outer radius
-        grid.gridWidth,
-        grid.gridHeight
-      );
-      cells = cells.map((c) => ({ ...c, type: "IMPACT" as const }));
-      break;
-
-    case "CONE":
-      // TODO: Implementar cone
-      cells = [{ x: targetX, y: targetY, type: "IMPACT", distance: 0 }];
-      break;
+      if (isInBounds(x, y, gridWidth, gridHeight)) {
+        cells.push({ x, y, type: "RANGE", distance });
+      }
+    }
   }
 
   return cells;
 }
 
 /**
- * Calcula o preview completo de targeting
+ * Calcula células afetadas quando o mouse está sobre uma posição
+ */
+export function calculateAffectedCells(
+  pattern: CoordinatePattern,
+  casterX: number,
+  casterY: number,
+  targetX: number,
+  targetY: number,
+  gridWidth: number,
+  gridHeight: number
+): TargetingCell[] {
+  const patternCells = calculatePatternCells(
+    pattern,
+    casterX,
+    casterY,
+    targetX,
+    targetY,
+    gridWidth,
+    gridHeight
+  );
+
+  return patternCells.map((cell) => ({
+    x: cell.x,
+    y: cell.y,
+    type: "IMPACT" as const,
+    distance: getManhattanDistance(casterX, casterY, cell.x, cell.y),
+  }));
+}
+
+/**
+ * Calcula o preview completo de targeting baseado em CoordinatePattern
  */
 export function calculateTargetingPreview(
-  config: TargetingConfig,
-  unitX: number,
-  unitY: number,
+  pattern: CoordinatePattern,
+  casterX: number,
+  casterY: number,
   unitStats: UnitStats,
   grid: GridContext,
   hoverX?: number,
   hoverY?: number
 ): TargetingPreview {
-  // Resolver distância do range
-  const rangeDistance = config.rangeDistance
-    ? resolveDynamicValue(config.rangeDistance, unitStats)
-    : DEFAULT_RANGE_DISTANCE[config.range];
-
   // Se não há posição do mouse, retornar vazio
   if (hoverX === undefined || hoverY === undefined) {
     return {
@@ -594,464 +412,557 @@ export function calculateTargetingPreview(
     };
   }
 
-  // === SISTEMA DE MIRA DIRECIONAL ===
-  // Em vez de mostrar todas as células selecionáveis,
-  // calculamos a DIREÇÃO do mouse e mostramos apenas as células afetadas nessa direção
-
   // Calcular direção do mouse em relação à unidade
-  const direction = getDirectionBetweenPoints(unitX, unitY, hoverX, hoverY);
-  const delta = getDirectionDelta(direction);
+  const direction = getDirectionBetweenPoints(casterX, casterY, hoverX, hoverY);
 
-  // Calcular células afetadas na direção do mouse
-  let affectedCells: TargetingCell[] = [];
+  // Calcular células afetadas baseado no pattern
+  const affectedCells = calculateAffectedCells(
+    pattern,
+    casterX,
+    casterY,
+    hoverX,
+    hoverY,
+    grid.gridWidth,
+    grid.gridHeight
+  );
 
-  switch (config.shape) {
-    case "SINGLE":
-      // Apenas células em linha reta na direção apontada
-      for (let i = 1; i <= rangeDistance; i++) {
-        const cellX = unitX + delta.dx * i;
-        const cellY = unitY + delta.dy * i;
+  // Verificar se o alvo está dentro do range máximo
+  const maxRange = pattern.maxRange
+    ? resolveDynamicValue(pattern.maxRange, unitStats)
+    : Infinity;
+  const targetDistance = getManhattanDistance(casterX, casterY, hoverX, hoverY);
+  const inRange = targetDistance <= maxRange;
 
-        if (isInBounds(cellX, cellY, grid.gridWidth, grid.gridHeight)) {
-          // Verificar se há obstáculo bloqueando (se não tem piercing)
-          if (!config.piercing && isCellBlocked(cellX, cellY, grid.obstacles)) {
-            break; // Para antes do obstáculo
-          }
+  // Sempre válido se há células afetadas e está no range
+  const isValidTarget = affectedCells.length > 0 && inRange;
 
-          affectedCells.push({
-            x: cellX,
-            y: cellY,
-            type: "IMPACT",
-            distance: i,
-          });
-        }
-      }
-      break;
-
-    case "LINE":
-      // Linha inteira na direção
-      const areaSize = config.areaSize
-        ? resolveDynamicValue(config.areaSize, unitStats)
-        : rangeDistance;
-
-      for (let i = 1; i <= areaSize; i++) {
-        const cellX = unitX + delta.dx * i;
-        const cellY = unitY + delta.dy * i;
-
-        if (isInBounds(cellX, cellY, grid.gridWidth, grid.gridHeight)) {
-          if (!config.piercing && isCellBlocked(cellX, cellY, grid.obstacles)) {
-            break;
-          }
-          affectedCells.push({
-            x: cellX,
-            y: cellY,
-            type: "IMPACT",
-            distance: i,
-          });
-        }
-      }
-      break;
-
-    case "DIAMOND":
-    case "SQUARE":
-    case "CROSS":
-      // Para shapes de área, calcular o centro na direção e expandir
-      const centerDistance = Math.min(
-        rangeDistance,
-        Math.max(Math.abs(hoverX - unitX), Math.abs(hoverY - unitY))
-      );
-      const centerX = unitX + delta.dx * Math.max(1, centerDistance);
-      const centerY = unitY + delta.dy * Math.max(1, centerDistance);
-
-      const size = config.areaSize
-        ? resolveDynamicValue(config.areaSize, unitStats)
-        : 1;
-
-      if (config.shape === "DIAMOND") {
-        affectedCells = getDiamondCells(
-          centerX,
-          centerY,
-          size,
-          grid.gridWidth,
-          grid.gridHeight,
-          true
-        ).map((c) => ({ ...c, type: "IMPACT" as const }));
-      } else if (config.shape === "SQUARE") {
-        affectedCells = getSquareCells(
-          centerX,
-          centerY,
-          size,
-          grid.gridWidth,
-          grid.gridHeight,
-          true
-        ).map((c) => ({ ...c, type: "IMPACT" as const }));
-      } else if (config.shape === "CROSS") {
-        affectedCells = getCrossCells(
-          centerX,
-          centerY,
-          size,
-          grid.gridWidth,
-          grid.gridHeight,
-          true
-        ).map((c) => ({ ...c, type: "IMPACT" as const }));
-      }
-      break;
-
-    default:
-      // Fallback: célula única na primeira posição da direção
-      const fallbackX = unitX + delta.dx;
-      const fallbackY = unitY + delta.dy;
-      if (isInBounds(fallbackX, fallbackY, grid.gridWidth, grid.gridHeight)) {
-        affectedCells = [
-          { x: fallbackX, y: fallbackY, type: "IMPACT", distance: 1 },
-        ];
-      }
-  }
-
-  // Sempre válido se há células afetadas (sistema de mira direcional)
-  const isValidTarget = affectedCells.length > 0;
-
-  // Não usamos mais selectableCells - o sistema é puramente direcional
   return {
-    selectableCells: [], // Vazio - não mostramos mais área selecionável
+    selectableCells: [], // Não usamos mais - sistema puramente direcional
     affectedCells,
     hoverCell: affectedCells.length > 0 ? affectedCells[0] : undefined,
     isValidTarget,
     errorMessage: isValidTarget ? undefined : "Fora do alcance",
-    direction, // Direção para rotação do sprite
+    direction,
   };
 }
 
 // =============================================================================
-// SISTEMA DE PROJÉTIL - FILTRAGEM DE ALVOS POR DISTÂNCIA
+// SISTEMA DE PROJÉTIL COM COORDINATE PATTERN
 // =============================================================================
 
 /**
- * Representa uma unidade com posição para cálculo de projétil
+ * Resultado do cálculo de trajetória de projétil
  */
-export interface ProjectileUnit {
-  id: string;
-  posX: number;
-  posY: number;
-  isAlive: boolean;
-  ownerId?: string;
+export interface ProjectileTrajectory {
+  orderedCells: Array<{ x: number; y: number; distance: number }>;
+  currentIndex: number;
+  hasMoreCells: boolean;
+  nextCell?: { x: number; y: number };
 }
 
 /**
- * Configuração para filtragem de projétil
+ * Ordena coordenadas do pattern para percurso de projétil
  */
-export interface ProjectileConfig {
-  /** Se true, projétil atravessa unidades e continua até maxTargets ou fim do alcance */
-  piercing?: boolean;
-  /** Número máximo de alvos a serem atingidos (default: 1 se não piercing, infinito se piercing) */
-  maxTargets?: number;
-  /** Se true, inclui unidades aliadas como bloqueio/alvo */
-  hitsAllies?: boolean;
-}
-
-/**
- * Resultado da filtragem de projétil
- */
-export interface ProjectileFilterResult {
-  /** Unidades que serão atingidas, ordenadas da mais próxima para a mais distante */
-  targets: ProjectileUnit[];
-  /** Células que o projétil percorre até parar */
-  pathCells: Array<{ x: number; y: number; distance: number }>;
-  /** Se o projétil foi bloqueado antes de atingir todas as células */
-  blocked: boolean;
-  /** ID da unidade que bloqueou o projétil (se aplicável) */
-  blockedByUnitId?: string;
-}
-
-/**
- * Ordena unidades por distância do ponto de origem (mais próximo primeiro)
- * Usa distância Manhattan para consistência com o sistema de grid
- */
-export function sortUnitsByDistance(
-  units: ProjectileUnit[],
-  originX: number,
-  originY: number
-): ProjectileUnit[] {
-  return [...units].sort((a, b) => {
-    const distA = getManhattanDistance(originX, originY, a.posX, a.posY);
-    const distB = getManhattanDistance(originX, originY, b.posX, b.posY);
-    return distA - distB;
-  });
-}
-
-/**
- * Filtra células afetadas baseado em comportamento de projétil
- * Retorna as células que serão atingidas considerando bloqueio por unidades
- *
- * @param affectedCells - Células originalmente afetadas pela habilidade
- * @param originX - Posição X de origem do projétil (caster)
- * @param originY - Posição Y de origem do projétil (caster)
- * @param units - Todas as unidades no campo de batalha
- * @param config - Configuração do projétil
- * @param casterId - ID do caster (para excluir da filtragem)
- */
-export function filterCellsByProjectile(
-  affectedCells: TargetingCell[],
+export function orderCoordinatesForProjectile(
+  coordinates: PatternCoordinate[],
   originX: number,
   originY: number,
-  units: ProjectileUnit[],
-  config: ProjectileConfig,
-  casterId?: string
-): ProjectileFilterResult {
-  // Se não há células, retornar vazio
-  if (affectedCells.length === 0) {
-    return { targets: [], pathCells: [], blocked: false };
+  order: "DISTANCE" | "SEQUENTIAL" | "REVERSE" = "DISTANCE"
+): Array<{ x: number; y: number; distance: number }> {
+  const withDistance = coordinates.map((coord) => ({
+    x: coord.x,
+    y: coord.y,
+    distance: getManhattanDistance(originX, originY, coord.x, coord.y),
+  }));
+
+  switch (order) {
+    case "DISTANCE":
+      return withDistance.sort((a, b) => a.distance - b.distance);
+    case "REVERSE":
+      return withDistance.sort((a, b) => b.distance - a.distance);
+    case "SEQUENTIAL":
+    default:
+      return withDistance;
   }
+}
 
-  // Ordenar células pela distância do origin
-  const sortedCells = [...affectedCells].sort((a, b) => {
-    const distA = getManhattanDistance(originX, originY, a.x, a.y);
-    const distB = getManhattanDistance(originX, originY, b.x, b.y);
-    return distA - distB;
-  });
+/**
+ * Calcula a trajetória completa de um projétil
+ */
+export function calculateProjectileTrajectory(
+  pattern: CoordinatePattern,
+  casterX: number,
+  casterY: number,
+  targetX: number,
+  targetY: number,
+  gridWidth: number,
+  gridHeight: number
+): ProjectileTrajectory {
+  const affectedCells = calculatePatternCells(
+    pattern,
+    casterX,
+    casterY,
+    targetX,
+    targetY,
+    gridWidth,
+    gridHeight
+  );
 
-  // Filtrar unidades vivas (excluindo caster)
+  const projectileOrder = pattern.projectileOrder ?? "DISTANCE";
+  const orderedCells = orderCoordinatesForProjectile(
+    affectedCells,
+    casterX,
+    casterY,
+    projectileOrder
+  );
+
+  return {
+    orderedCells,
+    currentIndex: 0,
+    hasMoreCells: orderedCells.length > 0,
+    nextCell: orderedCells.length > 0 ? orderedCells[0] : undefined,
+  };
+}
+
+/**
+ * Encontra o primeiro alvo na trajetória do projétil
+ */
+export function findNextProjectileTarget(
+  trajectory: ProjectileTrajectory,
+  units: ProjectileUnit[],
+  casterId: string,
+  startIndex: number = 0
+): {
+  target: ProjectileUnit | null;
+  cellIndex: number;
+  cell: { x: number; y: number } | null;
+  remainingCells: Array<{ x: number; y: number; distance: number }>;
+} {
   const aliveUnits = units.filter((u) => u.isAlive && u.id !== casterId);
 
-  // Resultado
-  const targets: ProjectileUnit[] = [];
-  const pathCells: Array<{ x: number; y: number; distance: number }> = [];
-  let blocked = false;
-  let blockedByUnitId: string | undefined;
+  for (let i = startIndex; i < trajectory.orderedCells.length; i++) {
+    const cell = trajectory.orderedCells[i];
 
-  // Determinar maxTargets
-  const maxTargets = config.maxTargets ?? (config.piercing ? Infinity : 1);
-
-  // Percorrer células em ordem de distância
-  for (const cell of sortedCells) {
-    const distance = getManhattanDistance(originX, originY, cell.x, cell.y);
-
-    // Verificar se há unidade nesta célula
     const unitInCell = aliveUnits.find(
       (u) => u.posX === cell.x && u.posY === cell.y
     );
 
     if (unitInCell) {
-      // Unidade encontrada na célula
-      targets.push(unitInCell);
-      pathCells.push({ x: cell.x, y: cell.y, distance });
+      return {
+        target: unitInCell,
+        cellIndex: i,
+        cell: { x: cell.x, y: cell.y },
+        remainingCells: trajectory.orderedCells.slice(i + 1),
+      };
+    }
+  }
 
-      // Verificar se atingiu o máximo de alvos
+  return {
+    target: null,
+    cellIndex: -1,
+    cell: null,
+    remainingCells: [],
+  };
+}
+
+/**
+ * Continua a trajetória do projétil após uma esquiva
+ */
+export function continueProjectileAfterDodge(
+  trajectory: ProjectileTrajectory,
+  lastHitIndex: number,
+  units: ProjectileUnit[],
+  casterId: string
+): {
+  nextTarget: ProjectileUnit | null;
+  nextCellIndex: number;
+  projectileContinues: boolean;
+} {
+  const result = findNextProjectileTarget(
+    trajectory,
+    units,
+    casterId,
+    lastHitIndex + 1
+  );
+
+  return {
+    nextTarget: result.target,
+    nextCellIndex: result.cellIndex,
+    projectileContinues: result.target !== null,
+  };
+}
+
+/**
+ * Resultado completo do processamento de projétil
+ */
+export interface ProjectileProcessResult {
+  targets: ProjectileUnit[];
+  pathCells: Array<{ x: number; y: number; distance: number }>;
+  blocked: boolean;
+  blockedByUnitId?: string;
+  hasRemainingCells: boolean;
+  remainingCells: Array<{ x: number; y: number; distance: number }>;
+}
+
+/**
+ * Processa a trajetória completa de um projétil
+ */
+export function processProjectileForPattern(
+  pattern: CoordinatePattern,
+  casterX: number,
+  casterY: number,
+  targetX: number,
+  targetY: number,
+  units: ProjectileUnit[],
+  gridWidth: number,
+  gridHeight: number,
+  config: {
+    piercing?: boolean;
+    maxTargets?: number;
+  } = {}
+): ProjectileProcessResult {
+  const trajectory = calculateProjectileTrajectory(
+    pattern,
+    casterX,
+    casterY,
+    targetX,
+    targetY,
+    gridWidth,
+    gridHeight
+  );
+
+  const aliveUnits = units.filter((u) => u.isAlive);
+  const targets: ProjectileUnit[] = [];
+  const pathCells: Array<{ x: number; y: number; distance: number }> = [];
+  const maxTargets = config.maxTargets ?? (config.piercing ? Infinity : 1);
+
+  let blocked = false;
+  let blockedByUnitId: string | undefined;
+
+  for (const cell of trajectory.orderedCells) {
+    pathCells.push(cell);
+
+    const unitInCell = aliveUnits.find(
+      (u) => u.posX === cell.x && u.posY === cell.y
+    );
+
+    if (unitInCell) {
+      targets.push(unitInCell);
+
       if (targets.length >= maxTargets) {
         blocked = true;
         blockedByUnitId = unitInCell.id;
         break;
       }
 
-      // Se não é piercing, para no primeiro alvo
       if (!config.piercing) {
         blocked = true;
         blockedByUnitId = unitInCell.id;
         break;
       }
-    } else {
-      // Célula vazia, adicionar ao path
-      pathCells.push({ x: cell.x, y: cell.y, distance });
     }
   }
+
+  const remainingCells = trajectory.orderedCells.slice(pathCells.length);
 
   return {
     targets,
     pathCells,
     blocked,
     blockedByUnitId,
+    hasRemainingCells: remainingCells.length > 0,
+    remainingCells,
   };
 }
 
+// =============================================================================
+// SISTEMA DE VIAGEM + EXPLOSÃO (PROJECTILE WITH AOE)
+// =============================================================================
+
 /**
- * Obtém unidades alvos de um projétil, ordenadas por distância
- * Função de conveniência que combina filtragem e extração de alvos
- *
- * @param casterX - Posição X do caster
- * @param casterY - Posição Y do caster
- * @param targetX - Posição X do alvo clicado
- * @param targetY - Posição Y do alvo clicado
- * @param units - Todas as unidades no campo
- * @param config - Configuração do projétil
- * @param casterId - ID do caster
- * @param maxRange - Alcance máximo do projétil
+ * Obstáculo para cálculos de viagem
  */
-export function getProjectileTargets(
+export interface TravelObstacle {
+  posX: number;
+  posY: number;
+  destroyed?: boolean;
+}
+
+/**
+ * Resultado do cálculo de viagem do projétil
+ */
+export interface TravelResult {
+  /** Ponto de impacto final (onde explode/aplica área) */
+  impactPoint: { x: number; y: number };
+  /** Células percorridas durante a viagem */
+  travelPath: Array<{ x: number; y: number }>;
+  /** Se foi interceptado (não chegou ao destino original) */
+  intercepted: boolean;
+  /** Tipo de interceptação */
+  interceptedBy?: "unit" | "obstacle" | "edge";
+  /** ID da unidade que interceptou (se foi unidade) */
+  interceptedUnitId?: string;
+  /** Distância percorrida */
+  distanceTraveled: number;
+}
+
+/**
+ * Resultado completo do processamento de ability com viagem + área
+ */
+export interface AreaAbilityResult {
+  /** Ponto de impacto (onde a área é aplicada) */
+  impactPoint: { x: number; y: number };
+  /** Células afetadas pela área de efeito */
+  affectedCells: PatternCoordinate[];
+  /** Unidades afetadas na área */
+  affectedUnits: ProjectileUnit[];
+  /** Se o projétil foi interceptado durante a viagem */
+  intercepted: boolean;
+  /** Detalhes da viagem (se houve) */
+  travelDetails?: TravelResult;
+}
+
+/**
+ * Calcula a viagem de um projétil até o ponto de impacto
+ * Verifica interceptação por unidades e obstáculos no caminho
+ */
+export function calculateProjectileTravel(
   casterX: number,
   casterY: number,
   targetX: number,
   targetY: number,
+  maxDistance: number,
   units: ProjectileUnit[],
-  config: ProjectileConfig,
-  casterId?: string,
-  maxRange?: number
-): ProjectileUnit[] {
-  // Calcular direção do caster ao target
+  obstacles: TravelObstacle[],
+  gridWidth: number,
+  gridHeight: number,
+  config: {
+    stopsOnUnit?: boolean;
+    stopsOnObstacle?: boolean;
+    excludeCasterId?: string;
+  } = {}
+): TravelResult {
+  const stopsOnUnit = config.stopsOnUnit ?? true;
+  const stopsOnObstacle = config.stopsOnObstacle ?? true;
+
+  // Calcular direção
   const direction = getDirectionBetweenPoints(
     casterX,
     casterY,
     targetX,
     targetY
   );
-  const range =
-    maxRange ?? getManhattanDistance(casterX, casterY, targetX, targetY);
+  const delta = getDirectionDelta(direction);
 
-  // Gerar linha de células usando a direção calculada
-  const lineCells = getLineCells(
-    casterX,
-    casterY,
-    direction,
-    range,
-    100, // gridWidth (valor alto para não limitar)
-    100 // gridHeight
+  const travelPath: Array<{ x: number; y: number }> = [];
+  let currentX = casterX;
+  let currentY = casterY;
+  let intercepted = false;
+  let interceptedBy: "unit" | "obstacle" | "edge" | undefined;
+  let interceptedUnitId: string | undefined;
+
+  // Unidades vivas (excluindo caster)
+  const aliveUnits = units.filter(
+    (u) => u.isAlive && u.id !== config.excludeCasterId
   );
 
-  // Aplicar filtragem de projétil
-  const result = filterCellsByProjectile(
-    lineCells,
+  // Obstáculos ativos
+  const activeObstacles = obstacles.filter((o) => !o.destroyed);
+
+  // Percorrer células na direção do alvo
+  for (let i = 1; i <= maxDistance; i++) {
+    const nextX = casterX + delta.dx * i;
+    const nextY = casterY + delta.dy * i;
+
+    // Verificar limites do grid
+    if (!isInBounds(nextX, nextY, gridWidth, gridHeight)) {
+      intercepted = true;
+      interceptedBy = "edge";
+      break;
+    }
+
+    // Verificar obstáculo
+    if (stopsOnObstacle) {
+      const hitObstacle = activeObstacles.find(
+        (o) => o.posX === nextX && o.posY === nextY
+      );
+      if (hitObstacle) {
+        travelPath.push({ x: nextX, y: nextY });
+        currentX = nextX;
+        currentY = nextY;
+        intercepted = true;
+        interceptedBy = "obstacle";
+        break;
+      }
+    }
+
+    // Verificar unidade
+    if (stopsOnUnit) {
+      const hitUnit = aliveUnits.find(
+        (u) => u.posX === nextX && u.posY === nextY
+      );
+      if (hitUnit) {
+        travelPath.push({ x: nextX, y: nextY });
+        currentX = nextX;
+        currentY = nextY;
+        intercepted = true;
+        interceptedBy = "unit";
+        interceptedUnitId = hitUnit.id;
+        break;
+      }
+    }
+
+    // Célula livre, adicionar ao caminho
+    travelPath.push({ x: nextX, y: nextY });
+    currentX = nextX;
+    currentY = nextY;
+
+    // Chegou no destino original?
+    if (nextX === targetX && nextY === targetY) {
+      break;
+    }
+  }
+
+  return {
+    impactPoint: { x: currentX, y: currentY },
+    travelPath,
+    intercepted,
+    interceptedBy,
+    interceptedUnitId,
+    distanceTraveled: travelPath.length,
+  };
+}
+
+/**
+ * Processa uma ability com sistema de viagem + explosão
+ * Usado para spells como FIRE que viajam e depois explodem
+ */
+export function processAreaAbility(
+  pattern: CoordinatePattern,
+  casterX: number,
+  casterY: number,
+  targetX: number,
+  targetY: number,
+  units: ProjectileUnit[],
+  obstacles: TravelObstacle[],
+  gridWidth: number,
+  gridHeight: number,
+  travelDistance?: number,
+  casterId?: string
+): AreaAbilityResult {
+  let impactPoint = { x: targetX, y: targetY };
+  let travelDetails: TravelResult | undefined;
+  let intercepted = false;
+
+  // Se tem viagem, calcular trajetória
+  if (travelDistance && travelDistance > 0) {
+    travelDetails = calculateProjectileTravel(
+      casterX,
+      casterY,
+      targetX,
+      targetY,
+      travelDistance,
+      units,
+      obstacles,
+      gridWidth,
+      gridHeight,
+      {
+        stopsOnUnit: pattern.stopsOnUnit ?? true,
+        stopsOnObstacle: pattern.stopsOnObstacle ?? true,
+        excludeCasterId: casterId,
+      }
+    );
+
+    impactPoint = travelDetails.impactPoint;
+    intercepted = travelDetails.intercepted;
+  }
+
+  // Determinar pattern de explosão (pode ser um sub-pattern ou o próprio pattern)
+  const explosionPattern = pattern.explosionPattern ?? pattern;
+
+  // Calcular células afetadas pela explosão no ponto de impacto
+  const affectedCells = calculatePatternCells(
+    explosionPattern,
     casterX,
     casterY,
+    impactPoint.x,
+    impactPoint.y,
+    gridWidth,
+    gridHeight
+  );
+
+  // Encontrar unidades na área afetada
+  const aliveUnits = units.filter((u) => u.isAlive);
+  const affectedUnits = aliveUnits.filter((unit) =>
+    affectedCells.some((cell) => cell.x === unit.posX && cell.y === unit.posY)
+  );
+
+  return {
+    impactPoint,
+    affectedCells,
+    affectedUnits,
+    intercepted,
+    travelDetails,
+  };
+}
+
+/**
+ * Helper simplificado para executores de abilities de área
+ * Retorna apenas as unidades afetadas, considerando viagem + explosão
+ */
+export function getTargetsInArea(
+  pattern: CoordinatePattern,
+  casterX: number,
+  casterY: number,
+  targetX: number,
+  targetY: number,
+  units: ProjectileUnit[],
+  obstacles: TravelObstacle[],
+  gridWidth: number,
+  gridHeight: number,
+  travelDistance?: number,
+  casterId?: string,
+  filterFn?: (unit: ProjectileUnit) => boolean
+): {
+  targets: ProjectileUnit[];
+  impactPoint: { x: number; y: number };
+  affectedCells: PatternCoordinate[];
+  intercepted: boolean;
+} {
+  const result = processAreaAbility(
+    pattern,
+    casterX,
+    casterY,
+    targetX,
+    targetY,
     units,
-    config,
+    obstacles,
+    gridWidth,
+    gridHeight,
+    travelDistance,
     casterId
   );
 
-  return result.targets;
-}
-
-/**
- * Converte configuração de ability para ProjectileConfig
- */
-export function abilityToProjectileConfig(ability: {
-  piercing?: boolean;
-  maxTargets?: number;
-}): ProjectileConfig {
-  return {
-    piercing: ability.piercing ?? false,
-    maxTargets: ability.maxTargets,
-    hitsAllies: false,
-  };
-}
-
-// =============================================================================
-// CONFIGURAÇÕES DE TARGETING PARA AÇÕES COMUNS
-// =============================================================================
-
-/**
- * Configuração de targeting para ataque básico
- * Range baseado em attackRange da unidade (modificado por condições)
- */
-export function getBasicAttackTargeting(attackRange: number): TargetingConfig {
-  return {
-    range: attackRange <= 1 ? "MELEE" : "RANGED",
-    rangeDistance: attackRange,
-    targetType: "POSITION",
-    shape: "SINGLE",
-    includeSelf: false,
-  };
-}
-
-/**
- * Configuração de targeting para DASH
- */
-export function getDashTargeting(dashRange: number): TargetingConfig {
-  return {
-    range: "RANGED",
-    rangeDistance: dashRange,
-    targetType: "GROUND",
-    shape: "SINGLE",
-    includeSelf: false,
-  };
-}
-
-/**
- * Configuração de targeting para skills de área
- */
-export function getAreaTargeting(
-  range: number,
-  areaSize: number
-): TargetingConfig {
-  return {
-    range: "AREA",
-    rangeDistance: range,
-    targetType: "POSITION",
-    shape: "DIAMOND",
-    areaSize,
-    includeSelf: true,
-  };
-}
-
-// =============================================================================
-// CONVERSÃO DE ABILITY PARA TARGETING CONFIG
-// =============================================================================
-
-/**
- * Converte uma AbilityDefinition para TargetingConfig
- * Unifica skills e spells - ambos usam a mesma estrutura
- */
-export function abilityToTargetingConfig(
-  ability: {
-    range?: AbilityRange | "ADJACENT";
-    rangeDistance?: DynamicValue;
-    rangeValue?: number;
-    targetType?: AbilityTargetType;
-    targetingShape?: TargetingShape;
-    areaSize?: DynamicValue;
-  },
-  attackRangeMod: number = 0
-): TargetingConfig {
-  // Mapear range legado (ADJACENT → MELEE)
-  let range: AbilityRange = "MELEE";
-  if (ability.range) {
-    range = ability.range === "ADJACENT" ? "MELEE" : ability.range;
-  }
-
-  // Calcular distância
-  let rangeDistance: DynamicValue = DEFAULT_RANGE_DISTANCE[range];
-  if (ability.rangeDistance !== undefined) {
-    rangeDistance = ability.rangeDistance;
-  } else if (ability.rangeValue !== undefined) {
-    rangeDistance = ability.rangeValue;
-  }
-
-  // Aplicar modificador de range (de condições)
-  if (typeof rangeDistance === "number") {
-    rangeDistance = rangeDistance + attackRangeMod;
+  // Aplicar filtro opcional (ex: apenas inimigos)
+  let targets = result.affectedUnits;
+  if (filterFn) {
+    targets = targets.filter(filterFn);
   }
 
   return {
-    range,
-    rangeDistance,
-    targetType: ability.targetType || "UNIT",
-    shape: ability.targetingShape || "SINGLE",
-    areaSize: ability.areaSize,
-    includeSelf: range === "SELF" || range === "AREA",
+    targets,
+    impactPoint: result.impactPoint,
+    affectedCells: result.affectedCells,
+    intercepted: result.intercepted,
   };
 }
 
-/** @deprecated Use abilityToTargetingConfig */
-export const skillToTargetingConfig = abilityToTargetingConfig;
-
-/** @deprecated Use abilityToTargetingConfig */
-export const spellToTargetingConfig = (spell: {
-  range: AbilityRange | "ADJACENT";
-  rangeDistance?: DynamicValue;
-  targetType: AbilityTargetType;
-  targetingShape?: TargetingShape;
-  areaSize?: DynamicValue;
-}): TargetingConfig => abilityToTargetingConfig(spell);
-
 // =============================================================================
-// PLACEHOLDER PARA QTE
+// QTE HANDLER (PLACEHOLDER)
 // =============================================================================
 
 /**
- * Handler para Quick Time Event após confirmar alvo
- * @param actionType Tipo de ação (ATTACK ou ABILITY - unificado)
- * @param unitId ID da unidade executando
- * @param targetX Coordenada X do alvo
- * @param targetY Coordenada Y do alvo
- * @param abilityCode Código da ability (opcional para ATTACK)
+ * Handler para iniciar QTE ao confirmar alvo
  */
 export function handleQTE(
   actionType: "ATTACK" | "ABILITY",
@@ -1060,9 +971,6 @@ export function handleQTE(
   targetY: number,
   abilityCode?: string
 ): void {
-  // TODO: Implementar sistema de QTE
-  // Esta função será chamada quando o jogador confirmar o alvo
-  // clicando na célula durante o preview de targeting
   console.log(`[QTE] ${actionType} by ${unitId} at (${targetX}, ${targetY})`, {
     abilityCode,
   });

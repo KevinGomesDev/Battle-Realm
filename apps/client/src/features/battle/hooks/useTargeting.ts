@@ -1,18 +1,19 @@
 // client/src/features/battle/hooks/useTargeting.ts
 // Hook para gerenciar o sistema de targeting no frontend
+// Usa o novo sistema baseado em CoordinatePattern
 
 import { useMemo, useCallback } from "react";
 import type { BattleUnitState } from "@/services/colyseus.service";
 import {
   calculateTargetingPreview,
-  abilityToTargetingConfig,
   handleQTE,
-  type TargetingConfig,
   type TargetingPreview,
   type GridContext,
   type UnitStats,
   type TargetingCell,
+  type CoordinatePattern,
 } from "@boundless/shared/utils/targeting.utils";
+import { PATTERNS } from "@boundless/shared/data/targeting-patterns.data";
 import type { PendingAbility } from "../types/pending-ability.types";
 
 /**
@@ -43,8 +44,8 @@ interface UseTargetingProps {
 interface UseTargetingResult {
   /** Preview de targeting calculado */
   targetingPreview: TargetingPreview | null;
-  /** Configuração de targeting ativa */
-  targetingConfig: TargetingConfig | null;
+  /** Pattern de targeting ativo */
+  targetingPattern: CoordinatePattern | null;
   /** Se está em modo de targeting (tem preview ativo) */
   isTargeting: boolean;
   /** Confirmar o alvo atual */
@@ -72,7 +73,7 @@ function extractUnitStats(unit: BattleUnitState): UnitStats {
 
 /**
  * Hook para gerenciar o sistema de targeting
- * Calcula preview de células selecionáveis e afetadas
+ * Calcula preview de células afetadas baseado em CoordinatePattern
  */
 export function useTargeting({
   selectedUnit,
@@ -99,8 +100,8 @@ export function useTargeting({
     [gridConfig, units]
   );
 
-  // Calcular configuração de targeting baseada na ability pendente
-  const targetingConfig: TargetingConfig | null = useMemo(() => {
+  // Obter CoordinatePattern da ability pendente
+  const targetingPattern: CoordinatePattern | null = useMemo(() => {
     if (!pendingAbility || !selectedUnit) return null;
 
     const { ability, code } = pendingAbility;
@@ -111,43 +112,57 @@ export function useTargeting({
     // SELF abilities não precisam de targeting visual
     if (ability.targetType === "SELF" || ability.range === "SELF") return null;
 
-    // ATTACK usa rangeDistance da ability (base 1) + attackRangeMod de condições
+    // Se a ability tem targetingPattern definido, usar diretamente
+    if (ability.targetingPattern) {
+      // Aplicar modificador de range se for ATTACK
+      if (code === "ATTACK" && attackRangeMod > 0) {
+        const baseRange =
+          typeof ability.targetingPattern.maxRange === "number"
+            ? ability.targetingPattern.maxRange
+            : 1;
+        return {
+          ...ability.targetingPattern,
+          maxRange: baseRange + attackRangeMod,
+        };
+      }
+      return ability.targetingPattern;
+    }
+
+    // Fallback: criar pattern básico baseado na ability
+    // ATTACK usa SINGLE com range = 1 + mod
     if (code === "ATTACK") {
       const baseRange = Number(ability.rangeDistance ?? 1);
       const finalRange = baseRange + attackRangeMod;
       return {
-        range: finalRange <= 1 ? "MELEE" : "RANGED",
-        rangeDistance: finalRange,
-        targetType: "POSITION", // Baseado em célula, não em unidade
-        shape: "SINGLE",
-        includeSelf: false,
-      } as TargetingConfig;
+        ...PATTERNS.SINGLE,
+        maxRange: finalRange,
+      };
     }
 
-    // DASH usa speed da unidade
+    // DASH usa SINGLE com range = speed da unidade
     if (code === "DASH") {
       const dashRange = selectedUnit.speed ?? 3;
       return {
-        range: "RANGED",
-        rangeDistance: dashRange,
-        targetType: "GROUND",
-        shape: "SINGLE",
-        includeSelf: false,
-      } as TargetingConfig;
+        ...PATTERNS.SINGLE,
+        maxRange: dashRange,
+      };
     }
 
-    // Todas as outras abilities usam a função unificada
-    return abilityToTargetingConfig(ability, attackRangeMod);
+    // Fallback genérico: SINGLE com range 1
+    return {
+      ...PATTERNS.SINGLE,
+      maxRange: 1,
+    };
   }, [pendingAbility, selectedUnit, attackRangeMod]);
 
   // Calcular preview de targeting
   const targetingPreview: TargetingPreview | null = useMemo(() => {
-    if (!targetingConfig || !selectedUnit) return null;
+    if (!targetingPattern || !selectedUnit) return null;
 
     const unitStats = extractUnitStats(selectedUnit);
 
     const preview = calculateTargetingPreview(
-      targetingConfig,
+      targetingPattern,
       selectedUnit.posX,
       selectedUnit.posY,
       unitStats,
@@ -157,7 +172,7 @@ export function useTargeting({
     );
 
     return preview;
-  }, [targetingConfig, selectedUnit, gridContext, hoveredCell]);
+  }, [targetingPattern, selectedUnit, gridContext, hoveredCell]);
 
   // Verificar se uma célula está no range selecionável
   const isCellSelectable = useCallback(
@@ -199,8 +214,8 @@ export function useTargeting({
 
   return {
     targetingPreview,
-    targetingConfig,
-    isTargeting: targetingConfig !== null && targetingPreview !== null,
+    targetingPattern,
+    isTargeting: targetingPattern !== null && targetingPreview !== null,
     confirmTarget,
     isCellSelectable,
     isCellAffected,

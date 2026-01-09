@@ -34,10 +34,7 @@ import {
   obstaclesToBlockers,
   unitsToBlockers,
 } from "@boundless/shared/utils/line-of-sight.utils";
-import {
-  isValidAbilityTarget,
-  isValidAbilityPosition,
-} from "@boundless/shared/utils/ability-validation";
+import { isValidAbilityPosition } from "@boundless/shared/utils/ability-validation";
 import { useTargeting } from "../hooks/useTargeting";
 import { colyseusService } from "../../../services/colyseus.service";
 import { useBattleStore } from "../../../stores/battleStore";
@@ -314,6 +311,11 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       targetUnitId: string | null;
       missed?: boolean;
     }) => {
+      const attackerUnit = units.find((u) => u.id === data.attackerUnitId);
+      const targetUnit = data.targetUnitId
+        ? units.find((u) => u.id === data.targetUnitId)
+        : null;
+
       // Centralizar câmera no alvo se estiver na visão do jogador
       if (data.targetUnitId && canvasRef.current) {
         canvasRef.current.centerOnUnitIfVisible(data.targetUnitId);
@@ -323,16 +325,38 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       if (canvasRef.current && data.attackerUnitId) {
         canvasRef.current.playAnimation(data.attackerUnitId, "Sword_1");
       }
-      // Animação de dano no alvo (se não errou e tem alvo válido)
-      if (!data.missed && data.targetUnitId && canvasRef.current) {
-        // Pequeno delay para o dano aparecer após o golpe
+
+      // Disparar projétil se houver atacante e alvo
+      if (attackerUnit && targetUnit && canvasRef.current) {
+        canvasRef.current.fireProjectile({
+          abilityCode: "ATTACK",
+          startX: attackerUnit.posX,
+          startY: attackerUnit.posY,
+          endX: targetUnit.posX,
+          endY: targetUnit.posY,
+          casterId: attackerUnit.id,
+          targetId: targetUnit.id,
+          onComplete: () => {
+            // Animação de dano no alvo após projétil chegar
+            if (!data.missed && data.targetUnitId && canvasRef.current) {
+              canvasRef.current.playAnimation(data.targetUnitId, "Damage");
+
+              // Shake da câmera
+              const isPlayerInvolved =
+                attackerUnit?.ownerId === user?.id ||
+                targetUnit?.ownerId === user?.id;
+              if (isPlayerInvolved) {
+                canvasRef.current.shake(5, 150);
+              }
+            }
+          },
+        });
+      } else if (!data.missed && data.targetUnitId && canvasRef.current) {
+        // Fallback se não conseguir disparar projétil
         setTimeout(() => {
           canvasRef.current?.playAnimation(data.targetUnitId!, "Damage");
         }, 200);
 
-        // Shake da câmera quando uma unidade do jogador receber ou causar dano visível
-        const attackerUnit = units.find((u) => u.id === data.attackerUnitId);
-        const targetUnit = units.find((u) => u.id === data.targetUnitId);
         const isPlayerInvolved =
           attackerUnit?.ownerId === user?.id ||
           targetUnit?.ownerId === user?.id;
@@ -364,24 +388,44 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     // Handler para skill usada - centraliza câmera no alvo se houver
     const handleSkillUsed = (data: {
       casterUnitId: string;
-      targetUnitId?: string | null;
+      targetPosition?: { x: number; y: number };
       skillCode: string;
     }) => {
-      // Centralizar câmera no alvo se estiver na visão do jogador
-      if (data.targetUnitId && canvasRef.current) {
-        canvasRef.current.centerOnUnitIfVisible(data.targetUnitId);
+      const casterUnit = units.find((u) => u.id === data.casterUnitId);
+      const targetPos = data.targetPosition;
+
+      // Disparar projétil se houver caster e posição alvo
+      if (casterUnit && targetPos && canvasRef.current) {
+        canvasRef.current.fireProjectile({
+          abilityCode: data.skillCode,
+          startX: casterUnit.posX,
+          startY: casterUnit.posY,
+          endX: targetPos.x,
+          endY: targetPos.y,
+          casterId: casterUnit.id,
+        });
       }
     };
 
-    // Handler para spell cast - centraliza câmera no alvo se houver
+    // Handler para spell cast - dispara projétil até posição alvo
     const handleSpellCast = (data: {
       casterUnitId: string;
-      targetUnitId?: string | null;
+      targetPosition?: { x: number; y: number };
       spellCode: string;
     }) => {
-      // Centralizar câmera no alvo se estiver na visão do jogador
-      if (data.targetUnitId && canvasRef.current) {
-        canvasRef.current.centerOnUnitIfVisible(data.targetUnitId);
+      const casterUnit = units.find((u) => u.id === data.casterUnitId);
+      const targetPos = data.targetPosition;
+
+      // Disparar projétil se houver caster e posição alvo
+      if (casterUnit && targetPos && canvasRef.current) {
+        canvasRef.current.fireProjectile({
+          abilityCode: data.spellCode,
+          startX: casterUnit.posX,
+          startY: casterUnit.posY,
+          endX: targetPos.x,
+          endY: targetPos.y,
+          casterId: casterUnit.id,
+        });
       }
     };
 
@@ -936,42 +980,29 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       return;
     }
 
-    // Se há uma ability pendente aguardando alvo (targetType: UNIT ou ALL)
+    // Se há uma ability pendente, enviar apenas a posição da célula clicada
+    // O servidor é responsável por encontrar as unidades afetadas
     if (
       pendingAbility &&
       pendingAbility.type === "ABILITY" &&
       selectedUnit &&
       isMyTurn
     ) {
-      const ability = pendingAbility.ability;
-
-      if (ability.targetType === "UNIT" || ability.targetType === "ALL") {
-        // Usar validação centralizada
-        if (isValidAbilityTarget(selectedUnit, ability, unit)) {
-          console.log(
-            "%c[BattleView] ✨ Executando ability em unidade!",
-            "color: #a855f7; font-weight: bold;",
-            {
-              abilityCode: pendingAbility.code,
-              targetId: unit.id,
-              targetName: unit.name,
-            }
-          );
-          executeAction("use_ability", selectedUnit.id, {
-            abilityCode: pendingAbility.code,
-            casterUnitId: selectedUnit.id,
-            targetUnitId: unit.id,
-          });
-          setPendingAbility(null);
-        } else {
-          console.log(
-            "%c[BattleView] ❌ Alvo inválido para ability",
-            "color: #ef4444;",
-            { ability: pendingAbility.code, target: unit.name }
-          );
+      console.log(
+        "%c[BattleView] ✨ Executando ability na célula da unidade!",
+        "color: #a855f7; font-weight: bold;",
+        {
+          abilityCode: pendingAbility.code,
+          targetPosition: { x: unit.posX, y: unit.posY },
         }
-        return;
-      }
+      );
+      executeAction("use_ability", selectedUnit.id, {
+        abilityCode: pendingAbility.code,
+        casterUnitId: selectedUnit.id,
+        targetPosition: { x: unit.posX, y: unit.posY },
+      });
+      setPendingAbility(null);
+      return;
     }
 
     // Comportamento padrão: selecionar unidade
@@ -981,24 +1012,24 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       // Unidades desabilitadas não podem iniciar ação
       const unitIsDisabled = isUnitDisabled(unit);
 
-      // Se clicar na mesma unidade E há uma ability pendente → self-cast
+      // Se clicar na mesma unidade E há uma ability pendente → self-cast (enviar posição)
       if (selectedUnitId === unit.id && pendingAbility && isMyTurn) {
         const ability = pendingAbility.ability;
 
-        if (ability.targetType === "UNIT") {
+        // Self-cast: enviar a posição da própria unidade
+        if (ability.targetType === "SELF" || ability.targetType === "UNIT") {
           console.log(
             "%c[BattleView] ✨ Executando ability em si mesmo!",
             "color: #a855f7; font-weight: bold;",
             {
               abilityCode: pendingAbility.code,
-              unitId: unit.id,
-              unitName: unit.name,
+              targetPosition: { x: unit.posX, y: unit.posY },
             }
           );
           executeAction("use_ability", unit.id, {
             abilityCode: pendingAbility.code,
             casterUnitId: unit.id,
-            targetUnitId: unit.id,
+            targetPosition: { x: unit.posX, y: unit.posY },
           });
           setPendingAbility(null);
           return;
@@ -1172,26 +1203,20 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
         return;
       }
 
-      // Se é uma ability (skill ou spell)
+      // Se é uma ability (skill ou spell) - enviar apenas targetPosition
       if (pendingAbility.type === "ABILITY") {
-        const targetUnit = units.find(
-          (u) => u.isAlive && u.posX === targetCell.x && u.posY === targetCell.y
-        );
-
         console.log(
           "%c[BattleView] ✨ Confirmando ability direcional!",
           "color: #a855f7; font-weight: bold;",
           {
             abilityCode: pendingAbility.code,
-            targetCell,
-            hasUnit: !!targetUnit,
+            targetPosition: { x: targetCell.x, y: targetCell.y },
           }
         );
 
         executeAction("use_ability", selectedUnit.id, {
           abilityCode: pendingAbility.code,
           casterUnitId: selectedUnit.id,
-          targetUnitId: targetUnit?.id,
           targetPosition: { x: targetCell.x, y: targetCell.y },
         });
         setPendingAbility(null);

@@ -1,27 +1,36 @@
 // server/src/modules/abilities/executors/spells/fire.spell.ts
-// FIRE - Causa dano mágico em área 3x3
+// FIRE - Lança uma bola de fogo que viaja e explode em área 3x3
 
 import type {
   AbilityDefinition,
   AbilityExecutionResult,
-  AbilityExecutionContext,
 } from "@boundless/shared/types/ability.types";
 import type { BattleUnit } from "@boundless/shared/types/battle.types";
-import { resolveSpellValue } from "../helpers";
+import { resolveSpellValue, processAbilityTargeting } from "../helpers";
+import type { SpellExecutionContext } from "../types";
 import { scanConditionsForAction } from "../../../conditions/conditions";
 import { processUnitDeath } from "../../../combat/death-logic";
 import { applyDamage } from "../../../combat/damage.utils";
 
 /**
- * 🔥 FIRE - Causa dano mágico em área 3x3
- * Nota: Validação de alcance já foi feita em validateSpellUse()
+ * 🔥 FIRE - Lança uma bola de fogo que viaja até o alvo e explode em 3x3
+ *
+ * FLUXO COM QTE:
+ * 1. Projétil viaja em direção ao alvo
+ * 2. Se encontrar unidade no caminho:
+ *    a. Retorna requiresQTE: true com qteType: "DODGE"
+ *    b. Handler inicia QTE de DODGE para a unidade interceptora
+ *    c. Se FALHAR no QTE → explode nessa unidade (chama executeFire com skipQTE)
+ *    d. Se CONSEGUIR → projétil continua (recalcula próximo impacto)
+ * 3. Se não encontrar unidade → explode no alvo original
+ * 4. Todas as unidades na área de explosão recebem dano (com chance de esquiva simples)
  */
 export function executeFire(
   caster: BattleUnit,
   target: BattleUnit | { x: number; y: number } | null,
   allUnits: BattleUnit[],
   spell: AbilityDefinition,
-  context?: AbilityExecutionContext
+  context?: SpellExecutionContext
 ): AbilityExecutionResult {
   // Validação: target deve ser uma posição
   if (!target || "id" in target) {
@@ -33,36 +42,131 @@ export function executeFire(
 
   const position = target as { x: number; y: number };
   const battleId = context?.battleId;
+  const pattern = spell.targetingPattern;
 
-  // Encontrar todas as unidades na área 3x3
-  const targetsInArea = allUnits.filter((u) => {
-    if (!u.isAlive) return false;
-    const dx = Math.abs(u.posX - position.x);
-    const dy = Math.abs(u.posY - position.y);
-    return dx <= 1 && dy <= 1; // 3x3 centered on position
-  });
+  if (!pattern) {
+    return {
+      success: false,
+      error: "Spell FIRE não tem targetingPattern definido",
+    };
+  }
+
+  // Usar sistema de targeting padronizado
+  const gridWidth = context?.gridWidth ?? 20;
+  const gridHeight = context?.gridHeight ?? 15;
+  const obstacles = context?.obstacles ?? [];
+
+  // Flag para pular QTE (usado quando já passou pelo QTE e falhou)
+  const skipQTE = context?.skipQTE ?? false;
+  // Ponto de impacto forçado (quando já definido pelo QTE)
+  const forcedImpactPoint = context?.forcedImpactPoint;
+
+  // Resolve travel distance do pattern
+  const travelDistance = pattern.travelDistance
+    ? resolveSpellValue(pattern.travelDistance, caster, 5)
+    : 5;
+
+  // Processar targeting: viagem + explosão
+  const targetingResult = processAbilityTargeting(
+    pattern,
+    caster,
+    forcedImpactPoint?.x ?? position.x,
+    forcedImpactPoint?.y ?? position.y,
+    allUnits,
+    obstacles,
+    gridWidth,
+    gridHeight,
+    {
+      travelDistance: forcedImpactPoint ? 0 : travelDistance, // Se temos ponto forçado, não viaja mais
+      excludeCaster: true,
+    }
+  );
+
+  const { targets: targetsInArea, impactPoint, intercepted } = targetingResult;
+
+  // Se foi interceptado por uma unidade e não estamos pulando QTE
+  // Verificar se há uma unidade inimiga exatamente no ponto de impacto
+  if (intercepted && !skipQTE && !forcedImpactPoint) {
+    const interceptorUnit = allUnits.find(
+      (u) =>
+        u.isAlive &&
+        u.posX === impactPoint.x &&
+        u.posY === impactPoint.y &&
+        u.id !== caster.id &&
+        u.ownerId !== caster.ownerId // Apenas inimigos ativam QTE
+    );
+
+    if (interceptorUnit) {
+      console.log(
+        `🔥 Bola de fogo interceptada por ${interceptorUnit.name}! Iniciando QTE de DODGE...`
+      );
+
+      // Retornar para iniciar QTE de DODGE
+      return {
+        success: true,
+        requiresQTE: true,
+        qteType: "DODGE",
+        qteAttackerId: caster.id,
+        qteTargetId: interceptorUnit.id,
+        qteImpactPoint: impactPoint,
+        isAreaProjectile: true,
+        pendingAbilityCode: spell.code,
+        metadata: {
+          impactPoint,
+          intercepted: true,
+        },
+      };
+    }
+  }
+
+  // Log de impacto
+  if (intercepted && !forcedImpactPoint) {
+    console.log(
+      `🔥 Bola de fogo explodindo em (${impactPoint.x}, ${impactPoint.y}) ao invés de (${position.x}, ${position.y})`
+    );
+  }
 
   if (targetsInArea.length === 0) {
     return {
-      success: false,
-      error: "Nenhuma unidade na área alvo",
+      success: true,
+      damageDealt: 0,
+      targetIds: [],
+      dodgeResults: [],
+      metadata: {
+        impactPoint,
+        intercepted,
+        affectedCells: targetingResult.affectedCells,
+      },
     };
   }
 
   // Aplicar dano a cada unidade na área
   const targetIds: string[] = [];
   const dodgeResults: AbilityExecutionResult["dodgeResults"] = [];
+  const affectedUnits: AbilityExecutionResult["affectedUnits"] = [];
   let totalDamage = 0;
   let totalRawDamage = 0;
   let totalDamageReduction = 0;
 
   for (const targetUnit of targetsInArea) {
-    // Sistema de esquiva (Speed × 3%)
-    const dodgeChance = targetUnit.speed * 3;
-    const dodgeRoll = Math.floor(Math.random() * 100) + 1;
-    const dodged = dodgeRoll <= dodgeChance;
+    // Sistema de esquiva simples para unidades NA ÁREA (não interceptadores)
+    // Unidades que já passaram pelo QTE não rolam esquiva novamente
+    const wasQTETarget =
+      forcedImpactPoint &&
+      targetUnit.posX === forcedImpactPoint.x &&
+      targetUnit.posY === forcedImpactPoint.y;
 
-    // Registrar resultado de esquiva
+    let dodged = false;
+    let dodgeChance = 0;
+    let dodgeRoll = 0;
+
+    if (!wasQTETarget) {
+      // Esquiva simples (Speed × 3%) para unidades na área de explosão
+      dodgeChance = targetUnit.speed * 3;
+      dodgeRoll = Math.floor(Math.random() * 100) + 1;
+      dodged = dodgeRoll <= dodgeChance;
+    }
+
     dodgeResults.push({
       targetId: targetUnit.id,
       targetName: targetUnit.name,
@@ -78,15 +182,14 @@ export function executeFire(
       continue;
     }
 
-    // Dano base: resolver valor dinâmico (pode ser número fixo ou atributo)
+    // Dano base
     let baseDamage = resolveSpellValue(spell.baseDamage, caster, caster.focus);
 
-    // Aplicar multiplicador de dano se existir
     if (spell.damageMultiplier) {
       baseDamage = Math.floor(baseDamage * (1 + spell.damageMultiplier));
     }
 
-    // Scan condições do alvo para redução de dano
+    // Condições do alvo
     const targetConditionEffects = scanConditionsForAction(
       targetUnit.conditions,
       "take_damage"
@@ -94,11 +197,10 @@ export function executeFire(
     const damageReduction =
       targetConditionEffects.modifiers.damageReduction || 0;
 
-    // Aplicar redução de dano das condições
     let finalDamage = baseDamage - damageReduction;
     if (finalDamage < 0) finalDamage = 0;
 
-    // Aplicar dano usando o sistema de proteção dual (absorve na proteção mágica primeiro)
+    // Aplicar dano
     const damageResult = applyDamage(
       targetUnit.physicalProtection,
       targetUnit.magicalProtection,
@@ -107,7 +209,6 @@ export function executeFire(
       "MAGICO"
     );
 
-    // Atualizar valores do alvo
     targetUnit.physicalProtection = damageResult.newPhysicalProtection;
     targetUnit.magicalProtection = damageResult.newMagicalProtection;
     targetUnit.currentHp = damageResult.newHp;
@@ -115,16 +216,23 @@ export function executeFire(
     totalRawDamage += baseDamage;
     totalDamageReduction += damageReduction;
 
-    if (targetUnit.currentHp <= 0) {
+    const defeated = targetUnit.currentHp <= 0;
+    if (defeated) {
       targetUnit.currentHp = 0;
       processUnitDeath(targetUnit, allUnits, caster, "battle", battleId);
     }
 
     targetIds.push(targetUnit.id);
 
-    console.log(
-      `🔥 ${targetUnit.name} recebeu ${finalDamage} de dano mágico (base: ${baseDamage}, redução: ${damageReduction}, absorvido: ${damageResult.damageAbsorbed}, HP: ${damageResult.damageToHp})`
-    );
+    // Adicionar ao array de unidades afetadas
+    affectedUnits.push({
+      unitId: targetUnit.id,
+      damage: finalDamage,
+      hpAfter: targetUnit.currentHp,
+      defeated,
+    });
+
+    console.log(`🔥 ${targetUnit.name} recebeu ${finalDamage} de dano mágico`);
   }
 
   return {
@@ -134,5 +242,11 @@ export function executeFire(
     damageReduction: totalDamageReduction,
     targetIds,
     dodgeResults,
+    affectedUnits,
+    metadata: {
+      impactPoint,
+      intercepted,
+      affectedCells: targetingResult.affectedCells,
+    },
   };
 }

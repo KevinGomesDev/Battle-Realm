@@ -17,6 +17,10 @@ interface UseAnimationLoopParams {
   hasActiveAnimations: () => boolean;
   needsRedrawRef: React.MutableRefObject<boolean>;
   animationTimeRef: React.MutableRefObject<number>;
+  /** Função para atualizar projéteis (opcional) */
+  updateProjectiles?: () => boolean;
+  /** Função para verificar se há projéteis ativos (opcional) */
+  hasActiveProjectiles?: () => boolean;
 }
 
 // Configurações de timing do loop
@@ -36,6 +40,8 @@ export function useAnimationLoop({
   hasActiveAnimations,
   needsRedrawRef,
   animationTimeRef,
+  updateProjectiles,
+  hasActiveProjectiles,
 }: UseAnimationLoopParams): void {
   const animationFrameRef = useRef<number | null>(null);
 
@@ -52,6 +58,9 @@ export function useAnimationLoop({
 
       // Atualizar animações de movimento
       const hasMovementAnimations = updateAnimations();
+
+      // Atualizar projéteis
+      const hasProjectileAnimations = updateProjectiles?.() ?? false;
 
       // Atualizar frame dos sprites
       const spriteFrameChanged = updateSpriteFrame(
@@ -70,7 +79,9 @@ export function useAnimationLoop({
       const shouldRedraw =
         needsRedrawRef.current ||
         hasMovementAnimations ||
+        hasProjectileAnimations ||
         hasActiveAnimations() ||
+        (hasActiveProjectiles?.() ?? false) ||
         spriteFrameChanged ||
         (hasCurrentTurnUnit && needsPulseUpdate);
 
@@ -105,5 +116,7 @@ export function useAnimationLoop({
     hasActiveAnimations,
     needsRedrawRef,
     animationTimeRef,
+    updateProjectiles,
+    hasActiveProjectiles,
   ]);
 }

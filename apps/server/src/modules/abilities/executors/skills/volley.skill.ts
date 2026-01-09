@@ -5,16 +5,15 @@ import type {
   AbilityDefinition,
   AbilityExecutionResult,
 } from "@boundless/shared/types/ability.types";
-import { resolveDynamicValue } from "@boundless/shared/types/ability.types";
 import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import type { SkillExecutionContext } from "../types";
-import { getManhattanDistance } from "@boundless/shared/utils/distance.utils";
 import { applyDamage } from "../../../combat/damage.utils";
 import { processUnitDeath } from "../../../combat/death-logic";
+import { getEnemiesInArea } from "../helpers";
 
 /**
  * RANGER_VOLLEY: Ataca todos os inimigos em área com metade do dano
- * Pode atingir obstáculos destrutíveis na área
+ * Usa o sistema padronizado de targeting
  */
 export function executeVolley(
   caster: BattleUnit,
@@ -31,34 +30,38 @@ export function executeVolley(
     return { success: false, error: "Requer uma posição ou alvo" };
   }
 
+  const pattern = skill.targetingPattern;
+  if (!pattern) {
+    return {
+      success: false,
+      error: "Skill VOLLEY não tem targetingPattern definido",
+    };
+  }
+
+  // Grid dimensions from context or defaults
+  const gridWidth = context?.gridWidth ?? 20;
+  const gridHeight = context?.gridHeight ?? 15;
+  const obstacles = context?.obstacles ?? [];
+
+  // Usar sistema padronizado para encontrar inimigos na área
+  const enemies = getEnemiesInArea(
+    pattern,
+    caster,
+    centerX,
+    centerY,
+    allUnits,
+    obstacles,
+    gridWidth,
+    gridHeight
+  );
+
   const baseDamage = Math.floor(caster.combat / 2);
-  // Resolver areaSize dinamicamente (pode ser número ou atributo)
-  const areaSize = skill.areaSize
-    ? resolveDynamicValue(skill.areaSize, caster)
-    : 3;
-  const radius = Math.floor(areaSize / 2); // Ex: 3x3 = radius 1
   let totalDamage = 0;
   let unitsHit = 0;
-  const obstaclesDestroyed: string[] = [];
+  const targetIds: string[] = [];
 
   // Atacar unidades na área
-  for (const unit of allUnits) {
-    if (unit.ownerId === caster.ownerId) continue;
-    if (!unit.isAlive) continue;
-
-    const distance = getManhattanDistance(
-      centerX,
-      centerY,
-      unit.posX,
-      unit.posY
-    );
-    // Checar se está dentro do quadrado de área (não Manhattan para área quadrada)
-    if (
-      Math.abs(unit.posX - centerX) > radius ||
-      Math.abs(unit.posY - centerY) > radius
-    )
-      continue;
-
+  for (const unit of enemies) {
     // Dano físico - usar sistema de proteção dual
     const damageResult = applyDamage(
       unit.physicalProtection,
@@ -76,32 +79,13 @@ export function executeVolley(
       processUnitDeath(unit, allUnits, caster, "battle", context?.battleId);
     }
 
+    targetIds.push(unit.id);
     unitsHit++;
-  }
-
-  // Atacar obstáculos destrutíveis na área
-  if (context?.obstacles) {
-    for (const obstacle of context.obstacles) {
-      if (obstacle.destroyed) continue;
-
-      // Checar se está dentro da área
-      if (
-        Math.abs(obstacle.posX - centerX) > radius ||
-        Math.abs(obstacle.posY - centerY) > radius
-      )
-        continue;
-
-      // Aplicar dano ao obstáculo
-      obstacle.hp = (obstacle.hp ?? 0) - baseDamage;
-      if (obstacle.hp <= 0) {
-        obstacle.destroyed = true;
-        obstaclesDestroyed.push(obstacle.id);
-      }
-    }
   }
 
   return {
     success: true,
     damageDealt: totalDamage,
+    targetIds,
   };
 }

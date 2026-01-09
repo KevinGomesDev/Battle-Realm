@@ -183,30 +183,11 @@ export function mapLegacyRange(range: string | AbilityRange): AbilityRange {
 }
 
 // =============================================================================
-// TARGETING SHAPES (FORMAS DE ÁREA DE EFEITO)
+// TARGETING DIRECTION
 // =============================================================================
 
 /**
- * Forma do padrão de targeting/área de efeito
- * - SINGLE: Uma única célula (ataque básico, single target spells)
- * - LINE: Linha reta em uma direção
- * - CONE: Cone que se expande (ex: breath attacks)
- * - CROSS: Cruz/+ shape (ex: explosões cardinais)
- * - DIAMOND: Diamante/Losango (distância Manhattan, mais comum)
- * - SQUARE: Quadrado/Área (distância Chebyshev)
- * - RING: Anel ao redor (ex: shockwave)
- */
-export type TargetingShape =
-  | "SINGLE"
-  | "LINE"
-  | "CONE"
-  | "CROSS"
-  | "DIAMOND"
-  | "SQUARE"
-  | "RING";
-
-/**
- * Direção do targeting (para shapes direcionais)
+ * Direção do targeting (para patterns direcionais)
  */
 export type TargetingDirection =
   | "NORTH"
@@ -217,6 +198,167 @@ export type TargetingDirection =
   | "NORTHWEST"
   | "SOUTHEAST"
   | "SOUTHWEST";
+
+// =============================================================================
+// COORDINATE PATTERN - SISTEMA DE TARGETING BASEADO EM COORDENADAS
+// =============================================================================
+
+/**
+ * Coordenada relativa para padrões de targeting
+ * x: offset horizontal (negativo = esquerda, positivo = direita)
+ * y: offset vertical (negativo = cima/norte, positivo = baixo/sul)
+ */
+export interface PatternCoordinate {
+  x: number;
+  y: number;
+}
+
+/**
+ * Padrão de targeting baseado em coordenadas
+ * Define exatamente quais células são afetadas relativamente ao caster/alvo
+ *
+ * BENEFÍCIOS sobre shapes predefinidas:
+ * - Flexibilidade total (qualquer formato: T, L, Z, custom)
+ * - Código mais simples (1 função vs 7 funções complexas)
+ * - Fácil visualização (coordenadas explícitas)
+ * - Rotação trivial (basta rotacionar coordenadas)
+ *
+ * EXEMPLO DE USO:
+ * ```
+ * // Formato T apontando para cima
+ * const T_PATTERN: CoordinatePattern = {
+ *   origin: "CASTER",
+ *   coordinates: [
+ *     { x: -2, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, // barra horizontal
+ *     { x: 0, y: -1 }, { x: 0, y: -2 } // haste vertical
+ *   ],
+ *   rotatable: true
+ * };
+ * ```
+ */
+export interface CoordinatePattern {
+  /**
+   * Ponto de origem do padrão
+   * - "CASTER": Coordenadas são relativas ao caster (ex: AOE ao redor do caster)
+   * - "TARGET": Coordenadas são relativas ao alvo clicado (ex: explosão no alvo)
+   * - "DIRECTION": Padrão parte do caster na direção do alvo (ex: cone, linha)
+   */
+  origin: "CASTER" | "TARGET" | "DIRECTION";
+
+  /**
+   * Lista de coordenadas afetadas (relativas à origem)
+   * x: offset horizontal (positivo = leste)
+   * y: offset vertical (positivo = sul)
+   */
+  coordinates: PatternCoordinate[];
+
+  /**
+   * Se o padrão pode ser rotacionado baseado na direção escolhida
+   * true = rotaciona coordenadas (ex: cone aponta na direção do mouse)
+   * false = padrão fixo (ex: AOE circular)
+   * Default: false
+   */
+  rotatable?: boolean;
+
+  /**
+   * Se inclui a célula de origem (0,0) mesmo se não estiver na lista
+   * Default: false
+   */
+  includeOrigin?: boolean;
+
+  /**
+   * Alcance máximo para selecionar o alvo (para origin "TARGET" ou "DIRECTION")
+   * Pode ser número fixo ou referência a atributo
+   */
+  maxRange?: DynamicValue;
+
+  // === SISTEMA DE PROJÉTIL ===
+
+  /**
+   * Se a ability é um projétil interceptável
+   * Projéteis percorrem células uma a uma e podem ser esquivados
+   * Se o alvo esquivar, o projétil continua para a próxima célula
+   * Default: false (abilities de área afetam todas as células simultaneamente)
+   */
+  isProjectile?: boolean;
+
+  /**
+   * Ordem de percurso do projétil
+   * - "DISTANCE": Células mais próximas primeiro (default)
+   * - "SEQUENTIAL": Na ordem definida no array coordinates
+   * - "REVERSE": Células mais distantes primeiro
+   */
+  projectileOrder?: "DISTANCE" | "SEQUENTIAL" | "REVERSE";
+
+  /**
+   * Se o projétil atravessa unidades (atinge múltiplos alvos)
+   * Default: false (para no primeiro alvo)
+   */
+  piercing?: boolean;
+
+  /**
+   * Número máximo de alvos que o projétil pode atingir
+   * Só usado se piercing = true
+   * Default: Infinity (atinge todos no caminho)
+   */
+  maxTargets?: number;
+
+  // === SISTEMA DE PROJÉTIL COM EXPLOSÃO ===
+
+  /**
+   * Distância que o projétil viaja antes de explodir/expandir área
+   * Se definido, o projétil viaja em linha reta até encontrar obstáculo ou atingir essa distância
+   * O ponto de impacto se torna a origem da explosão (área de efeito)
+   * Default: undefined (não viaja, aplica área diretamente no alvo)
+   */
+  travelDistance?: DynamicValue;
+
+  /**
+   * Pattern de explosão que expande no ponto de impacto
+   * Quando o projétil atinge algo ou chega ao destino, este pattern é aplicado
+   * Default: usa o próprio pattern como área de impacto
+   */
+  explosionPattern?: CoordinatePattern;
+
+  /**
+   * Se o projétil para em obstáculos durante a viagem
+   * Default: true
+   */
+  stopsOnObstacle?: boolean;
+
+  /**
+   * Se o projétil para em unidades durante a viagem
+   * Default: true (explode na primeira unidade encontrada)
+   */
+  stopsOnUnit?: boolean;
+
+  // === METADATA ===
+
+  /**
+   * Nome do padrão para debug/UI
+   */
+  name?: string;
+
+  /**
+   * Preview ASCII para debug (opcional)
+   */
+  visualPreview?: string;
+}
+
+/**
+ * Verifica se um valor é um CoordinatePattern
+ */
+export function isCoordinatePattern(
+  value: unknown
+): value is CoordinatePattern {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "origin" in value &&
+    "coordinates" in value &&
+    Array.isArray((value as CoordinatePattern).coordinates)
+  );
+}
 
 // =============================================================================
 // CUSTO E RECURSOS
@@ -275,11 +417,12 @@ export interface AbilityDefinition {
   /** Valor customizado para RANGED/AREA (pode ser número ou atributo) */
   rangeDistance?: DynamicValue;
 
-  // === ÁREA DE EFEITO ===
-  /** Tamanho da área de efeito (ex: 3 = 3x3) */
-  areaSize?: DynamicValue;
-  /** Forma do targeting/área de efeito */
-  targetingShape?: TargetingShape;
+  // === TARGETING PATTERN ===
+  /**
+   * Padrão de coordenadas para área de efeito
+   * Define exatamente quais células são afetadas
+   */
+  targetingPattern?: CoordinatePattern;
 
   // === ALVO ===
   targetType?: AbilityTargetType;
@@ -293,6 +436,13 @@ export interface AbilityDefinition {
   cooldown?: number;
 
   // === PROJÉTIL ===
+  /**
+   * Se a ability é um projétil interceptável
+   * Projéteis percorrem células uma a uma, podem ser esquivados
+   * Se o alvo esquivar (QTE), o projétil continua para próxima célula
+   * Default: true para OFFENSIVE, false para outros
+   */
+  isProjectile?: boolean;
   /** Se o projétil atravessa unidades (não para no primeiro alvo). Default: false */
   piercing?: boolean;
   /** Número máximo de alvos afetados em sequência (do mais próximo ao mais distante) */
@@ -390,10 +540,34 @@ export interface AbilityExecutionResult {
   eidolonDefeated?: boolean;
   killedSummonIds?: string[];
 
-  // === QTE (para ATTACK) ===
+  // === QTE (para ATTACK e PROJECTILES) ===
   requiresQTE?: boolean;
   qteAttackerId?: string;
   qteTargetId?: string;
+  /** Tipo de QTE necessário */
+  qteType?: "ATTACK" | "DODGE";
+  /** Posição do impacto (para projéteis de área) */
+  qteImpactPoint?: { x: number; y: number };
+  /** Se é um projétil de área que vai explodir após QTE */
+  isAreaProjectile?: boolean;
+  /** Ability code para continuar execução após QTE */
+  pendingAbilityCode?: string;
+
+  // === METADATA (informações extras para viagem + explosão) ===
+  metadata?: {
+    impactPoint?: { x: number; y: number };
+    intercepted?: boolean;
+    affectedCells?: Array<{ x: number; y: number }>;
+    travelPath?: Array<{ x: number; y: number }>;
+  };
+
+  // === UNIDADES AFETADAS (para explosões de área) ===
+  affectedUnits?: Array<{
+    unitId: string;
+    damage: number;
+    hpAfter: number;
+    defeated: boolean;
+  }>;
 }
 
 /**
@@ -420,6 +594,10 @@ export interface AbilityExecutionContext {
     destroyed?: boolean;
   }>;
   battleId?: string;
+  /** Largura do grid de batalha */
+  gridWidth?: number;
+  /** Altura do grid de batalha */
+  gridHeight?: number;
 }
 
 // =============================================================================
@@ -615,6 +793,68 @@ export function getResourceLabel(resource: AbilityResourceType): string {
     MANA: "Mana",
   };
   return labels[resource];
+}
+
+// =============================================================================
+// SISTEMA DE PROJÉTIL
+// =============================================================================
+
+/**
+ * Determina se uma ability é um projétil interceptável
+ * Regras:
+ * 1. Se isProjectile está definido explicitamente, usa esse valor
+ * 2. Se targetingPattern.isProjectile está definido, usa esse valor
+ * 3. OFFENSIVE é projétil por padrão (exceto SELF target)
+ * 4. BUFF, DEBUFF, HEALING, UTILITY NÃO são projéteis
+ */
+export function isAbilityProjectile(ability: AbilityDefinition): boolean {
+  // Verificar definição explícita na ability
+  if (ability.isProjectile !== undefined) {
+    return ability.isProjectile;
+  }
+
+  // Verificar definição no pattern
+  if (ability.targetingPattern?.isProjectile !== undefined) {
+    return ability.targetingPattern.isProjectile;
+  }
+
+  // SELF não é projétil
+  if (ability.targetType === "SELF" || ability.range === "SELF") {
+    return false;
+  }
+
+  // OFFENSIVE é projétil por padrão
+  if (ability.effectType === "OFFENSIVE") {
+    return true;
+  }
+
+  // Outros tipos não são projéteis
+  return false;
+}
+
+/**
+ * Obtém configuração de projétil de uma ability
+ */
+export function getAbilityProjectileConfig(ability: AbilityDefinition): {
+  isProjectile: boolean;
+  piercing: boolean;
+  maxTargets: number;
+  projectileOrder: "DISTANCE" | "SEQUENTIAL" | "REVERSE";
+} {
+  const isProjectile = isAbilityProjectile(ability);
+
+  // Prioridade: pattern > ability > defaults
+  const pattern = ability.targetingPattern;
+
+  return {
+    isProjectile,
+    piercing: pattern?.piercing ?? ability.piercing ?? false,
+    maxTargets:
+      pattern?.maxTargets ??
+      ability.maxTargets ??
+      (pattern?.piercing || ability.piercing ? Infinity : 1),
+    projectileOrder: pattern?.projectileOrder ?? "DISTANCE",
+  };
 }
 
 // =============================================================================

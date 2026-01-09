@@ -10,6 +10,8 @@ import type { BattleComputed } from "../../../../../stores/battleStore";
 import type { TargetingPreview } from "@boundless/shared/utils/targeting.utils";
 import type { SpriteAnimation, SpriteDirection } from "../sprite.config";
 
+import type { ProjectileType } from "../components/ProjectileTrajectory";
+
 /** Bolha de fala ativa sobre uma unidade */
 export interface ActiveBubble {
   message: string;
@@ -108,6 +110,31 @@ export interface BattleCanvasRef {
     toX: number,
     toY: number
   ) => void;
+  /** Disparar um projétil de uma posição para outra */
+  fireProjectile: (params: {
+    /** Tipo explícito do projétil (opcional se abilityCode for fornecido) */
+    type?: ProjectileType;
+    /** Código da ability para inferir o tipo de projétil */
+    abilityCode?: string;
+    /** Posição inicial X (grid) */
+    startX: number;
+    /** Posição inicial Y (grid) */
+    startY: number;
+    /** Posição final X (grid) */
+    endX: number;
+    /** Posição final Y (grid) */
+    endY: number;
+    /** ID do caster */
+    casterId?: string;
+    /** ID do alvo */
+    targetId?: string;
+    /** Se é projétil de área (mostra explosão) */
+    isAreaProjectile?: boolean;
+    /** Tamanho da explosão em células */
+    explosionSize?: number;
+    /** Callback quando projétil chegar ao destino */
+    onComplete?: () => void;
+  }) => void;
 }
 
 /** Contexto de renderização para os renderers */

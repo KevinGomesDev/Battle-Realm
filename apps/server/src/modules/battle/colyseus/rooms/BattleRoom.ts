@@ -352,6 +352,7 @@ export class BattleRoom extends Room<BattleSessionState> {
               this.startAttackQTEInternal(c, attacker, target);
             }
           },
+          this.qteManager,
           params
         );
       }
