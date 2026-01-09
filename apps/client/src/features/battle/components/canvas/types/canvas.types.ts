@@ -116,6 +116,8 @@ export interface BattleCanvasRef {
   isUnitVisible: (unitId: string) => boolean;
   /** Verificar se uma posição do grid está na visão do jogador */
   isPositionVisible: (x: number, y: number) => boolean;
+  /** Obter a posição na tela (pixels) de uma unidade - para QTE inline */
+  getUnitScreenPosition: (unitId: string) => { x: number; y: number } | null;
   /** Iniciar animação de sprite em uma unidade */
   playAnimation: (unitId: string, animation: SpriteAnimation) => void;
   /** Sacudir a câmera (feedback de dano) */

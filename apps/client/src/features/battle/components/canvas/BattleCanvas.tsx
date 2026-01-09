@@ -712,6 +712,29 @@ export const BattleCanvas = memo(
         [isPositionVisible, cellSize]
       );
 
+      // Calcular posição na tela de uma unidade (para QTE inline)
+      const getUnitScreenPosition = useCallback(
+        (unitId: string): { x: number; y: number } | null => {
+          const unit = units.find((u) => u.id === unitId);
+          if (!unit) return null;
+
+          // Obter estado da câmera
+          const camera = cameraRef.current?.getCamera();
+          if (!camera) return null;
+
+          // Calcular posição no canvas (centro da célula)
+          const canvasX = (unit.posX + 0.5) * cellSize;
+          const canvasY = (unit.posY + 0.5) * cellSize;
+
+          // Aplicar transformação da câmera (zoom e offset)
+          const screenX = canvasX * camera.zoom + camera.offsetX;
+          const screenY = canvasY * camera.zoom + camera.offsetY;
+
+          return { x: screenX, y: screenY };
+        },
+        [units, cellSize]
+      );
+
       useImperativeHandle(
         ref,
         () => ({
@@ -720,6 +743,7 @@ export const BattleCanvas = memo(
           centerOnPositionIfVisible,
           isUnitVisible,
           isPositionVisible,
+          getUnitScreenPosition,
           playAnimation: (unitId: string, animation: SpriteAnimation) => {
             startSpriteAnimation(unitId, animation);
             needsRedrawRef.current = true;
@@ -757,6 +781,7 @@ export const BattleCanvas = memo(
           centerOnPositionIfVisible,
           isUnitVisible,
           isPositionVisible,
+          getUnitScreenPosition,
           startSpriteAnimation,
           startMoveAnimation,
           fireProjectile,

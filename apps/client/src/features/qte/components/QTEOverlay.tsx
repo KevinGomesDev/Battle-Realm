@@ -1,6 +1,28 @@
 // client/src/features/qte/components/QTEOverlay.tsx
 // Componente de overlay para Quick Time Event
 // UI do círculo fechando com feedback visual
+//
+// MODOS DE EXIBIÇÃO:
+// - "modal": Centralizado na tela com overlay escurecido (para treinamento)
+// - "inline": Posicionado sobre uma unidade no campo de batalha
+//
+// EXEMPLO DE USO EM BATALHA (inline):
+// <QTEOverlay
+//   config={qteConfig}
+//   onResponse={handleResponse}
+//   isResponder={isMyUnit}
+//   displayMode="inline"
+//   position={{ x: unitScreenX, y: unitScreenY }}
+//   size={80}
+// />
+//
+// EXEMPLO DE USO EM TREINAMENTO (modal):
+// <QTEOverlay
+//   config={qteConfig}
+//   onResponse={handleResponse}
+//   isResponder={true}
+//   isTrainingMode={true}
+// />
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -36,6 +58,28 @@ interface QTEOverlayProps {
 
   /** Resultado externo (do servidor, para observadores) */
   externalResult?: QTEResultGrade | null;
+
+  /** Modo treinamento: exibe textos tutoriais */
+  isTrainingMode?: boolean;
+
+  /**
+   * Modo de exibição:
+   * - "modal": Centralizado na tela com overlay escurecido (padrão, para treinamento)
+   * - "inline": Posicionado sobre uma unidade no campo de batalha
+   */
+  displayMode?: "modal" | "inline";
+
+  /**
+   * Posição na tela (em pixels) - usado apenas no modo "inline"
+   * Representa o centro da unidade sobre a qual o QTE será exibido
+   */
+  position?: { x: number; y: number };
+
+  /**
+   * Tamanho do círculo em pixels - usado apenas no modo "inline"
+   * Padrão: 80px para inline, 256px para modal
+   */
+  size?: number;
 }
 
 // =============================================================================
@@ -50,7 +94,15 @@ export const QTEOverlay: React.FC<QTEOverlayProps> = ({
   responderName = "Unidade",
   attackerName = "Inimigo",
   externalResult = null,
+  isTrainingMode = false,
+  displayMode = "modal",
+  position,
+  size,
 }) => {
+  // Determinar tamanho baseado no modo
+  const circleSize = size ?? (displayMode === "inline" ? 80 : 256);
+  const isInlineMode = displayMode === "inline";
+
   // Estado do indicador (0-100%)
   const [indicatorPosition, setIndicatorPosition] = useState(0);
   const [hasResponded, setHasResponded] = useState(false);
@@ -166,11 +218,25 @@ export const QTEOverlay: React.FC<QTEOverlayProps> = ({
       }
 
       // Determinar resultado visual
+      // indicatorPosition vai de 0 a 100
+      // hitZoneStart/End estão centrados em 50 (ex: 37.5 a 62.5 para hitZoneSize=25)
       const isInHitZone =
         indicatorPosition >= hitZoneStart && indicatorPosition <= hitZoneEnd;
       const isInPerfectZone =
         indicatorPosition >= perfectZoneStart &&
         indicatorPosition <= perfectZoneEnd;
+
+      console.log("[QTE] Input detectado:", {
+        input,
+        indicatorPosition: indicatorPosition.toFixed(1),
+        hitZone: `${hitZoneStart.toFixed(1)} - ${hitZoneEnd.toFixed(1)}`,
+        perfectZone: `${perfectZoneStart.toFixed(1)} - ${perfectZoneEnd.toFixed(
+          1
+        )}`,
+        isInHitZone,
+        isInPerfectZone,
+        circleSize: `${(100 - indicatorPosition).toFixed(1)}%`,
+      });
 
       let grade: QTEResultGrade = "FAIL";
       if (input !== "NONE") {
@@ -180,6 +246,8 @@ export const QTEOverlay: React.FC<QTEOverlayProps> = ({
           grade = "HIT";
         }
       }
+
+      console.log("[QTE] Resultado:", grade);
 
       setResultGrade(grade);
       setShowResult(true);
@@ -336,14 +404,253 @@ export const QTEOverlay: React.FC<QTEOverlayProps> = ({
     }
   };
 
-  // Shake style
-  const shakeStyle =
-    config.shakeIntensity > 0 && !hasResponded
-      ? {
-          animation: `shake ${100 / (config.shakeIntensity + 1)}ms infinite`,
-        }
-      : {};
+  // Shake offset para tremor dinâmico
+  const [shakeOffset, setShakeOffset] = useState({ x: 0, y: 0 });
 
+  // ==========================================================================
+  // CORES DINÂMICAS BASEADAS NOS PARÂMETROS DO QTE
+  // ==========================================================================
+
+  // Calcular "dificuldade" geral (0-100) baseado nos parâmetros
+  // Duração curta + shake alto + hitZone pequena = mais difícil
+  const getDifficultyLevel = () => {
+    if (!config) return 50;
+
+    // Normalizar duração (100-2000ms típico) - invertido (menor = mais difícil)
+    const durationScore = Math.max(
+      0,
+      Math.min(100, ((2000 - config.duration) / 1900) * 100)
+    );
+
+    // Shake já está em 0-100
+    const shakeScore = config.shakeIntensity;
+
+    // hitZoneSize (1-50% típico) - invertido (menor = mais difícil)
+    const hitZoneScore = Math.max(
+      0,
+      Math.min(100, ((50 - config.hitZoneSize) / 49) * 100)
+    );
+
+    // Média ponderada
+    return durationScore * 0.4 + shakeScore * 0.3 + hitZoneScore * 0.3;
+  };
+
+  const difficultyLevel = getDifficultyLevel();
+
+  // Gerar cores baseadas na dificuldade
+  // Fácil (0-33): Verde/Azul - Calmo
+  // Médio (34-66): Amarelo/Laranja - Alerta
+  // Difícil (67-100): Vermelho/Magenta - Perigo
+  const getDynamicColors = () => {
+    const d = difficultyLevel;
+
+    if (d < 33) {
+      // Fácil - tons de verde/ciano
+      const t = d / 33; // 0-1 dentro da faixa
+      return {
+        indicatorColor: `rgb(${Math.round(100 + t * 50)}, ${Math.round(
+          220 - t * 20
+        )}, ${Math.round(200 - t * 50)})`,
+        indicatorGlow: `rgba(100, 220, 200, ${0.4 + t * 0.2})`,
+        hitZoneColor: `rgba(34, 197, 94, ${0.5 + t * 0.1})`,
+        hitZoneGlow: `rgba(34, 197, 94, ${0.5 + t * 0.1})`,
+        perfectColor: `rgba(250, 204, 21, 0.7)`,
+        backgroundTint: `rgba(20, 60, 50, 0.3)`,
+      };
+    } else if (d < 66) {
+      // Médio - tons de amarelo/laranja
+      const t = (d - 33) / 33; // 0-1 dentro da faixa
+      return {
+        indicatorColor: `rgb(${Math.round(255)}, ${Math.round(
+          200 - t * 80
+        )}, ${Math.round(100 - t * 50)})`,
+        indicatorGlow: `rgba(255, 180, 50, ${0.5 + t * 0.2})`,
+        hitZoneColor: `rgba(${Math.round(200 + t * 55)}, ${Math.round(
+          150 - t * 50
+        )}, 50, 0.5)`,
+        hitZoneGlow: `rgba(255, 150, 50, ${0.5 + t * 0.1})`,
+        perfectColor: `rgba(250, 204, 21, 0.8)`,
+        backgroundTint: `rgba(60, 40, 20, 0.3)`,
+      };
+    } else {
+      // Difícil - tons de vermelho/magenta
+      const t = (d - 66) / 34; // 0-1 dentro da faixa
+      return {
+        indicatorColor: `rgb(${Math.round(255)}, ${Math.round(
+          100 - t * 60
+        )}, ${Math.round(100 + t * 80)})`,
+        indicatorGlow: `rgba(255, 80, 120, ${0.6 + t * 0.2})`,
+        hitZoneColor: `rgba(239, 68, 68, ${0.5 + t * 0.2})`,
+        hitZoneGlow: `rgba(239, 68, 68, ${0.5 + t * 0.2})`,
+        perfectColor: `rgba(250, 150, 50, 0.9)`,
+        backgroundTint: `rgba(60, 20, 30, 0.4)`,
+      };
+    }
+  };
+
+  const dynamicColors = getDynamicColors();
+
+  // Animação de shake (tremor)
+  useEffect(() => {
+    if (!config || hasResponded || config.shakeIntensity <= 0) {
+      setShakeOffset({ x: 0, y: 0 });
+      return;
+    }
+
+    // Intensidade do shake: quanto maior, mais forte o tremor
+    const intensity = config.shakeIntensity;
+    // Intervalo entre shakes: quanto maior a intensidade, mais rápido
+    const interval = Math.max(16, 80 - intensity);
+
+    const shakeInterval = setInterval(() => {
+      // Gerar offsets aleatórios baseados na intensidade
+      const maxOffset = intensity * 0.3; // Até 30px para intensidade 100
+      const x = (Math.random() - 0.5) * 2 * maxOffset;
+      const y = (Math.random() - 0.5) * 2 * maxOffset;
+      setShakeOffset({ x, y });
+    }, interval);
+
+    return () => clearInterval(shakeInterval);
+  }, [config?.qteId, config?.shakeIntensity, hasResponded]);
+
+  // Shake style aplicado ao container do círculo
+  // No modo inline, reduzir intensidade do shake proporcionalmente ao tamanho
+  const shakeScale = isInlineMode ? circleSize / 256 : 1;
+  const shakeStyle = {
+    transform: `translate(${shakeOffset.x * shakeScale}px, ${
+      shakeOffset.y * shakeScale
+    }px)`,
+    transition: "transform 0.05s ease-out",
+  };
+
+  // ==========================================================================
+  // RENDER - MODO INLINE (sobre unidade no campo de batalha)
+  // ==========================================================================
+  if (isInlineMode) {
+    // Posição padrão se não fornecida
+    const posX = position?.x ?? 0;
+    const posY = position?.y ?? 0;
+
+    return (
+      <AnimatePresence>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.5 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.5 }}
+          className="fixed z-50 pointer-events-none"
+          style={{
+            left: posX,
+            top: posY,
+            transform: "translate(-50%, -100%)", // Posicionar acima da unidade
+            marginTop: -10, // Pequeno offset para ficar acima
+          }}
+        >
+          {/* Container do QTE inline */}
+          <div
+            className="relative flex flex-col items-center"
+            style={shakeStyle}
+          >
+            {/* Círculo do QTE - tamanho dinâmico */}
+            <div
+              className="relative flex items-center justify-center"
+              style={{ width: circleSize, height: circleSize }}
+            >
+              {/* Fundo escuro do círculo */}
+              <div
+                className="absolute w-full h-full rounded-full"
+                style={{ backgroundColor: dynamicColors.backgroundTint }}
+              />
+
+              {/* Zona de acerto usando SVG */}
+              <svg className="absolute w-full h-full" viewBox="0 0 100 100">
+                {/* Anel da zona de acerto */}
+                <circle
+                  cx="50"
+                  cy="50"
+                  r={(100 - hitZoneStart + (100 - hitZoneEnd)) / 4}
+                  fill="none"
+                  stroke={
+                    isBlockMode
+                      ? "rgba(59, 130, 246, 0.5)"
+                      : dynamicColors.hitZoneColor
+                  }
+                  strokeWidth={(100 - hitZoneStart - (100 - hitZoneEnd)) / 2}
+                  style={{
+                    filter: isBlockMode
+                      ? "drop-shadow(0 0 4px rgba(59, 130, 246, 0.5))"
+                      : `drop-shadow(0 0 4px ${dynamicColors.hitZoneGlow})`,
+                  }}
+                />
+                {/* Anel da zona perfeita */}
+                <circle
+                  cx="50"
+                  cy="50"
+                  r={(100 - perfectZoneStart + (100 - perfectZoneEnd)) / 4}
+                  fill="none"
+                  stroke={dynamicColors.perfectColor}
+                  strokeWidth={
+                    (100 - perfectZoneStart - (100 - perfectZoneEnd)) / 2
+                  }
+                  style={{
+                    filter: `drop-shadow(0 0 3px ${dynamicColors.perfectColor})`,
+                  }}
+                />
+              </svg>
+
+              {/* Círculo central (mira) - menor no modo inline */}
+              <div
+                className="absolute bg-white rounded-full z-10"
+                style={{
+                  width: Math.max(4, circleSize * 0.04),
+                  height: Math.max(4, circleSize * 0.04),
+                  boxShadow: "0 0 4px white, 0 0 8px rgba(255,255,255,0.5)",
+                }}
+              />
+
+              {/* Círculo que diminui (indicador) */}
+              <motion.div
+                className="absolute rounded-full pointer-events-none z-20"
+                style={{
+                  border: `${Math.max(2, circleSize * 0.012)}px solid ${
+                    dynamicColors.indicatorColor
+                  }`,
+                  boxShadow: hasResponded
+                    ? "none"
+                    : `0 0 6px ${dynamicColors.indicatorGlow}, 0 0 12px ${dynamicColors.indicatorGlow}`,
+                }}
+                initial={{ width: "100%", height: "100%", opacity: 1 }}
+                animate={{
+                  width: `${100 - indicatorPosition}%`,
+                  height: `${100 - indicatorPosition}%`,
+                  opacity: hasResponded ? 0.3 : 1,
+                }}
+                transition={{ duration: 0.016, ease: "linear" }}
+              />
+            </div>
+
+            {/* Resultado inline - menor e mais discreto */}
+            <AnimatePresence>
+              {showResult && resultGrade && (
+                <motion.div
+                  initial={{ scale: 0.5, opacity: 0, y: 10 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.8, opacity: 0 }}
+                  className="absolute -bottom-6 text-sm font-bold whitespace-nowrap"
+                  style={{ color: getResultColor(resultGrade) }}
+                >
+                  {getResultText(resultGrade)}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
+
+  // ==========================================================================
+  // RENDER - MODO MODAL (centralizado, para treinamento)
+  // ==========================================================================
   return (
     <AnimatePresence>
       <motion.div
@@ -360,105 +667,153 @@ export const QTEOverlay: React.FC<QTEOverlayProps> = ({
           className="relative flex flex-col items-center gap-6"
           style={shakeStyle}
         >
-          {/* Título do QTE */}
-          <motion.div
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="text-center"
+          {/* Título do QTE - SÓ APARECE NO TREINAMENTO */}
+          {isTrainingMode && (
+            <motion.div
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              className="text-center"
+            >
+              <h2 className="text-2xl font-bold text-white drop-shadow-lg">
+                {isAttack
+                  ? `${responderName} Ataca!`
+                  : `${attackerName} Ataca ${responderName}!`}
+              </h2>
+              {/* Indicação para observadores */}
+              {!isResponder && (
+                <p className="text-xs text-gray-400 mt-1 italic">
+                  👁️ Observando...
+                </p>
+              )}
+              {isResponder && isDefense && (
+                <p className="text-sm text-gray-300 mt-1">
+                  <kbd
+                    className={`px-2 py-1 rounded ${
+                      isBlockMode ? "bg-blue-600 text-white" : "bg-gray-700"
+                    }`}
+                  >
+                    E
+                  </kbd>{" "}
+                  Bloquear |{" "}
+                  <kbd
+                    className={`px-2 py-1 rounded ${
+                      !isBlockMode ? "bg-green-600 text-white" : "bg-gray-700"
+                    }`}
+                  >
+                    WASD
+                  </kbd>{" "}
+                  Esquivar
+                </p>
+              )}
+              {isResponder && isDefense && isBlockMode && (
+                <p className="text-xs text-blue-400 mt-1">
+                  🛡️ Modo Bloqueio (Resistance)
+                </p>
+              )}
+              {isResponder && isAttack && (
+                <p className="text-sm text-gray-300 mt-1">
+                  Pressione{" "}
+                  <kbd className="px-2 py-1 bg-gray-700 rounded">E</kbd> na zona
+                  verde!
+                </p>
+              )}
+            </motion.div>
+          )}
+
+          {/* Círculo do QTE - com shake */}
+          <div
+            className="relative w-64 h-64 flex items-center justify-center"
+            style={shakeStyle}
           >
-            <h2 className="text-2xl font-bold text-white drop-shadow-lg">
-              {isAttack
-                ? `${responderName} Ataca!`
-                : `${attackerName} Ataca ${responderName}!`}
-            </h2>
-            {/* Indicação para observadores */}
-            {!isResponder && (
-              <p className="text-xs text-gray-400 mt-1 italic">
-                👁️ Observando...
-              </p>
-            )}
-            {isResponder && isDefense && (
-              <p className="text-sm text-gray-300 mt-1">
-                <kbd
-                  className={`px-2 py-1 rounded ${
-                    isBlockMode ? "bg-blue-600 text-white" : "bg-gray-700"
-                  }`}
-                >
-                  E
-                </kbd>{" "}
-                Bloquear |{" "}
-                <kbd
-                  className={`px-2 py-1 rounded ${
-                    !isBlockMode ? "bg-green-600 text-white" : "bg-gray-700"
-                  }`}
-                >
-                  WASD
-                </kbd>{" "}
-                Esquivar
-              </p>
-            )}
-            {isResponder && isDefense && isBlockMode && (
-              <p className="text-xs text-blue-400 mt-1">
-                🛡️ Modo Bloqueio (Resistance)
-              </p>
-            )}
-            {isResponder && isAttack && (
-              <p className="text-sm text-gray-300 mt-1">
-                Pressione <kbd className="px-2 py-1 bg-gray-700 rounded">E</kbd>{" "}
-                na zona verde!
-              </p>
-            )}
-          </motion.div>
+            {/* 
+              Lógica: indicatorPosition vai de 0% a 100%
+              O círculo diminui de 100% para 0% (tamanho = 100 - indicatorPosition)
+              
+              Zona de acerto: hitZoneStart a hitZoneEnd (centrado em 50%)
+              Quando indicatorPosition = hitZoneStart, círculo está em (100-hitZoneStart)%
+              Quando indicatorPosition = hitZoneEnd, círculo está em (100-hitZoneEnd)%
+              
+              SVG viewBox 100x100: raio 50 = 100% do container
+              Para anel entre X% e Y%: raio = (X + Y) / 4, strokeWidth = (X - Y) / 2
+            */}
 
-          {/* Barra do QTE */}
-          <div className="relative w-80 h-12 bg-gray-800 rounded-full overflow-hidden border-2 border-gray-600">
-            {/* Zona de acerto (verde para esquiva, azul para bloqueio) */}
-            <motion.div
-              className={`absolute top-0 bottom-0 ${
-                isBlockMode ? "bg-blue-500/40" : "bg-green-500/40"
-              }`}
+            {/* Fundo escuro do círculo - com tint dinâmico */}
+            <div
+              className="absolute w-full h-full rounded-full bg-gray-900/80"
+              style={{ backgroundColor: dynamicColors.backgroundTint }}
+            />
+
+            {/* Zona de acerto (anel verde/azul) - usando SVG para precisão */}
+            <svg className="absolute w-full h-full" viewBox="0 0 100 100">
+              {/* Anel da zona de acerto - cor dinâmica baseada na dificuldade */}
+              <circle
+                cx="50"
+                cy="50"
+                r={(100 - hitZoneStart + (100 - hitZoneEnd)) / 4}
+                fill="none"
+                stroke={
+                  isBlockMode
+                    ? "rgba(59, 130, 246, 0.5)"
+                    : dynamicColors.hitZoneColor
+                }
+                strokeWidth={(100 - hitZoneStart - (100 - hitZoneEnd)) / 2}
+                style={{
+                  filter: isBlockMode
+                    ? "drop-shadow(0 0 8px rgba(59, 130, 246, 0.5))"
+                    : `drop-shadow(0 0 8px ${dynamicColors.hitZoneGlow})`,
+                }}
+              />
+              {/* Anel da zona perfeita - cor dinâmica */}
+              <circle
+                cx="50"
+                cy="50"
+                r={(100 - perfectZoneStart + (100 - perfectZoneEnd)) / 4}
+                fill="none"
+                stroke={dynamicColors.perfectColor}
+                strokeWidth={
+                  (100 - perfectZoneStart - (100 - perfectZoneEnd)) / 2
+                }
+                style={{
+                  filter: `drop-shadow(0 0 6px ${dynamicColors.perfectColor})`,
+                }}
+              />
+            </svg>
+
+            {/* Círculo central (mira) */}
+            <div
+              className="absolute w-3 h-3 bg-white rounded-full z-10"
               style={{
-                left: `${hitZoneStart}%`,
-                width: `${currentHitZoneSize}%`,
+                boxShadow: "0 0 8px white, 0 0 16px rgba(255,255,255,0.5)",
               }}
+            />
+
+            {/* Círculo que diminui (indicador) - cor dinâmica */}
+            <motion.div
+              className="absolute rounded-full pointer-events-none z-20"
+              style={{
+                border: `3px solid ${dynamicColors.indicatorColor}`,
+                boxShadow: hasResponded
+                  ? "none"
+                  : `0 0 10px ${dynamicColors.indicatorGlow}, 0 0 20px ${dynamicColors.indicatorGlow}`,
+              }}
+              initial={{ width: "100%", height: "100%", opacity: 1 }}
               animate={{
-                left: `${hitZoneStart}%`,
-                width: `${currentHitZoneSize}%`,
+                width: `${100 - indicatorPosition}%`,
+                height: `${100 - indicatorPosition}%`,
+                opacity: hasResponded ? 0.3 : 1,
               }}
-              transition={{ duration: 0.1 }}
+              transition={{ duration: 0.016, ease: "linear" }}
             />
 
-            {/* Zona perfeita (dourada) */}
-            <motion.div
-              className="absolute top-0 bottom-0 bg-yellow-400/60"
-              style={{
-                left: `${perfectZoneStart}%`,
-                width: `${currentPerfectZoneSize}%`,
-              }}
-              animate={{
-                left: `${perfectZoneStart}%`,
-                width: `${currentPerfectZoneSize}%`,
-              }}
-              transition={{ duration: 0.1 }}
-            />
-
-            {/* Indicador */}
-            <motion.div
-              className="absolute top-0 bottom-0 w-1 bg-white shadow-lg"
-              style={{
-                left: `${indicatorPosition}%`,
-                boxShadow: "0 0 10px white, 0 0 20px white",
-              }}
-              animate={hasResponded ? {} : { opacity: [1, 0.7, 1] }}
-              transition={{ duration: 0.2, repeat: Infinity }}
-            />
-
-            {/* Marcador central */}
-            <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-gray-500" />
+            {/* Marcadores cardeais */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0.5 h-2 bg-gray-500/60 z-10" />
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0.5 h-2 bg-gray-500/60 z-10" />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-2 h-0.5 bg-gray-500/60 z-10" />
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-0.5 bg-gray-500/60 z-10" />
           </div>
 
-          {/* Direção do ataque (para defesa) */}
-          {isDefense && config.attackDirection && (
+          {/* Direção do ataque (para defesa) - SÓ APARECE NO TREINAMENTO */}
+          {isTrainingMode && isDefense && config.attackDirection && (
             <div className="flex gap-4 text-white">
               <DirectionIndicator
                 direction="UP"
@@ -498,8 +853,8 @@ export const QTEOverlay: React.FC<QTEOverlayProps> = ({
             )}
           </AnimatePresence>
 
-          {/* Timer visual */}
-          {!hasResponded && (
+          {/* Timer visual - SÓ APARECE NO TREINAMENTO */}
+          {isTrainingMode && !hasResponded && (
             <div className="w-60 h-2 bg-gray-700 rounded-full overflow-hidden">
               <motion.div
                 className="h-full bg-red-500"

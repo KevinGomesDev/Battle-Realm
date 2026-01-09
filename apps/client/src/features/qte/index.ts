@@ -17,3 +17,8 @@ export {
   ChainQTEOverlay,
   default as ChainQTEOverlayDefault,
 } from "./components/ChainQTEOverlay";
+export {
+  CombatTraining,
+  generateRandomQTEConfig,
+  default as CombatTrainingDefault,
+} from "./components/CombatTraining";

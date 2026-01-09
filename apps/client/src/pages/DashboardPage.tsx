@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMatch } from "../features/match";
 import { useBattle } from "../features/battle";
-import { QTEOverlay } from "../features/qte";
-import type { QTEConfig } from "@boundless/shared/qte";
+import { CombatTraining } from "../features/qte";
 import { EventHistory } from "../features/events";
 import { ArenaSection } from "../features/arena";
 import {
@@ -88,26 +87,7 @@ const DashboardPage: React.FC = () => {
 
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
   const [isCharacterCreatorOpen, setIsCharacterCreatorOpen] = useState(false);
-  const [showQTEMock, setShowQTEMock] = useState(false);
-  const [qteKey, setQteKey] = useState(0); // Para resetar o QTE
-
-  // Mock QTE config para teste visual
-  const mockQTEConfig: QTEConfig | null = showQTEMock
-    ? {
-        qteId: `mock-qte-${qteKey}`,
-        actionType: "DODGE",
-        battleId: "mock-battle",
-        responderId: "mock-unit",
-        responderOwnerId: "mock-user",
-        attackerId: "mock-attacker",
-        duration: 2000,
-        shakeIntensity: 30,
-        hitZoneSize: 25,
-        perfectZoneSize: 8,
-        blockHitZoneSize: 35,
-        blockPerfectZoneSize: 12,
-      }
-    : null;
+  const [isCombatTrainingOpen, setIsCombatTrainingOpen] = useState(false);
 
   // Hooks para ações dos headers
   const kingdomActions = useKingdomSectionActions();
@@ -163,10 +143,10 @@ const DashboardPage: React.FC = () => {
                   <Button
                     variant="secondary"
                     size="xs"
-                    onClick={() => setShowQTEMock(true)}
-                    icon="⚡"
+                    onClick={() => setIsCombatTrainingOpen(true)}
+                    icon="⚔️"
                   >
-                    QTE
+                    Treino
                   </Button>
                   <CriarPersonagemBtn
                     onClick={() => setIsCharacterCreatorOpen(true)}
@@ -261,24 +241,10 @@ const DashboardPage: React.FC = () => {
         }}
       />
 
-      {/* === QTE OVERLAY MOCKADO (LOOP) === */}
-      <QTEOverlay
-        config={mockQTEConfig}
-        onResponse={(input, hitPosition) => {
-          console.log("[QTE Mock] Input:", input, "Position:", hitPosition);
-          // Loop: fecha e reabre após delay
-          setTimeout(() => {
-            setShowQTEMock(false);
-            setTimeout(() => {
-              setQteKey((k) => k + 1); // Novo ID para resetar
-              setShowQTEMock(true);
-            }, 500);
-          }, 1500);
-        }}
-        isResponder={true}
-        isVisualActive={showQTEMock}
-        responderName="Guerreiro"
-        attackerName="Orc Brutal"
+      {/* === TREINAMENTO DE COMBATE === */}
+      <CombatTraining
+        isOpen={isCombatTrainingOpen}
+        onClose={() => setIsCombatTrainingOpen(false)}
       />
     </div>
   );

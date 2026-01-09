@@ -1730,21 +1730,58 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       )}
 
       {/* QTE Overlay - Quick Time Event para ataques */}
-      {qteState.activeQTE && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="pointer-events-auto">
-            <QTEOverlay
-              config={qteState.activeQTE}
-              onResponse={respondToQTE}
-              isResponder={isQTEResponder}
-              isVisualActive={isQTEVisualActive}
-              responderName={qteResponderUnit?.name ?? "Unidade"}
-              attackerName={qteAttackerUnit?.name ?? "Inimigo"}
-              externalResult={qteState.result?.grade ?? null}
-            />
-          </div>
-        </div>
-      )}
+      {/* Modo inline: aparece sobre a unidade que está realizando o QTE */}
+      {qteState.activeQTE &&
+        (() => {
+          // Determinar qual unidade está fazendo o QTE atualmente
+          // Se é fase de ATTACK, mostrar sobre o atacante
+          // Se é fase de DODGE/BLOCK, mostrar sobre o defensor
+          const isAttackPhase = qteState.activeQTE.actionType === "ATTACK";
+          const qteUnitId = isAttackPhase
+            ? qteState.activeQTE.attackerId
+            : qteState.activeQTE.targetId;
+
+          // Obter posição na tela da unidade
+          const screenPos = qteUnitId
+            ? canvasRef.current?.getUnitScreenPosition(qteUnitId)
+            : null;
+
+          // Se conseguimos obter a posição, usar modo inline
+          // Caso contrário, fallback para modo modal
+          if (screenPos) {
+            return (
+              <QTEOverlay
+                config={qteState.activeQTE}
+                onResponse={respondToQTE}
+                isResponder={isQTEResponder}
+                isVisualActive={isQTEVisualActive}
+                responderName={qteResponderUnit?.name ?? "Unidade"}
+                attackerName={qteAttackerUnit?.name ?? "Inimigo"}
+                externalResult={qteState.result?.grade ?? null}
+                displayMode="inline"
+                position={screenPos}
+                size={100}
+              />
+            );
+          }
+
+          // Fallback: modo modal centralizado
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+              <div className="pointer-events-auto">
+                <QTEOverlay
+                  config={qteState.activeQTE}
+                  onResponse={respondToQTE}
+                  isResponder={isQTEResponder}
+                  isVisualActive={isQTEVisualActive}
+                  responderName={qteResponderUnit?.name ?? "Unidade"}
+                  attackerName={qteAttackerUnit?.name ?? "Inimigo"}
+                  externalResult={qteState.result?.grade ?? null}
+                />
+              </div>
+            </div>
+          );
+        })()}
 
       {/* Notificação de Turno (Início e Auto-End) */}
       <TurnNotification
