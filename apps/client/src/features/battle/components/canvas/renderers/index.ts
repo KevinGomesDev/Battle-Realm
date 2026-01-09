@@ -11,6 +11,8 @@ export {
   drawConditions,
   drawSpeechBubble,
   drawTurnIndicator,
+  type UnitCombatState,
+  type UnitAnimationState,
 } from "./unit.renderer";
 export { drawFogOfWar } from "./fog-of-war.renderer";
 export { drawTargetingPreview } from "./targeting.renderer";

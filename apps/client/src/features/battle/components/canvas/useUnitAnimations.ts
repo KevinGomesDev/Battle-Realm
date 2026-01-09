@@ -46,6 +46,8 @@ interface UseUnitAnimationsReturn {
   getSpriteAnimation: (unitId: string) => SpriteAnimation | null;
   /** Obtém o frame atual da animação de sprite */
   getSpriteFrame: (unitId: string) => number;
+  /** Obtém o tempo de início da animação de sprite ativa */
+  getSpriteAnimationStartTime: (unitId: string) => number;
   /** Verifica se uma unidade está se movendo */
   isMoving: (unitId: string) => boolean;
   /** Verifica se há animações em andamento */
@@ -198,6 +200,12 @@ export function useUnitAnimations(): UseUnitAnimationsReturn {
     return anim?.frameIndex ?? 0;
   }, []);
 
+  // Obter tempo de início da animação de sprite ativa
+  const getSpriteAnimationStartTime = useCallback((unitId: string): number => {
+    const anim = spriteAnimationsRef.current.get(unitId);
+    return anim?.startTime ?? 0;
+  }, []);
+
   // Verificar se unidade está se movendo
   const isMoving = useCallback((unitId: string): boolean => {
     return moveAnimationsRef.current.has(unitId);
@@ -216,6 +224,7 @@ export function useUnitAnimations(): UseUnitAnimationsReturn {
     startSpriteAnimation,
     getSpriteAnimation,
     getSpriteFrame,
+    getSpriteAnimationStartTime,
     isMoving,
     hasActiveAnimations,
     updateAnimations,

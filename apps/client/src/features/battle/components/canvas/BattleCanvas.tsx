@@ -56,6 +56,7 @@ import {
   drawAbilityAreaPreview,
   calculateAreaPreviewCenter,
   drawSingleTargetLine,
+  type UnitCombatState,
 } from "./renderers";
 
 // Components
@@ -142,6 +143,7 @@ export const BattleCanvas = memo(
         startSpriteAnimation,
         getSpriteAnimation,
         getSpriteFrame,
+        getSpriteAnimationStartTime,
         isMoving,
         hasActiveAnimations,
         updateAnimations,
@@ -475,6 +477,24 @@ export const BattleCanvas = memo(
             unitDirectionsRef.current.get(unit.id) ||
             (isOwned ? "right" : "left");
 
+          // Calcular estado de combate baseado na animação de sprite ativa
+          let combatState: UnitCombatState = "idle";
+          if (!unit.isAlive) {
+            combatState = "dead";
+          } else if (
+            activeSpriteAnim === "Sword_1" ||
+            activeSpriteAnim === "Sword_2" ||
+            activeSpriteAnim === "Bow" ||
+            activeSpriteAnim === "Staff"
+          ) {
+            combatState = "attacking";
+          } else if (activeSpriteAnim === "Damage") {
+            combatState = "damaged";
+          }
+
+          // Calcular HP percent
+          const hpPercent = unit.maxHp > 0 ? unit.currentHp / unit.maxHp : 1;
+
           // Desenhar unidade
           drawUnit({
             ctx,
@@ -489,6 +509,16 @@ export const BattleCanvas = memo(
             spritesLoaded,
             currentFrame,
             playerColors: getPlayerColors(unit.ownerId),
+            hpPercent,
+            animationState: {
+              combatState,
+              stateStartTime: getSpriteAnimationStartTime(unit.id),
+              offsetX: 0,
+              offsetY: 0,
+              scale: 1,
+              flashIntensity: 0,
+            },
+            animationTime: animationTimeRef.current,
           });
 
           // Condições
