@@ -20,10 +20,7 @@ import {
   logAIDecision,
   getAIUnits,
 } from "./ai-controller";
-import {
-  emitAttackHitEvent,
-  emitAttackDodgedEvent,
-} from "../../modules/combat/combat-events";
+import { emitAttackHitEvent } from "../../modules/combat/combat-events";
 
 // Delay padrão entre ações da IA (ms)
 const AI_ACTION_DELAY = 600;
@@ -57,9 +54,6 @@ export interface AIExecutionResult {
       targetMagicalProtection: number;
       defeated: boolean;
       missed: boolean;
-      dodged: boolean;
-      dodgeChance: number;
-      dodgeRoll: number;
     };
     skillUsed?: { casterId: string; skillCode: string; targetId: string };
   };
@@ -196,9 +190,6 @@ function executeAttack(
             result.targetMagicalProtection ?? target.magicalProtection,
           defeated: result.targetDefeated ?? false,
           missed: result.missed ?? false,
-          dodged: result.dodged ?? false,
-          dodgeChance: result.dodgeChance ?? 0,
-          dodgeRoll: result.dodgeRoll ?? 0,
         },
       },
     };
@@ -481,22 +472,11 @@ export async function executeFullAITurn(
             targetIcon: "🛡️",
             targetCombat: 0,
             targetSpeed: 0,
-            dodgeChance: attack.dodgeChance,
-            dodgeRoll: attack.dodgeRoll,
           });
 
           // Emitir eventos de combate para o log de batalha (com visibilidade)
           if (targetUnit) {
-            if (attack.missed && attack.dodged) {
-              emitAttackDodgedEvent(
-                battle.battleId,
-                unit,
-                targetUnit,
-                battle.units,
-                attack.dodgeChance,
-                attack.dodgeRoll
-              );
-            } else if (!attack.missed) {
+            if (!attack.missed) {
               emitAttackHitEvent(
                 battle.battleId,
                 unit,
@@ -511,8 +491,6 @@ export async function executeFullAITurn(
                   damageReduction: attack.damageReduction,
                   targetPhysicalProtection: attack.targetPhysicalProtection,
                   targetMagicalProtection: attack.targetMagicalProtection,
-                  dodgeChance: attack.dodgeChance,
-                  dodgeRoll: attack.dodgeRoll,
                 },
                 battle.units
               );

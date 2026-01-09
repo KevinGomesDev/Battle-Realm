@@ -13,7 +13,6 @@ export interface ConditionEffects {
   blockAllActions?: boolean;
 
   // === MODIFICADORES DE CHANCE ===
-  dodgeChance?: number;
   critChance?: number;
   missChance?: number;
 
@@ -136,7 +135,6 @@ export interface ConditionInfo {
  */
 export type ConditionId =
   | "GRAPPLED"
-  | "DODGING"
   | "DASHING"
   | "PROTECTED"
   | "STUNNED"

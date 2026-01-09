@@ -221,7 +221,6 @@ export const SEVERITY_COLORS = {
 export const CONDITION_COLORS = {
   // Condições de combate gerais
   GRAPPLED: "#845ef7",
-  DODGING: "#60a5fa",
   PROTECTED: "#60a5fa",
   STUNNED: "#ffd43b",
   FROZEN: "#74c0fc",

@@ -7,6 +7,7 @@ import { findAbilityByCode } from "@boundless/shared/data/abilities.data";
 import { executeSkill } from "../../../../abilities/executors";
 import { handleCommand } from "../../../../match/commands";
 import { createAndEmitEvent } from "../../../../match/services/event.service";
+import { emitAbilityExecutedEvent } from "../../../../combat/combat-events";
 import { processUnitDeath } from "../../../../combat/death-logic";
 import { schemaUnitToBattleUnit, syncUnitFromResult } from "./utils";
 import { getUserData, sendError } from "./types";
@@ -366,22 +367,16 @@ function handleUseAbility(
             },
           });
 
-          createAndEmitEvent({
-            context: "BATTLE",
-            scope: "GLOBAL",
-            category: "SKILL",
-            severity: "INFO",
-            battleId: roomId,
-            sourceUserId: casterSchema.ownerId,
-            message: dodgeResult.dodged
-              ? `${targetSchema.name} esquivou do ${ability.name}!`
-              : `${targetSchema.name} foi atingido pelo ${ability.name}!`,
-            code: "PROJECTILE_RESOLVED",
-            actorId: unitId,
-            actorName: casterSchema.name,
-            targetId: targetSchema.id,
-            targetName: targetSchema.name,
-          }).catch(console.error);
+          // Emitir evento detalhado do projétil resolvido
+          const targetUnit = allUnits.find((u) => u.id === targetSchema.id);
+          emitAbilityExecutedEvent(
+            roomId,
+            ability,
+            casterUnit,
+            targetUnit || null,
+            continuationResult,
+            allUnits
+          ).catch(console.error);
         } else {
           console.error(
             `[BattleRoom] Erro ao continuar projétil:`,
@@ -525,20 +520,15 @@ function handleUseAbility(
     },
   });
 
-  createAndEmitEvent({
-    context: "BATTLE",
-    scope: "GLOBAL",
-    category: "SKILL",
-    severity: "INFO",
-    battleId: roomId,
-    sourceUserId: unit.ownerId,
-    message: `${unit.name} usou ${ability.name}`,
-    code: "ABILITY_USED",
-    actorId: unitId,
-    actorName: unit.name,
-    targetId: target?.id,
-    targetName: target?.name,
-  }).catch((err) =>
+  // Emitir evento detalhado com todos os dados do resultado
+  emitAbilityExecutedEvent(
+    roomId,
+    ability,
+    casterUnit,
+    target,
+    result,
+    allUnits
+  ).catch((err) =>
     console.error("[BattleRoom] Erro ao criar evento de ability:", err)
   );
 }

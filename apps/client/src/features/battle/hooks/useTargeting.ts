@@ -131,7 +131,8 @@ export function useTargeting({
     // Fallback: criar pattern básico baseado na ability
     // ATTACK usa SINGLE com range = 1 + mod
     if (code === "ATTACK") {
-      const baseRange = Number(ability.rangeDistance ?? 1);
+      // Usar valor padrão 1 (targetingPattern já foi tratado acima)
+      const baseRange = 1;
       const finalRange = baseRange + attackRangeMod;
       return {
         ...PATTERNS.SINGLE,

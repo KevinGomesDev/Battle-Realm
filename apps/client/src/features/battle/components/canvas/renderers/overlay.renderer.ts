@@ -8,7 +8,12 @@ import type {
   BattleObstacleState,
 } from "@/services/colyseus.service";
 import type { TargetingPreview } from "@boundless/shared/utils/targeting.utils";
-import type { GridColors, Position, SpellAreaPreview } from "../types";
+import type {
+  GridColors,
+  Position,
+  SpellAreaPreview,
+  TeleportLinePreview,
+} from "../types";
 
 interface DrawFogOfWarParams {
   ctx: CanvasRenderingContext2D;
@@ -158,7 +163,7 @@ export function drawSpellRangeIndicator({
   gridColors,
 }: DrawSpellRangeIndicatorParams): void {
   if (
-    spellAreaPreview.rangeDistance === undefined ||
+    spellAreaPreview.maxRange === undefined ||
     !spellAreaPreview.casterPos ||
     spellAreaPreview.centerOnSelf
   ) {
@@ -167,7 +172,7 @@ export function drawSpellRangeIndicator({
 
   const casterX = spellAreaPreview.casterPos.x;
   const casterY = spellAreaPreview.casterPos.y;
-  const maxRange = spellAreaPreview.rangeDistance;
+  const maxRange = spellAreaPreview.maxRange;
 
   for (let gx = 0; gx < gridWidth; gx++) {
     for (let gy = 0; gy < gridHeight; gy++) {
@@ -219,7 +224,7 @@ export function drawSpellAreaPreview({
   // Verificar se a posição central está fora do alcance
   let isCenterOutOfRange = false;
   if (
-    spellAreaPreview.rangeDistance !== undefined &&
+    spellAreaPreview.maxRange !== undefined &&
     spellAreaPreview.casterPos &&
     hoveredCell
   ) {
@@ -229,7 +234,7 @@ export function drawSpellAreaPreview({
       Math.abs(hoveredCell.x - casterX),
       Math.abs(hoveredCell.y - casterY)
     );
-    isCenterOutOfRange = distanceToHover > spellAreaPreview.rangeDistance;
+    isCenterOutOfRange = distanceToHover > spellAreaPreview.maxRange;
   }
 
   // Desenhar área de efeito
@@ -286,7 +291,7 @@ export function drawSpellAreaPreview({
 }
 
 /**
- * Calcula o centro do preview de área (clamped ao rangeDistance)
+ * Calcula o centro do preview de área (clamped ao maxRange)
  */
 export function calculateAreaPreviewCenter(
   spellAreaPreview: SpellAreaPreview | null,
@@ -303,18 +308,15 @@ export function calculateAreaPreviewCenter(
   // Sem hover, não mostra preview
   if (!hoveredCell) return null;
 
-  // Se não tem rangeDistance definido, usa posição do mouse diretamente
-  if (
-    spellAreaPreview.rangeDistance === undefined ||
-    !spellAreaPreview.casterPos
-  ) {
+  // Se não tem maxRange definido, usa posição do mouse diretamente
+  if (spellAreaPreview.maxRange === undefined || !spellAreaPreview.casterPos) {
     return hoveredCell;
   }
 
   // Calcular distância do caster até o hover
   const casterX = spellAreaPreview.casterPos.x;
   const casterY = spellAreaPreview.casterPos.y;
-  const maxRange = spellAreaPreview.rangeDistance;
+  const maxRange = spellAreaPreview.maxRange;
 
   // Distância Chebyshev (8 direções)
   const distance = Math.max(
@@ -337,4 +339,134 @@ export function calculateAreaPreviewCenter(
   const clampedY = Math.round(casterY + dy * scale);
 
   return { x: clampedX, y: clampedY };
+}
+
+interface DrawTeleportLineParams {
+  ctx: CanvasRenderingContext2D;
+  teleportPreview: TeleportLinePreview;
+  hoveredCell: Position | null;
+  cellSize: number;
+  animationTime: number;
+  gridWidth: number;
+  gridHeight: number;
+}
+
+/**
+ * Desenha linha de preview para Teleport
+ * Mostra uma linha tracejada do caster até a posição alvo (limitada pelo maxRange)
+ */
+export function drawTeleportLine({
+  ctx,
+  teleportPreview,
+  hoveredCell,
+  cellSize,
+  animationTime,
+  gridWidth,
+  gridHeight,
+}: DrawTeleportLineParams): void {
+  if (!hoveredCell) return;
+
+  const { from, maxRange, color } = teleportPreview;
+
+  // Calcular centro da célula do caster
+  const startX = from.x * cellSize + cellSize / 2;
+  const startY = from.y * cellSize + cellSize / 2;
+
+  // Calcular distância até o hover
+  const dx = hoveredCell.x - from.x;
+  const dy = hoveredCell.y - from.y;
+  const distance = Math.max(Math.abs(dx), Math.abs(dy)); // Chebyshev
+
+  // Determinar posição final (clampada ao maxRange)
+  let targetPos: Position;
+  let isOutOfRange = false;
+
+  if (distance <= maxRange) {
+    targetPos = hoveredCell;
+  } else {
+    isOutOfRange = true;
+    // Clamp para o limite do alcance
+    const scale = maxRange / Math.max(Math.abs(dx), Math.abs(dy));
+    targetPos = {
+      x: Math.round(from.x + dx * scale),
+      y: Math.round(from.y + dy * scale),
+    };
+  }
+
+  // Verificar limites do grid
+  targetPos.x = Math.max(0, Math.min(gridWidth - 1, targetPos.x));
+  targetPos.y = Math.max(0, Math.min(gridHeight - 1, targetPos.y));
+
+  // Calcular centro da célula alvo
+  const endX = targetPos.x * cellSize + cellSize / 2;
+  const endY = targetPos.y * cellSize + cellSize / 2;
+
+  // Animação de dash offset para efeito de movimento
+  const dashOffset = (animationTime / 50) % 20;
+
+  // Configurar estilo da linha
+  ctx.save();
+
+  // Linha principal (tracejada)
+  ctx.setLineDash([10, 6]);
+  ctx.lineDashOffset = -dashOffset;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = isOutOfRange ? "rgba(239, 68, 68, 0.8)" : color;
+  ctx.lineCap = "round";
+
+  // Desenhar linha
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.lineTo(endX, endY);
+  ctx.stroke();
+
+  // Glow effect
+  ctx.setLineDash([10, 6]);
+  ctx.lineDashOffset = -dashOffset;
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = isOutOfRange
+    ? "rgba(239, 68, 68, 0.3)"
+    : color.replace("0.8", "0.3").replace(")", ", 0.3)");
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.lineTo(endX, endY);
+  ctx.stroke();
+
+  ctx.setLineDash([]);
+
+  // Desenhar círculo pulsante no destino
+  const pulse = Math.sin(animationTime / 150) * 0.3 + 0.7;
+  const circleRadius = cellSize * 0.35 * pulse;
+
+  // Círculo externo (glow)
+  ctx.beginPath();
+  ctx.arc(endX, endY, circleRadius + 4, 0, Math.PI * 2);
+  ctx.fillStyle = isOutOfRange
+    ? "rgba(239, 68, 68, 0.2)"
+    : color.replace("0.8", "0.2").replace(")", ", 0.2)");
+  ctx.fill();
+
+  // Círculo interno
+  ctx.beginPath();
+  ctx.arc(endX, endY, circleRadius, 0, Math.PI * 2);
+  ctx.strokeStyle = isOutOfRange ? "rgba(239, 68, 68, 0.9)" : color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Ícone de teleport no centro (cruz com círculo)
+  const iconSize = cellSize * 0.15;
+  ctx.strokeStyle = isOutOfRange
+    ? "rgba(255, 255, 255, 0.7)"
+    : "rgba(255, 255, 255, 0.9)";
+  ctx.lineWidth = 2;
+
+  // Cruz
+  ctx.beginPath();
+  ctx.moveTo(endX - iconSize, endY);
+  ctx.lineTo(endX + iconSize, endY);
+  ctx.moveTo(endX, endY - iconSize);
+  ctx.lineTo(endX, endY + iconSize);
+  ctx.stroke();
+
+  ctx.restore();
 }

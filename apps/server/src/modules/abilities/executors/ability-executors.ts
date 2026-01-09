@@ -72,7 +72,8 @@ export function executeSkill(
     return { success: false, error: "Skill não possui executor definido" };
   }
 
-  const executor = SKILL_EXECUTORS[skill.functionName];
+  // Usar ALL_ABILITY_EXECUTORS para incluir skills E spells (ex: TELEPORT)
+  const executor = getAbilityExecutor(skill.functionName);
   if (!executor) {
     return {
       success: false,

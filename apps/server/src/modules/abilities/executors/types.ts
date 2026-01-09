@@ -106,8 +106,6 @@ export interface AttackActionResult {
   obstacleDestroyed?: boolean;
   obstacleId?: string;
   attacksLeftThisTurn?: number;
-  dodgeChance?: number;
-  dodgeRoll?: number;
   damageTransferredToEidolon?: boolean;
   eidolonDefeated?: boolean;
   killedSummonIds?: string[];

@@ -510,7 +510,8 @@ export class BattleRoom extends Room<BattleSessionState> {
       (x, y) => isValidPosition(this.state, x, y),
       (attacker, target, qteResult) =>
         this.executeAttackInternal(attacker, target, qteResult),
-      () => this.advanceToNextUnitInternal()
+      () => this.advanceToNextUnitInternal(),
+      this.roomId
     );
   }
 

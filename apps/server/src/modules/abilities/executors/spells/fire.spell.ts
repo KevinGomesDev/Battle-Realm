@@ -142,46 +142,12 @@ export function executeFire(
 
   // Aplicar dano a cada unidade na área
   const targetIds: string[] = [];
-  const dodgeResults: AbilityExecutionResult["dodgeResults"] = [];
   const affectedUnits: AbilityExecutionResult["affectedUnits"] = [];
   let totalDamage = 0;
   let totalRawDamage = 0;
   let totalDamageReduction = 0;
 
   for (const targetUnit of targetsInArea) {
-    // Sistema de esquiva simples para unidades NA ÁREA (não interceptadores)
-    // Unidades que já passaram pelo QTE não rolam esquiva novamente
-    const wasQTETarget =
-      forcedImpactPoint &&
-      targetUnit.posX === forcedImpactPoint.x &&
-      targetUnit.posY === forcedImpactPoint.y;
-
-    let dodged = false;
-    let dodgeChance = 0;
-    let dodgeRoll = 0;
-
-    if (!wasQTETarget) {
-      // Esquiva simples (Speed × 3%) para unidades na área de explosão
-      dodgeChance = targetUnit.speed * 3;
-      dodgeRoll = Math.floor(Math.random() * 100) + 1;
-      dodged = dodgeRoll <= dodgeChance;
-    }
-
-    dodgeResults.push({
-      targetId: targetUnit.id,
-      targetName: targetUnit.name,
-      dodged,
-      dodgeChance,
-      dodgeRoll,
-    });
-
-    if (dodged) {
-      console.log(
-        `🌀 ${targetUnit.name} esquivou do Fogo! (${dodgeRoll} <= ${dodgeChance}%)`
-      );
-      continue;
-    }
-
     // Dano base
     let baseDamage = resolveSpellValue(spell.baseDamage, caster, caster.focus);
 
@@ -241,7 +207,6 @@ export function executeFire(
     rawDamage: totalRawDamage,
     damageReduction: totalDamageReduction,
     targetIds,
-    dodgeResults,
     affectedUnits,
     metadata: {
       impactPoint,

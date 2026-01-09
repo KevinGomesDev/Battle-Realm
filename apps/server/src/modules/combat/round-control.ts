@@ -72,7 +72,7 @@ export interface ExhaustionCheckResult {
  * Isso inclui:
  * - Dano de condições como QUEIMANDO (BURNING)
  * - Remoção de condições que expiram em "end_of_turn"
- * - Remoção de condições temporárias como DERRUBADA (knocked down) e DODGING
+ * - Remoção de condições temporárias como DERRUBADA (knocked down)
  */
 export function processUnitTurnEndConditions(unit: BattleUnit): TurnEndResult {
   let damageFromConditions = 0;
@@ -96,7 +96,7 @@ export function processUnitTurnEndConditions(unit: BattleUnit): TurnEndResult {
   }
 
   // 2. Remover condições específicas que sempre saem no fim do turno
-  const alwaysRemoveAtTurnEnd = ["DERRUBADA", "DODGING"];
+  const alwaysRemoveAtTurnEnd = ["DERRUBADA"];
   for (const condId of alwaysRemoveAtTurnEnd) {
     if (
       unit.conditions.includes(condId) &&

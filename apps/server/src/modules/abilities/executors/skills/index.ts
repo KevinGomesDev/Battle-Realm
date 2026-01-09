@@ -10,7 +10,6 @@ export {
   executeAttackFromQTEResult,
 } from "./attack.skill";
 export { executeDash } from "./dash.skill";
-export { executeDodge } from "./dodge.skill";
 
 // === Warrior ===
 export { executeSecondWind } from "./second-wind.skill";

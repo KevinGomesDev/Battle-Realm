@@ -85,15 +85,13 @@ export function getAbilityMaxRange(
   ability: AbilityDefinition,
   caster: BattleUnit
 ): number {
-  // Mapear range legado (ADJACENT -> MELEE)
-  const normalizedRange = mapLegacyRange(ability.range || "MELEE");
-
-  // Se ability tem rangeDistance definido, usar valor dinâmico
-  if (ability.rangeDistance !== undefined) {
-    return resolveDynamicValue(ability.rangeDistance, caster);
+  // 1. Fonte de verdade: targetingPattern.maxRange
+  if (ability.targetingPattern?.maxRange !== undefined) {
+    return resolveDynamicValue(ability.targetingPattern.maxRange, caster);
   }
 
-  // Fallback para valores padrão baseado no tipo de range
+  // 2. Fallback final: valor padrão baseado no tipo de range
+  const normalizedRange = mapLegacyRange(ability.range || "MELEE");
   return DEFAULT_RANGE_DISTANCE[normalizedRange];
 }
 

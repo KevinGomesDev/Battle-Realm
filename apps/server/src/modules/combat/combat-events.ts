@@ -11,11 +11,256 @@ import {
 import { EVENT_CODES } from "@boundless/shared/types/events.types";
 import type { AttackActionResult } from "../abilities/executors";
 import type { MoveActionResult } from "./movement-actions";
-import type { AbilityExecutionResult as SpellExecutionResult } from "@boundless/shared/types/ability.types";
+import type {
+  AbilityExecutionResult,
+  AbilityDefinition,
+} from "@boundless/shared/types/ability.types";
 import { BattleUnit } from "@boundless/shared/types/battle.types";
+import { getConditionInfo } from "@boundless/shared/data/conditions.data";
+
+// Alias para compatibilidade
+type SpellExecutionResult = AbilityExecutionResult;
 
 // =============================================================================
-// EVENTOS DE SKILL
+// EVENTOS GENÉRICOS DE ABILITY
+// =============================================================================
+
+/**
+ * Determina a severidade do evento baseado no resultado
+ */
+function getSeverityFromResult(
+  result: AbilityExecutionResult
+): "INFO" | "SUCCESS" | "WARNING" | "DANGER" | "NEUTRAL" {
+  // Se causou dano ou derrotou alvo
+  if (result.damageDealt && result.damageDealt > 0) return "DANGER";
+  if (result.targetDefeated) return "DANGER";
+  if (result.affectedUnits?.some((u) => u.damage > 0)) return "DANGER";
+
+  // Se curou ou ganhou recursos
+  if (result.healAmount && result.healAmount > 0) return "SUCCESS";
+  if (result.movementGained && result.movementGained > 0) return "SUCCESS";
+  if (result.actionsGained && result.actionsGained > 0) return "SUCCESS";
+
+  // Se aplicou condição
+  if (
+    result.conditionApplied ||
+    (result.conditionsApplied && result.conditionsApplied.length > 0)
+  ) {
+    return "WARNING";
+  }
+
+  return "INFO";
+}
+
+/**
+ * Constrói uma mensagem detalhada baseada no resultado da ability
+ */
+function buildAbilityResultMessage(
+  ability: AbilityDefinition,
+  caster: BattleUnit,
+  target: BattleUnit | null,
+  result: AbilityExecutionResult
+): string {
+  const parts: string[] = [];
+
+  // Ícone baseado no tipo de efeito
+  const icon =
+    ability.effectType === "OFFENSIVE"
+      ? "⚔️"
+      : ability.effectType === "DEFENSIVE"
+      ? "🛡️"
+      : ability.effectType === "HEALING"
+      ? "💚"
+      : "⚡";
+
+  // Mensagem principal
+  parts.push(`${icon} ${caster.name} usou ${ability.name}`);
+
+  // Alvo (se houver)
+  if (target) {
+    parts.push(`em ${target.name}`);
+  }
+
+  // Construir detalhes entre colchetes
+  const details: string[] = [];
+
+  // Dano
+  if (result.damageDealt !== undefined && result.damageDealt > 0) {
+    if (result.damageReduction && result.damageReduction > 0) {
+      const raw = result.rawDamage ?? result.damageDealt;
+      details.push(
+        `${raw} - ${result.damageReduction} redução = ${result.damageDealt} dano`
+      );
+    } else {
+      details.push(`${result.damageDealt} dano`);
+    }
+  }
+
+  // Cura
+  if (result.healAmount && result.healAmount > 0) {
+    details.push(`+${result.healAmount} HP`);
+  }
+
+  // Movimento ganho
+  if (result.movementGained && result.movementGained > 0) {
+    details.push(`+${result.movementGained} movimento`);
+  }
+
+  // Ações ganhas
+  if (result.actionsGained && result.actionsGained > 0) {
+    details.push(`+${result.actionsGained} ação`);
+  }
+
+  // Condições aplicadas
+  if (result.conditionApplied) {
+    const condInfo = getConditionInfo(result.conditionApplied);
+    details.push(`aplicou ${condInfo.name}`);
+  } else if (result.conditionsApplied && result.conditionsApplied.length > 0) {
+    const uniqueConditions = [
+      ...new Set(result.conditionsApplied.map((c) => c.conditionId)),
+    ];
+    const names = uniqueConditions.map((id) => getConditionInfo(id).name);
+    details.push(`aplicou ${names.join(", ")}`);
+  }
+
+  // Condições removidas
+  if (result.conditionRemoved) {
+    const condInfo = getConditionInfo(result.conditionRemoved);
+    details.push(`removeu ${condInfo.name}`);
+  } else if (result.conditionsRemoved && result.conditionsRemoved.length > 0) {
+    const uniqueConditions = [
+      ...new Set(result.conditionsRemoved.map((c) => c.conditionId)),
+    ];
+    const names = uniqueConditions.map((id) => getConditionInfo(id).name);
+    details.push(`removeu ${names.join(", ")}`);
+  }
+
+  // Teleporte/Movimento forçado
+  if (result.newPosX !== undefined && result.newPosY !== undefined) {
+    details.push(`moveu para (${result.newPosX}, ${result.newPosY})`);
+  }
+
+  // Unidades afetadas por área
+  if (result.affectedUnits && result.affectedUnits.length > 0) {
+    const totalDamage = result.affectedUnits.reduce(
+      (sum, u) => sum + u.damage,
+      0
+    );
+    const defeated = result.affectedUnits.filter((u) => u.defeated).length;
+    if (totalDamage > 0) {
+      details.push(
+        `${totalDamage} dano total em ${result.affectedUnits.length} alvos`
+      );
+    }
+    if (defeated > 0) {
+      details.push(`${defeated} derrotado(s)`);
+    }
+  }
+
+  // Alvo derrotado (single target)
+  if (result.targetDefeated && target) {
+    details.push(`${target.name} derrotado!`);
+  }
+
+  // Obstáculo destruído
+  if (result.obstacleDestroyed) {
+    details.push("obstáculo destruído");
+  }
+
+  // Construir mensagem final
+  let message = parts.join(" ");
+  if (details.length > 0) {
+    message += ` [${details.join(" | ")}]`;
+  }
+  message += "!";
+
+  return message;
+}
+
+/**
+ * Emite evento detalhado quando uma ability é executada com sucesso
+ * @param battleId - ID da batalha
+ * @param ability - Definição da ability executada
+ * @param caster - Unidade que executou
+ * @param target - Alvo (se houver)
+ * @param result - Resultado da execução
+ * @param allUnits - Todas as unidades (para calcular visibilidade)
+ */
+export async function emitAbilityExecutedEvent(
+  battleId: string,
+  ability: AbilityDefinition,
+  caster: BattleUnit,
+  target: BattleUnit | null,
+  result: AbilityExecutionResult,
+  allUnits?: BattleUnit[]
+): Promise<void> {
+  // Construir mensagem detalhada
+  const message = buildAbilityResultMessage(ability, caster, target, result);
+  const severity = getSeverityFromResult(result);
+
+  // Calcular visibilidade
+  const positions: Array<{ x: number; y: number }> = [
+    { x: caster.posX, y: caster.posY },
+  ];
+  const alwaysInclude: string[] = [caster.ownerId];
+
+  if (target) {
+    positions.push({ x: target.posX, y: target.posY });
+    if (!alwaysInclude.includes(target.ownerId)) {
+      alwaysInclude.push(target.ownerId);
+    }
+  }
+
+  // Adicionar posições de unidades afetadas
+  if (result.affectedUnits && allUnits) {
+    for (const affected of result.affectedUnits) {
+      const unit = allUnits.find((u) => u.id === affected.unitId);
+      if (unit) {
+        positions.push({ x: unit.posX, y: unit.posY });
+        if (!alwaysInclude.includes(unit.ownerId)) {
+          alwaysInclude.push(unit.ownerId);
+        }
+      }
+    }
+  }
+
+  // Adicionar posição de teleporte
+  if (result.newPosX !== undefined && result.newPosY !== undefined) {
+    positions.push({ x: result.newPosX, y: result.newPosY });
+  }
+
+  const visibility = allUnits
+    ? { allUnits, positions, alwaysInclude }
+    : undefined;
+
+  // Determinar categoria baseada no tipo de ability
+  const category = ability.category === "SPELL" ? "SKILL" : "SKILL";
+
+  await createSkillEvent({
+    battleId,
+    code:
+      ability.category === "SPELL"
+        ? EVENT_CODES.SPELL_CAST
+        : EVENT_CODES.SKILL_USED,
+    message,
+    severity,
+    actorId: caster.id,
+    actorName: caster.name,
+    targetId: target?.id,
+    targetName: target?.name,
+    data: {
+      abilityCode: ability.code,
+      abilityName: ability.name,
+      abilityCategory: ability.category,
+      effectType: ability.effectType,
+      ...result,
+    },
+    visibility,
+  });
+}
+
+// =============================================================================
+// EVENTOS DE SKILL (Legado - mantido para compatibilidade)
 // =============================================================================
 
 /** Dados adicionais para evento de skill */
@@ -25,9 +270,6 @@ interface SkillEventData {
   rawDamage?: number;
   damageReduction?: number;
   conditionApplied?: string;
-  dodgeChance?: number;
-  dodgeRoll?: number;
-  dodged?: boolean;
 }
 
 /**
@@ -64,15 +306,6 @@ export async function emitSkillUsedEvent(
   }
   if (data?.conditionApplied) {
     message += ` [aplicou ${data.conditionApplied}]`;
-  }
-
-  // Adicionar info de esquiva se houver
-  if (data?.dodgeChance !== undefined && data?.dodgeRoll !== undefined) {
-    if (data.dodged) {
-      message += ` (🎲 ${data.dodgeRoll} <= ${data.dodgeChance}% - ESQUIVOU)`;
-    } else {
-      message += ` (🎲 ${data.dodgeRoll} vs ${data.dodgeChance}%)`;
-    }
   }
 
   message += "!";
@@ -148,30 +381,6 @@ export async function emitSpellCastEvent(
     }
   }
 
-  // Adicionar detalhes de esquiva
-  if (result.dodgeResults && result.dodgeResults.length > 0) {
-    const dodged = result.dodgeResults.filter((d) => d.dodged);
-    const hit = result.dodgeResults.filter((d) => !d.dodged);
-
-    if (dodged.length > 0 && hit.length > 0) {
-      // Alguns esquivaram, alguns foram atingidos
-      const dodgedNames = dodged
-        .map((d) => `${d.targetName} (🎲${d.dodgeRoll}≤${d.dodgeChance}%)`)
-        .join(", ");
-      message += ` | Esquivaram: ${dodgedNames}`;
-    } else if (dodged.length > 0) {
-      // Todos esquivaram
-      const dodgedInfo = dodged
-        .map((d) => `${d.targetName} (🎲${d.dodgeRoll}≤${d.dodgeChance}%)`)
-        .join(", ");
-      message += ` | TODOS ESQUIVARAM: ${dodgedInfo}`;
-    } else if (hit.length === 1) {
-      // Apenas um alvo e foi atingido
-      const h = hit[0];
-      message += ` (🎲 ${h.dodgeRoll} vs ${h.dodgeChance}%)`;
-    }
-  }
-
   // Condições aplicadas
   if (result.conditionsApplied && result.conditionsApplied.length > 0) {
     const conditionIds = [
@@ -210,7 +419,7 @@ export async function emitSpellCastEvent(
       rawDamage: result.rawDamage,
       damageReduction: result.damageReduction,
       targetIds: result.targetIds,
-      dodgeResults: result.dodgeResults,
+      dodgeResults: (result as any).dodgeResults,
       conditionsApplied: result.conditionsApplied,
     },
     visibility,
@@ -255,11 +464,6 @@ export async function emitAttackHitEvent(
     detailMessage += ` [${result.finalDamage} dano]`;
   }
 
-  // Info de esquiva (caso não tenha esquivado mas rolou)
-  if (result.dodgeChance !== undefined && result.dodgeRoll !== undefined) {
-    detailMessage += ` (🎲 ${result.dodgeRoll} vs ${result.dodgeChance}% esquiva)`;
-  }
-
   await createCombatEvent({
     battleId,
     code: EVENT_CODES.ATTACK_HIT,
@@ -277,8 +481,6 @@ export async function emitAttackHitEvent(
       targetHpAfter: result.targetHpAfter,
       targetPhysicalProtection: result.targetPhysicalProtection,
       targetMagicalProtection: result.targetMagicalProtection,
-      dodgeChance: result.dodgeChance,
-      dodgeRoll: result.dodgeRoll,
     },
     visibility,
   });
@@ -297,55 +499,6 @@ export async function emitAttackHitEvent(
       visibility,
     });
   }
-}
-
-/**
- * Emite evento quando ataque erra (dodge)
- * @param allUnits - Se fornecido, emite apenas para jogadores com visão do atacante/alvo
- * @param dodgeChance - Chance de esquiva do alvo
- * @param dodgeRoll - Resultado do dado de esquiva
- */
-export async function emitAttackDodgedEvent(
-  battleId: string,
-  attacker: BattleUnit,
-  target: BattleUnit,
-  allUnits?: BattleUnit[],
-  dodgeChance?: number,
-  dodgeRoll?: number
-): Promise<void> {
-  // Calcular visibilidade se unidades foram fornecidas
-  const visibility = allUnits
-    ? {
-        allUnits,
-        positions: [
-          { x: attacker.posX, y: attacker.posY },
-          { x: target.posX, y: target.posY },
-        ],
-        alwaysInclude: [attacker.ownerId, target.ownerId],
-      }
-    : undefined;
-
-  // Construir mensagem detalhada
-  let detailMessage = `💨 ${target.name} esquivou do ataque de ${attacker.name}!`;
-  if (dodgeChance !== undefined && dodgeRoll !== undefined) {
-    detailMessage += ` (🎲 ${dodgeRoll} <= ${dodgeChance}%)`;
-  }
-
-  await createCombatEvent({
-    battleId,
-    code: EVENT_CODES.ATTACK_DODGED,
-    message: detailMessage,
-    severity: "SUCCESS",
-    actorId: attacker.id,
-    actorName: attacker.name,
-    targetId: target.id,
-    targetName: target.name,
-    data: {
-      dodgeChance,
-      dodgeRoll,
-    },
-    visibility,
-  });
 }
 
 /**

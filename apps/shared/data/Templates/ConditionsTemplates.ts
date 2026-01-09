@@ -21,18 +21,6 @@ export const COMBAT_CONDITIONS: Record<string, ConditionDefinition> = {
     },
   },
 
-  DODGING: {
-    id: "DODGING",
-    name: "Esquivando",
-    description: "Postura defensiva. Ataques têm 50% de chance de errar.",
-    expiry: "next_turn",
-    icon: "🌀",
-    color: "#60a5fa",
-    effects: {
-      dodgeChance: 50,
-    },
-  },
-
   DASHING: {
     id: "DASHING",
     name: "Disparada",
@@ -535,7 +523,6 @@ export const SPELL_CONDITIONS: Record<string, ConditionDefinition> = {
     effects: {
       bonusDamage: 2,
       movementMod: 2,
-      dodgeChance: 10,
     },
   },
 
@@ -550,7 +537,6 @@ export const SPELL_CONDITIONS: Record<string, ConditionDefinition> = {
     effects: {
       bonusDamage: -2,
       movementMod: -2,
-      dodgeChance: -10,
     },
   },
 };

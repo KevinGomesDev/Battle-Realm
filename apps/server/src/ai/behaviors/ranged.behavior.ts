@@ -79,11 +79,16 @@ export function makeRangedDecision(
     if (spellDecision) return spellDecision;
 
     // 3. Tentar usar skill ranged
-    const rangedSkills = availableSkills.filter(
-      (s) =>
-        s.range === "RANGED" ||
-        (s.rangeDistance && resolveDynamicValue(s.rangeDistance, unit) > 1)
-    );
+    const rangedSkills = availableSkills.filter((s) => {
+      // Usar targetingPattern.maxRange como fonte de verdade
+      const maxRange =
+        s.targetingPattern?.maxRange !== undefined
+          ? typeof s.targetingPattern.maxRange === "number"
+            ? s.targetingPattern.maxRange
+            : resolveDynamicValue(s.targetingPattern.maxRange, unit)
+          : 0;
+      return s.range === "RANGED" || maxRange > 1;
+    });
 
     if (rangedSkills.length > 0) {
       const skillEval = selectBestSkill(unit, rangedSkills, units, profile);

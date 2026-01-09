@@ -16,11 +16,7 @@ import type {
   QTEResultForExecutor,
 } from "../types";
 import { isWithinRange } from "@boundless/shared/utils/distance.utils";
-import {
-  OBSTACLE_CONFIG,
-  DEFENSE_CONFIG,
-  type DamageTypeName,
-} from "@boundless/shared/config";
+import { OBSTACLE_CONFIG, type DamageTypeName } from "@boundless/shared/config";
 import {
   shouldTransferDamageToEidolon,
   transferDamageToEidolon,
@@ -38,9 +34,9 @@ import { applyDamage } from "../../../combat/damage.utils";
 /**
  * ATTACK: Ataque corpo-a-corpo unificado
  * Pode atacar: unidade viva, cadáver (unidade morta) ou obstáculo
- * NOVO SISTEMA SEM DADOS:
+ * SISTEMA SIMPLIFICADO:
  * - Dano = Combat + bônus de condições
- * - Esquiva = 1D100 vs Speed × dodgeMultiplier (máximo maxDodgeChance)
+ * - Sem sistema de esquiva por rolagem (QTE é usado para jogadores)
  */
 export function executeAttack(
   attacker: BattleUnit,
@@ -209,45 +205,12 @@ export function executeAttack(
   // Varredura de condições do alvo
   const targetScan = scanConditionsForAction(target.conditions, "ATTACK");
 
-  // === SISTEMA DE ESQUIVA (1D100) ===
-  // Chance = Speed × dodgeMultiplier + bônus de condições (cap: maxDodgeChance)
-  const baseDodgeChance =
-    target.speed * DEFENSE_CONFIG.dodgeMultiplier +
-    (targetScan.modifiers.dodgeChance || 0);
-  const dodgeChance = Math.min(baseDodgeChance, DEFENSE_CONFIG.maxDodgeChance);
-  const dodgeRoll = Math.floor(Math.random() * 100) + 1; // 1-100
-
-  if (dodgeRoll <= dodgeChance) {
-    // Alvo esquivou!
-    attacker.conditions = applyConditionScanResult(
-      attacker.conditions,
-      attackerScan
-    );
-    return {
-      success: true,
-      missed: true,
-      dodged: true,
-      targetType: "unit",
-      rawDamage: 0,
-      damageReduction: 0,
-      finalDamage: 0,
-      damageType: effectiveDamageType,
-      targetHpAfter: target.currentHp,
-      targetPhysicalProtection: target.physicalProtection,
-      targetMagicalProtection: target.magicalProtection,
-      targetDefeated: false,
-      attacksLeftThisTurn: attacker.attacksLeftThisTurn,
-      dodgeChance,
-      dodgeRoll,
-    };
-  }
-
   // === APLICAR DANO ===
-  // Redução de dano apenas por condições (não mais por dados)
+  // Redução de dano apenas por condições
   const damageReduction = targetScan.modifiers.damageReduction || 0;
   const damageToApply = Math.max(0, rawDamage - damageReduction);
 
-  console.log("[COMBAT] Aplicando dano (novo sistema):", {
+  console.log("[COMBAT] Aplicando dano:", {
     targetName: target.name,
     targetRace: target.race,
     targetConditions: target.conditions,
@@ -255,8 +218,6 @@ export function executeAttack(
     damageReduction,
     damageToApply,
     damageType: effectiveDamageType,
-    dodgeChance,
-    dodgeRoll,
   });
 
   // === VERIFICAR TRANSFERÊNCIA DE DANO PARA EIDOLON ===
@@ -303,8 +264,6 @@ export function executeAttack(
       targetMagicalProtection: target.magicalProtection,
       targetDefeated: false,
       attacksLeftThisTurn: attacker.attacksLeftThisTurn,
-      dodgeChance,
-      dodgeRoll,
       damageTransferredToEidolon: true,
       eidolonDefeated,
     };
@@ -356,8 +315,6 @@ export function executeAttack(
     targetMagicalProtection: target.magicalProtection,
     targetDefeated,
     attacksLeftThisTurn: attacker.attacksLeftThisTurn,
-    dodgeChance,
-    dodgeRoll,
     killedSummonIds: killedSummons.map((s) => s.id),
   };
 }

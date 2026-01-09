@@ -710,28 +710,68 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     : undefined;
 
   // Preview de área para abilities de área
+  // Usa targetingPattern.coordinates para calcular área
   const areaPreview = useMemo(() => {
     if (!pendingAbility || !selectedUnit) return null;
 
     const { ability } = pendingAbility;
-    if (!ability.areaSize) return null;
+    const pattern = ability.targetingPattern;
+
+    // Verificar se tem pattern com coordenadas (área)
+    if (!pattern || !pattern.coordinates || pattern.coordinates.length === 0) {
+      return null;
+    }
 
     const casterPos = { x: selectedUnit.posX, y: selectedUnit.posY };
 
-    // Resolver rangeDistance dinamicamente
-    const rangeDistance = ability.rangeDistance
-      ? resolveDynamicValue(ability.rangeDistance, selectedUnit)
+    // Calcular tamanho da área baseado nas coordenadas do pattern
+    const maxOffset = pattern.coordinates.reduce((max, coord) => {
+      return Math.max(max, Math.abs(coord.x), Math.abs(coord.y));
+    }, 0);
+    const size = maxOffset * 2 + 1; // Converter offset para tamanho (ex: offset 1 = 3x3)
+
+    // Resolver maxRange do pattern
+    const maxRange = pattern.maxRange
+      ? resolveDynamicValue(pattern.maxRange, selectedUnit)
       : undefined;
 
     return {
-      size:
-        typeof ability.areaSize === "number"
-          ? ability.areaSize
-          : resolveDynamicValue(ability.areaSize, selectedUnit),
+      size,
       color: ability.color || "#4ade80",
       centerOnSelf: ability.range === "SELF",
-      rangeDistance,
+      maxRange,
       casterPos,
+    };
+  }, [pendingAbility, selectedUnit]);
+
+  // Preview de linha para abilities com PATTERNS.SINGLE (alvo único a distância)
+  // Mostra linha do caster até o alvo, limitada pelo maxRange
+  const singleTargetLinePreview = useMemo(() => {
+    if (!pendingAbility || !selectedUnit) return null;
+
+    const { ability } = pendingAbility;
+    const pattern = ability.targetingPattern;
+
+    // Verificar se é um pattern SINGLE (uma única coordenada em {0,0})
+    const isSinglePattern =
+      pattern?.coordinates?.length === 1 &&
+      pattern.coordinates[0].x === 0 &&
+      pattern.coordinates[0].y === 0;
+
+    if (!isSinglePattern) return null;
+
+    // Verificar se tem maxRange > 1 (para mostrar linha apenas em habilidades à distância)
+    const maxRange = pattern?.maxRange
+      ? resolveDynamicValue(pattern.maxRange, selectedUnit)
+      : 1;
+
+    // Não mostrar linha para melee (range 1)
+    if (maxRange <= 1) return null;
+
+    return {
+      from: { x: selectedUnit.posX, y: selectedUnit.posY },
+      maxRange,
+      color: ability.color || "rgba(0, 255, 255, 0.8)",
     };
   }, [pendingAbility, selectedUnit]);
 
@@ -925,10 +965,14 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     // Se há uma ability de área pendente (targetType: POSITION/GROUND), tratar como clique de célula
     if (pendingAbility && selectedUnit && isMyTurn) {
       const ability = pendingAbility.ability;
+      const hasAreaPattern =
+        ability.targetingPattern?.coordinates &&
+        ability.targetingPattern.coordinates.length > 1;
+
       if (
         (ability.targetType === "POSITION" ||
           ability.targetType === "GROUND") &&
-        ability.areaSize
+        hasAreaPattern
       ) {
         console.log(
           "%c[BattleView] 🔮 Ability de área: delegando para handleCellClick",
@@ -943,7 +987,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       }
 
       // Skills de área com range: AREA
-      if (ability.range === "AREA" && ability.areaSize) {
+      if (ability.range === "AREA" && hasAreaPattern) {
         console.log(
           "%c[BattleView] ✨ Ability de área: delegando para handleCellClick",
           "color: #fbbf24;",
@@ -1264,14 +1308,16 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
         return;
       }
 
-      // Skills de área (range: AREA com areaSize)
-      if (ability?.range === "AREA" && ability.areaSize) {
+      // Skills de área (range: AREA com targetingPattern.coordinates)
+      const hasAreaCoordinates =
+        ability?.targetingPattern?.coordinates &&
+        ability.targetingPattern.coordinates.length > 1;
+      if (ability?.range === "AREA" && hasAreaCoordinates) {
         // Verificar se está dentro do alcance
         const distance =
           Math.abs(x - selectedUnit.posX) + Math.abs(y - selectedUnit.posY);
-        // Usar rangeDistance se disponível, senão padrão 4
-        const maxRange = ability.rangeDistance
-          ? resolveDynamicValue(ability.rangeDistance, selectedUnit)
+        const maxRange = ability.targetingPattern?.maxRange
+          ? resolveDynamicValue(ability.targetingPattern.maxRange, selectedUnit)
           : 4;
 
         if (distance <= maxRange) {
@@ -1469,6 +1515,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           activeBubbles={activeBubbles}
           spellAreaPreview={areaPreview}
           targetingPreview={targetingPreview}
+          teleportLinePreview={singleTargetLinePreview}
         />
 
         {/* BattleHeader - Overlay na parte superior (dentro do Canvas) */}

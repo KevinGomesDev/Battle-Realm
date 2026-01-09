@@ -75,16 +75,6 @@ export const EFFECT_METADATA: Partial<
   },
 
   // === MODIFICADORES DE CHANCE ===
-  dodgeChance: {
-    name: "Esquiva",
-    icon: "🌀",
-    description: "Chance de evitar ataques",
-    color: "#22d3ee",
-    category: "defense",
-    valueSuffix: "%",
-    valuePrefix: "+",
-    negativeIsBad: true,
-  },
   critChance: {
     name: "Crítico",
     icon: "💥",

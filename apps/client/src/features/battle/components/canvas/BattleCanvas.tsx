@@ -55,6 +55,7 @@ import {
   drawSpellRangeIndicator,
   drawSpellAreaPreview,
   calculateAreaPreviewCenter,
+  drawTeleportLine,
 } from "./renderers";
 
 // Components
@@ -95,6 +96,7 @@ export const BattleCanvas = memo(
         activeBubbles,
         spellAreaPreview,
         targetingPreview,
+        teleportLinePreview,
       },
       ref
     ) => {
@@ -382,6 +384,19 @@ export const BattleCanvas = memo(
             gridHeight: GRID_HEIGHT,
             cellSize,
             gridColors: GRID_COLORS,
+          });
+        }
+
+        // Teleport Line Preview
+        if (teleportLinePreview) {
+          drawTeleportLine({
+            ctx,
+            teleportPreview: teleportLinePreview,
+            hoveredCell,
+            cellSize,
+            animationTime: animationTimeRef.current,
+            gridWidth: GRID_WIDTH,
+            gridHeight: GRID_HEIGHT,
           });
         }
 

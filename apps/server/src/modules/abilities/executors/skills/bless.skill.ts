@@ -19,8 +19,9 @@ export function executeBless(
   allUnits: BattleUnit[],
   skill: AbilityDefinition
 ): AbilityExecutionResult {
-  const radius = skill.rangeDistance
-    ? resolveDynamicValue(skill.rangeDistance, caster)
+  // Usar targetingPattern.maxRange como fonte de verdade
+  const radius = skill.targetingPattern?.maxRange
+    ? resolveDynamicValue(skill.targetingPattern.maxRange, caster)
     : 2;
   let unitsBlessed = 0;
 

@@ -23,7 +23,6 @@ export const COMMON_ACTION_ATTACK: AbilityDefinition = {
   effectType: "OFFENSIVE",
   commonAction: true,
   range: "MELEE",
-  rangeDistance: 1,
   targetType: "UNIT",
   targetingPattern: { ...PATTERNS.SINGLE, maxRange: 1 },
   functionName: "executeAttackSkill",
@@ -48,27 +47,9 @@ export const COMMON_ACTION_DASH: AbilityDefinition = {
   conditionApplied: "DASHING",
 };
 
-export const COMMON_ACTION_DODGE: AbilityDefinition = {
-  code: "DODGE",
-  name: "Esquiva",
-  description: "Aumenta a chance de esquiva até o próximo turno",
-  category: "SKILL",
-  activationType: "ACTIVE",
-  effectType: "BUFF",
-  commonAction: true,
-  range: "SELF",
-  targetType: "SELF",
-  targetingPattern: PATTERNS.SELF,
-  functionName: "executeDodge",
-  consumesAction: true,
-  cooldown: 0,
-  conditionApplied: "DODGING",
-};
-
 export const COMMON_ACTIONS: AbilityDefinition[] = [
   COMMON_ACTION_ATTACK,
   COMMON_ACTION_DASH,
-  COMMON_ACTION_DODGE,
 ];
 
 // =============================================================================
@@ -111,10 +92,43 @@ export const TOTAL_DESTRUCTION: AbilityDefinition = {
   cooldown: 0,
 };
 
+/**
+ * INTIMIDATING_ROAR - Skill de DEBUFF CONTESTADA
+ * Exemplo de ability que requer QTE para ser resistida
+ * O alvo pode resistir através de um duelo de COMBAT vs WILL
+ */
+export const INTIMIDATING_ROAR: AbilityDefinition = {
+  code: "INTIMIDATING_ROAR",
+  name: "Rugido Intimidador",
+  description:
+    "Solta um rugido aterrorizante. O alvo deve resistir (WILL vs COMBAT) ou ficará Amedrontado por 2 turnos, sofrendo -2 em todos os atributos.",
+  category: "SKILL",
+  activationType: "ACTIVE",
+  effectType: "DEBUFF",
+  costTier: "MEDIUM",
+  range: "MELEE",
+  targetType: "UNIT",
+  targetingPattern: { ...PATTERNS.SINGLE, maxRange: 2 },
+  functionName: "executeIntimidatingRoar",
+  consumesAction: true,
+  cooldown: 3,
+  // === QTE CONTESTADO ===
+  contested: true,
+  contestedAttackerAttribute: "COMBAT",
+  contestedDefenderAttribute: "WILL",
+  // === CONDIÇÃO ===
+  conditionApplied: "FRIGHTENED",
+  conditionDuration: 2,
+  // === VISUAL ===
+  icon: "😱",
+  color: "red",
+};
+
 export const BARBARIAN_ABILITIES: AbilityDefinition[] = [
   WILD_FURY,
   RECKLESS_ATTACK,
   TOTAL_DESTRUCTION,
+  INTIMIDATING_ROAR,
 ];
 
 // =============================================================================
@@ -221,7 +235,6 @@ export const HUNTERS_MARK: AbilityDefinition = {
   effectType: "DEBUFF",
   costTier: "LOW",
   range: "RANGED",
-  rangeDistance: 6,
   targetType: "UNIT",
   targetingPattern: { ...PATTERNS.SINGLE, maxRange: 6 },
   functionName: "executeHuntersMark",
@@ -248,7 +261,6 @@ export const VOLLEY: AbilityDefinition = {
   effectType: "OFFENSIVE",
   costTier: "MEDIUM",
   range: "AREA",
-  rangeDistance: 5,
   targetType: "UNIT",
   targetingPattern: { ...PATTERNS.DIAMOND_2, maxRange: 5 },
   functionName: "executeVolley",
@@ -309,7 +321,6 @@ export const BLESS: AbilityDefinition = {
   effectType: "BUFF",
   costTier: "MEDIUM",
   range: "AREA",
-  rangeDistance: 3,
   targetType: "UNIT",
   targetingPattern: { ...PATTERNS.DIAMOND_2, maxRange: 3 },
   functionName: "executeBless",
@@ -503,13 +514,12 @@ export const TELEPORT: AbilityDefinition = {
   code: "TELEPORT",
   name: "Teleporte",
   description:
-    "Move-se instantaneamente para uma posição dentro do alcance (baseado em Speed), ignorando obstáculos e unidades.",
+    "Move-se instantaneamente para uma posição dentro do alcance (baseado em Focus), ignorando obstáculos e unidades.",
   category: "SPELL",
   range: "RANGED",
-  rangeDistance: ATTRIBUTE.SPEED,
   targetType: "POSITION",
   effectType: "UTILITY",
-  targetingPattern: { ...PATTERNS.SINGLE, maxRange: ATTRIBUTE.SPEED },
+  targetingPattern: { ...PATTERNS.SINGLE, maxRange: ATTRIBUTE.FOCUS },
   functionName: "executeTeleport",
   icon: "🌀",
   color: "cyan",
@@ -524,7 +534,6 @@ export const FIRE: AbilityDefinition = {
     "Lança uma bola de fogo que viaja até o alvo e explode, causando dano mágico a todas as unidades na área (3x3). Se algo interceptar no caminho, explode nesse ponto.",
   category: "SPELL",
   range: "RANGED",
-  rangeDistance: DEFAULT_RANGE_DISTANCE.RANGED,
   targetType: "POSITION",
   effectType: "OFFENSIVE",
   targetingPattern: { ...PATTERNS.FIREBALL, maxRange: 5, travelDistance: 5 },
@@ -544,7 +553,6 @@ export const EMPOWER: AbilityDefinition = {
     "Potencializa uma unidade adjacente, aumentando todos os seus atributos em 50% do seu Focus até o começo do próximo turno.",
   category: "SPELL",
   range: "MELEE",
-  rangeDistance: DEFAULT_RANGE_DISTANCE.MELEE,
   targetType: "UNIT",
   effectType: "BUFF",
   targetingPattern: { ...PATTERNS.SINGLE, maxRange: 1 },
@@ -788,7 +796,6 @@ export const ABILITY_ICONS: Record<string, string> = {
   // Ações Comuns
   ATTACK: "⚔️",
   DASH: "💨",
-  DODGE: "🌀",
   // Warrior
   EXTRA_ATTACK: "⚔️",
   SECOND_WIND: "💨",
@@ -805,6 +812,7 @@ export const ABILITY_ICONS: Record<string, string> = {
   WILD_FURY: "😡",
   RECKLESS_ATTACK: "💥",
   TOTAL_DESTRUCTION: "💀",
+  INTIMIDATING_ROAR: "😱",
   // Rogue
   SNEAK_ATTACK: "🗡️",
   CUNNING_ACTION: "🎭",
@@ -828,7 +836,6 @@ export const ABILITY_COLORS: Record<string, string> = {
   // Ações Comuns
   ATTACK: "red",
   DASH: "blue",
-  DODGE: "cyan",
   // Warrior - amber
   EXTRA_ATTACK: "amber",
   SECOND_WIND: "emerald",
@@ -844,6 +851,7 @@ export const ABILITY_COLORS: Record<string, string> = {
   // Barbarian - red
   WILD_FURY: "red",
   RECKLESS_ATTACK: "red",
+  INTIMIDATING_ROAR: "red",
   TOTAL_DESTRUCTION: "red",
   // Rogue - gray
   SNEAK_ATTACK: "gray",

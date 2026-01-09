@@ -21,8 +21,6 @@ export const ATTACK_CONFIG = {
 
 export const DEFENSE_CONFIG = {
   attribute: "speed" as const,
-  dodgeMultiplier: 1,
-  maxDodgeChance: 75,
 } as const;
 
 // =============================================================================
@@ -136,14 +134,6 @@ export const TURN_CONFIG = {
 // =============================================================================
 // HELPERS DE CÁLCULO
 // =============================================================================
-
-export function getDodgeChance(unit: UnitAttributes): number {
-  const speed = getAttributeValue(unit, "speed");
-  return Math.min(
-    DEFENSE_CONFIG.maxDodgeChance,
-    speed * DEFENSE_CONFIG.dodgeMultiplier
-  );
-}
 
 export function calculateDamage(unit: UnitAttributes): number {
   const attrValue = getAttributeValue(unit, ATTACK_CONFIG.attribute);

@@ -52,7 +52,6 @@ export type ConditionEffect = ConditionDefinition;
 
 export interface ConditionModifiers {
   // Chances
-  dodgeChance: number;
   critChance: number;
   missChance: number;
   // Dano
@@ -89,7 +88,6 @@ export interface ConditionScanResult {
 
 function createEmptyModifiers(): ConditionModifiers {
   return {
-    dodgeChance: 0,
     critChance: 0,
     missChance: 0,
     damageReduction: 0,
@@ -146,7 +144,6 @@ export function scanConditionsForAction(
 
     // Acumular todos os modificadores numéricos
     const numericKeys: (keyof ConditionModifiers)[] = [
-      "dodgeChance",
       "critChance",
       "missChance",
       "damageReduction",
@@ -188,10 +185,6 @@ export function scanConditionsForAction(
   }
 
   // Limitar chances a 0-100
-  result.modifiers.dodgeChance = Math.min(
-    100,
-    Math.max(0, result.modifiers.dodgeChance)
-  );
   result.modifiers.critChance = Math.min(
     100,
     Math.max(0, result.modifiers.critChance)
@@ -581,7 +574,6 @@ export function getMinAttackSuccesses(conditions: string[]): number {
 //   blockItem          - Impede uso de itens (futuro)
 //
 // MODIFICADORES DE CHANCE (%):
-//   dodgeChance        - Chance de esquivar ataques
 //   critChance         - Chance de acerto crítico
 //   missChance         - Chance de errar ataques
 //   blockChance        - Chance de bloquear ataques (futuro)

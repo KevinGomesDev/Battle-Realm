@@ -198,11 +198,25 @@ export function syncUnitFromResult(
     casterActionsLeft?: number;
     targetHpAfter?: number;
     targetDefeated?: boolean;
+    unitsMoved?: Array<{
+      unitId: string;
+      from: { x: number; y: number };
+      to: { x: number; y: number };
+    }>;
   }
 ): void {
   // Sincronizar ações restantes
   if (result.casterActionsLeft !== undefined) {
     schema.actionsLeft = result.casterActionsLeft;
+  }
+
+  // Sincronizar posição (para TELEPORT e outras habilidades de movimento)
+  if (result.unitsMoved) {
+    const movedUnit = result.unitsMoved.find((m) => m.unitId === schema.id);
+    if (movedUnit) {
+      schema.posX = movedUnit.to.x;
+      schema.posY = movedUnit.to.y;
+    }
   }
 
   // Sincronizar movimento (pode ter sido alterado por DASH, etc)

@@ -40,7 +40,7 @@ export type UnitAttribute =
 
 /**
  * Constante para referenciar atributos em definições de habilidades
- * Uso: baseDamage: ATTRIBUTE.FOCUS ou areaSize: ATTRIBUTE.SPEED
+ * Uso: baseDamage: ATTRIBUTE.FOCUS ou targetingPattern.maxRange: ATTRIBUTE.SPEED
  */
 export const ATTRIBUTE = {
   COMBAT: "ATTR:COMBAT" as const,
@@ -126,7 +126,7 @@ export function resolveDynamicValue(
  * SELF = apenas o próprio usuário (distância 0)
  * MELEE = adjacente (distância 1)
  * RANGED = à distância (distância customizável)
- * AREA = afeta área (requer areaSize)
+ * AREA = afeta área (requer targetingPattern.coordinates)
  */
 export type AbilityRange = "SELF" | "MELEE" | "RANGED" | "AREA";
 
@@ -153,7 +153,8 @@ export type AbilityEffectType =
   | "HEALING"
   | "BUFF"
   | "DEBUFF"
-  | "UTILITY";
+  | "UTILITY"
+  | "DEFENSIVE";
 
 /**
  * Valores padrão de distância para cada tipo de alcance
@@ -413,9 +414,8 @@ export interface AbilityDefinition {
   manaCost?: number;
 
   // === ALCANCE ===
+  /** Tipo semântico de alcance (para UI e legibilidade) */
   range?: AbilityRange;
-  /** Valor customizado para RANGED/AREA (pode ser número ou atributo) */
-  rangeDistance?: DynamicValue;
 
   // === TARGETING PATTERN ===
   /**
@@ -462,12 +462,66 @@ export interface AbilityDefinition {
   /** Condição aplicada pela habilidade */
   conditionApplied?: string;
 
+  // === QTE CONTESTADO ===
+  /**
+   * Se a habilidade é contestada via QTE
+   * Quando true, o alvo pode resistir ao efeito através de um QTE
+   * Usado principalmente para DEBUFFs que podem ser resistidos
+   * Default: false
+   */
+  contested?: boolean;
+  /**
+   * Atributo do caster usado no QTE contestado
+   * Ex: "FOCUS" para magias, "COMBAT" para debuffs físicos
+   * Obrigatório se contested = true
+   */
+  contestedAttackerAttribute?: UnitAttribute;
+  /**
+   * Atributo do alvo usado para resistir no QTE contestado
+   * Ex: "WILL" para resistir magias, "RESISTANCE" para debuffs físicos
+   * Obrigatório se contested = true
+   */
+  contestedDefenderAttribute?: UnitAttribute;
+
   // === VISUAL ===
   icon?: string;
   color?: string;
 
   // === EXTRAS ===
   metadata?: Record<string, unknown>;
+}
+
+// =============================================================================
+// FUNÇÕES HELPER PARA ABILITIES
+// =============================================================================
+
+/**
+ * Verifica se uma ability é contestada via QTE
+ * Retorna true se a ability tem contested = true E possui os atributos necessários
+ */
+export function isContestedAbility(ability: AbilityDefinition): boolean {
+  return (
+    ability.contested === true &&
+    ability.contestedAttackerAttribute !== undefined &&
+    ability.contestedDefenderAttribute !== undefined
+  );
+}
+
+/**
+ * Verifica se uma ability requer QTE (qualquer tipo)
+ * Inclui: ataques, projéteis interceptáveis e abilities contestadas
+ */
+export function abilityRequiresQTE(ability: AbilityDefinition): boolean {
+  // Ataques básicos sempre requerem QTE
+  if (ability.code === "ATTACK") return true;
+
+  // Projéteis que podem ser interceptados
+  if (ability.isProjectile === true) return true;
+
+  // Abilities contestadas (ex: debuffs resistíveis)
+  if (isContestedAbility(ability)) return true;
+
+  return false;
 }
 
 // =============================================================================
@@ -517,23 +571,12 @@ export interface AbilityExecutionResult {
   rolls?: number[];
   successes?: number;
 
-  // === ESQUIVA ===
-  dodgeResults?: Array<{
-    targetId: string;
-    targetName: string;
-    dodged: boolean;
-    dodgeChance: number;
-    dodgeRoll: number;
-  }>;
-
   // === OBSTÁCULOS ===
   obstacleDestroyed?: boolean;
   obstacleId?: string;
 
   // === ATAQUES EXTRAS ===
   attacksLeftThisTurn?: number;
-  dodgeChance?: number;
-  dodgeRoll?: number;
 
   // === EIDOLON (INVOCADOR) ===
   damageTransferredToEidolon?: boolean;
@@ -689,17 +732,16 @@ export function getAbilityCost(
  * Obtém o alcance efetivo de uma habilidade
  */
 export function getAbilityEffectiveRange(ability: AbilityDefinition): number {
-  if (!ability.range) return 0;
-
-  // Se tem rangeDistance definido como número, usa ele
+  // 1. Fonte de verdade: targetingPattern.maxRange
   if (
-    ability.rangeDistance !== undefined &&
-    typeof ability.rangeDistance === "number"
+    ability.targetingPattern?.maxRange !== undefined &&
+    typeof ability.targetingPattern.maxRange === "number"
   ) {
-    return ability.rangeDistance;
+    return ability.targetingPattern.maxRange;
   }
 
-  // Senão usa o valor padrão
+  // 2. Fallback final: valor padrão baseado no tipo de range
+  if (!ability.range) return 0;
   return DEFAULT_RANGE_DISTANCE[ability.range];
 }
 

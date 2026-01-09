@@ -3,6 +3,7 @@ import type { Room } from "@colyseus/core";
 import type { BattleSessionState, BattleUnitSchema } from "../../schemas";
 import { isValidPosition, canAttack } from "./utils";
 import type { QTEResultForExecutor } from "../../../../abilities/executors/types";
+import { createAndEmitEvent } from "../../../../match/services/event.service";
 
 /**
  * Executa o turno de uma unidade controlada por IA
@@ -17,7 +18,8 @@ export function executeAITurn(
     target: BattleUnitSchema,
     qteResult: QTEResultForExecutor
   ) => void,
-  advanceToNextUnitFn: () => void
+  advanceToNextUnitFn: () => void,
+  roomId?: string
 ): void {
   console.log(
     `[BattleRoom] 🤖 executeAITurn iniciado para: ${unit.name} (${unit.id})`
@@ -81,6 +83,33 @@ export function executeAITurn(
           toY: newY,
           movesLeft: unit.movesLeft,
         });
+
+        // Emitir evento de movimento da IA
+        if (roomId) {
+          createAndEmitEvent({
+            context: "BATTLE",
+            scope: "GLOBAL",
+            category: "MOVEMENT",
+            severity: "INFO",
+            battleId: roomId,
+            sourceUserId: unit.ownerId,
+            message: `🤖 ${unit.name} se moveu de (${fromX}, ${fromY}) para (${newX}, ${newY})`,
+            code: "UNIT_MOVED",
+            data: {
+              fromPosition: { x: fromX, y: fromY },
+              toPosition: { x: newX, y: newY },
+              movesLeft: unit.movesLeft,
+              isAI: true,
+            },
+            actorId: unit.id,
+            actorName: unit.name,
+          }).catch((err) =>
+            console.error(
+              "[BattleRoom] Erro ao criar evento de movimento IA:",
+              err
+            )
+          );
+        }
       } else {
         console.log(
           `[BattleRoom] 🤖 IA: Posição (${newX},${newY}) inválida, não moveu`

@@ -7,7 +7,6 @@ import type { ExecutorRegistry } from "./types";
 import {
   executeAttackSkill,
   executeDash,
-  executeDodge,
   executeSecondWind,
   executeActionSurge,
   executeTotalDestruction,
@@ -35,7 +34,6 @@ export const SKILL_EXECUTORS: ExecutorRegistry = {
   // Ações Comuns
   executeAttackSkill,
   executeDash,
-  executeDodge,
 
   // Guerreiro
   executeSecondWind,

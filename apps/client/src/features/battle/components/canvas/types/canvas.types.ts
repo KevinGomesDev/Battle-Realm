@@ -33,9 +33,19 @@ export interface SpellAreaPreview {
   /** Se true, centra na unidade selecionada (para range SELF) */
   centerOnSelf?: boolean;
   /** Distância máxima do caster */
-  rangeDistance?: number;
+  maxRange?: number;
   /** Posição do caster para calcular distância */
   casterPos?: Position;
+}
+
+/** Preview de linha para Teleport */
+export interface TeleportLinePreview {
+  /** Posição inicial (caster) */
+  from: Position;
+  /** Alcance máximo */
+  maxRange: number;
+  /** Cor da linha */
+  color: string;
 }
 
 /** Informação de tooltip para célula de movimento */
@@ -84,6 +94,8 @@ export interface BattleCanvasProps {
   onCellHover?: (cell: Position | null) => void;
   /** Preview de targeting calculado pelo sistema unificado */
   targetingPreview?: TargetingPreview | null;
+  /** Preview de linha para teleport */
+  teleportLinePreview?: TeleportLinePreview | null;
 }
 
 /** Métodos expostos via ref do BattleCanvas */

@@ -114,7 +114,6 @@ export {
   DAMAGE_TYPES,
   type DamageTypeName,
   TURN_CONFIG,
-  getDodgeChance,
   calculateDamage,
   calculatePhysicalProtection,
   calculateMagicalProtection,

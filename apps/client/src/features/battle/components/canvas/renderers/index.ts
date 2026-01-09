@@ -18,4 +18,5 @@ export {
   drawSpellRangeIndicator,
   drawSpellAreaPreview,
   calculateAreaPreviewCenter,
+  drawTeleportLine,
 } from "./overlay.renderer";

@@ -58,6 +58,7 @@ export type {
   ActiveBubble,
   Position,
   SpellAreaPreview,
+  TeleportLinePreview,
   MovementTooltipInfo,
   HoverTooltipInfo,
   UnitDirectionInfo,
@@ -100,6 +101,7 @@ export {
   drawSpellRangeIndicator,
   drawSpellAreaPreview,
   calculateAreaPreviewCenter,
+  drawTeleportLine,
 } from "./renderers";
 
 // ============================================

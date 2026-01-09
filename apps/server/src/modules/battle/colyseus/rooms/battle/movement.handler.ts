@@ -79,17 +79,30 @@ export function handleMove(
     totalCost: moveValidation.totalCost,
   });
 
+  // Construir mensagem detalhada do movimento
+  let moveMessage = `🏃 ${unitSchema.name} se moveu de (${fromX}, ${fromY}) para (${toX}, ${toY})`;
+  const moveDetails: string[] = [];
+
+  if (moveValidation.totalCost > 1) {
+    moveDetails.push(`custo: ${moveValidation.totalCost}`);
+  }
+  if (moveValidation.engagementCost > 0) {
+    moveDetails.push(`engajamento: +${moveValidation.engagementCost}`);
+  }
+  moveDetails.push(`restante: ${unitSchema.movesLeft}`);
+
+  if (moveDetails.length > 0) {
+    moveMessage += ` [${moveDetails.join(" | ")}]`;
+  }
+
   createAndEmitEvent({
     context: "BATTLE",
     scope: "GLOBAL",
-    category: "COMBAT",
+    category: "MOVEMENT",
     severity: "INFO",
     battleId: roomId,
     sourceUserId: unitSchema.ownerId,
-    message:
-      moveValidation.engagementCost > 0
-        ? `${unitSchema.name} se moveu de (${fromX}, ${fromY}) para (${toX}, ${toY}) [Custo de engajamento: ${moveValidation.engagementCost}]`
-        : `${unitSchema.name} se moveu de (${fromX}, ${fromY}) para (${toX}, ${toY})`,
+    message: moveMessage,
     code: "UNIT_MOVED",
     data: {
       fromPosition: { x: fromX, y: fromY },
