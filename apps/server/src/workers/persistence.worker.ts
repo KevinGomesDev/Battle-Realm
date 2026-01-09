@@ -142,6 +142,7 @@ function serializeObstacles(obstacles: any[]): any[] {
     posX: obs.posX,
     posY: obs.posY,
     type: obs.type,
+    size: obs.size || "SMALL",
     hp: obs.hp,
     maxHp: obs.maxHp,
     destroyed: obs.destroyed,

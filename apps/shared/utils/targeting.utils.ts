@@ -8,10 +8,37 @@ import type {
   PatternCoordinate,
 } from "../types/ability.types";
 import { resolveDynamicValue } from "../types/ability.types";
-import { isCellBlockedByObstacle as _isCellBlockedByObstacle } from "./blocking.utils";
+import {
+  isCellBlockedByObstacle as _isCellBlockedByObstacle,
+  getObstacleOccupiedCellsForBlocking,
+} from "./blocking.utils";
+import { getUnitSizeDefinition, type UnitSize } from "../config";
 
 // Re-exportar tipos para conveniência
 export type { TargetingDirection, CoordinatePattern, PatternCoordinate };
+
+// =============================================================================
+// HELPER FUNCTION
+// =============================================================================
+
+/**
+ * Retorna as células ocupadas por uma unidade baseado em seu tamanho
+ */
+function getUnitOccupiedCells(unit: {
+  posX: number;
+  posY: number;
+  size?: string;
+}): Array<{ x: number; y: number }> {
+  const sizeDef = getUnitSizeDefinition((unit.size || "NORMAL") as UnitSize);
+  const dimension = sizeDef.dimension;
+  const cells: Array<{ x: number; y: number }> = [];
+  for (let dx = 0; dx < dimension; dx++) {
+    for (let dy = 0; dy < dimension; dy++) {
+      cells.push({ x: unit.posX + dx, y: unit.posY + dy });
+    }
+  }
+  return cells;
+}
 
 // =============================================================================
 // TIPOS DE TARGETING
@@ -543,9 +570,11 @@ export function findNextProjectileTarget(
   for (let i = startIndex; i < trajectory.orderedCells.length; i++) {
     const cell = trajectory.orderedCells[i];
 
-    const unitInCell = aliveUnits.find(
-      (u) => u.posX === cell.x && u.posY === cell.y
-    );
+    // Verificar se há unidade nesta célula (considerando tamanho)
+    const unitInCell = aliveUnits.find((u) => {
+      const cells = getUnitOccupiedCells(u);
+      return cells.some((c) => c.x === cell.x && c.y === cell.y);
+    });
 
     if (unitInCell) {
       return {
@@ -642,9 +671,11 @@ export function processProjectileForPattern(
   for (const cell of trajectory.orderedCells) {
     pathCells.push(cell);
 
-    const unitInCell = aliveUnits.find(
-      (u) => u.posX === cell.x && u.posY === cell.y
-    );
+    // Verificar se há unidade nesta célula (considerando tamanho)
+    const unitInCell = aliveUnits.find((u) => {
+      const cells = getUnitOccupiedCells(u);
+      return cells.some((c) => c.x === cell.x && c.y === cell.y);
+    });
 
     if (unitInCell) {
       targets.push(unitInCell);
@@ -686,6 +717,8 @@ export interface TravelObstacle {
   posX: number;
   posY: number;
   destroyed?: boolean;
+  /** Tamanho do obstáculo para ocupar múltiplas células */
+  size?: "SMALL" | "MEDIUM" | "LARGE" | "HUGE";
 }
 
 /**
@@ -781,11 +814,14 @@ export function calculateProjectileTravel(
       break;
     }
 
-    // Verificar obstáculo
+    // Verificar obstáculo (considerando tamanho do obstáculo)
     if (stopsOnObstacle) {
-      const hitObstacle = activeObstacles.find(
-        (o) => o.posX === nextX && o.posY === nextY
-      );
+      const hitObstacle = activeObstacles.find((o) => {
+        const occupiedCells = getObstacleOccupiedCellsForBlocking(o);
+        return occupiedCells.some(
+          (cell) => cell.x === nextX && cell.y === nextY
+        );
+      });
       if (hitObstacle) {
         travelPath.push({ x: nextX, y: nextY });
         currentX = nextX;
@@ -796,11 +832,12 @@ export function calculateProjectileTravel(
       }
     }
 
-    // Verificar unidade
+    // Verificar unidade (considerando tamanho)
     if (stopsOnUnit) {
-      const hitUnit = aliveUnits.find(
-        (u) => u.posX === nextX && u.posY === nextY
-      );
+      const hitUnit = aliveUnits.find((u) => {
+        const cells = getUnitOccupiedCells(u);
+        return cells.some((c) => c.x === nextX && c.y === nextY);
+      });
       if (hitUnit) {
         travelPath.push({ x: nextX, y: nextY });
         currentX = nextX;

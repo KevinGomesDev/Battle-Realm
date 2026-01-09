@@ -35,6 +35,7 @@ import {
   SafeIterator,
 } from "./safety-guards";
 import { BattleUnit } from "@boundless/shared/types/battle.types";
+import { getUnitSizeDefinition, type UnitSize } from "@boundless/shared/config";
 
 /**
  * Determina o perfil de IA para uma unidade baseado no seu tipo
@@ -201,10 +202,23 @@ export function validateDecision(
       ) {
         return { valid: false, reason: "Posição fora do grid" };
       }
-      // Verificar bloqueio
-      const blocked = context.units.some(
-        (u) => u.isAlive && u.posX === x && u.posY === y
-      );
+      // Verificar bloqueio (considerando tamanho de unidades)
+      let blocked = false;
+      for (const u of context.units) {
+        if (!u.isAlive) continue;
+        const sizeDef = getUnitSizeDefinition(u.size as UnitSize);
+        const dimension = sizeDef.dimension;
+        for (let dx = 0; dx < dimension; dx++) {
+          for (let dy = 0; dy < dimension; dy++) {
+            if (u.posX + dx === x && u.posY + dy === y) {
+              blocked = true;
+              break;
+            }
+          }
+          if (blocked) break;
+        }
+        if (blocked) break;
+      }
       if (blocked) {
         return { valid: false, reason: "Posição bloqueada por outra unidade" };
       }

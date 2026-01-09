@@ -18,6 +18,7 @@ export interface BattleObstacleState extends BattleObstacle {
   hp: number;
   maxHp: number;
   destroyed: boolean;
+  size: import("@boundless/shared/config").ObstacleSize;
 }
 
 export interface BattleSessionState {

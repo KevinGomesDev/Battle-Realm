@@ -18,6 +18,7 @@ import {
   isAdjacent,
   isWithinRange,
 } from "./distance.utils";
+import { getUnitSizeDefinition, type UnitSize } from "../config";
 
 // Re-exportar funções de distância para compatibilidade
 export {
@@ -477,11 +478,24 @@ export function isValidAbilityPosition(
     return false;
   }
 
-  // Para TELEPORT, verificar se posição não está ocupada
+  // Para TELEPORT, verificar se posição não está ocupada (considerando tamanho)
   if (ability.code === "TELEPORT") {
-    const occupied = allUnits.some(
-      (u) => u.isAlive && u.posX === position.x && u.posY === position.y
-    );
+    let occupied = false;
+    for (const u of allUnits) {
+      if (!u.isAlive) continue;
+      const sizeDef = getUnitSizeDefinition(u.size as UnitSize);
+      const dimension = sizeDef.dimension;
+      for (let dx = 0; dx < dimension; dx++) {
+        for (let dy = 0; dy < dimension; dy++) {
+          if (u.posX + dx === position.x && u.posY + dy === position.y) {
+            occupied = true;
+            break;
+          }
+        }
+        if (occupied) break;
+      }
+      if (occupied) break;
+    }
     if (occupied) {
       return false;
     }

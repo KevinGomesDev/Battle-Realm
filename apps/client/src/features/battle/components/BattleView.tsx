@@ -53,6 +53,12 @@ import {
   type PendingAbility,
   createPendingAbility,
 } from "../types/pending-ability.types";
+import {
+  getUnitSizeDefinition,
+  getObstacleDimension,
+  type UnitSize,
+  type ObstacleSize,
+} from "@boundless/shared/config";
 
 /**
  * BattleView - Componente principal da batalha
@@ -822,10 +828,23 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           break;
       }
 
-      // Verificar se a célula está ocupada
-      const occupied = units.some(
-        (u) => u.posX === newX && u.posY === newY && u.isAlive
-      );
+      // Verificar se a célula está ocupada (considerando tamanho de unidades)
+      let occupied = false;
+      for (const u of units) {
+        if (!u.isAlive) continue;
+        const sizeDef = getUnitSizeDefinition(u.size as UnitSize);
+        const dimension = sizeDef.dimension;
+        for (let dx = 0; dx < dimension; dx++) {
+          for (let dy = 0; dy < dimension; dy++) {
+            if (u.posX + dx === newX && u.posY + dy === newY) {
+              occupied = true;
+              break;
+            }
+          }
+          if (occupied) break;
+        }
+        if (occupied) break;
+      }
 
       // Calcular direção para sprite (baseado no movimento horizontal)
       const deltaX = newX - selectedUnit.posX;
@@ -1222,13 +1241,47 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
 
       // Verificar se é ATTACK
       if (pendingAbility.type === "ATTACK") {
-        // Verificar se há uma unidade ou obstáculo na célula alvo
-        const targetUnit = units.find(
-          (u) => u.isAlive && u.posX === targetCell.x && u.posY === targetCell.y
-        );
+        // Verificar se há uma unidade na célula alvo (considerando tamanho)
+        const targetUnit = units.find((u) => {
+          if (!u.isAlive) return false;
+          const sizeDef = getUnitSizeDefinition(u.size as UnitSize);
+          const dimension = sizeDef.dimension;
+          for (let dx = 0; dx < dimension; dx++) {
+            for (let dy = 0; dy < dimension; dy++) {
+              if (
+                u.posX + dx === targetCell.x &&
+                u.posY + dy === targetCell.y
+              ) {
+                return true;
+              }
+            }
+          }
+          return false;
+        });
+        // Verificar se há obstáculo na célula alvo (considerando tamanho)
         const targetObstacle = battle.config.map?.obstacles?.find(
-          (o: { posX: number; posY: number; destroyed?: boolean }) =>
-            !o.destroyed && o.posX === targetCell.x && o.posY === targetCell.y
+          (o: {
+            posX: number;
+            posY: number;
+            destroyed?: boolean;
+            size?: string;
+          }) => {
+            if (o.destroyed) return false;
+            const dimension = getObstacleDimension(
+              (o.size || "SMALL") as ObstacleSize
+            );
+            for (let dx = 0; dx < dimension; dx++) {
+              for (let dy = 0; dy < dimension; dy++) {
+                if (
+                  o.posX + dx === targetCell.x &&
+                  o.posY + dy === targetCell.y
+                ) {
+                  return true;
+                }
+              }
+            }
+            return false;
+          }
         );
 
         console.log(
@@ -1513,9 +1566,9 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           unitDirection={unitDirection}
           pendingAction={pendingAbility?.code ?? null}
           activeBubbles={activeBubbles}
-          spellAreaPreview={areaPreview}
+          abilityAreaPreview={areaPreview}
           targetingPreview={targetingPreview}
-          teleportLinePreview={singleTargetLinePreview}
+          singleTargetLinePreview={singleTargetLinePreview}
         />
 
         {/* BattleHeader - Overlay na parte superior (dentro do Canvas) */}

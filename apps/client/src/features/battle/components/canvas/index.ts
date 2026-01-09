@@ -57,7 +57,9 @@ export { UI_COLORS, UNIT_RENDER_CONFIG } from "./canvas.constants";
 export type {
   ActiveBubble,
   Position,
+  AbilityAreaPreview,
   SpellAreaPreview,
+  SingleTargetLinePreview,
   TeleportLinePreview,
   MovementTooltipInfo,
   HoverTooltipInfo,
@@ -98,10 +100,10 @@ export {
   drawTurnIndicator,
   drawFogOfWar,
   drawTargetingPreview,
-  drawSpellRangeIndicator,
-  drawSpellAreaPreview,
+  drawAbilityRangeIndicator,
+  drawAbilityAreaPreview,
   calculateAreaPreviewCenter,
-  drawTeleportLine,
+  drawSingleTargetLine,
 } from "./renderers";
 
 // ============================================

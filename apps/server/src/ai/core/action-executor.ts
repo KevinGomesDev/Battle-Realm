@@ -1,9 +1,13 @@
 // server/src/ai/core/action-executor.ts
 // Executor de ações da IA - integra com movement-actions e skill-executors
 
+import type { BattleSession } from "@boundless/shared/types/battle-lobby.types";
 import type { BattleUnit } from "@boundless/shared/types/battle.types";
-import type { AIDecision, BattleSession } from "../types/ai.types";
-import { executeMoveAction } from "../../modules/combat/movement-actions";
+import type { AIDecision } from "../types/ai.types";
+import {
+  executeMoveAction,
+  calculateBaseMovement,
+} from "../../modules/combat/movement-actions";
 import {
   executeSkill as executeSkillLogic,
   executeAttack as executeAttackLogic,
@@ -62,7 +66,7 @@ function executeMove(
   decision: AIDecision,
   battle: BattleSession
 ): AIExecutionResult {
-  const unit = battle.units.find((u: BattleUnit) => u.id === decision.unitId);
+  const unit = battle.units.find((u) => u.id === decision.unitId);
   if (!unit || !unit.isAlive) {
     return {
       decision,
@@ -122,9 +126,7 @@ function executeAttack(
   decision: AIDecision,
   battle: BattleSession
 ): AIExecutionResult {
-  const attacker = battle.units.find(
-    (u: BattleUnit) => u.id === decision.unitId
-  );
+  const attacker = battle.units.find((u) => u.id === decision.unitId);
   if (!attacker || !attacker.isAlive) {
     return {
       decision,
@@ -133,9 +135,7 @@ function executeAttack(
     };
   }
 
-  const target = battle.units.find(
-    (u: BattleUnit) => u.id === decision.targetId
-  );
+  const target = battle.units.find((u) => u.id === decision.targetId);
   if (!target || !target.isAlive) {
     return { decision, success: false, error: "Alvo não encontrado ou morto" };
   }
@@ -206,7 +206,7 @@ function executeSkill(
   decision: AIDecision,
   battle: BattleSession
 ): AIExecutionResult {
-  const caster = battle.units.find((u: BattleUnit) => u.id === decision.unitId);
+  const caster = battle.units.find((u) => u.id === decision.unitId);
   if (!caster || !caster.isAlive) {
     return {
       decision,
@@ -225,7 +225,7 @@ function executeSkill(
 
   // Encontrar alvo se especificado
   const target = decision.targetId
-    ? battle.units.find((u: BattleUnit) => u.id === decision.targetId) || null
+    ? battle.units.find((u) => u.id === decision.targetId) || null
     : null;
 
   // Executar skill usando o sistema existente
@@ -263,7 +263,7 @@ function executeDash(
   decision: AIDecision,
   battle: BattleSession
 ): AIExecutionResult {
-  const unit = battle.units.find((u: BattleUnit) => u.id === decision.unitId);
+  const unit = battle.units.find((u) => u.id === decision.unitId);
   if (!unit || !unit.isAlive) {
     return {
       decision,
@@ -292,7 +292,7 @@ function executeSpellAction(
   decision: AIDecision,
   battle: BattleSession
 ): AIExecutionResult {
-  const caster = battle.units.find((u: BattleUnit) => u.id === decision.unitId);
+  const caster = battle.units.find((u) => u.id === decision.unitId);
   if (!caster || !caster.isAlive) {
     return {
       decision,
@@ -323,8 +323,7 @@ function executeSpellAction(
   let target: BattleUnit | { x: number; y: number } | null = null;
 
   if (decision.targetId) {
-    target =
-      battle.units.find((u: BattleUnit) => u.id === decision.targetId) || null;
+    target = battle.units.find((u) => u.id === decision.targetId) || null;
   } else if (decision.targetPosition) {
     target = decision.targetPosition;
   }

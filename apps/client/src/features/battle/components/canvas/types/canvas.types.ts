@@ -24,8 +24,8 @@ export interface Position {
   y: number;
 }
 
-/** Preview de área de spell/skill */
-export interface SpellAreaPreview {
+/** Preview de área de ability */
+export interface AbilityAreaPreview {
   /** Tamanho da área (Ex: 3 = 3x3) */
   size: number;
   /** Cor base do preview */
@@ -38,8 +38,11 @@ export interface SpellAreaPreview {
   casterPos?: Position;
 }
 
-/** Preview de linha para Teleport */
-export interface TeleportLinePreview {
+/** @deprecated Use AbilityAreaPreview instead */
+export type SpellAreaPreview = AbilityAreaPreview;
+
+/** Preview de linha para abilities com alvo único (PATTERNS.SINGLE) */
+export interface SingleTargetLinePreview {
   /** Posição inicial (caster) */
   from: Position;
   /** Alcance máximo */
@@ -47,6 +50,9 @@ export interface TeleportLinePreview {
   /** Cor da linha */
   color: string;
 }
+
+/** @deprecated Use SingleTargetLinePreview instead */
+export type TeleportLinePreview = SingleTargetLinePreview;
 
 /** Informação de tooltip para célula de movimento */
 export interface MovementTooltipInfo {
@@ -88,14 +94,14 @@ export interface BattleCanvasProps {
   pendingAction?: string | null;
   /** Balões de fala ativos (unitId -> mensagem) */
   activeBubbles?: Map<string, ActiveBubble>;
-  /** Preview de área de spell/skill */
-  spellAreaPreview?: SpellAreaPreview | null;
+  /** Preview de área de ability */
+  abilityAreaPreview?: AbilityAreaPreview | null;
   /** Handler para quando o mouse passa sobre uma célula */
   onCellHover?: (cell: Position | null) => void;
   /** Preview de targeting calculado pelo sistema unificado */
   targetingPreview?: TargetingPreview | null;
-  /** Preview de linha para teleport */
-  teleportLinePreview?: TeleportLinePreview | null;
+  /** Preview de linha para abilities com alvo único */
+  singleTargetLinePreview?: SingleTargetLinePreview | null;
 }
 
 /** Métodos expostos via ref do BattleCanvas */

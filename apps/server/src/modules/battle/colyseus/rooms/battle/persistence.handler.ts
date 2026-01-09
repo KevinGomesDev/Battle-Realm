@@ -64,6 +64,7 @@ export async function restoreFromDatabase(
       obstacle.posX = obs.posX;
       obstacle.posY = obs.posY;
       obstacle.type = obs.type;
+      obstacle.size = obs.size || "SMALL"; // Default para compatibilidade com dados antigos
       obstacle.hp = obs.hp;
       obstacle.maxHp = obs.maxHp;
       obstacle.destroyed = obs.destroyed ?? false;

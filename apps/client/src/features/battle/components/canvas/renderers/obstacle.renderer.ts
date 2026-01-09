@@ -1,11 +1,16 @@
 /**
  * Renderer para obstáculos 2.5D no canvas de batalha
  * Responsável por desenhar blocos 3D com perspectiva dinâmica
+ * Suporta obstáculos de tamanhos variados (SMALL=1x1, MEDIUM=2x2, LARGE=3x3, HUGE=4x4)
  */
 
 import type { BattleObstacleState } from "@/services/colyseus.service";
 import type { ObstacleType } from "@boundless/shared/types/battle.types";
-import { getObstacleVisualConfig } from "@boundless/shared/config";
+import {
+  getObstacleVisualConfig,
+  getObstacleDimension,
+} from "@boundless/shared/config";
+import type { ObstacleSize } from "@boundless/shared/config";
 import type { Position } from "../types";
 
 interface DrawObstacle3DParams {
@@ -39,6 +44,7 @@ function drawFace(
 
 /**
  * Desenha um obstáculo com efeito 2.5D baseado na posição da perspectiva
+ * Suporta tamanhos variados (dimension x dimension células)
  */
 export function drawObstacle3D({
   ctx,
@@ -50,25 +56,34 @@ export function drawObstacle3D({
     (obstacle.type as ObstacleType) || "ROCK"
   );
 
+  // Obter dimensão do obstáculo baseado no tamanho
+  const dimension = getObstacleDimension(
+    (obstacle.size as ObstacleSize) || "SMALL"
+  );
+  const obstacleSize = cellSize * dimension;
+
   const baseX = obstacle.posX * cellSize;
   const baseY = obstacle.posY * cellSize;
 
-  // Centro do obstáculo
-  const centerX = baseX + cellSize / 2;
-  const centerY = baseY + cellSize / 2;
+  // Centro do obstáculo (considerando tamanho)
+  const centerX = baseX + obstacleSize / 2;
+  const centerY = baseY + obstacleSize / 2;
 
   // Vetor do centro para a perspectiva (determina perspectiva)
   const vecX = centerX - perspectivePos.x;
   const vecY = centerY - perspectivePos.y;
 
-  // Força da perspectiva baseada na altura do obstáculo
+  // Força da perspectiva baseada na altura do obstáculo (escala com tamanho)
   const perspectiveStrength = 0.15;
-  const shiftX = vecX * perspectiveStrength * config.heightScale;
-  const shiftY = vecY * perspectiveStrength * config.heightScale;
+  const heightMultiplier = 1 + (dimension - 1) * 0.3; // Obstáculos maiores são mais altos
+  const shiftX =
+    vecX * perspectiveStrength * config.heightScale * heightMultiplier;
+  const shiftY =
+    vecY * perspectiveStrength * config.heightScale * heightMultiplier;
 
-  // Tamanho do bloco (ligeiramente menor que a célula para dar espaço)
-  const blockSize = cellSize * 0.85;
-  const offset = (cellSize - blockSize) / 2;
+  // Tamanho do bloco (ligeiramente menor que o total de células para dar espaço)
+  const blockSize = obstacleSize * 0.9;
+  const offset = (obstacleSize - blockSize) / 2;
 
   // Cantos da base
   const bTL = { x: baseX + offset, y: baseY + offset };
@@ -109,30 +124,8 @@ export function drawObstacle3D({
   // Borda do topo (highlight)
   if (config.highlightColor) {
     ctx.strokeStyle = config.highlightColor;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1 + (dimension - 1) * 0.5; // Borda mais grossa para obstáculos maiores
     ctx.stroke();
-  }
-
-  // HP bar se o obstáculo foi danificado
-  if (
-    obstacle.hp !== undefined &&
-    obstacle.maxHp !== undefined &&
-    obstacle.hp < obstacle.maxHp
-  ) {
-    const hpPercent = obstacle.hp / obstacle.maxHp;
-    const barWidth = blockSize * 0.8;
-    const barHeight = 4;
-    const barX = tTL.x + (blockSize - barWidth) / 2;
-    const barY = tTL.y - 8;
-
-    // Background
-    ctx.fillStyle = "rgba(0,0,0,0.5)";
-    ctx.fillRect(barX, barY, barWidth, barHeight);
-
-    // HP
-    ctx.fillStyle =
-      hpPercent > 0.5 ? "#2ecc71" : hpPercent > 0.25 ? "#f39c12" : "#e74c3c";
-    ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
   }
 }
 
@@ -146,6 +139,7 @@ interface DrawAllObstaclesParams {
 
 /**
  * Desenha todos os obstáculos visíveis ordenados por distância
+ * Considera o tamanho do obstáculo para visibilidade (visível se qualquer célula for visível)
  */
 export function drawAllObstacles({
   ctx,
@@ -154,16 +148,32 @@ export function drawAllObstacles({
   cellSize,
   perspectivePos,
 }: DrawAllObstaclesParams): void {
+  // Função auxiliar para verificar se obstáculo tem alguma célula visível
+  const isObstacleVisible = (obs: BattleObstacleState): boolean => {
+    const dimension = getObstacleDimension(
+      (obs.size as ObstacleSize) || "SMALL"
+    );
+    for (let dx = 0; dx < dimension; dx++) {
+      for (let dy = 0; dy < dimension; dy++) {
+        if (visibleCells.has(`${obs.posX + dx},${obs.posY + dy}`)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
   // Ordenar obstáculos por distância à perspectiva (mais distantes primeiro)
   const sortedObstacles = [...obstacles]
-    .filter(
-      (obs) => !obs.destroyed && visibleCells.has(`${obs.posX},${obs.posY}`)
-    )
+    .filter((obs) => !obs.destroyed && isObstacleVisible(obs))
     .sort((a, b) => {
-      const aCenterX = a.posX * cellSize + cellSize / 2;
-      const aCenterY = a.posY * cellSize + cellSize / 2;
-      const bCenterX = b.posX * cellSize + cellSize / 2;
-      const bCenterY = b.posY * cellSize + cellSize / 2;
+      // Calcular centro considerando tamanho
+      const aDim = getObstacleDimension((a.size as ObstacleSize) || "SMALL");
+      const bDim = getObstacleDimension((b.size as ObstacleSize) || "SMALL");
+      const aCenterX = a.posX * cellSize + (aDim * cellSize) / 2;
+      const aCenterY = a.posY * cellSize + (aDim * cellSize) / 2;
+      const bCenterX = b.posX * cellSize + (bDim * cellSize) / 2;
+      const bCenterY = b.posY * cellSize + (bDim * cellSize) / 2;
       const aDistSq =
         (aCenterX - perspectivePos.x) ** 2 + (aCenterY - perspectivePos.y) ** 2;
       const bDistSq =

@@ -15,7 +15,11 @@ import {
   getRandomObstacleType,
 } from "@boundless/shared/types/battle.types";
 import type { BattleMapConfig } from "@boundless/shared/types/battle-lobby.types";
-import { OBSTACLE_CONFIG } from "@boundless/shared/config";
+import {
+  OBSTACLE_CONFIG,
+  getObstacleDimension,
+  type ObstacleSize,
+} from "@boundless/shared/config";
 
 // Função simples para gerar ID único
 function generateObstacleId(): string {
@@ -189,14 +193,26 @@ export function generateBattleMap(
 // =============================================================================
 
 /**
- * Verifica se uma posição está ocupada por obstáculo
+ * Verifica se uma posição está ocupada por obstáculo (considerando tamanho)
  */
 export function isPositionBlocked(
   x: number,
   y: number,
   obstacles: BattleObstacle[]
 ): boolean {
-  return obstacles.some((obs) => obs.posX === x && obs.posY === y);
+  for (const obs of obstacles) {
+    const dimension = getObstacleDimension(
+      (obs.size || "SMALL") as ObstacleSize
+    );
+    for (let dx = 0; dx < dimension; dx++) {
+      for (let dy = 0; dy < dimension; dy++) {
+        if (obs.posX + dx === x && obs.posY + dy === y) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
 }
 
 /**
@@ -211,9 +227,16 @@ export function findRandomFreePosition(
 ): { x: number; y: number } | null {
   const allBlocked = new Set<string>();
 
-  // Marcar obstáculos
+  // Marcar obstáculos (considerando tamanho)
   for (const obs of obstacles) {
-    allBlocked.add(`${obs.posX},${obs.posY}`);
+    const dimension = getObstacleDimension(
+      (obs.size || "SMALL") as ObstacleSize
+    );
+    for (let dx = 0; dx < dimension; dx++) {
+      for (let dy = 0; dy < dimension; dy++) {
+        allBlocked.add(`${obs.posX + dx},${obs.posY + dy}`);
+      }
+    }
   }
 
   // Marcar posições ocupadas por unidades

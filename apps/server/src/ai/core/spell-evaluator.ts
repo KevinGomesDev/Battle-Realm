@@ -9,6 +9,7 @@ import {
   getValidAbilityTargets as getValidSpellTargets,
 } from "@boundless/shared/utils/ability-validation";
 import { getChebyshevDistance } from "@boundless/shared/utils/distance.utils";
+import { getUnitSizeDefinition, type UnitSize } from "@boundless/shared/config";
 import type { AIProfile } from "../types/ai.types";
 import { getEnemies, getAllies } from "./target-selection";
 
@@ -274,10 +275,23 @@ function evaluateMovementSpell(
     y: nearestEnemy.posY,
   };
 
-  // Verificar se posi��o � v�lida (n�o ocupada)
-  const isOccupied = allUnits.some(
-    (u) => u.isAlive && u.posX === targetPos.x && u.posY === targetPos.y
-  );
+  // Verificar se posi��o � v�lida (n�o ocupada - considerando tamanho)
+  let isOccupied = false;
+  for (const u of allUnits) {
+    if (!u.isAlive) continue;
+    const sizeDef = getUnitSizeDefinition(u.size as UnitSize);
+    const dimension = sizeDef.dimension;
+    for (let dx = 0; dx < dimension; dx++) {
+      for (let dy = 0; dy < dimension; dy++) {
+        if (u.posX + dx === targetPos.x && u.posY + dy === targetPos.y) {
+          isOccupied = true;
+          break;
+        }
+      }
+      if (isOccupied) break;
+    }
+    if (isOccupied) break;
+  }
 
   if (isOccupied) {
     return {

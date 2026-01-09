@@ -45,7 +45,7 @@ export {
 // OBSTÁCULOS - Interface (mantida aqui por ser tipo de dados)
 // =============================================================================
 
-import type { ObstacleType } from "../config";
+import type { ObstacleType, ObstacleSize } from "../config";
 
 /**
  * Obstáculo no grid de batalha
@@ -57,10 +57,12 @@ export interface BattleObstacle {
   posY: number;
   /** Tipo do obstáculo para renderização 2.5D */
   type: ObstacleType;
+  /** Tamanho do obstáculo (SMALL=1x1, MEDIUM=2x2, LARGE=3x3, HUGE=4x4) */
+  size: ObstacleSize;
   /** @deprecated Use 'type' - mantido apenas para compatibilidade */
   emoji?: string;
-  hp?: number; // HP do obstáculo (default: 5)
-  maxHp?: number; // HP máximo (default: 5)
+  hp?: number; // HP do obstáculo (default: baseado no tamanho)
+  maxHp?: number; // HP máximo (default: baseado no tamanho)
   destroyed?: boolean; // Se foi destruído
 }
 

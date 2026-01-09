@@ -36,6 +36,8 @@ export interface ObstacleForBlocking {
   posX: number;
   posY: number;
   destroyed?: boolean;
+  /** Tamanho do obstáculo para ocupar múltiplas células */
+  size?: "SMALL" | "MEDIUM" | "LARGE" | "HUGE";
 }
 
 /**
@@ -134,15 +136,62 @@ export function unitsToBlockers(
 }
 
 /**
- * Converte obstáculos em lista de bloqueadores
+ * Retorna a dimensão de um obstáculo baseada no tamanho
+ */
+export function getObstacleDimensionForBlocking(
+  size: "SMALL" | "MEDIUM" | "LARGE" | "HUGE" = "SMALL"
+): number {
+  switch (size) {
+    case "SMALL":
+      return 1;
+    case "MEDIUM":
+      return 2;
+    case "LARGE":
+      return 3;
+    case "HUGE":
+      return 4;
+    default:
+      return 1;
+  }
+}
+
+/**
+ * Obtém todas as células ocupadas por um obstáculo (considerando tamanho)
+ */
+export function getObstacleOccupiedCellsForBlocking(
+  obstacle: ObstacleForBlocking
+): Array<{ x: number; y: number }> {
+  const cells: Array<{ x: number; y: number }> = [];
+  const dimension = getObstacleDimensionForBlocking(obstacle.size);
+
+  for (let dx = 0; dx < dimension; dx++) {
+    for (let dy = 0; dy < dimension; dy++) {
+      cells.push({ x: obstacle.posX + dx, y: obstacle.posY + dy });
+    }
+  }
+
+  return cells;
+}
+
+/**
+ * Converte obstáculos em lista de bloqueadores (todas as células ocupadas)
  * @param obstacles Obstáculos para converter
  */
 export function obstaclesToBlockers(
   obstacles: ObstacleForBlocking[]
 ): BlockerPosition[] {
-  return obstacles
-    .filter((obs) => !obs.destroyed)
-    .map((obs) => ({ posX: obs.posX, posY: obs.posY }));
+  const blockers: BlockerPosition[] = [];
+  
+  for (const obs of obstacles) {
+    if (obs.destroyed) continue;
+    
+    const cells = getObstacleOccupiedCellsForBlocking(obs);
+    for (const cell of cells) {
+      blockers.push({ posX: cell.x, posY: cell.y });
+    }
+  }
+  
+  return blockers;
 }
 
 /**
@@ -229,15 +278,22 @@ export function isCellBlocked(
 /**
  * Verifica se uma célula está bloqueada apenas por obstáculo
  * Versão simplificada quando não precisa considerar unidades
+ * Considera o tamanho do obstáculo
  */
 export function isCellBlockedByObstacle(
   x: number,
   y: number,
   obstacles: ObstacleForBlocking[]
 ): boolean {
-  return obstacles.some(
-    (obs) => obs.posX === x && obs.posY === y && !obs.destroyed
-  );
+  for (const obs of obstacles) {
+    if (obs.destroyed) continue;
+    
+    const cells = getObstacleOccupiedCellsForBlocking(obs);
+    if (cells.some(cell => cell.x === x && cell.y === y)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // =============================================================================

@@ -134,6 +134,15 @@ export {
   OBSTACLE_VISUAL_CONFIG,
   getRandomObstacleType,
   getObstacleVisualConfig,
+  // Tamanho de obstáculos
+  type ObstacleSize,
+  type ObstacleSizeDefinition,
+  OBSTACLE_SIZE_CONFIG,
+  ALL_OBSTACLE_SIZES,
+  getObstacleSizeDefinition,
+  getObstacleDimension,
+  getObstacleOccupiedCells,
+  getRandomObstacleSize,
 } from "./obstacle.config";
 
 // =============================================================================

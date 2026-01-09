@@ -6,6 +6,12 @@ import type {
 } from "../../schemas";
 import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import type { AttackActionResult } from "../../../../abilities/executors/types";
+import {
+  getUnitSizeDefinition,
+  getObstacleDimension,
+  type UnitSize,
+  type ObstacleSize,
+} from "@boundless/shared/config";
 
 /**
  * Converte um BattleUnitSchema para BattleUnit (tipos simples)
@@ -93,18 +99,34 @@ export function isValidPosition(
     return false;
   }
 
-  // Verificar obstáculos
+  // Verificar obstáculos (considerando tamanho)
   for (const obs of state.obstacles) {
-    if (!obs.destroyed && obs.posX === x && obs.posY === y) {
-      return false;
+    if (obs.destroyed) continue;
+
+    const dimension = getObstacleDimension(obs.size as ObstacleSize);
+    for (let dx = 0; dx < dimension; dx++) {
+      for (let dy = 0; dy < dimension; dy++) {
+        if (obs.posX + dx === x && obs.posY + dy === y) {
+          return false;
+        }
+      }
     }
   }
 
-  // Verificar outras unidades
+  // Verificar outras unidades (considerando tamanho)
   let occupied = false;
   state.units.forEach((unit) => {
-    if (unit.isAlive && unit.posX === x && unit.posY === y) {
-      occupied = true;
+    if (!unit.isAlive) return;
+
+    const sizeDef = getUnitSizeDefinition(unit.size as UnitSize);
+    const dimension = sizeDef.dimension;
+    for (let dx = 0; dx < dimension; dx++) {
+      for (let dy = 0; dy < dimension; dy++) {
+        if (unit.posX + dx === x && unit.posY + dy === y) {
+          occupied = true;
+          return;
+        }
+      }
     }
   });
 

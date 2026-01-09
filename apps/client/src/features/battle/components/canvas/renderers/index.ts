@@ -12,11 +12,11 @@ export {
   drawSpeechBubble,
   drawTurnIndicator,
 } from "./unit.renderer";
+export { drawFogOfWar } from "./fog-of-war.renderer";
+export { drawTargetingPreview } from "./targeting.renderer";
 export {
-  drawFogOfWar,
-  drawTargetingPreview,
-  drawSpellRangeIndicator,
-  drawSpellAreaPreview,
+  drawAbilityRangeIndicator,
+  drawAbilityAreaPreview,
   calculateAreaPreviewCenter,
-  drawTeleportLine,
-} from "./overlay.renderer";
+} from "./ability-area.renderer";
+export { drawSingleTargetLine } from "./single-target-line.renderer";

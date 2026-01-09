@@ -16,7 +16,14 @@ import type {
   QTEResultForExecutor,
 } from "../types";
 import { isWithinRange } from "@boundless/shared/utils/distance.utils";
-import { OBSTACLE_CONFIG, type DamageTypeName } from "@boundless/shared/config";
+import {
+  OBSTACLE_CONFIG,
+  type DamageTypeName,
+  getUnitSizeDefinition,
+  getObstacleDimension,
+  type UnitSize,
+  type ObstacleSize,
+} from "@boundless/shared/config";
 import {
   shouldTransferDamageToEidolon,
   transferDamageToEidolon,
@@ -419,11 +426,20 @@ export function executeAttackSkill(
       return { success: false, error: "Posição fora de alcance" };
     }
 
-    // Verificar se há unidade na posição
-    const unitAtPos = allUnits.find(
-      (u) =>
-        u.posX === targetPosition.x && u.posY === targetPosition.y && u.isAlive
-    );
+    // Verificar se há unidade na posição (considerando tamanho)
+    const unitAtPos = allUnits.find((u) => {
+      if (!u.isAlive) return false;
+      const sizeDef = getUnitSizeDefinition(u.size as UnitSize);
+      const dimension = sizeDef.dimension;
+      for (let dx = 0; dx < dimension; dx++) {
+        for (let dy = 0; dy < dimension; dy++) {
+          if (u.posX + dx === targetPosition.x && u.posY + dy === targetPosition.y) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
     if (unitAtPos) {
       // Precisa de QTE
       return {
@@ -434,13 +450,19 @@ export function executeAttackSkill(
       };
     }
 
-    // Verificar se há obstáculo na posição
-    const obstacleAtPos = context?.obstacles?.find(
-      (o) =>
-        o.posX === targetPosition.x &&
-        o.posY === targetPosition.y &&
-        !o.destroyed
-    );
+    // Verificar se há obstáculo na posição (considerando tamanho)
+    const obstacleAtPos = context?.obstacles?.find((o) => {
+      if (o.destroyed) return false;
+      const dimension = getObstacleDimension((o.size || "SMALL") as ObstacleSize);
+      for (let dx = 0; dx < dimension; dx++) {
+        for (let dy = 0; dy < dimension; dy++) {
+          if (o.posX + dx === targetPosition.x && o.posY + dy === targetPosition.y) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
     if (obstacleAtPos) {
       // Ataque em obstáculo - executa direto
       const obstacle = {
@@ -448,6 +470,7 @@ export function executeAttackSkill(
         posX: obstacleAtPos.posX,
         posY: obstacleAtPos.posY,
         type: "default" as any,
+        size: (obstacleAtPos.size || "SMALL") as any,
         hp: obstacleAtPos.hp || 0,
         destroyed: obstacleAtPos.destroyed || false,
       };

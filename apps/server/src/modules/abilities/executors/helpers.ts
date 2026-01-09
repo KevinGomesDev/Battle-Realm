@@ -59,6 +59,7 @@ function toTravelObstacle(obstacle: BattleObstacle): TravelObstacle {
     posX: obstacle.posX,
     posY: obstacle.posY,
     destroyed: obstacle.destroyed,
+    size: obstacle.size,
   };
 }
 

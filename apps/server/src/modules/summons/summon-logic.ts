@@ -13,6 +13,7 @@ import {
   MAGICAL_PROTECTION_CONFIG,
   getMaxMarksByCategory,
   type UnitSize,
+  getUnitSizeDefinition,
 } from "@boundless/shared/config";
 import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import { applyDamage } from "../combat/damage.utils";
@@ -166,13 +167,26 @@ export function findAdjacentFreePosition(
     // Verificar limites do grid
     if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) continue;
 
-    // Verificar se há unidade no local
-    const occupied = allUnits.some(
-      (u) => u.isAlive && u.posX === x && u.posY === y
-    );
+    // Verificar se há unidade no local (considerando tamanho)
+    let occupied = false;
+    for (const u of allUnits) {
+      if (!u.isAlive) continue;
+      const sizeDef = getUnitSizeDefinition(u.size as UnitSize);
+      const dimension = sizeDef.dimension;
+      for (let ux = 0; ux < dimension; ux++) {
+        for (let uy = 0; uy < dimension; uy++) {
+          if (u.posX + ux === x && u.posY + uy === y) {
+            occupied = true;
+            break;
+          }
+        }
+        if (occupied) break;
+      }
+      if (occupied) break;
+    }
     if (occupied) continue;
 
-    // Verificar obstáculos
+    // Verificar obstáculos (já vem como células ocupadas)
     const hasObstacle = obstacles.some((o) => o.x === x && o.y === y);
     if (hasObstacle) continue;
 

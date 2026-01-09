@@ -23,6 +23,10 @@ import {
   MANA_CONFIG,
   calculateUnitVision,
   getMaxMarksByCategory,
+  getUnitSizeDefinition,
+  getObstacleDimension,
+  type UnitSize,
+  type ObstacleSize,
 } from "@boundless/shared/config";
 
 /**
@@ -48,24 +52,39 @@ function randomBetween(min: number, max: number): number {
 
 /**
  * Encontra uma posição aleatória livre no grid
+ * Considera tamanho de unidades e obstáculos
  */
 function findRandomFreePosition(
   context: CommandExecutionContext
 ): { x: number; y: number } | null {
   const { battleState, gridWidth, gridHeight } = context;
 
-  // Coletar posições ocupadas
+  // Coletar posições ocupadas (considerando tamanhos)
   const occupied = new Set<string>();
 
   battleState.units.forEach((unit) => {
     if (unit.isAlive) {
-      occupied.add(`${unit.posX},${unit.posY}`);
+      const dimension = getUnitSizeDefinition(
+        (unit.size as UnitSize) || "NORMAL"
+      ).dimension;
+      for (let dx = 0; dx < dimension; dx++) {
+        for (let dy = 0; dy < dimension; dy++) {
+          occupied.add(`${unit.posX + dx},${unit.posY + dy}`);
+        }
+      }
     }
   });
 
   battleState.obstacles.forEach((obs) => {
     if (!obs.destroyed) {
-      occupied.add(`${obs.posX},${obs.posY}`);
+      const dimension = getObstacleDimension(
+        (obs.size as ObstacleSize) || "SMALL"
+      );
+      for (let dx = 0; dx < dimension; dx++) {
+        for (let dy = 0; dy < dimension; dy++) {
+          occupied.add(`${obs.posX + dx},${obs.posY + dy}`);
+        }
+      }
     }
   });
 

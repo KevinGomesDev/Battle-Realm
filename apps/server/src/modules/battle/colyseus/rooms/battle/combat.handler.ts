@@ -6,7 +6,13 @@ import type {
   BattleObstacleSchema,
 } from "../../schemas";
 import type { BattleUnit } from "@boundless/shared/types/battle.types";
-import type { ObstacleType } from "@boundless/shared/config";
+import {
+  type ObstacleType,
+  getUnitSizeDefinition,
+  getObstacleDimension,
+  type UnitSize,
+  type ObstacleSize,
+} from "@boundless/shared/config";
 import { isWithinRange } from "@boundless/shared/utils/distance.utils";
 import { executeAttack } from "../../../../abilities/executors";
 import { createAndEmitEvent } from "../../../../match/services/event.service";
@@ -163,22 +169,45 @@ function handlePositionAttack(
     return;
   }
 
-  // Verificar se há uma unidade na posição
-  const unitAtPosition = Array.from(state.units.values()).find(
-    (u) =>
-      u.posX === targetPosition.x && u.posY === targetPosition.y && u.isAlive
-  );
+  // Verificar se há uma unidade na posição (considerando tamanho)
+  const unitAtPosition = Array.from(state.units.values()).find((u) => {
+    if (!u.isAlive) return false;
+    const sizeDef = getUnitSizeDefinition(u.size as UnitSize);
+    const dimension = sizeDef.dimension;
+    for (let dx = 0; dx < dimension; dx++) {
+      for (let dy = 0; dy < dimension; dy++) {
+        if (
+          u.posX + dx === targetPosition.x &&
+          u.posY + dy === targetPosition.y
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  });
 
   if (unitAtPosition) {
     handleUnitAttack(client, attacker, unitAtPosition.id, state, startQTEFn);
     return;
   }
 
-  // Verificar se há um obstáculo na posição
-  const obstacleAtPosition = Array.from(state.obstacles.values()).find(
-    (o) =>
-      o.posX === targetPosition.x && o.posY === targetPosition.y && !o.destroyed
-  );
+  // Verificar se há um obstáculo na posição (considerando tamanho)
+  const obstacleAtPosition = Array.from(state.obstacles.values()).find((o) => {
+    if (o.destroyed) return false;
+    const dimension = getObstacleDimension(o.size as ObstacleSize);
+    for (let dx = 0; dx < dimension; dx++) {
+      for (let dy = 0; dy < dimension; dy++) {
+        if (
+          o.posX + dx === targetPosition.x &&
+          o.posY + dy === targetPosition.y
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  });
 
   if (obstacleAtPosition) {
     handleObstacleAttack(

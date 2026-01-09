@@ -4,6 +4,133 @@
 import type { TerrainType, TerritorySize } from "./terrain.config";
 
 // =============================================================================
+// TAMANHO DE OBSTÁCULOS
+// =============================================================================
+
+export type ObstacleSize = "SMALL" | "MEDIUM" | "LARGE" | "HUGE";
+
+export interface ObstacleSizeDefinition {
+  key: ObstacleSize;
+  name: string;
+  /** Dimensão em blocos (NxN) */
+  dimension: number;
+  /** Número total de células ocupadas */
+  cells: number;
+  /** HP base para este tamanho */
+  baseHp: number;
+  /** Peso para spawn aleatório (maior = mais comum) */
+  spawnWeight: number;
+  /** Descrição para UI */
+  description: string;
+}
+
+export const OBSTACLE_SIZE_CONFIG: Record<
+  ObstacleSize,
+  ObstacleSizeDefinition
+> = {
+  SMALL: {
+    key: "SMALL",
+    name: "Pequeno",
+    dimension: 1,
+    cells: 1,
+    baseHp: 3,
+    spawnWeight: 50,
+    description: "Obstáculo pequeno (1x1)",
+  },
+  MEDIUM: {
+    key: "MEDIUM",
+    name: "Médio",
+    dimension: 2,
+    cells: 4,
+    baseHp: 8,
+    spawnWeight: 30,
+    description: "Obstáculo médio (2x2)",
+  },
+  LARGE: {
+    key: "LARGE",
+    name: "Grande",
+    dimension: 3,
+    cells: 9,
+    baseHp: 15,
+    spawnWeight: 15,
+    description: "Obstáculo grande (3x3)",
+  },
+  HUGE: {
+    key: "HUGE",
+    name: "Enorme",
+    dimension: 4,
+    cells: 16,
+    baseHp: 25,
+    spawnWeight: 5,
+    description: "Obstáculo enorme (4x4)",
+  },
+};
+
+export const ALL_OBSTACLE_SIZES: ObstacleSize[] = [
+  "SMALL",
+  "MEDIUM",
+  "LARGE",
+  "HUGE",
+];
+
+/**
+ * Retorna a definição de tamanho do obstáculo
+ */
+export function getObstacleSizeDefinition(
+  size: ObstacleSize
+): ObstacleSizeDefinition {
+  return OBSTACLE_SIZE_CONFIG[size];
+}
+
+/**
+ * Retorna a dimensão de um obstáculo baseado no tamanho
+ */
+export function getObstacleDimension(size: ObstacleSize = "SMALL"): number {
+  return OBSTACLE_SIZE_CONFIG[size].dimension;
+}
+
+/**
+ * Retorna todas as células ocupadas por um obstáculo baseado em sua posição e tamanho
+ */
+export function getObstacleOccupiedCells(
+  posX: number,
+  posY: number,
+  size: ObstacleSize
+): { x: number; y: number }[] {
+  const dimension = OBSTACLE_SIZE_CONFIG[size].dimension;
+  const cells: { x: number; y: number }[] = [];
+
+  for (let dx = 0; dx < dimension; dx++) {
+    for (let dy = 0; dy < dimension; dy++) {
+      cells.push({ x: posX + dx, y: posY + dy });
+    }
+  }
+
+  return cells;
+}
+
+/**
+ * Retorna um tamanho de obstáculo aleatório baseado nos pesos de spawn
+ */
+export function getRandomObstacleSize(): ObstacleSize {
+  const totalWeight = ALL_OBSTACLE_SIZES.reduce(
+    (sum, size) => sum + OBSTACLE_SIZE_CONFIG[size].spawnWeight,
+    0
+  );
+
+  let random = Math.random() * totalWeight;
+
+  for (const size of ALL_OBSTACLE_SIZES) {
+    random -= OBSTACLE_SIZE_CONFIG[size].spawnWeight;
+    if (random <= 0) {
+      return size;
+    }
+  }
+
+  return "SMALL"; // Fallback
+}
+
+// =============================================================================
 // CONFIGURAÇÃO GERAL DE OBSTÁCULOS
 // =============================================================================
 

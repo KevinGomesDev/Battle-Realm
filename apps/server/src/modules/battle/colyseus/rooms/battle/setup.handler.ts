@@ -9,6 +9,9 @@ import {
   getRandomBattleSize,
   getObstacleCount,
   getRandomObstacleType,
+  getRandomObstacleSize,
+  getObstacleSizeDefinition,
+  getObstacleOccupiedCells,
 } from "@boundless/shared/config";
 import { serializeConfig } from "./utils";
 import { persistBattle } from "../../../../../workers/persistence.worker";
@@ -151,6 +154,7 @@ export async function startBattle(
       posX: o.posX,
       posY: o.posY,
       type: o.type,
+      size: o.size,
       hp: o.hp,
       maxHp: o.maxHp,
       destroyed: o.destroyed,
@@ -216,7 +220,7 @@ export async function startBattle(
 }
 
 /**
- * Gera obstáculos no mapa
+ * Gera obstáculos no mapa com tamanhos variados
  */
 export function generateObstacles(
   state: BattleSessionState,
@@ -224,12 +228,13 @@ export function generateObstacles(
 ): void {
   const usedPositions = new Set<string>();
 
-  // Reservar posições de spawn
+  // Reservar posições de spawn (maior área para acomodar unidades grandes)
   state.players.forEach((_, idx) => {
-    const spawnX = idx === 0 ? 1 : state.gridWidth - 2;
-    for (let y = 0; y < Math.min(3, state.gridHeight); y++) {
-      usedPositions.add(`${spawnX},${y}`);
-      usedPositions.add(`${spawnX + 1},${y}`);
+    const spawnX = idx === 0 ? 0 : state.gridWidth - 4;
+    for (let dx = 0; dx < 4; dx++) {
+      for (let y = 0; y < Math.min(5, state.gridHeight); y++) {
+        usedPositions.add(`${spawnX + dx},${y}`);
+      }
     }
   });
 
@@ -238,21 +243,44 @@ export function generateObstacles(
 
   for (let i = 0; i < count; i++) {
     let attempts = 0;
-    while (attempts < 50) {
-      const x = Math.floor(Math.random() * state.gridWidth);
-      const y = Math.floor(Math.random() * state.gridHeight);
-      const key = `${x},${y}`;
+    while (attempts < 100) {
+      // Sortear tamanho do obstáculo
+      const obstacleSize = getRandomObstacleSize();
+      const sizeDef = getObstacleSizeDefinition(obstacleSize);
+      const dimension = sizeDef.dimension;
 
-      if (!usedPositions.has(key)) {
-        usedPositions.add(key);
+      // Gerar posição que caiba o obstáculo no grid
+      const maxX = state.gridWidth - dimension;
+      const maxY = state.gridHeight - dimension;
+
+      if (maxX < 0 || maxY < 0) {
+        attempts++;
+        continue;
+      }
+
+      const x = Math.floor(Math.random() * (maxX + 1));
+      const y = Math.floor(Math.random() * (maxY + 1));
+
+      // Verificar se todas as células do obstáculo estão livres
+      const cellsToOccupy = getObstacleOccupiedCells(x, y, obstacleSize);
+      const allCellsFree = cellsToOccupy.every(
+        (cell) => !usedPositions.has(`${cell.x},${cell.y}`)
+      );
+
+      if (allCellsFree) {
+        // Marcar todas as células como usadas
+        cellsToOccupy.forEach((cell) => {
+          usedPositions.add(`${cell.x},${cell.y}`);
+        });
 
         const obstacle = new BattleObstacleSchema();
         obstacle.id = `obs_${i}`;
         obstacle.posX = x;
         obstacle.posY = y;
         obstacle.type = getRandomObstacleType(terrainType);
-        obstacle.hp = 5;
-        obstacle.maxHp = 5;
+        obstacle.size = obstacleSize;
+        obstacle.hp = sizeDef.baseHp;
+        obstacle.maxHp = sizeDef.baseHp;
         obstacle.destroyed = false;
 
         state.obstacles.push(obstacle);

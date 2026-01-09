@@ -83,10 +83,12 @@ export class BattleObstacleSchema extends Schema {
   @type("number") posY: number = 0;
   /** Tipo do obstáculo para renderização 2.5D */
   @type("string") type: string = "ROCK";
+  /** Tamanho do obstáculo (SMALL=1x1, MEDIUM=2x2, LARGE=3x3, HUGE=4x4) */
+  @type("string") size: string = "SMALL";
   /** @deprecated Use 'type' - mantido apenas para compatibilidade */
   @type("string") emoji: string = "";
-  @type("number") hp: number = 5;
-  @type("number") maxHp: number = 5;
+  @type("number") hp: number = 3;
+  @type("number") maxHp: number = 3;
   @type("boolean") destroyed: boolean = false;
 }
 

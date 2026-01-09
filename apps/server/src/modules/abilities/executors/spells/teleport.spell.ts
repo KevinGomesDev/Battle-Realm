@@ -7,6 +7,7 @@ import type {
   AbilityExecutionContext,
 } from "@boundless/shared/types/ability.types";
 import type { BattleUnit } from "@boundless/shared/types/battle.types";
+import { getUnitSizeDefinition, type UnitSize } from "@boundless/shared/config";
 
 /**
  * 🌀 TELEPORT - Move instantaneamente para uma posição
@@ -29,10 +30,23 @@ export function executeTeleport(
 
   const position = target as { x: number; y: number };
 
-  // Validação específica: verificar se a posição não está ocupada
-  const occupied = allUnits.some(
-    (u) => u.isAlive && u.posX === position.x && u.posY === position.y
-  );
+  // Validação específica: verificar se a posição não está ocupada (considerando tamanho)
+  let occupied = false;
+  for (const u of allUnits) {
+    if (!u.isAlive) continue;
+    const sizeDef = getUnitSizeDefinition(u.size as UnitSize);
+    const dimension = sizeDef.dimension;
+    for (let dx = 0; dx < dimension; dx++) {
+      for (let dy = 0; dy < dimension; dy++) {
+        if (u.posX + dx === position.x && u.posY + dy === position.y) {
+          occupied = true;
+          break;
+        }
+      }
+      if (occupied) break;
+    }
+    if (occupied) break;
+  }
   if (occupied) {
     return {
       success: false,

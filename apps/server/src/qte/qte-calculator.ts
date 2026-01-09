@@ -26,6 +26,12 @@ import {
   QTE_DAMAGE_MULTIPLIERS,
   PERFECT_DODGE_BUFF,
 } from "@boundless/shared/qte";
+import {
+  getUnitSizeDefinition,
+  getObstacleDimension,
+  type UnitSize,
+  type ObstacleSize,
+} from "@boundless/shared/config";
 
 /**
  * Gera um ID único simples para QTE
@@ -160,20 +166,45 @@ export function calculateBlockedCells(
       continue;
     }
 
-    // Ocupado por outra unidade viva
-    const unitInCell = allUnits.find(
-      (u) => u.isAlive && u.posX === newX && u.posY === newY
-    );
-    if (unitInCell) {
+    // Ocupado por outra unidade viva (considerando tamanho)
+    let unitBlocks = false;
+    for (const u of allUnits) {
+      if (!u.isAlive) continue;
+      const sizeDef = getUnitSizeDefinition(u.size as UnitSize);
+      const dimension = sizeDef.dimension;
+      for (let ux = 0; ux < dimension; ux++) {
+        for (let uy = 0; uy < dimension; uy++) {
+          if (u.posX + ux === newX && u.posY + uy === newY) {
+            unitBlocks = true;
+            break;
+          }
+        }
+        if (unitBlocks) break;
+      }
+      if (unitBlocks) break;
+    }
+    if (unitBlocks) {
       blockedCells.push({ x: newX, y: newY });
       continue;
     }
 
-    // Ocupado por obstáculo não destruído
-    const obstacleInCell = obstacles.find(
-      (o) => !o.destroyed && o.posX === newX && o.posY === newY
-    );
-    if (obstacleInCell) {
+    // Ocupado por obstáculo não destruído (considerando tamanho)
+    let obstacleBlocks = false;
+    for (const o of obstacles) {
+      if (o.destroyed) continue;
+      const dimension = getObstacleDimension(o.size as ObstacleSize);
+      for (let ox = 0; ox < dimension; ox++) {
+        for (let oy = 0; oy < dimension; oy++) {
+          if (o.posX + ox === newX && o.posY + oy === newY) {
+            obstacleBlocks = true;
+            break;
+          }
+        }
+        if (obstacleBlocks) break;
+      }
+      if (obstacleBlocks) break;
+    }
+    if (obstacleBlocks) {
       blockedCells.push({ x: newX, y: newY });
     }
   }

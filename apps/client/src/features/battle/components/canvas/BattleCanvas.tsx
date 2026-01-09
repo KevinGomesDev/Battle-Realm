@@ -52,10 +52,10 @@ import {
   drawTurnIndicator,
   drawFogOfWar,
   drawTargetingPreview,
-  drawSpellRangeIndicator,
-  drawSpellAreaPreview,
+  drawAbilityRangeIndicator,
+  drawAbilityAreaPreview,
   calculateAreaPreviewCenter,
-  drawTeleportLine,
+  drawSingleTargetLine,
 } from "./renderers";
 
 // Components
@@ -94,9 +94,9 @@ export const BattleCanvas = memo(
         unitDirection,
         pendingAction,
         activeBubbles,
-        spellAreaPreview,
+        abilityAreaPreview,
         targetingPreview,
-        teleportLinePreview,
+        singleTargetLinePreview,
       },
       ref
     ) => {
@@ -338,7 +338,7 @@ export const BattleCanvas = memo(
           attackableCells,
           hoveredCell,
           gridColors: GRID_COLORS,
-          hasSpellAreaPreview: !!spellAreaPreview,
+          hasAbilityAreaPreview: !!abilityAreaPreview,
         });
 
         // Targeting Preview
@@ -353,11 +353,11 @@ export const BattleCanvas = memo(
           });
         }
 
-        // Spell Range Indicator
-        if (spellAreaPreview) {
-          drawSpellRangeIndicator({
+        // Ability Range Indicator
+        if (abilityAreaPreview) {
+          drawAbilityRangeIndicator({
             ctx,
-            spellAreaPreview,
+            abilityAreaPreview,
             gridWidth: GRID_WIDTH,
             gridHeight: GRID_HEIGHT,
             cellSize,
@@ -365,17 +365,17 @@ export const BattleCanvas = memo(
           });
         }
 
-        // Spell Area Preview
+        // Ability Area Preview
         const areaPreviewCenter = calculateAreaPreviewCenter(
-          spellAreaPreview ?? null,
+          abilityAreaPreview ?? null,
           selectedUnit,
           hoveredCell
         );
 
-        if (spellAreaPreview && areaPreviewCenter) {
-          drawSpellAreaPreview({
+        if (abilityAreaPreview && areaPreviewCenter) {
+          drawAbilityAreaPreview({
             ctx,
-            spellAreaPreview,
+            abilityAreaPreview,
             centerPos: areaPreviewCenter,
             units,
             obstacles: OBSTACLES,
@@ -387,11 +387,11 @@ export const BattleCanvas = memo(
           });
         }
 
-        // Teleport Line Preview
-        if (teleportLinePreview) {
-          drawTeleportLine({
+        // Single Target Line Preview (Teleport, etc)
+        if (singleTargetLinePreview) {
+          drawSingleTargetLine({
             ctx,
-            teleportPreview: teleportLinePreview,
+            singleTargetPreview: singleTargetLinePreview,
             hoveredCell,
             cellSize,
             animationTime: animationTimeRef.current,
@@ -576,7 +576,7 @@ export const BattleCanvas = memo(
         OBSTACLES,
         activeBubbles,
         targetingPreview,
-        spellAreaPreview,
+        abilityAreaPreview,
         selectedUnit,
         selectedUnitId,
         isMyTurn,

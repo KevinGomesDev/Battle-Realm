@@ -13,7 +13,7 @@ interface DrawCellHighlightsParams {
   attackableCells: Set<string>;
   hoveredCell: Position | null;
   gridColors: GridColors;
-  hasSpellAreaPreview: boolean;
+  hasAbilityAreaPreview: boolean;
 }
 
 /**
@@ -26,7 +26,7 @@ export function drawCellHighlights({
   attackableCells,
   hoveredCell,
   gridColors,
-  hasSpellAreaPreview,
+  hasAbilityAreaPreview,
 }: DrawCellHighlightsParams): void {
   // Desenhar células movíveis
   movableCellsMap.forEach((cellInfo, cellKey) => {

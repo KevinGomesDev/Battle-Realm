@@ -3,6 +3,7 @@ import type { Client, Room } from "@colyseus/core";
 import type { BattleSessionState, BattleUnitSchema } from "../../schemas";
 import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import type { CommandPayload } from "@boundless/shared/types/commands.types";
+import { getUnitSizeDefinition, type UnitSize } from "@boundless/shared/config";
 import { findAbilityByCode } from "@boundless/shared/data/abilities.data";
 import { executeSkill } from "../../../../abilities/executors";
 import { handleCommand } from "../../../../match/commands";
@@ -170,10 +171,20 @@ function handleUseAbility(
     | undefined;
 
   if (targetPos) {
-    // Buscar unidade viva na posição alvo
-    const targetUnit = allUnits.find(
-      (u) => u.isAlive && u.posX === targetPos.x && u.posY === targetPos.y
-    );
+    // Buscar unidade viva na posição alvo (considerando tamanho)
+    const targetUnit = allUnits.find((u) => {
+      if (!u.isAlive) return false;
+      const sizeDef = getUnitSizeDefinition(u.size as UnitSize);
+      const dimension = sizeDef.dimension;
+      for (let dx = 0; dx < dimension; dx++) {
+        for (let dy = 0; dy < dimension; dy++) {
+          if (u.posX + dx === targetPos.x && u.posY + dy === targetPos.y) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
     if (targetUnit) {
       target = targetUnit;
     }
