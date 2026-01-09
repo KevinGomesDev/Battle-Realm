@@ -21,17 +21,58 @@ interface DrawObstacle3DParams {
 }
 
 /**
- * Desenha uma face do bloco 3D
+ * Função hash determinística para posição (igual ao grid.renderer)
+ * Cria padrão "aleatório" consistente para mesma posição
  */
-function drawFace(
+function hashPosition(x: number, y: number): number {
+  const hash = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return hash - Math.floor(hash);
+}
+
+/**
+ * Escurece uma cor hex por uma porcentagem
+ */
+function darkenColor(hex: string, percent: number): string {
+  const num = parseInt(hex.replace("#", ""), 16);
+  const r = Math.max(0, Math.floor((num >> 16) * (1 - percent)));
+  const g = Math.max(0, Math.floor(((num >> 8) & 0x00ff) * (1 - percent)));
+  const b = Math.max(0, Math.floor((num & 0x0000ff) * (1 - percent)));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+}
+
+/**
+ * Clareia uma cor hex por uma porcentagem
+ */
+function lightenColor(hex: string, percent: number): string {
+  const num = parseInt(hex.replace("#", ""), 16);
+  const r = Math.min(
+    255,
+    Math.floor((num >> 16) + (255 - (num >> 16)) * percent)
+  );
+  const g = Math.min(
+    255,
+    Math.floor(((num >> 8) & 0x00ff) + (255 - ((num >> 8) & 0x00ff)) * percent)
+  );
+  const b = Math.min(
+    255,
+    Math.floor((num & 0x0000ff) + (255 - (num & 0x0000ff)) * percent)
+  );
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+}
+
+/**
+ * Desenha uma face do bloco 3D com textura sutil
+ */
+function drawFaceWithTexture(
   ctx: CanvasRenderingContext2D,
   points: Position[],
-  fillColor: string,
-  strokeColor: string = "#000"
+  baseColor: string,
+  obstacleX: number,
+  obstacleY: number,
+  faceIndex: number
 ): void {
-  ctx.fillStyle = fillColor;
-  ctx.strokeStyle = strokeColor;
-  ctx.lineWidth = 0.5;
+  // Desenhar face base
+  ctx.fillStyle = baseColor;
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
   for (let i = 1; i < points.length; i++) {
@@ -39,12 +80,24 @@ function drawFace(
   }
   ctx.closePath();
   ctx.fill();
+
+  // Adicionar textura sutil (variação baseada em hash)
+  const hash = hashPosition(obstacleX * 7 + faceIndex, obstacleY * 11);
+  if (hash > 0.5) {
+    ctx.fillStyle = lightenColor(baseColor, 0.08);
+    ctx.fill();
+  }
+
+  // Borda sutil interna (mais suave que linha preta)
+  ctx.strokeStyle = darkenColor(baseColor, 0.15) + "60";
+  ctx.lineWidth = 1;
   ctx.stroke();
 }
 
 /**
  * Desenha um obstáculo com efeito 2.5D baseado na posição da perspectiva
  * Suporta tamanhos variados (dimension x dimension células)
+ * Estilo integrado com o terreno do grid
  */
 export function drawObstacle3D({
   ctx,
@@ -82,7 +135,7 @@ export function drawObstacle3D({
     vecY * perspectiveStrength * config.heightScale * heightMultiplier;
 
   // Tamanho do bloco (ligeiramente menor que o total de células para dar espaço)
-  const blockSize = obstacleSize * 0.9;
+  const blockSize = obstacleSize * 0.88;
   const offset = (obstacleSize - blockSize) / 2;
 
   // Cantos da base
@@ -97,22 +150,68 @@ export function drawObstacle3D({
   const tBR = { x: bBR.x + shiftX, y: bBR.y + shiftY };
   const tBL = { x: bBL.x + shiftX, y: bBL.y + shiftY };
 
-  // Face Y (Norte ou Sul)
+  // Sombra suave no chão (integração com terreno)
+  ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
+  ctx.beginPath();
+  ctx.moveTo(bTL.x + 2, bTL.y + 2);
+  ctx.lineTo(bTR.x + 2, bTR.y + 2);
+  ctx.lineTo(bBR.x + 2, bBR.y + 2);
+  ctx.lineTo(bBL.x + 2, bBL.y + 2);
+  ctx.closePath();
+  ctx.fill();
+
+  // Face Y (Norte ou Sul) - com textura
   if (vecY > 0) {
-    drawFace(ctx, [bTL, bTR, tTR, tTL], config.sideYColor);
+    drawFaceWithTexture(
+      ctx,
+      [bTL, bTR, tTR, tTL],
+      config.sideYColor,
+      obstacle.posX,
+      obstacle.posY,
+      0
+    );
   } else {
-    drawFace(ctx, [bBL, bBR, tBR, tBL], config.sideYColor);
+    drawFaceWithTexture(
+      ctx,
+      [bBL, bBR, tBR, tBL],
+      config.sideYColor,
+      obstacle.posX,
+      obstacle.posY,
+      1
+    );
   }
 
-  // Face X (Oeste ou Leste)
+  // Face X (Oeste ou Leste) - com textura
   if (vecX > 0) {
-    drawFace(ctx, [bTL, bBL, tBL, tTL], config.sideXColor);
+    drawFaceWithTexture(
+      ctx,
+      [bTL, bBL, tBL, tTL],
+      config.sideXColor,
+      obstacle.posX,
+      obstacle.posY,
+      2
+    );
   } else {
-    drawFace(ctx, [bTR, bBR, tBR, tTR], config.sideXColor);
+    drawFaceWithTexture(
+      ctx,
+      [bTR, bBR, tBR, tTR],
+      config.sideXColor,
+      obstacle.posX,
+      obstacle.posY,
+      3
+    );
   }
 
-  // Topo
-  ctx.fillStyle = config.topColor;
+  // Topo com textura e variação
+  const topHash = hashPosition(obstacle.posX * 13, obstacle.posY * 17);
+  let topColor = config.topColor;
+  if (topHash > 0.6) {
+    topColor = lightenColor(config.topColor, 0.1);
+  } else if (topHash < 0.3) {
+    topColor = darkenColor(config.topColor, 0.08);
+  }
+
+  ctx.fillStyle = topColor;
   ctx.beginPath();
   ctx.moveTo(tTL.x, tTL.y);
   ctx.lineTo(tTR.x, tTR.y);
@@ -121,11 +220,27 @@ export function drawObstacle3D({
   ctx.closePath();
   ctx.fill();
 
-  // Borda do topo (highlight)
+  // Borda sutil do topo (highlight suave, não mais linha grossa)
   if (config.highlightColor) {
-    ctx.strokeStyle = config.highlightColor;
-    ctx.lineWidth = 1 + (dimension - 1) * 0.5; // Borda mais grossa para obstáculos maiores
+    ctx.strokeStyle = config.highlightColor + "80"; // 50% opacity
+    ctx.lineWidth = 1;
     ctx.stroke();
+  }
+
+  // Detalhes decorativos no topo (similar ao grid)
+  const detailHash = hashPosition(obstacle.posX * 5, obstacle.posY * 9);
+  if (detailHash > 0.65) {
+    const detailColor = darkenColor(config.topColor, 0.12) + "50";
+    ctx.fillStyle = detailColor;
+    const detailX = tTL.x + (tTR.x - tTL.x) * detailHash * 0.5 + 2;
+    const detailY =
+      tTL.y +
+      (tBL.y - tTL.y) *
+        hashPosition(obstacle.posX * 3, obstacle.posY * 7) *
+        0.5 +
+      2;
+    const detailSize = 2 + Math.floor(detailHash * 2);
+    ctx.fillRect(detailX, detailY, detailSize, detailSize);
   }
 }
 
@@ -189,6 +304,7 @@ export function drawAllObstacles({
 
 /**
  * Calcula a posição de perspectiva baseada nas unidades do jogador
+ * Usa posição visual interpolada para transição suave
  */
 export function calculatePerspectivePosition(
   selectedUnitId: string | null,
@@ -202,7 +318,12 @@ export function calculatePerspectivePosition(
   currentUserId: string,
   cellSize: number,
   gridWidth: number,
-  gridHeight: number
+  gridHeight: number,
+  getVisualPosition?: (
+    unitId: string,
+    logicalX: number,
+    logicalY: number
+  ) => { x: number; y: number }
 ): Position {
   const gridCenterX = (gridWidth * cellSize) / 2;
   const gridCenterY = (gridHeight * cellSize) / 2;
@@ -214,9 +335,18 @@ export function calculatePerspectivePosition(
     : null;
 
   if (perspectiveUnit && perspectiveUnit.isAlive) {
+    // Usar posição visual interpolada se disponível
+    const visualPos = getVisualPosition
+      ? getVisualPosition(
+          perspectiveUnit.id,
+          perspectiveUnit.posX,
+          perspectiveUnit.posY
+        )
+      : { x: perspectiveUnit.posX, y: perspectiveUnit.posY };
+
     perspectivePos = {
-      x: perspectiveUnit.posX * cellSize + cellSize / 2,
-      y: perspectiveUnit.posY * cellSize + cellSize / 2,
+      x: visualPos.x * cellSize + cellSize / 2,
+      y: visualPos.y * cellSize + cellSize / 2,
     };
   } else {
     // Fallback: usar a unidade do jogador mais próxima do centro do grid
@@ -240,9 +370,14 @@ export function calculatePerspectivePosition(
         }
       }
 
+      // Usar posição visual interpolada se disponível
+      const visualPos = getVisualPosition
+        ? getVisualPosition(closestUnit.id, closestUnit.posX, closestUnit.posY)
+        : { x: closestUnit.posX, y: closestUnit.posY };
+
       perspectivePos = {
-        x: closestUnit.posX * cellSize + cellSize / 2,
-        y: closestUnit.posY * cellSize + cellSize / 2,
+        x: visualPos.x * cellSize + cellSize / 2,
+        y: visualPos.y * cellSize + cellSize / 2,
       };
     }
   }

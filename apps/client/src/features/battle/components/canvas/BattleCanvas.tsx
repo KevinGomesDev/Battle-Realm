@@ -400,14 +400,15 @@ export const BattleCanvas = memo(
           });
         }
 
-        // Obstáculos 3D
+        // Obstáculos 3D - usa posição visual interpolada para perspectiva suave
         const perspectivePos = calculatePerspectivePosition(
           selectedUnitId,
           units,
           currentUserId,
           cellSize,
           GRID_WIDTH,
-          GRID_HEIGHT
+          GRID_HEIGHT,
+          getVisualPosition
         );
 
         drawAllObstacles({
