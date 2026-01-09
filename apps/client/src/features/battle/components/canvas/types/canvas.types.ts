@@ -153,6 +153,14 @@ export interface BattleCanvasRef {
     /** Callback quando projétil chegar ao destino */
     onComplete?: () => void;
   }) => void;
+  /** Disparar efeito de Hit Stop (freeze + shake + partículas) */
+  triggerHitStop: (
+    cellX: number,
+    cellY: number,
+    damage: number,
+    maxHp: number,
+    isCritical?: boolean
+  ) => void;
 }
 
 /** Contexto de renderização para os renderers */

@@ -58,3 +58,6 @@ export {
   type SummonTemplate,
   type KingdomTemplateDefinition,
 } from "./units.types";
+
+// Nemesis System - Narrativa Emergente
+export * from "./nemesis.types";

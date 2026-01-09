@@ -66,6 +66,9 @@ import {
   ProjectileTrajectory,
 } from "./components/ProjectileTrajectory";
 
+// Systems
+import { HitStopSystem } from "./systems";
+
 // Types
 import type { BattleCanvasProps, BattleCanvasRef, GridColors } from "./types";
 
@@ -128,6 +131,7 @@ export const BattleCanvas = memo(
       const prevPositionsRef = useRef<Map<string, { x: number; y: number }>>(
         new Map()
       );
+      const hitStopRef = useRef<HitStopSystem>(new HitStopSystem());
 
       // === HOOKS DE SPRITES E ANIMAÇÕES ===
       const {
@@ -273,6 +277,14 @@ export const BattleCanvas = memo(
       });
 
       // === EFFECTS ===
+      // Configurar HitStop
+      useEffect(() => {
+        hitStopRef.current.setCellSize(cellSize);
+        hitStopRef.current.setShakeCallback((intensity, duration) => {
+          cameraRef.current?.shake(intensity, duration);
+        });
+      }, [cellSize]);
+
       // Detectar mudanças de posição e iniciar animações
       useEffect(() => {
         units.forEach((unit) => {
@@ -571,6 +583,12 @@ export const BattleCanvas = memo(
           animationTime: animationTimeRef.current,
         });
 
+        // Hit Stop - Partículas de impacto
+        hitStopRef.current.render(ctx);
+
+        // Hit Stop - Flash overlay
+        hitStopRef.current.renderFlashOverlay(ctx, canvasWidth, canvasHeight);
+
         // Indicador de turno
         const currentTurnUnit = units.find(
           (u) => u.ownerId === battle.currentPlayerId && u.isAlive
@@ -638,6 +656,9 @@ export const BattleCanvas = memo(
         animationTimeRef,
         updateProjectiles,
         hasActiveProjectiles,
+        updateHitStop: (deltaTime) => hitStopRef.current.update(deltaTime),
+        hasActiveHitStop: () => hitStopRef.current.hasActiveEffects(),
+        isHitStopFrozen: () => hitStopRef.current.isFrozen(),
       });
 
       // === REF API ===
@@ -715,6 +736,16 @@ export const BattleCanvas = memo(
           },
           fireProjectile: (params) => {
             fireProjectile(params);
+            needsRedrawRef.current = true;
+          },
+          triggerHitStop: (
+            cellX: number,
+            cellY: number,
+            damage: number,
+            maxHp: number,
+            isCritical?: boolean
+          ) => {
+            hitStopRef.current.trigger(cellX, cellY, damage, maxHp, isCritical);
             needsRedrawRef.current = true;
           },
         }),

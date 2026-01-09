@@ -21,6 +21,12 @@ interface UseAnimationLoopParams {
   updateProjectiles?: () => boolean;
   /** Função para verificar se há projéteis ativos (opcional) */
   hasActiveProjectiles?: () => boolean;
+  /** Função para atualizar HitStop (opcional) */
+  updateHitStop?: (deltaTime: number) => boolean;
+  /** Função para verificar se há efeitos HitStop ativos (opcional) */
+  hasActiveHitStop?: () => boolean;
+  /** Função para verificar freeze frame (opcional) */
+  isHitStopFrozen?: () => boolean;
 }
 
 // Configurações de timing do loop
@@ -42,6 +48,9 @@ export function useAnimationLoop({
   animationTimeRef,
   updateProjectiles,
   hasActiveProjectiles,
+  updateHitStop,
+  hasActiveHitStop,
+  isHitStopFrozen,
 }: UseAnimationLoopParams): void {
   const animationFrameRef = useRef<number | null>(null);
 
@@ -49,12 +58,33 @@ export function useAnimationLoop({
     let running = true;
     let lastGridDrawTime = 0;
     let lastPulseUpdate = 0;
+    let lastFrameTime = performance.now();
 
     const animate = (currentTime: number) => {
       if (!running) return;
 
+      // Calcular deltaTime
+      const deltaTime = currentTime - lastFrameTime;
+      lastFrameTime = currentTime;
+
       // Atualizar timestamp de animação
       animationTimeRef.current = currentTime;
+
+      // Atualizar HitStop (sempre, mesmo durante freeze)
+      const hasHitStopAnimations = updateHitStop?.(deltaTime) ?? false;
+
+      // Verificar se está em freeze frame
+      const isFrozen = isHitStopFrozen?.() ?? false;
+
+      // Se congelado, ainda desenha mas não atualiza outras animações
+      if (isFrozen) {
+        if (currentTime - lastGridDrawTime >= GRID_MIN_INTERVAL) {
+          draw();
+          lastGridDrawTime = currentTime;
+        }
+        animationFrameRef.current = requestAnimationFrame(animate);
+        return;
+      }
 
       // Atualizar animações de movimento
       const hasMovementAnimations = updateAnimations();
@@ -80,8 +110,10 @@ export function useAnimationLoop({
         needsRedrawRef.current ||
         hasMovementAnimations ||
         hasProjectileAnimations ||
+        hasHitStopAnimations ||
         hasActiveAnimations() ||
         (hasActiveProjectiles?.() ?? false) ||
+        (hasActiveHitStop?.() ?? false) ||
         spriteFrameChanged ||
         (hasCurrentTurnUnit && needsPulseUpdate);
 
@@ -118,5 +150,8 @@ export function useAnimationLoop({
     animationTimeRef,
     updateProjectiles,
     hasActiveProjectiles,
+    updateHitStop,
+    hasActiveHitStop,
+    isHitStopFrozen,
   ]);
 }

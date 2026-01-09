@@ -316,6 +316,9 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       attackerUnitId: string;
       targetUnitId: string | null;
       missed?: boolean;
+      finalDamage?: number;
+      damage?: number;
+      targetDefeated?: boolean;
     }) => {
       const attackerUnit = units.find((u) => u.id === data.attackerUnitId);
       const targetUnit = data.targetUnitId
@@ -332,6 +335,11 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
         canvasRef.current.playAnimation(data.attackerUnitId, "Sword_1");
       }
 
+      // Calcular se é crítico (dano alto proporcionalmente)
+      const damageDealt = data.finalDamage ?? data.damage ?? 0;
+      const targetMaxHp = targetUnit?.maxHp ?? 100;
+      const isCritical = damageDealt >= targetMaxHp * 0.25;
+
       // Disparar projétil se houver atacante e alvo
       if (attackerUnit && targetUnit && canvasRef.current) {
         canvasRef.current.fireProjectile({
@@ -347,35 +355,44 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
             if (!data.missed && data.targetUnitId && canvasRef.current) {
               canvasRef.current.playAnimation(data.targetUnitId, "Damage");
 
-              // Shake da câmera
-              const isPlayerInvolved =
-                attackerUnit?.ownerId === user?.id ||
-                targetUnit?.ownerId === user?.id;
-              if (isPlayerInvolved) {
-                canvasRef.current.shake(5, 150);
+              // Hit Stop - Freeze + Shake + Partículas (SÓ se visível para o jogador)
+              const isTargetVisible = canvasRef.current.isUnitVisible(
+                data.targetUnitId
+              );
+              if (targetUnit && isTargetVisible) {
+                canvasRef.current.triggerHitStop(
+                  targetUnit.posX,
+                  targetUnit.posY,
+                  damageDealt,
+                  targetMaxHp,
+                  isCritical
+                );
               }
             }
           },
         });
       } else if (!data.missed && data.targetUnitId && canvasRef.current) {
         // Fallback se não conseguir disparar projétil
+        const isTargetVisible = canvasRef.current.isUnitVisible(
+          data.targetUnitId
+        );
+
         setTimeout(() => {
-          canvasRef.current?.playAnimation(data.targetUnitId!, "Damage");
+          if (canvasRef.current) {
+            canvasRef.current.playAnimation(data.targetUnitId!, "Damage");
+
+            // Hit Stop no fallback também (SÓ se visível)
+            if (targetUnit && isTargetVisible) {
+              canvasRef.current.triggerHitStop(
+                targetUnit.posX,
+                targetUnit.posY,
+                damageDealt,
+                targetMaxHp,
+                isCritical
+              );
+            }
+          }
         }, 200);
-
-        const isPlayerInvolved =
-          attackerUnit?.ownerId === user?.id ||
-          targetUnit?.ownerId === user?.id;
-        const isOtherVisible =
-          attackerUnit?.ownerId === user?.id
-            ? canvasRef.current?.isUnitVisible(data.targetUnitId!)
-            : canvasRef.current?.isUnitVisible(data.attackerUnitId);
-
-        if (isPlayerInvolved && isOtherVisible) {
-          setTimeout(() => {
-            canvasRef.current?.shake(5, 150);
-          }, 200);
-        }
       }
     };
 
