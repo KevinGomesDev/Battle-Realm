@@ -3,9 +3,6 @@
 // Main View (orchestrates battle components)
 export { BattleView } from "./BattleView";
 
-// Lobby components
-export * from "./lobby";
-
 // Battle components
 export * from "./battle";
 

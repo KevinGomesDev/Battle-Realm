@@ -21,6 +21,7 @@ interface KingdomActions {
     data: CreateKingdomData | { templateId: string }
   ) => Promise<KingdomWithRelations>;
   loadKingdoms: () => Promise<KingdomSummary[]>;
+  deleteKingdom: (kingdomId: string) => Promise<void>;
   selectKingdom: (kingdom: KingdomWithRelations | null) => void;
   clearError: () => void;
   setKingdom: (kingdom: KingdomWithRelations | null) => void;
@@ -99,6 +100,32 @@ export const useKingdomStore = create<KingdomState & KingdomActions>((set) => ({
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Erro ao carregar reinos";
+      set({ error: message });
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  deleteKingdom: async (kingdomId: string) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await kingdomApi.delete(kingdomId);
+
+      if (!response.success) {
+        throw new Error(response.error || "Erro ao deletar reino");
+      }
+
+      // Remove o reino da lista local
+      set((state) => ({
+        kingdoms: state.kingdoms.filter((k) => k.id !== kingdomId),
+        // Se o reino deletado era o selecionado, limpa a seleção
+        kingdom: state.kingdom?.id === kingdomId ? null : state.kingdom,
+      }));
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Erro ao deletar reino";
       set({ error: message });
       throw error;
     } finally {

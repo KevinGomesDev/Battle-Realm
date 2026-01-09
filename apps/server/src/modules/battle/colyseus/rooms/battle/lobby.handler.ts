@@ -9,7 +9,7 @@ import {
   PLAYER_COLORS,
   type JoinOptions,
 } from "./types";
-import { getPlayersInfo } from "./utils";
+import { getPlayersInfo, serializeFullState } from "./utils";
 
 /**
  * Handler quando jogador marca como pronto
@@ -65,21 +65,25 @@ export async function handleJoin(
   state: BattleSessionState,
   roomId: string,
   metadata: Record<string, any>,
-  lobbyPhase: boolean,
+  getLobbyPhase: () => boolean,
   disconnectedPlayers: Map<string, any>,
   broadcast: Room<BattleSessionState>["broadcast"],
   setMetadata: Room<BattleSessionState>["setMetadata"],
   cancelPersistence: () => void,
-  addBotPlayer: () => void,
   startBattle: () => Promise<void>,
-  vsBot: boolean
+  fromArena: boolean = false
 ): Promise<void> {
+  const lobbyPhase = getLobbyPhase();
   console.log(`[BattleRoom] ${client.sessionId} entrou na sala ${roomId}`);
+  console.log(
+    `[BattleRoom] Estado atual: lobbyPhase=${lobbyPhase}, status=${state.status}, players=${state.players.length}`
+  );
 
   const { userId, kingdomId } = options;
 
-  // Reconexão durante batalha
-  if (!lobbyPhase && state.status !== "WAITING") {
+  // Se a batalha já está ativa (não mais em lobby), tratar reconexão
+  if (state.status === "ACTIVE") {
+    // Primeiro tenta reconexão via map de desconectados
     const reconnected = await handleReconnection(
       client,
       userId,
@@ -88,8 +92,29 @@ export async function handleJoin(
       disconnectedPlayers,
       cancelPersistence
     );
-    if (reconnected) return;
+    if (reconnected) {
+      console.log(`[BattleRoom] ${userId} reconectou com sucesso`);
+      return;
+    }
 
+    // Se não reconectou mas o jogador já existe na partida, apenas reconectar
+    const existingPlayer = state.getPlayer(userId);
+    if (existingPlayer) {
+      console.log(`[BattleRoom] ${userId} já está na partida, reconectando`);
+      existingPlayer.isConnected = true;
+      client.userData = { userId, kingdomId };
+
+      // Enviar estado completo serializado para garantir sincronização
+      const fullState = serializeFullState(state);
+      client.send("battle:reconnected", {
+        success: true,
+        ...fullState,
+      });
+      return;
+    }
+
+    // Se a batalha já começou e o jogador não está nela, erro
+    console.log(`[BattleRoom] ${userId} tentou entrar em batalha já iniciada`);
     throw new Error("Batalha já iniciada");
   }
 
@@ -134,9 +159,15 @@ export async function handleJoin(
   player.playerIndex = playerIndex;
   player.playerColor = PLAYER_COLORS[playerIndex % PLAYER_COLORS.length];
   player.isConnected = true;
-  player.isBot = false;
 
   state.players.push(player);
+
+  console.log(`[BattleRoom] Jogador adicionado ao lobby:`, {
+    userId,
+    username: player.username,
+    playerIndex,
+    totalPlayers: state.players.length,
+  });
 
   // Atualizar metadata
   const playerKingdoms: Record<string, string> = {};
@@ -150,6 +181,11 @@ export async function handleJoin(
     players: state.players.map((p: BattlePlayerSchema) => p.oderId),
     playerKingdoms,
     status: state.players.length >= state.maxPlayers ? "READY" : "WAITING",
+    // Guardar info do host quando é o primeiro jogador
+    ...(playerIndex === 0 && {
+      hostUsername: player.username,
+      hostKingdomName: player.kingdomName,
+    }),
   });
 
   client.userData = { userId, kingdomId };
@@ -175,23 +211,28 @@ export async function handleJoin(
     { except: client }
   );
 
-  // vsBot flow
-  if (vsBot && state.players.length === 1) {
-    console.log(`[BattleRoom] Iniciando fluxo vsBot...`);
-    addBotPlayer();
-    console.log(
-      `[BattleRoom] Bot adicionado, players agora: ${state.players.length}`
-    );
-    await startBattle();
-    console.log(
-      `[BattleRoom] startBattle() concluído, status: ${state.status}`
-    );
-    return;
-  }
-
   // Lobby cheio
   if (state.players.length >= state.maxPlayers && state.status === "WAITING") {
     state.status = "READY";
+
+    // Se veio da Arena, iniciar batalha automaticamente
+    if (fromArena) {
+      console.log(
+        `[BattleRoom] Lobby cheio e fromArena=true, iniciando batalha automaticamente`
+      );
+      await startBattle();
+
+      // Log do estado após batalha iniciar
+      console.log(`[BattleRoom] Estado após startBattle:`, {
+        battleId: state.battleId,
+        status: state.status,
+        round: state.round,
+        playersCount: state.players.length,
+        unitsCount: state.units.size,
+        gridWidth: state.gridWidth,
+        gridHeight: state.gridHeight,
+      });
+    }
   }
 }
 
@@ -220,7 +261,12 @@ async function handleReconnection(
     console.log(
       `[BattleRoom] Jogador ${userId} reconectado via disconnectedPlayers`
     );
-    client.send("battle:reconnected", { success: true });
+    // Enviar estado completo serializado para garantir sincronização
+    const fullState = serializeFullState(state);
+    client.send("battle:reconnected", {
+      success: true,
+      ...fullState,
+    });
     return true;
   }
 
@@ -235,7 +281,12 @@ async function handleReconnection(
     console.log(
       `[BattleRoom] Jogador ${userId} reconectado (já existe no state)`
     );
-    client.send("battle:reconnected", { success: true });
+    // Enviar estado completo serializado para garantir sincronização
+    const fullStateFromState = serializeFullState(state);
+    client.send("battle:reconnected", {
+      success: true,
+      ...fullStateFromState,
+    });
     return true;
   }
 

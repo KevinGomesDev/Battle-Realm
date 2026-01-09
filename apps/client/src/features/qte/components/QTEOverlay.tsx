@@ -206,6 +206,32 @@ export const QTEOverlay: React.FC<QTEOverlayProps> = ({
     [handleInput, isResponder, hasResponded, isVisualActive]
   );
 
+  // Hotkeys - Setas (Arrow Keys)
+  useHotkeys(
+    "ArrowUp",
+    () => handleInput("W"),
+    { enabled: isResponder && !hasResponded && isVisualActive },
+    [handleInput, isResponder, hasResponded, isVisualActive]
+  );
+  useHotkeys(
+    "ArrowLeft",
+    () => handleInput("A"),
+    { enabled: isResponder && !hasResponded && isVisualActive },
+    [handleInput, isResponder, hasResponded, isVisualActive]
+  );
+  useHotkeys(
+    "ArrowDown",
+    () => handleInput("S"),
+    { enabled: isResponder && !hasResponded && isVisualActive },
+    [handleInput, isResponder, hasResponded, isVisualActive]
+  );
+  useHotkeys(
+    "ArrowRight",
+    () => handleInput("D"),
+    { enabled: isResponder && !hasResponded && isVisualActive },
+    [handleInput, isResponder, hasResponded, isVisualActive]
+  );
+
   // Não renderizar se não há QTE ou visual não está ativo
   if (!config || !isVisualActive) return null;
 

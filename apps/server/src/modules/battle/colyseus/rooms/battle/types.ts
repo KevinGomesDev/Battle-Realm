@@ -17,8 +17,11 @@ export interface BattleRoomOptions {
   userId: string;
   kingdomId: string;
   maxPlayers?: number;
-  vsBot?: boolean;
   restoreBattleId?: string;
+  /** Se true, a batalha inicia automaticamente quando o lobby fica cheio */
+  fromArena?: boolean;
+  challengerKingdomId?: string;
+  challengedKingdomId?: string;
 }
 
 export interface JoinOptions {
@@ -72,10 +75,11 @@ export interface BattleHandlerContext {
   // Callbacks para outros handlers
   startBattle: () => Promise<void>;
   advanceToNextUnit: () => void;
+  /** @deprecated Use forceCheckBattleEnd - a verificação agora é feita pelo timer a cada segundo */
   checkBattleEnd: () => void;
+  /** Força verificação imediata de fim de batalha */
+  forceCheckBattleEnd: () => void;
   executeAITurn: (unit: BattleUnitSchema) => void;
-  persistBattleToDb: () => Promise<void>;
-  cancelPersistence: () => void;
   getPlayersInfo: () => PlayerInfo[];
   isValidPosition: (x: number, y: number) => boolean;
   schemaUnitToBattleUnit: (schema: BattleUnitSchema) => BattleUnit;
@@ -88,7 +92,6 @@ export interface PlayerInfo {
   kingdomName: string;
   playerIndex: number;
   playerColor: string;
-  isBot: boolean;
 }
 
 // =========================================

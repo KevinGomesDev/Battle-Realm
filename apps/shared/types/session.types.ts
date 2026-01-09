@@ -14,11 +14,6 @@ export type SessionType = "MATCH" | "BATTLE_LOBBY" | "BATTLE_SESSION";
 export type BattleLobbyStatus = "WAITING" | "READY" | "BATTLING" | "ENDED";
 
 /**
- * Status da sess�o de batalha
- */
-export type BattleSessionStatus = "ACTIVE" | "ENDED";
-
-/**
  * Representa uma sessão ativa do usuário
  */
 export interface ActiveSession {
@@ -28,7 +23,7 @@ export interface ActiveSession {
   lobbyId?: string;
   battleId?: string;
   matchStatus?: string;
-  battleStatus?: BattleLobbyStatus | BattleSessionStatus;
+  battleStatus?: BattleLobbyStatus | BattleLobbyStatus;
   playerId?: string;
 }
 
@@ -54,8 +49,6 @@ export interface BattleLobbyData {
   players: BattleLobbyPlayer[];
   status: BattleLobbyStatus;
   createdAt: Date;
-  /** Se true, preenche vagas restantes com BOTs */
-  vsBot?: boolean;
 }
 
 /**
@@ -69,12 +62,11 @@ export interface BattlePlayer {
   playerIndex: number;
   playerColor: string;
   isConnected: boolean;
-  isBot: boolean;
   surrendered: boolean;
 }
 
 /**
- * Dados da sess�o de batalha em memória (Backend)
+ * Dados da sess�o de batalha em memória (Backend)
  * Suporta de 2 a 8 jogadores
  */
 export interface BattleSessionData {
@@ -161,7 +153,7 @@ export interface SessionActiveBattleResponse {
   type: "BATTLE_SESSION";
   battleId: string;
   lobbyId: string;
-  battleStatus: BattleSessionStatus;
+  battleStatus: BattleLobbyStatus;
   round: number;
   currentTurnIndex: number;
   currentPlayerId?: string;
@@ -224,7 +216,7 @@ export interface BattleBattleRestoredResponse {
   lobbyId: string;
   config: any; // BattleConfig
   round: number;
-  status: BattleSessionStatus;
+  status: BattleLobbyStatus;
   currentTurnIndex: number;
   currentPlayerId: string;
   activeUnitId?: string;

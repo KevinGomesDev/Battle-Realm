@@ -7,6 +7,13 @@ import type {
   BattleUnit,
 } from "@boundless/shared/types/battle.types";
 import { getManhattanDistance } from "@boundless/shared/utils/distance.utils";
+import {
+  type UnitForBlocking,
+  type ObstacleForBlocking,
+  getAllBlockers,
+  createBlockerSet,
+  getMovementBlockingOptions,
+} from "@boundless/shared/utils/blocking.utils";
 
 interface Position {
   x: number;
@@ -49,6 +56,7 @@ export function isInBounds(
 
 /**
  * Verifica se uma célula está bloqueada
+ * Usa funções unificadas de blocking.utils.ts
  */
 export function isCellBlocked(
   pos: Position,
@@ -56,28 +64,13 @@ export function isCellBlocked(
   obstacles: BattleObstacle[],
   ignoreUnitId?: string
 ): boolean {
-  // Verificar obstáculos não destruídos
-  const hasObstacle = obstacles.some(
-    (obs) => !obs.destroyed && obs.posX === pos.x && obs.posY === pos.y
+  const blockers = getAllBlockers(
+    obstacles as ObstacleForBlocking[],
+    units as UnitForBlocking[],
+    getMovementBlockingOptions(ignoreUnitId ? [ignoreUnitId] : [])
   );
-  if (hasObstacle) return true;
-
-  // Verificar unidades vivas (exceto a unidade que está se movendo)
-  const hasUnit = units.some(
-    (u) =>
-      u.isAlive && u.posX === pos.x && u.posY === pos.y && u.id !== ignoreUnitId
-  );
-  if (hasUnit) return true;
-
-  // Verificar cadáveres (unidades mortas sem CORPSE_REMOVED)
-  const hasCorpse = units.some(
-    (u) =>
-      !u.isAlive &&
-      u.posX === pos.x &&
-      u.posY === pos.y &&
-      !u.conditions?.includes("CORPSE_REMOVED")
-  );
-  return hasCorpse;
+  const blockerSet = createBlockerSet(blockers);
+  return blockerSet.has(`${pos.x},${pos.y}`);
 }
 
 /**
@@ -113,6 +106,7 @@ export function getNeighbors(
 
 /**
  * Cria um grid do Pathfinding.js a partir do estado atual da batalha
+ * Usa funções unificadas de blocking.utils.ts para consistência
  */
 function createPFGrid(
   gridWidth: number,
@@ -123,31 +117,19 @@ function createPFGrid(
 ): PF.Grid {
   const grid = new PF.Grid(gridWidth, gridHeight);
 
-  // Marcar obstáculos como não walkable
-  for (const obs of obstacles) {
+  // Obter todos os bloqueadores usando funções unificadas
+  const blockers = getAllBlockers(
+    obstacles as ObstacleForBlocking[],
+    units as UnitForBlocking[],
+    getMovementBlockingOptions(ignoreUnitId ? [ignoreUnitId] : [])
+  );
+
+  // Marcar todas as posições bloqueadas como não walkable
+  for (const blocker of blockers) {
     if (
-      !obs.destroyed &&
-      isInBounds({ x: obs.posX, y: obs.posY }, gridWidth, gridHeight)
+      isInBounds({ x: blocker.posX, y: blocker.posY }, gridWidth, gridHeight)
     ) {
-      grid.setWalkableAt(obs.posX, obs.posY, false);
-    }
-  }
-
-  // Marcar unidades como não walkable
-  for (const unit of units) {
-    if (unit.id === ignoreUnitId) continue;
-    if (!isInBounds({ x: unit.posX, y: unit.posY }, gridWidth, gridHeight))
-      continue;
-
-    // Unidades vivas bloqueiam
-    if (unit.isAlive) {
-      grid.setWalkableAt(unit.posX, unit.posY, false);
-      continue;
-    }
-
-    // Cadáveres bloqueiam (exceto se removidos)
-    if (!unit.conditions?.includes("CORPSE_REMOVED")) {
-      grid.setWalkableAt(unit.posX, unit.posY, false);
+      grid.setWalkableAt(blocker.posX, blocker.posY, false);
     }
   }
 

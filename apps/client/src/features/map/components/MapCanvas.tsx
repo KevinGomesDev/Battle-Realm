@@ -12,6 +12,8 @@ export interface MapTerritory {
   centerX?: number;
   centerY?: number;
   mapIndex?: number;
+  usedSlots?: number;
+  areaSlots?: number;
 }
 
 export interface MapPlayer {
@@ -19,6 +21,7 @@ export interface MapPlayer {
   odataId?: string;
   playerColor?: string;
   color?: string;
+  kingdomName?: string;
 }
 
 interface MapCanvasProps {
@@ -196,13 +199,20 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     ctx.fill();
 
     // Borda
-    const strokeWidth = SIZE_STROKE_WIDTH[territory.size] || 2;
+    const strokeWidth = territory.size
+      ? SIZE_STROKE_WIDTH[territory.size] || 2
+      : 2;
     ctx.strokeStyle = territory.ownerId ? "#000000" : "#333333";
     ctx.lineWidth = strokeWidth;
     ctx.stroke();
 
     // Desenhar ícone de capital
-    if (territory.isCapital && drawLabel) {
+    if (
+      territory.isCapital &&
+      drawLabel &&
+      territory.centerX !== undefined &&
+      territory.centerY !== undefined
+    ) {
       const centerX = territory.centerX * scale + offsetX;
       const centerY = territory.centerY * scale + offsetY;
 
@@ -217,7 +227,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     }
 
     // Índice do território
-    if (drawLabel && territory.type === "LAND") {
+    if (
+      drawLabel &&
+      territory.type === "LAND" &&
+      territory.centerX !== undefined &&
+      territory.centerY !== undefined &&
+      territory.mapIndex !== undefined
+    ) {
       const centerX = territory.centerX * scale + offsetX;
       const centerY =
         territory.centerY * scale + offsetY + (territory.isCapital ? 20 : 0);

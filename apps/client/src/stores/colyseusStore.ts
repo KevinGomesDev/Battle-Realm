@@ -40,7 +40,7 @@ const initialState: ConnectionState = {
 };
 
 export const useColyseusStore = create<ConnectionState & ConnectionActions>(
-  (set, get) => ({
+  (set, _get) => ({
     ...initialState,
 
     setConnecting: (isConnecting) => set({ isConnecting }),

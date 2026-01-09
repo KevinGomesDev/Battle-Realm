@@ -58,13 +58,25 @@ export const TerritoryModal: React.FC<TerritoryModalProps> = ({
       }
 
       // Se há estruturas existentes, preenche
-      if (territory.structures && territory.structures.length > 0) {
-        territory.structures.forEach((struct, idx) => {
+      if (
+        territory.structures &&
+        Array.isArray(territory.structures) &&
+        territory.structures.length > 0
+      ) {
+        (
+          territory.structures as Array<{
+            id: string;
+            type?: string;
+            structureType?: string;
+            name?: string;
+            level?: number;
+          }>
+        ).forEach((struct, idx) => {
           if (idx < areaList.length) {
             areaList[idx].structure = {
               id: struct.id,
-              type: struct.type || struct.structureType,
-              name: struct.name || struct.type,
+              type: struct.type || struct.structureType || "unknown",
+              name: struct.name || struct.type || "Structure",
               level: struct.level,
             };
           }

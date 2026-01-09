@@ -147,6 +147,17 @@ export function processDefenseQTEResponse(
   const isInvalidInput =
     timedOut || (config.invalidInputs?.includes(input) && isDodge);
 
+  console.log("[QTE] processDefenseQTEResponse:", {
+    input,
+    hitPosition,
+    timedOut,
+    isBlock,
+    isDodge,
+    isInvalidInput,
+    invalidInputs: config.invalidInputs,
+    attackDirection: config.attackDirection,
+  });
+
   // === BLOQUEIO ===
   if (isBlock) {
     const grade = determineResultGrade(
@@ -223,7 +234,7 @@ export function processDefenseQTEResponse(
         grade: "FAIL",
         actionType: "DODGE",
         responderId: config.responderId,
-        damageModifier: 1.0,
+        damageModifier: QTE_DAMAGE_MULTIPLIERS.dodgeFail,
         dodgeSuccessful: false,
         feedbackMessage: "Erro: Unidade não encontrada",
         feedbackColor: QTE_FEEDBACK_COLORS.FAIL,
@@ -246,7 +257,7 @@ export function processDefenseQTEResponse(
         grade: "FAIL",
         actionType: "DODGE",
         responderId: config.responderId,
-        damageModifier: 1.0,
+        damageModifier: QTE_DAMAGE_MULTIPLIERS.dodgeFail,
         dodgeSuccessful: false,
         dodgeDirection,
         feedbackMessage: "Caminho Bloqueado!",
@@ -289,13 +300,24 @@ export function processDefenseQTEResponse(
     const messages = QTE_FEEDBACK_MESSAGES.DODGE;
     const colors = QTE_FEEDBACK_COLORS;
 
+    console.log("[QTE] Dodge processado:", {
+      grade,
+      dodgeSuccessful,
+      dodgeDirection,
+      defenderPos: { x: defender.posX, y: defender.posY },
+      newPosition: dodgeSuccessful ? { x: newX, y: newY } : undefined,
+      isCellBlocked,
+    });
+
     return {
       qteId: config.qteId,
       battleId: config.battleId,
       grade,
       actionType: "DODGE",
       responderId: config.responderId,
-      damageModifier: dodgeSuccessful ? 0 : 1.0,
+      damageModifier: dodgeSuccessful
+        ? QTE_DAMAGE_MULTIPLIERS.dodgeSuccess
+        : QTE_DAMAGE_MULTIPLIERS.dodgeFail,
       dodgeSuccessful,
       dodgeDirection,
       newPosition: dodgeSuccessful ? { x: newX, y: newY } : undefined,
@@ -317,7 +339,7 @@ export function processDefenseQTEResponse(
     grade: "FAIL",
     actionType: "DODGE",
     responderId: config.responderId,
-    damageModifier: 1.0,
+    damageModifier: QTE_DAMAGE_MULTIPLIERS.dodgeFail,
     dodgeSuccessful: false,
     feedbackMessage: isInvalidInput
       ? "Correu de Encontro ao Golpe!"

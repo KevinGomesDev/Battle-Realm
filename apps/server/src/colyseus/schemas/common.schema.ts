@@ -22,6 +22,36 @@ export class ActiveEffectSchema extends Schema {
   @type("string") value: string = "";
   /** IDs das condições que contribuem para este efeito (JSON array) */
   @type("string") sources: string = "[]";
+
+  /**
+   * Converte para o formato esperado pelo cliente
+   * Deserializa value e sources de strings para seus tipos corretos
+   */
+  toJSON() {
+    let parsedValue: number | boolean = 0;
+    // Tentar parsear como número primeiro
+    const numValue = Number(this.value);
+    if (!isNaN(numValue)) {
+      parsedValue = numValue;
+    } else if (this.value === "true") {
+      parsedValue = true;
+    } else if (this.value === "false") {
+      parsedValue = false;
+    }
+
+    let parsedSources: string[] = [];
+    try {
+      parsedSources = JSON.parse(this.sources);
+    } catch {
+      parsedSources = [];
+    }
+
+    return {
+      key: this.key,
+      value: parsedValue,
+      sources: parsedSources,
+    };
+  }
 }
 
 /**

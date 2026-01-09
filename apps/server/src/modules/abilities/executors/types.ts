@@ -48,7 +48,16 @@ export type SpellExecutorFn = (
 
 export interface AbilityExecutionContext {
   targetPosition?: { x: number; y: number };
-  obstacles?: Array<{ x: number; y: number; type: string }>;
+  obstacles?: Array<{
+    id?: string;
+    x?: number;
+    y?: number;
+    posX?: number;
+    posY?: number;
+    hp?: number;
+    destroyed?: boolean;
+    type?: string;
+  }>;
   battleId?: string;
   isBattle?: boolean;
 }

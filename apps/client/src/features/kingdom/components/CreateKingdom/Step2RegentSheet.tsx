@@ -148,12 +148,12 @@ export const Step2RegentSheet: React.FC<Step2RegentSheetProps> = ({
                 </p>
                 <span
                   className={`text-xs mt-1 inline-block px-2 py-0.5 rounded ${
-                    skill.category === "PASSIVE"
+                    skill.activationType === "PASSIVE"
                       ? "bg-stellar-deep/50 text-stellar-light"
                       : "bg-blue-900/50 text-blue-300"
                   }`}
                 >
-                  {skill.category === "PASSIVE" ? "Passiva" : "Ativa"}
+                  {skill.activationType === "PASSIVE" ? "Passiva" : "Ativa"}
                 </span>
               </button>
             ))}

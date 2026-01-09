@@ -105,6 +105,3 @@ export const BattleChat: React.FC<BattleChatProps> = ({
     </>
   );
 };
-
-// Hook para acessar balões de dentro do BattleCanvas
-export const useBattleChat = useChat;

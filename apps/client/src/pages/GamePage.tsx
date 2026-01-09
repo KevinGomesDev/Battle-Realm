@@ -40,8 +40,8 @@ const GamePage: React.FC<GamePageProps> = ({
 
     const syncState = async () => {
       try {
-        await requestMatchState(actualMatchId);
-        await requestMapData(actualMatchId);
+        requestMatchState();
+        requestMapData();
       } catch (err) {
         console.error("Erro ao sincronizar estado:", err);
       }
@@ -118,7 +118,10 @@ const GamePage: React.FC<GamePageProps> = ({
               </h3>
               {matchMapData && completeMatchState ? (
                 <MapCanvas
-                  territories={matchMapData.territories}
+                  territories={matchMapData.territories.map((t) => ({
+                    ...t,
+                    polygonData: "", // Default empty polygon
+                  }))}
                   players={completeMatchState.players}
                   onTerritoryClick={(_territory) => {
                     // Clique em território no modo de jogo

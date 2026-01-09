@@ -90,7 +90,7 @@ export function EventLog({
         context,
         matchId: context === "MATCH" ? contextId : undefined,
         battleId: context === "BATTLE" ? contextId : undefined,
-        BattleLobbyId: context === "battle" ? contextId : undefined,
+        battleLobbyId: context === "battle" ? contextId : undefined,
       });
       isSubscribedRef.current = true;
     }

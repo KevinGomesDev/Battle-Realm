@@ -5,6 +5,7 @@ import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
 import { ActiveEffectSchema } from "../../../../colyseus/schemas/common.schema";
 import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import type { ActiveEffect } from "@boundless/shared/types/conditions.types";
+import { calculateActiveEffects } from "../../../conditions/conditions";
 
 /**
  * Cooldowns de habilidades da unidade
@@ -83,6 +84,28 @@ export class BattleUnitSchema extends Schema {
   // Efeitos ativos (JSON serializado para cada efeito)
   @type({ map: ActiveEffectSchema }) activeEffects =
     new MapSchema<ActiveEffectSchema>();
+
+  /**
+   * Recalcula activeEffects baseado nas conditions atuais.
+   * Deve ser chamado sempre que conditions mudar.
+   */
+  syncActiveEffects(): void {
+    const conditions = Array.from(this.conditions).filter(
+      (c): c is string => !!c
+    );
+    const effects = calculateActiveEffects(conditions);
+
+    this.activeEffects.clear();
+    Object.entries(effects).forEach(([key, effect]) => {
+      if (effect) {
+        const effectSchema = new ActiveEffectSchema();
+        effectSchema.key = effect.key || key;
+        effectSchema.value = String(effect.value);
+        effectSchema.sources = JSON.stringify(effect.sources || []);
+        this.activeEffects.set(key, effectSchema);
+      }
+    });
+  }
 
   /**
    * Cria um BattleUnitSchema a partir de um BattleUnit plain object
@@ -261,6 +284,22 @@ export class BattleUnitSchema extends Schema {
     if (unit.conditions) {
       this.conditions.clear();
       unit.conditions.forEach((c) => this.conditions.push(c));
+      // Recalcular activeEffects quando conditions mudam
+      this.syncActiveEffects();
+    }
+
+    // Atualizar activeEffects explicitamente se fornecido
+    if (unit.activeEffects) {
+      this.activeEffects.clear();
+      Object.entries(unit.activeEffects).forEach(([key, effect]) => {
+        if (effect) {
+          const effectSchema = new ActiveEffectSchema();
+          effectSchema.key = effect.key || key;
+          effectSchema.value = String(effect.value);
+          effectSchema.sources = JSON.stringify(effect.sources || []);
+          this.activeEffects.set(key, effectSchema);
+        }
+      });
     }
 
     // Atualizar cooldowns se mudaram

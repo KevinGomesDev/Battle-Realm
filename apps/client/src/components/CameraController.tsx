@@ -222,7 +222,7 @@ export const CameraController = forwardRef<
       (
         offsetX: number,
         offsetY: number,
-        zoom: number
+        _zoom: number
       ): { x: number; y: number } => {
         // Retorna os valores sem restrições para permitir pan livre
         return { x: offsetX, y: offsetY };

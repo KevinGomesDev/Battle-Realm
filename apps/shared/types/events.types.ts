@@ -62,7 +62,7 @@ export interface GameEvent {
   // Relacionamentos (apenas um estará preenchido)
   matchId?: string;
   battleId?: string;
-  BattleLobbyId?: string;
+  battleLobbyId?: string;
 
   // Destinatários
   targetUserIds?: string[]; // Se scope=INDIVIDUAL, lista de usuários que veem
@@ -91,7 +91,7 @@ export interface GameEventCreate {
 
   matchId?: string;
   battleId?: string;
-  BattleLobbyId?: string;
+  battleLobbyId?: string;
 
   targetUserIds?: string[];
   sourceUserId?: string;
@@ -113,7 +113,7 @@ export interface EventFilter {
   context?: EventContext;
   matchId?: string;
   battleId?: string;
-  BattleLobbyId?: string;
+  battleLobbyId?: string;
   userId?: string;
   category?: EventCategory;
   limit?: number;

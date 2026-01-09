@@ -1,5 +1,5 @@
-// persistence.handler.ts - Persistência e restauração de batalhas
-import type { BattleSessionState, BattlePlayerSchema } from "../../schemas";
+// persistence.handler.ts - Restauração de batalhas do banco de dados
+import type { BattleSessionState } from "../../schemas";
 import {
   BattleObstacleSchema,
   BattleUnitSchema,
@@ -9,7 +9,6 @@ import {
 } from "../../schemas";
 import { prisma } from "../../../../../lib/prisma";
 import {
-  saveBattleSession,
   loadBattle,
   deleteBattle,
 } from "../../../../match/services/battle-persistence.service";
@@ -38,6 +37,11 @@ export async function restoreFromDatabase(
     state.gridHeight = persistedBattle.gridHeight;
     state.maxPlayers = persistedBattle.maxPlayers;
     state.currentTurnIndex = persistedBattle.currentTurnIndex;
+
+    // Restaurar turno ativo
+    state.activeUnitId = persistedBattle.activeUnitId || "";
+    state.currentPlayerId = persistedBattle.currentPlayerId || "";
+    state.turnTimer = persistedBattle.turnTimer || 60;
 
     // Restaurar actionOrder
     persistedBattle.actionOrder.forEach((id) => {
@@ -74,7 +78,6 @@ export async function restoreFromDatabase(
       player.playerIndex = i;
       player.playerColor = persistedBattle.playerColors[i] || PLAYER_COLORS[i];
       player.isConnected = false;
-      player.isBot = player.oderId.startsWith("bot_");
 
       const kingdom = await prisma.kingdom.findUnique({
         where: { id: player.kingdomId },
@@ -138,16 +141,26 @@ export async function restoreFromDatabase(
         battleUnit.unitCooldowns.set(key, value);
       });
 
+      // Recalcular activeEffects baseado nas conditions restauradas
+      // Isso garante consistência mesmo se os dados persistidos estiverem desatualizados
+      battleUnit.syncActiveEffects();
+
       state.units.set(battleUnit.id, battleUnit);
     }
 
-    // Atualizar metadata
+    // Preparar playerKingdoms para metadata
+    const playerKingdoms: Record<string, string> = {};
+    persistedBattle.playerIds.forEach((playerId, idx) => {
+      playerKingdoms[playerId] = persistedBattle.kingdomIds[idx];
+    });
+
+    // Atualizar metadata - IMPORTANTE: incluir playerKingdoms para reconexão
     setMetadata({
       hostUserId: persistedBattle.playerIds[0],
       maxPlayers: persistedBattle.maxPlayers,
       playerCount: persistedBattle.playerIds.length,
       players: persistedBattle.playerIds,
-      vsBot: persistedBattle.playerIds.some((id) => id.startsWith("bot_")),
+      playerKingdoms,
       status: "BATTLING",
     });
 
@@ -162,59 +175,5 @@ export async function restoreFromDatabase(
   } catch (error) {
     console.error(`[BattleRoom] Erro ao restaurar batalha:`, error);
     return false;
-  }
-}
-
-/**
- * Persiste a batalha no banco de dados
- */
-export async function persistBattleToDb(
-  roomId: string,
-  state: BattleSessionState
-): Promise<void> {
-  if (state.status !== "ACTIVE") {
-    console.log(`[BattleRoom] Não persistindo - batalha não está ativa`);
-    return;
-  }
-
-  try {
-    const playerIds = state.players.map((p: BattlePlayerSchema) => p.oderId);
-    const kingdomIds = state.players.map(
-      (p: BattlePlayerSchema) => p.kingdomId
-    );
-    const playerColors = state.players.map(
-      (p: BattlePlayerSchema) => p.playerColor
-    );
-
-    await saveBattleSession(roomId, state, playerIds, kingdomIds, playerColors);
-
-    console.log(`[BattleRoom] Batalha ${roomId} persistida no banco de dados`);
-  } catch (error) {
-    console.error(`[BattleRoom] Erro ao persistir batalha:`, error);
-  }
-}
-
-/**
- * Verifica se todos os jogadores humanos estão desconectados
- */
-export function checkAllDisconnected(
-  state: BattleSessionState,
-  lobbyPhase: boolean,
-  onAllDisconnected: () => void
-): void {
-  if (!lobbyPhase && state.status === "ACTIVE") {
-    const humanPlayers = state.players.filter(
-      (p: BattlePlayerSchema) => !p.isBot
-    );
-    const allDisconnected = humanPlayers.every(
-      (p: BattlePlayerSchema) => !p.isConnected
-    );
-
-    if (allDisconnected && humanPlayers.length > 0) {
-      console.log(
-        `[BattleRoom] Todos os jogadores desconectaram. Persistindo batalha em 10s...`
-      );
-      onAllDisconnected();
-    }
   }
 }

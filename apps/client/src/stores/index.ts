@@ -7,6 +7,7 @@ export { useSessionStore } from "./sessionStore";
 export { useKingdomStore } from "./kingdomStore";
 export { useBattleStore } from "./battleStore";
 export type { BattleComputed } from "./battleStore";
+export { useArenaStore } from "./arenaStore";
 export { useMatchStore } from "./matchStore";
 export { useMapStore } from "./mapStore";
 export { useGameDataStore } from "./gameDataStore";

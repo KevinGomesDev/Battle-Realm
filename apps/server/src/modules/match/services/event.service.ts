@@ -105,7 +105,7 @@ export async function loadBattleEventsFromDB(
     severity: dbEvent.severity as GameEvent["severity"],
     matchId: dbEvent.matchId || undefined,
     battleId: dbEvent.battleId || undefined,
-    BattleLobbyId: dbEvent.BattleLobbyId || undefined,
+    battleLobbyId: dbEvent.battleLobbyId || undefined,
     targetUserIds: JSON.parse(dbEvent.targetUserIds),
     sourceUserId: dbEvent.sourceUserId || undefined,
     message: dbEvent.message,
@@ -163,6 +163,31 @@ function getEventRoom(context: EventContext, contextId?: string): string {
 export async function createAndEmitEvent(
   eventData: GameEventCreate
 ): Promise<GameEvent> {
+  // Verificar se o battleId existe no banco antes de persistir
+  // Isso evita erro de foreign key quando a batalha ainda não foi criada
+  let validBattleId: string | null = null;
+  if (eventData.battleId) {
+    const battleExists = await prisma.battle.findUnique({
+      where: { id: eventData.battleId },
+      select: { id: true },
+    });
+    if (battleExists) {
+      validBattleId = eventData.battleId;
+    }
+  }
+
+  // Verificar se o matchId existe no banco antes de persistir
+  let validMatchId: string | null = null;
+  if (eventData.matchId) {
+    const matchExists = await prisma.match.findUnique({
+      where: { id: eventData.matchId },
+      select: { id: true },
+    });
+    if (matchExists) {
+      validMatchId = eventData.matchId;
+    }
+  }
+
   // Persistir no banco para todos os contextos
   const dbEvent = await prisma.gameEvent.create({
     data: {
@@ -170,9 +195,9 @@ export async function createAndEmitEvent(
       scope: eventData.scope,
       category: eventData.category,
       severity: eventData.severity,
-      matchId: eventData.matchId,
-      battleId: eventData.battleId,
-      BattleLobbyId: eventData.BattleLobbyId,
+      matchId: validMatchId,
+      battleId: validBattleId,
+      battleLobbyId: eventData.battleLobbyId,
       targetUserIds: JSON.stringify(eventData.targetUserIds || []),
       sourceUserId: eventData.sourceUserId,
       message: eventData.message,
@@ -195,7 +220,7 @@ export async function createAndEmitEvent(
     severity: dbEvent.severity as GameEvent["severity"],
     matchId: dbEvent.matchId || undefined,
     battleId: dbEvent.battleId || undefined,
-    BattleLobbyId: dbEvent.BattleLobbyId || undefined,
+    battleLobbyId: dbEvent.battleLobbyId || undefined,
     targetUserIds: JSON.parse(dbEvent.targetUserIds),
     sourceUserId: dbEvent.sourceUserId || undefined,
     message: dbEvent.message,
@@ -294,7 +319,7 @@ export async function getEvents(
   if (filter.context) where.context = filter.context;
   if (filter.matchId) where.matchId = filter.matchId;
   if (filter.battleId) where.battleId = filter.battleId;
-  if (filter.BattleLobbyId) where.BattleLobbyId = filter.BattleLobbyId;
+  if (filter.battleLobbyId) where.battleLobbyId = filter.battleLobbyId;
   if (filter.category) where.category = filter.category;
 
   // Para eventos individuais, filtrar por userId
@@ -340,7 +365,7 @@ export async function getEvents(
     severity: dbEvent.severity as GameEvent["severity"],
     matchId: dbEvent.matchId || undefined,
     battleId: dbEvent.battleId || undefined,
-    BattleLobbyId: dbEvent.BattleLobbyId || undefined,
+    battleLobbyId: dbEvent.battleLobbyId || undefined,
     targetUserIds: JSON.parse(dbEvent.targetUserIds),
     sourceUserId: dbEvent.sourceUserId || undefined,
     message: dbEvent.message,
@@ -663,7 +688,7 @@ export async function createSystemEvent(params: {
  * Cria evento de battle lobby
  */
 export async function createBattleLobbyEvent(params: {
-  BattleLobbyId: string;
+  battleLobbyId: string;
   code: string;
   message: string;
   severity?: GameEvent["severity"];
@@ -674,7 +699,7 @@ export async function createBattleLobbyEvent(params: {
     scope: "GLOBAL",
     category: "BATTLE",
     severity: params.severity || "INFO",
-    BattleLobbyId: params.BattleLobbyId,
+    battleLobbyId: params.battleLobbyId,
     code: params.code,
     message: params.message,
     data: params.data,

@@ -30,9 +30,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
     currentMatch,
     completeMatchState,
     preparationData,
-    getPreparationData,
-    setPlayerReady,
     isLoading,
+    setReady,
   } = useMatch();
   const { user } = useAuth();
 
@@ -40,7 +39,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   const inPreparation =
     completeMatchState?.status === "PREPARATION" ||
     currentMatch?.status === "PREPARATION";
-  const inAdministration = completeMatchState?.currentTurn === "ADMINISTRACAO";
+  const inAdministration = completeMatchState?.phase === "ADMINISTRACAO";
   const canBuild = inPreparation || inAdministration;
 
   const [isReady, setIsReady] = useState<boolean>(false);
@@ -54,13 +53,12 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
     }
   }, [preparationData]);
 
-  // On mount or when entering preparation, fetch prep data and subscribe to updates
+  // On mount or when entering preparation, subscribe to updates
   useEffect(() => {
     if (!matchId || !inPreparation) return;
-    getPreparationData(matchId).catch(() => {});
 
     const handleReadyUpdate = () => {
-      getPreparationData(matchId).catch(() => {});
+      // State updates through Colyseus automatically
     };
 
     colyseusService.on("match:player_ready_update", handleReadyUpdate);
@@ -69,7 +67,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
       colyseusService.off("match:player_ready_update", handleReadyUpdate);
       colyseusService.off("match:preparation_started", handleReadyUpdate);
     };
-  }, [matchId, inPreparation, getPreparationData]);
+  }, [matchId, inPreparation]);
 
   // Fetch available structures when territory modal is open and can build
   useEffect(() => {
@@ -188,13 +186,12 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     {selectedTerritory.terrainType}
                   </div>
                   <div className="text-surface-200 text-xs mt-1">
-                    Áreas: {selectedTerritory.usedSlots}/
-                    {selectedTerritory.areaSlots}
+                    Áreas: {selectedTerritory.usedSlots ?? 0}/
+                    {selectedTerritory.areaSlots ?? 1}
                   </div>
                   {inPreparation && preparationData && (
                     <div className="text-stellar-amber text-xs mt-2 font-bold">
-                      Construções gratuitas:{" "}
-                      {preparationData.freeBuildingsRemaining}
+                      Fase de Preparação
                     </div>
                   )}
                 </div>
@@ -321,16 +318,15 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                         </h3>
                         <div className="text-surface-200 text-xs space-y-1">
                           <div className="flex justify-between">
-                            <span>Round:</span>
+                            <span>Turno:</span>
                             <span className="text-astral-chrome font-bold">
-                              {completeMatchState?.currentRound || "1"}
+                              {completeMatchState?.currentTurn || 1}
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span>Turn:</span>
+                            <span>Fase:</span>
                             <span className="text-astral-chrome font-bold">
-                              {completeMatchState?.currentTurn ||
-                                currentMatch.status}
+                              {completeMatchState?.phase || currentMatch.status}
                             </span>
                           </div>
                           <div className="flex justify-between">
@@ -354,19 +350,11 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                           {preparationData && (
                             <div className="text-surface-200 text-xs space-y-1">
                               <div className="flex justify-between">
-                                <span>Free builds:</span>
+                                <span>Jogadores:</span>
                                 <span className="text-astral-chrome font-bold">
-                                  {preparationData.freeBuildingsRemaining}
+                                  {preparationData.players.length}
                                 </span>
                               </div>
-                              {preparationData.capital && (
-                                <div className="flex justify-between">
-                                  <span>Capital:</span>
-                                  <span className="text-astral-chrome font-bold">
-                                    {preparationData.capital.name}
-                                  </span>
-                                </div>
-                              )}
                             </div>
                           )}
 
@@ -375,20 +363,13 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                           </p>
 
                           <button
-                            onClick={() =>
-                              matchId &&
-                              setPlayerReady(matchId)
-                                .then(() => setIsReady(true))
-                                .catch(() => {})
-                            }
-                            disabled={
-                              isReady ||
-                              isLoading ||
-                              (preparationData?.freeBuildingsRemaining ?? 0) > 0
-                            }
+                            onClick={() => {
+                              setReady();
+                              setIsReady(true);
+                            }}
+                            disabled={isReady || isLoading}
                             className={`group relative w-full px-4 py-3 rounded-lg transition-all flex items-center justify-center gap-2 border-2 ${
-                              isReady ||
-                              (preparationData?.freeBuildingsRemaining ?? 0) > 0
+                              isReady
                                 ? "bg-slate-600/80 border-slate-500 cursor-not-allowed"
                                 : "bg-gradient-to-b from-stellar-amber to-stellar-gold border-surface-500 shadow-lg shadow-stellar-amber/20 hover:from-stellar-gold hover:to-stellar-amber"
                             }`}
@@ -401,13 +382,6 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                             ) : isReady ? (
                               <span className="text-astral-chrome font-bold">
                                 ✅ Pronto para Batalha!
-                              </span>
-                            ) : (preparationData?.freeBuildingsRemaining ?? 0) >
-                              0 ? (
-                              <span className="text-astral-chrome font-bold text-xs text-center">
-                                Coloque{" "}
-                                {preparationData?.freeBuildingsRemaining}{" "}
-                                construções gratuitas.
                               </span>
                             ) : (
                               <span

@@ -18,14 +18,16 @@ export const TopHUD: React.FC = () => {
   }
 
   // Encontra o jogador atual
-  const myPlayer = completeMatchState.players?.find((p) => p.id === myPlayerId);
+  const myPlayer = completeMatchState.players?.find(
+    (p) => p.odataId === myPlayerId
+  );
 
-  const resources = myPlayer?.resources || {
-    ore: 0,
+  const resources = {
+    ore: myPlayer?.gold ?? 0,
     supplies: 0,
-    arcane: 0,
+    arcane: myPlayer?.mana ?? 0,
     experience: 0,
-    devotion: 0,
+    devotion: myPlayer?.influence ?? 0,
   };
 
   return (
@@ -58,10 +60,10 @@ export const TopHUD: React.FC = () => {
                   {myPlayer?.kingdomName || "Kingdom"}
                 </h1>
                 <div className="text-surface-200 text-xs">
-                  {completeMatchState?.currentRound
-                    ? `Round ${completeMatchState.currentRound}`
+                  {completeMatchState?.currentTurn
+                    ? `Turno ${completeMatchState.currentTurn}`
                     : "Preparando"}{" "}
-                  • {completeMatchState?.currentTurn || currentMatch.status}
+                  • {completeMatchState?.phase || currentMatch.status}
                 </div>
               </div>
             </div>

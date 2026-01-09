@@ -7,7 +7,7 @@ export * from "./battle.types";
 export * from "./conditions.types";
 
 // Domain types
-export * from "./battle-lobby.types";
+export * from "./arena.types";
 export * from "./auth.types";
 export * from "./character.types";
 export * from "./chat.types";

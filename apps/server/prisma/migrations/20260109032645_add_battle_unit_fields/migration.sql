@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE "BattleUnit" ADD COLUMN     "activeEffects" TEXT NOT NULL DEFAULT '{}',
+ADD COLUMN     "aiBehavior" TEXT NOT NULL DEFAULT 'AGGRESSIVE',
+ADD COLUMN     "maxMagicalProtection" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "maxPhysicalProtection" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "oderId" TEXT,
+ADD COLUMN     "race" TEXT,
+ALTER COLUMN "size" SET DEFAULT 'MEDIUM';

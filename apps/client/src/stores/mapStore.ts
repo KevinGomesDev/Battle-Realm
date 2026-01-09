@@ -31,7 +31,7 @@ const initialState: MapState = {
   error: null,
 };
 
-export const useMapStore = create<MapState & MapActions>((set, get) => ({
+export const useMapStore = create<MapState & MapActions>((set, _get) => ({
   ...initialState,
 
   setTerritories: (territories) => set({ territories }),

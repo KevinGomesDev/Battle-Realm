@@ -21,7 +21,6 @@ export class BattleLobbyPlayerSchema extends Schema {
   @type("string") kingdomName: string = "";
   @type("number") playerIndex: number = 0;
   @type("boolean") isReady: boolean = false;
-  @type("boolean") isBot: boolean = false;
 }
 
 /**
@@ -32,7 +31,6 @@ export class BattleLobbyState extends Schema {
   @type("string") hostUserId: string = "";
   @type("number") maxPlayers: number = 2;
   @type("string") status: string = "WAITING"; // WAITING | READY | BATTLING | ENDED
-  @type("boolean") vsBot: boolean = false;
   @type("number") createdAt: number = Date.now();
 
   @type([BattleLobbyPlayerSchema]) players =
@@ -50,7 +48,6 @@ export class BattlePlayerSchema extends Schema {
   @type("number") playerIndex: number = 0;
   @type("string") playerColor: string = "#e63946";
   @type("boolean") isConnected: boolean = true;
-  @type("boolean") isBot: boolean = false;
   @type("boolean") surrendered: boolean = false;
 }
 

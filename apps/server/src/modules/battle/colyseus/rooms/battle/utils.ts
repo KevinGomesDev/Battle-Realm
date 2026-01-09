@@ -148,6 +148,7 @@ export function syncAttackResultToSchemas(
   // Sincronizar condições do atacante
   attackerSchema.conditions.clear();
   attackerUnit.conditions.forEach((c) => attackerSchema.conditions.push(c));
+  attackerSchema.syncActiveEffects();
 
   // Sincronizar alvo
   targetSchema.currentHp = targetUnit.currentHp;
@@ -156,6 +157,7 @@ export function syncAttackResultToSchemas(
   targetSchema.isAlive = targetUnit.isAlive;
   targetSchema.conditions.clear();
   targetUnit.conditions.forEach((c) => targetSchema.conditions.push(c));
+  targetSchema.syncActiveEffects();
 
   // Se houve transferência para Eidolon, sincronizar Eidolon
   if (result.damageTransferredToEidolon) {
@@ -203,6 +205,9 @@ export function syncUnitFromResult(
     schema.actionsLeft = result.casterActionsLeft;
   }
 
+  // Sincronizar movimento (pode ter sido alterado por DASH, etc)
+  schema.movesLeft = unit.movesLeft;
+
   // Sincronizar HP
   schema.currentHp = unit.currentHp;
   schema.currentMana = unit.currentMana;
@@ -219,6 +224,7 @@ export function syncUnitFromResult(
   for (const cond of unit.conditions) {
     schema.conditions.push(cond);
   }
+  schema.syncActiveEffects();
 
   // Verificar morte
   if (unit.currentHp <= 0 && schema.isAlive) {
@@ -260,6 +266,104 @@ export function getPlayersInfo(state: BattleSessionState): object[] {
     kingdomName: p.kingdomName,
     playerIndex: p.playerIndex,
     playerColor: p.playerColor,
-    isBot: p.isBot,
   }));
+}
+
+/**
+ * Serializa o estado completo da batalha para envio ao cliente
+ * Usado em reconexão e início de batalha
+ */
+export function serializeFullState(state: BattleSessionState): object {
+  const serializedState = {
+    battleId: state.battleId,
+    lobbyId: state.lobbyId,
+    matchId: state.matchId,
+    isBattle: state.isBattle,
+    maxPlayers: state.maxPlayers,
+    status: state.status,
+    round: state.round,
+    currentTurnIndex: state.currentTurnIndex,
+    activeUnitId: state.activeUnitId,
+    selectedUnitId: state.selectedUnitId,
+    currentPlayerId: state.currentPlayerId,
+    unitLocked: state.unitLocked,
+    turnTimer: state.turnTimer,
+    gridWidth: state.gridWidth,
+    gridHeight: state.gridHeight,
+    winnerId: state.winnerId || "",
+    winReason: state.winReason || "",
+    rematchRequests: Array.from(state.rematchRequests),
+    players: state.players.map((p) => ({
+      oderId: p.oderId,
+      kingdomId: p.kingdomId,
+      kingdomName: p.kingdomName,
+      username: p.username,
+      playerIndex: p.playerIndex,
+      playerColor: p.playerColor,
+      isConnected: p.isConnected,
+      surrendered: p.surrendered,
+    })),
+    actionOrder: Array.from(state.actionOrder),
+    units: {} as Record<string, object>,
+    obstacles: state.obstacles.map((o) => ({
+      id: o.id,
+      posX: o.posX,
+      posY: o.posY,
+      type: o.type,
+      hp: o.hp,
+      maxHp: o.maxHp,
+      destroyed: o.destroyed,
+    })),
+    config: serializeConfig(state),
+  };
+
+  // Serializar unidades
+  state.units.forEach((unit, id) => {
+    serializedState.units[id] = {
+      id: unit.id,
+      sourceUnitId: unit.sourceUnitId,
+      name: unit.name,
+      ownerId: unit.ownerId,
+      ownerKingdomId: unit.ownerKingdomId,
+      posX: unit.posX,
+      posY: unit.posY,
+      currentHp: unit.currentHp,
+      maxHp: unit.maxHp,
+      currentMana: unit.currentMana,
+      maxMana: unit.maxMana,
+      movesLeft: unit.movesLeft,
+      actionsLeft: unit.actionsLeft,
+      attacksLeftThisTurn: unit.attacksLeftThisTurn,
+      combat: unit.combat,
+      speed: unit.speed,
+      focus: unit.focus,
+      resistance: unit.resistance,
+      will: unit.will,
+      vitality: unit.vitality,
+      damageReduction: unit.damageReduction,
+      race: unit.race,
+      classCode: unit.classCode,
+      category: unit.category,
+      level: unit.level,
+      avatar: unit.avatar,
+      features: Array.from(unit.features),
+      equipment: Array.from(unit.equipment),
+      hasStartedAction: unit.hasStartedAction,
+      size: unit.size,
+      spells: Array.from(unit.spells),
+      conditions: Array.from(unit.conditions),
+      isAlive: unit.isAlive,
+      actionMarks: unit.actionMarks,
+      physicalProtection: unit.physicalProtection,
+      maxPhysicalProtection: unit.maxPhysicalProtection,
+      magicalProtection: unit.magicalProtection,
+      maxMagicalProtection: unit.maxMagicalProtection,
+      visionRange: unit.visionRange,
+      isAIControlled: unit.isAIControlled,
+      aiBehavior: unit.aiBehavior,
+      unitCooldowns: Object.fromEntries(unit.unitCooldowns.entries()),
+    };
+  });
+
+  return serializedState;
 }

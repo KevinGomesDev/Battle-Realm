@@ -55,6 +55,14 @@ export interface BattleCanvasRef {
   playAnimation: (unitId: string, animation: SpriteAnimation) => void;
   /** Sacudir a câmera (feedback de dano) */
   shake: (intensity?: number, duration?: number) => void;
+  /** Animar movimento de uma unidade de uma posição para outra */
+  animateMovement: (
+    unitId: string,
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number
+  ) => void;
 }
 
 interface ActiveBubble {
@@ -427,6 +435,9 @@ export const BattleCanvas = memo(
 
             const key = `${nx},${ny}`;
 
+            // Verificar se a célula está visível (não pode mover para fog of war)
+            if (!visibleCells.has(key)) continue;
+
             // Verificar se não tem unidade viva, cadáver NEM obstáculo na célula de destino
             if (
               unitPositionMap.has(key) ||
@@ -465,6 +476,7 @@ export const BattleCanvas = memo(
         unitPositionMap,
         corpsePositionMap,
         obstaclePositionMap,
+        visibleCells,
         units,
         OBSTACLES,
         GRID_WIDTH,
@@ -1877,6 +1889,15 @@ export const BattleCanvas = memo(
           shake: (intensity?: number, duration?: number) => {
             cameraRef.current?.shake(intensity, duration);
           },
+          animateMovement: (
+            unitId: string,
+            fromX: number,
+            fromY: number,
+            toX: number,
+            toY: number
+          ) => {
+            startMoveAnimation(unitId, fromX, fromY, toX, toY);
+          },
         }),
         [
           centerOnUnit,
@@ -1885,6 +1906,7 @@ export const BattleCanvas = memo(
           isUnitVisible,
           isPositionVisible,
           startSpriteAnimation,
+          startMoveAnimation,
         ]
       );
 

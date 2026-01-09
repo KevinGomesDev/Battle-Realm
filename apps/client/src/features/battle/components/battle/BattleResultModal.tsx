@@ -18,7 +18,6 @@ interface BattleResultModalProps {
   onLeave: () => void;
   rematchPending?: boolean;
   opponentWantsRematch?: boolean;
-  vsBot?: boolean;
 }
 
 type ViewTab = "summary" | "myUnits" | "enemyUnits";
@@ -38,7 +37,6 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
   onLeave,
   rematchPending,
   opponentWantsRematch,
-  vsBot,
 }) => {
   const [activeTab, setActiveTab] = useState<ViewTab>("summary");
 
@@ -380,15 +378,15 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
 
         {/* Footer - Ações */}
         <div className="p-4 bg-surface-800/30 border-t border-surface-500/30">
-          {/* Status de Revanche (apenas para jogadores humanos) */}
-          {!vsBot && opponentWantsRematch && !rematchPending && (
+          {/* Status de Revanche */}
+          {opponentWantsRematch && !rematchPending && (
             <div className="mb-3 p-2.5 bg-yellow-900/30 border border-yellow-600/50 rounded-lg text-center">
               <p className="text-yellow-400 text-sm font-medium">
                 ⚔️ O oponente quer uma revanche!
               </p>
             </div>
           )}
-          {!vsBot && rematchPending && (
+          {rematchPending && (
             <div className="mb-3 p-2.5 bg-blue-900/30 border border-blue-600/50 rounded-lg text-center">
               <p className="text-blue-400 text-sm font-medium">
                 ⏳ Aguardando resposta do oponente...
@@ -397,31 +395,27 @@ export const BattleResultModal: React.FC<BattleResultModalProps> = ({
           )}
 
           <div className="flex gap-3">
-            {/* Botão de Revanche (apenas para jogadores humanos) */}
-            {!vsBot && (
-              <button
-                onClick={onRematch}
-                disabled={rematchPending}
-                className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all ${
-                  rematchPending
-                    ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-                    : opponentWantsRematch
-                    ? "bg-gradient-to-r from-yellow-500 to-amber-600 text-cosmos-void hover:from-yellow-400 hover:to-amber-500 shadow-lg shadow-yellow-500/20"
-                    : "bg-gradient-to-r from-green-600 to-emerald-700 text-white hover:from-green-500 hover:to-emerald-600 shadow-lg shadow-green-500/20"
-                }`}
-              >
-                {rematchPending
-                  ? "⏳ Aguardando..."
+            {/* Botão de Revanche */}
+            <button
+              onClick={onRematch}
+              disabled={rematchPending}
+              className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+                rematchPending
+                  ? "bg-gray-700 text-gray-500 cursor-not-allowed"
                   : opponentWantsRematch
-                  ? "⚔️ Aceitar Revanche!"
-                  : "🔄 Revanche"}
-              </button>
-            )}
+                  ? "bg-gradient-to-r from-yellow-500 to-amber-600 text-cosmos-void hover:from-yellow-400 hover:to-amber-500 shadow-lg shadow-yellow-500/20"
+                  : "bg-gradient-to-r from-green-600 to-emerald-700 text-white hover:from-green-500 hover:to-emerald-600 shadow-lg shadow-green-500/20"
+              }`}
+            >
+              {rematchPending
+                ? "⏳ Aguardando..."
+                : opponentWantsRematch
+                ? "⚔️ Aceitar Revanche!"
+                : "🔄 Revanche"}
+            </button>
             <button
               onClick={onLeave}
-              className={`${
-                vsBot ? "w-full" : "flex-1"
-              } py-2.5 bg-gradient-to-r from-surface-700 to-surface-800 border border-surface-600 rounded-xl text-astral-silver font-semibold text-sm hover:from-surface-600 hover:to-surface-700 transition-all`}
+              className="flex-1 py-2.5 bg-gradient-to-r from-surface-700 to-surface-800 border border-surface-600 rounded-xl text-astral-silver font-semibold text-sm hover:from-surface-600 hover:to-surface-700 transition-all"
             >
               🚪 Sair
             </button>

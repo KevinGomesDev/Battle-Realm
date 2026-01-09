@@ -6,16 +6,12 @@ export {
   useBattle,
   useBattleOptional,
   useBattleState,
-  useBattleLobby,
   useBattleSession,
 } from "./hooks/useBattle";
 export { useBattleKeyboard } from "./hooks/useBattleKeyboard";
 
 // Components - Main View
 export { BattleView } from "./components";
-
-// Components - Lobby
-export { BattleList, BattleLobbyView } from "./components/lobby";
 
 // Components - Battle
 export {

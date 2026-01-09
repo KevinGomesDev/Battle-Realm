@@ -62,8 +62,9 @@ export const CharacterCreatorModal: React.FC<CharacterCreatorModalProps> = ({
 
   // Randomiza o personagem
   const randomize = useCallback(() => {
-    const randomItem = <T,>(arr: T[]): T =>
-      arr[Math.floor(Math.random() * arr.length)];
+    const randomItem = <T extends string | { id: string }>(
+      arr: readonly T[]
+    ): T => arr[Math.floor(Math.random() * arr.length)];
 
     setConfig({
       skinColor: randomItem(SKIN_PALETTES.colors),

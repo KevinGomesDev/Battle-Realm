@@ -113,7 +113,7 @@ export function useTargeting({
 
     // ATTACK usa rangeDistance da ability (base 1) + attackRangeMod de condições
     if (code === "ATTACK") {
-      const baseRange = ability.rangeDistance ?? 1;
+      const baseRange = Number(ability.rangeDistance ?? 1);
       const finalRange = baseRange + attackRangeMod;
       return {
         range: finalRange <= 1 ? "MELEE" : "RANGED",

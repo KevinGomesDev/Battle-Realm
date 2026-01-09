@@ -1,7 +1,15 @@
 import type { BattleUnit } from "../types/battle.types";
+import {
+  type ObstacleForBlocking,
+  type UnitForBlocking,
+  getAllBlockers,
+  createBlockerSet,
+  getMovementBlockingOptions,
+} from "./blocking.utils";
 
 /**
  * Interface para obstáculos usados na validação de movimento
+ * @deprecated Use ObstacleForBlocking de blocking.utils.ts
  */
 export interface ObstaclePosition {
   posX: number;
@@ -206,7 +214,7 @@ export function getMovementCostInfo(
 /**
  * Verifica se existe um caminho em LINHA RETA entre duas posições.
  * Movimento é feito primeiro na horizontal, depois na vertical (ou vice-versa).
- * Considera unidades vivas, cadáveres e obstáculos não destruídos como bloqueios.
+ * Usa funções unificadas de blocking.utils.ts para verificar bloqueios.
  *
  * @param fromX Posição X de origem
  * @param fromY Posição Y de origem
@@ -234,29 +242,13 @@ export function hasFreePath(
   const distance = Math.abs(toX - fromX) + Math.abs(toY - fromY);
   if (distance <= 1) return true;
 
-  // Criar set de posições bloqueadas
-  const blocked = new Set<string>();
-
-  // Adicionar unidades vivas (exceto a própria unidade)
-  allUnits.forEach((u) => {
-    if (u.isAlive && u.id !== unitId) {
-      blocked.add(`${u.posX},${u.posY}`);
-    }
-  });
-
-  // Adicionar cadáveres
-  allUnits.forEach((u) => {
-    if (!u.isAlive && !u.conditions?.includes("CORPSE_REMOVED")) {
-      blocked.add(`${u.posX},${u.posY}`);
-    }
-  });
-
-  // Adicionar obstáculos não destruídos
-  obstacles.forEach((obs) => {
-    if (!obs.destroyed) {
-      blocked.add(`${obs.posX},${obs.posY}`);
-    }
-  });
+  // Usar funções unificadas de bloqueio (com cadáveres para movimento)
+  const blockers = getAllBlockers(
+    obstacles as ObstacleForBlocking[],
+    allUnits as UnitForBlocking[],
+    getMovementBlockingOptions([unitId])
+  );
+  const blocked = createBlockerSet(blockers);
 
   // Verificar caminho em LINHA RETA
   // O movimento é feito célula por célula em linha reta

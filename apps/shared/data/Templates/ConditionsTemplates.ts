@@ -171,6 +171,19 @@ export const COMBAT_CONDITIONS: Record<string, ConditionDefinition> = {
       guaranteedCrit: true,
     },
   },
+
+  DISABLED: {
+    id: "DISABLED",
+    name: "Desabilitada",
+    description:
+      "A unidade não pode ser selecionada para agir nesta batalha. Ocorre quando Action Marks chegam a zero.",
+    expiry: "end_of_battle",
+    icon: "🚫",
+    color: "#4b5563",
+    effects: {
+      blockAllActions: true,
+    },
+  },
 };
 
 // =============================================================================

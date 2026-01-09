@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useMatch } from "../features/match";
 import { useBattle } from "../features/battle";
 import { EventHistory } from "../features/events";
+import { ArenaSection } from "../features/arena";
 import {
   SectionCard,
   Ranking,
@@ -10,11 +11,7 @@ import {
   useKingdomSectionActions,
   MatchSection,
   useMatchSectionActions,
-  BattleSection,
-  useBattleSectionActions,
-  BattleSelectionProvider,
   MatchLobby,
-  BattleLobby,
 } from "../components/Dashboard";
 import { SessionGuard } from "../components/SessionGuard";
 import { Topbar } from "../components/Topbar";
@@ -64,23 +61,6 @@ const CriarPartidaBtn: React.FC<{
   </Button>
 );
 
-/** Botão compacto para header - Criar Batalha */
-const CriarBattleBtn: React.FC<{
-  onClick: () => void;
-  disabled?: boolean;
-  isLoading?: boolean;
-}> = ({ onClick, disabled, isLoading }) => (
-  <Button
-    variant="mystic"
-    size="xs"
-    onClick={onClick}
-    disabled={disabled}
-    isLoading={isLoading}
-  >
-    Criar Batalha
-  </Button>
-);
-
 /** Botão compacto para header - Criar Personagem */
 const CriarPersonagemBtn: React.FC<{
   onClick: () => void;
@@ -95,52 +75,13 @@ const CriarPersonagemBtn: React.FC<{
 // =============================================================================
 
 /**
- * Componente interno da Batalha que usa o Provider
- */
-const BattleSectionWrapper: React.FC = () => {
-  const { state: BattleState } = useBattle();
-  const BattleActions = useBattleSectionActions();
-
-  return (
-    <SectionCard
-      title="battle"
-      icon="🏟️"
-      accentColor="mystic"
-      headerAction={
-        !BattleState.lobbyId && (
-          <div className="flex items-center gap-2">
-            {/* Checkbox BOT */}
-            <label className="flex items-center gap-1 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={BattleActions.vsBot}
-                onChange={(e) => BattleActions.setVsBot(e.target.checked)}
-                className="w-3 h-3 accent-mystic-blue cursor-pointer"
-              />
-              <span className="text-[10px] text-surface-200">BOT?</span>
-            </label>
-            <CriarBattleBtn
-              onClick={BattleActions.handleCreate}
-              disabled={!BattleActions.hasKingdoms || BattleActions.isCreating}
-              isLoading={BattleActions.isCreating}
-            />
-          </div>
-        )
-      }
-    >
-      {BattleState.lobbyId ? <BattleLobby /> : <BattleSection />}
-    </SectionCard>
-  );
-};
-
-/**
  * Dashboard Page - A CIDADELA DE PEDRA
  * Visão única com todas as seções lado a lado
  */
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { state: matchState } = useMatch();
-  const { state: BattleState } = useBattle();
+  const { state: battleState } = useBattle();
   const { kingdoms, loadKingdoms } = useKingdom();
 
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
@@ -153,19 +94,26 @@ const DashboardPage: React.FC = () => {
   // Verificar limite de reinos
   const isKingdomLimitReached = kingdoms.length >= MAX_KINGDOMS_PER_USER;
 
+  // Redirecionar para batalha/lobby se ativa
+  useEffect(() => {
+    // Só redireciona se está em batalha confirmada
+    // A condição anterior causava loop: redirecionava com battleId+!isLoading,
+    // mas BattleView esperava isInBattle=true
+    if (battleState.battleId && battleState.isInBattle) {
+      console.log("[Dashboard] Batalha ativa detectada, redirecionando...", {
+        battleId: battleState.battleId,
+        isInBattle: battleState.isInBattle,
+      });
+      navigate("/battle", { replace: true });
+    }
+  }, [battleState.battleId, battleState.isInBattle, navigate]);
+
   // Redirecionar para partida se ativa
   useEffect(() => {
     if (matchState.matchId && matchState.status !== "IDLE") {
       navigate("/match", { replace: true });
     }
   }, [matchState.matchId, matchState.status, navigate]);
-
-  // Redirecionar para battle se em batalha
-  useEffect(() => {
-    if (BattleState.isInBattle || BattleState.winnerId) {
-      navigate("/battle", { replace: true });
-    }
-  }, [BattleState.isInBattle, BattleState.winnerId, navigate]);
 
   return (
     <div className="relative min-h-screen flex flex-col bg-cosmos-void">
@@ -216,9 +164,7 @@ const DashboardPage: React.FC = () => {
               headerAction={
                 !activeMatchId && (
                   <CriarPartidaBtn
-                    onClick={() =>
-                      matchActions.handleCreate((id) => setActiveMatchId(id))
-                    }
+                    onClick={() => matchActions.handleCreate()}
                     disabled={
                       !matchActions.hasKingdoms || matchActions.isCreating
                     }
@@ -240,10 +186,10 @@ const DashboardPage: React.FC = () => {
               )}
             </SectionCard>
 
-            {/* 3. Batalha PvP - envolvido pelo Provider */}
-            <BattleSelectionProvider>
-              <BattleSectionWrapper />
-            </BattleSelectionProvider>
+            {/* 3. Arena - Sistema de Desafios */}
+            <SectionCard title="Arena" icon="⚔️" accentColor="mystic">
+              <ArenaSection />
+            </SectionCard>
 
             {/* 4. Ranking */}
             <SectionCard title="Ranking" icon="🏆" accentColor="gold">

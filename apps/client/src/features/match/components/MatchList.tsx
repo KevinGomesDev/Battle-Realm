@@ -6,7 +6,7 @@ import { useAuth } from "../../auth";
 
 interface MatchListProps {
   onMatchJoined?: (matchId: string) => void;
-  onMatchCreated?: (matchId: string) => void;
+  onMatchCreated?: () => void;
 }
 
 export const MatchList: React.FC<MatchListProps> = ({
@@ -64,8 +64,8 @@ export const MatchList: React.FC<MatchListProps> = ({
     setIsCreating(true);
     setLocalError(null);
     try {
-      const result = await createMatch(selectedKingdom);
-      onMatchCreated?.(result.matchId);
+      await createMatch(selectedKingdom);
+      onMatchCreated?.();
     } catch (err: any) {
       setLocalError(err.message || "Erro ao criar partida");
     } finally {

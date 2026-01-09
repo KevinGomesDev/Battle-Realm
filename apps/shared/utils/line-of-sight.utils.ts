@@ -1,21 +1,51 @@
 // shared/utils/line-of-sight.utils.ts
 // Sistema de Line of Sight (LoS) para verificar visibilidade através de bloqueadores
 // Usa algoritmo de Bresenham para rastrear células entre dois pontos
+//
+// NOTA: Funções de bloqueio foram movidas para blocking.utils.ts
+// Este arquivo re-exporta os tipos para compatibilidade
+
+import {
+  type BlockerPosition,
+  type UnitForBlocking,
+  type ObstacleForBlocking,
+  type BlockingOptions,
+  getUnitOccupiedCells,
+  unitsToBlockers as _unitsToBlockers,
+  obstaclesToBlockers,
+  getAllBlockers,
+  createBlockerSet,
+  getVisionBlockingOptions,
+} from "./blocking.utils";
 
 // =============================================================================
-// TIPOS
+// RE-EXPORTS PARA COMPATIBILIDADE
 // =============================================================================
+
+// Re-export tipos com aliases para manter compatibilidade
+export type { BlockerPosition };
+export type UnitForLoS = UnitForBlocking;
+export type ObstacleForLoS = ObstacleForBlocking;
+
+// Re-export funções de bloqueio
+export { getUnitOccupiedCells, obstaclesToBlockers, createBlockerSet };
 
 /**
- * Posição de um bloqueador (obstáculo ou unidade)
+ * Converte unidades em lista de bloqueadores (todas as células ocupadas)
+ * NOTA: Para visão, não inclui cadáveres por padrão
+ * @param units Unidades vivas
+ * @param excludeIds IDs de unidades para excluir (observador e alvo)
  */
-export interface BlockerPosition {
-  posX: number;
-  posY: number;
+export function unitsToBlockers(
+  units: UnitForBlocking[],
+  excludeIds: string[] = []
+): BlockerPosition[] {
+  return _unitsToBlockers(units, getVisionBlockingOptions(excludeIds));
 }
 
 /**
  * Configuração para checagem de LoS
+ * @deprecated Use BlockingOptions de blocking.utils.ts
  */
 export interface LoSConfig {
   /** Obstáculos que bloqueiam visão */
@@ -26,27 +56,6 @@ export interface LoSConfig {
   observerId?: string;
   /** ID do alvo (para não considerar ele como bloqueador) */
   targetId?: string;
-}
-
-/**
- * Unidade com posição e ID para filtragem
- */
-export interface UnitForLoS {
-  id: string;
-  posX: number;
-  posY: number;
-  isAlive: boolean;
-  /** Tamanho da unidade para ocupar múltiplas células */
-  size?: "NORMAL" | "LARGE" | "HUGE" | "GARGANTUAN";
-}
-
-/**
- * Obstáculo para verificação de LoS
- */
-export interface ObstacleForLoS {
-  posX: number;
-  posY: number;
-  destroyed?: boolean;
 }
 
 // =============================================================================
@@ -98,96 +107,6 @@ export function getBresenhamLine(
   }
 
   return cells;
-}
-
-// =============================================================================
-// FUNÇÕES DE VERIFICAÇÃO DE BLOQUEADORES
-// =============================================================================
-
-/**
- * Cria um Set de posições bloqueadas para lookup O(1)
- */
-function createBlockerSet(blockers: BlockerPosition[]): Set<string> {
-  const set = new Set<string>();
-  for (const blocker of blockers) {
-    set.add(`${blocker.posX},${blocker.posY}`);
-  }
-  return set;
-}
-
-/**
- * Obtém todas as células ocupadas por uma unidade (considerando tamanho)
- */
-export function getUnitOccupiedCells(
-  unit: UnitForLoS
-): Array<{ x: number; y: number }> {
-  const cells: Array<{ x: number; y: number }> = [];
-  const dimension = getUnitDimension(unit.size ?? "NORMAL");
-
-  for (let dx = 0; dx < dimension; dx++) {
-    for (let dy = 0; dy < dimension; dy++) {
-      cells.push({ x: unit.posX + dx, y: unit.posY + dy });
-    }
-  }
-
-  return cells;
-}
-
-/**
- * Retorna a dimensão de uma unidade baseada no tamanho
- */
-function getUnitDimension(
-  size: "NORMAL" | "LARGE" | "HUGE" | "GARGANTUAN"
-): number {
-  switch (size) {
-    case "NORMAL":
-      return 1;
-    case "LARGE":
-      return 2;
-    case "HUGE":
-      return 4;
-    case "GARGANTUAN":
-      return 8;
-    default:
-      return 1;
-  }
-}
-
-/**
- * Converte unidades em lista de bloqueadores (todas as células ocupadas)
- * @param units Unidades vivas
- * @param excludeIds IDs de unidades para excluir (observador e alvo)
- */
-export function unitsToBlockers(
-  units: UnitForLoS[],
-  excludeIds: string[] = []
-): BlockerPosition[] {
-  const blockers: BlockerPosition[] = [];
-  const excludeSet = new Set(excludeIds);
-
-  for (const unit of units) {
-    if (!unit.isAlive) continue;
-    if (excludeSet.has(unit.id)) continue;
-
-    const cells = getUnitOccupiedCells(unit);
-    for (const cell of cells) {
-      blockers.push({ posX: cell.x, posY: cell.y });
-    }
-  }
-
-  return blockers;
-}
-
-/**
- * Converte obstáculos em lista de bloqueadores
- * @param obstacles Obstáculos não destruídos
- */
-export function obstaclesToBlockers(
-  obstacles: ObstacleForLoS[]
-): BlockerPosition[] {
-  return obstacles
-    .filter((obs) => !obs.destroyed)
-    .map((obs) => ({ posX: obs.posX, posY: obs.posY }));
 }
 
 // =============================================================================

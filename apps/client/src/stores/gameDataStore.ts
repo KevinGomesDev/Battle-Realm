@@ -33,7 +33,7 @@ const initialState: GameDataState = {
 };
 
 export const useGameDataStore = create<GameDataState & GameDataActions>(
-  (set, get) => ({
+  (set, _get) => ({
     ...initialState,
 
     setTerrains: (terrains) => set({ terrains }),

@@ -11,7 +11,7 @@ export const MatchStatusDisplay: React.FC = () => {
     return null;
   }
 
-  const { status, currentRound, currentTurn, players } = completeMatchState;
+  const { status, currentTurn, players } = completeMatchState;
 
   // Mostrar apenas durante o jogo
   if (status !== "ACTIVE") {
@@ -19,13 +19,13 @@ export const MatchStatusDisplay: React.FC = () => {
   }
 
   // Tradução dos turnos
-  const turnNames: Record<string, string> = {
-    ADMINISTRACAO: "Administração",
-    EXERCITOS: "Exércitos",
-    MOVIMENTACAO: "Movimentação",
-    CRISE: "Crise",
-    ACAO: "Ação",
-    BATALHA: "Batalha",
+  const turnNames: Record<number, string> = {
+    1: "Administração",
+    2: "Exércitos",
+    3: "Movimentação",
+    4: "Crise",
+    5: "Ação",
+    6: "Batalha",
   };
 
   return (
@@ -33,10 +33,10 @@ export const MatchStatusDisplay: React.FC = () => {
       {/* Rodada e Turno */}
       <div className="text-center">
         <h3 className="text-2xl font-bold text-medieval-red-500 mb-1">
-          Rodada {currentRound}
+          Turno {currentTurn}
         </h3>
         <p className="text-lg text-gray-300">
-          {turnNames[currentTurn] || currentTurn}
+          {turnNames[currentTurn] || `Turno ${currentTurn}`}
         </p>
       </div>
 
@@ -51,7 +51,7 @@ export const MatchStatusDisplay: React.FC = () => {
           <div className="text-center">
             <p className="text-gray-400 text-sm mb-1">Aguardando:</p>
             <p className="text-medieval-red-400 font-semibold">
-              {waitingForPlayers.join(", ")}
+              {waitingForPlayers.map((p) => p.username).join(", ")}
             </p>
           </div>
         ) : (
@@ -65,18 +65,18 @@ export const MatchStatusDisplay: React.FC = () => {
       <div className="border-t border-medieval-red-800/30 pt-3 space-y-2">
         {players.map((player) => (
           <div
-            key={player.id}
+            key={player.odataId}
             className="flex items-center justify-between text-sm"
           >
             <div className="flex items-center gap-2">
               <div
                 className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: player.playerColor }}
+                style={{ backgroundColor: player.color }}
               ></div>
               <span className="text-gray-300">{player.username}</span>
             </div>
             <div>
-              {player.hasFinishedCurrentTurn ? (
+              {player.hasFinishedTurn ? (
                 <span className="text-green-400 text-xs">✓ Pronto</span>
               ) : (
                 <span className="text-yellow-400 text-xs">⏳ Jogando</span>

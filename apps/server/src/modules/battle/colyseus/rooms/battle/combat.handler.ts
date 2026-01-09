@@ -271,6 +271,7 @@ export function performObstacleAttack(
   // Sincronizar condições
   attacker.conditions.clear();
   attackerUnit.conditions.forEach((c) => attacker.conditions.push(c));
+  attacker.syncActiveEffects();
 
   // Sincronizar obstáculo
   obstacle.hp = result.targetHpAfter ?? obstacle.hp;

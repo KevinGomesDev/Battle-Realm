@@ -33,6 +33,7 @@ export interface AttributeDefinition {
   name: string;
   shortName: string;
   description: string;
+  icon: string;
   style: AttributeStyle;
 }
 
@@ -56,6 +57,7 @@ export const ATTRIBUTES: Record<AttributeId, AttributeDefinition> = {
     name: "Combate",
     shortName: "COM",
     description: "Determina dados de ataque e dano.",
+    icon: "⚔️",
     style: {
       color: "#dc2626",
       colorDark: "#991b1b",
@@ -69,6 +71,7 @@ export const ATTRIBUTES: Record<AttributeId, AttributeDefinition> = {
     name: "Velocidade",
     shortName: "VEL",
     description: "Determina chance de esquiva e movimento.",
+    icon: "💨",
     style: {
       color: "#06b6d4",
       colorDark: "#0e7490",
@@ -82,6 +85,7 @@ export const ATTRIBUTES: Record<AttributeId, AttributeDefinition> = {
     name: "Foco",
     shortName: "FOC",
     description: "Poder mágico. Usado para magias e determina visão.",
+    icon: "🎯",
     style: {
       color: "#6366f1",
       colorDark: "#4338ca",
@@ -95,6 +99,7 @@ export const ATTRIBUTES: Record<AttributeId, AttributeDefinition> = {
     name: "Resistência",
     shortName: "RES",
     description: "Redução de dano físico.",
+    icon: "🛡️",
     style: {
       color: "#f97316",
       colorDark: "#c2410c",
@@ -108,6 +113,7 @@ export const ATTRIBUTES: Record<AttributeId, AttributeDefinition> = {
     name: "Vontade",
     shortName: "VON",
     description: "Força mental.",
+    icon: "🔮",
     style: {
       color: "#a855f7",
       colorDark: "#7e22ce",
@@ -121,6 +127,7 @@ export const ATTRIBUTES: Record<AttributeId, AttributeDefinition> = {
     name: "Vitalidade",
     shortName: "VIT",
     description: "Pontos de vida.",
+    icon: "❤️",
     style: {
       color: "#22c55e",
       colorDark: "#15803d",

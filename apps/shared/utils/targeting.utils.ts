@@ -13,6 +13,7 @@ import {
   DEFAULT_RANGE_DISTANCE,
   resolveDynamicValue,
 } from "../types/ability.types";
+import { isCellBlockedByObstacle as _isCellBlockedByObstacle } from "./blocking.utils";
 
 // Re-exportar tipos para conveniência
 export type { TargetingShape, TargetingDirection };
@@ -144,15 +145,14 @@ export function isInBounds(
 
 /**
  * Verifica se uma célula está bloqueada por obstáculo
+ * Usa funções unificadas de blocking.utils.ts
  */
 export function isCellBlocked(
   x: number,
   y: number,
   obstacles: Array<{ posX: number; posY: number; destroyed?: boolean }>
 ): boolean {
-  return obstacles.some(
-    (obs) => obs.posX === x && obs.posY === y && !obs.destroyed
-  );
+  return _isCellBlockedByObstacle(x, y, obstacles);
 }
 
 /**

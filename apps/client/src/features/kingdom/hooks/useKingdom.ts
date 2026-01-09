@@ -23,6 +23,7 @@ export function useKingdom() {
     // Métodos do store
     createKingdom: store.createKingdom,
     loadKingdoms: store.loadKingdoms,
+    deleteKingdom: store.deleteKingdom,
     selectKingdom: store.selectKingdom,
     clearError: store.clearError,
 

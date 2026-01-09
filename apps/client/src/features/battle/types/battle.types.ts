@@ -63,7 +63,7 @@ export interface BattleState {
  */
 export interface BattleContextType {
   state: BattleState;
-  createLobby: (kingdomId: string, vsBot?: boolean) => void;
+  createLobby: (kingdomId: string) => void;
   listLobbies: () => void;
   joinLobby: (lobbyId: string, kingdomId: string) => void;
   leaveLobby: () => void;

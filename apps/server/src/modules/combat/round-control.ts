@@ -130,6 +130,11 @@ export function processUnitTurnEndConditions(unit: BattleUnit): TurnEndResult {
   // 5. Atualizar action marks (decrementar apenas se usou ação)
   if (unit.actionsLeft < 1) {
     unit.actionMarks = Math.max(0, unit.actionMarks - 1);
+
+    // Se actionMarks chegou a 0, aplicar condição DISABLED
+    if (unit.actionMarks <= 0 && !unit.conditions.includes("DISABLED")) {
+      unit.conditions.push("DISABLED");
+    }
   }
 
   // 6. Resetar recursos do turno
@@ -189,7 +194,7 @@ export function processUnitTurnStartConditions(
   // 4. Preparar unidade para o turno
   unit.movesLeft = unit.speed;
   unit.actionsLeft = 1;
-  unit.attacksLeftThisTurn = 1;
+  unit.attacksLeftThisTurn = 0;
 
   // 5. Atualizar cooldowns
   tickUnitCooldowns(unit);
@@ -360,7 +365,7 @@ export function prepareUnitForTurn(unit: BattleUnit): void {
   // Definir recursos do turno
   unit.movesLeft = unit.speed;
   unit.actionsLeft = 1;
-  unit.attacksLeftThisTurn = 1;
+  unit.attacksLeftThisTurn = 0;
   unit.hasStartedAction = true;
 
   // Processar efeitos de início de turno

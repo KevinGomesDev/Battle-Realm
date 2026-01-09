@@ -2,15 +2,13 @@
 export { SectionCard } from "./SectionCard";
 export { Ranking } from "./Ranking";
 
-// Seções com hooks de ações
-export { KingdomSection, useKingdomSectionActions } from "./KingdomSection";
-export { MatchSection, useMatchSectionActions } from "./MatchSection";
-export {
-  BattleSection,
-  useBattleSectionActions,
-  BattleSelectionProvider,
-} from "./BattleSection";
+// Seções (componentes apenas)
+export { KingdomSection } from "./KingdomSection";
+export { MatchSection } from "./MatchSection";
+
+// Hooks de ações (arquivos separados para HMR)
+export { useKingdomSectionActions } from "./useKingdomSectionActions";
+export { useMatchSectionActions } from "./useMatchSectionActions";
 
 // Lobbies compactos
 export { MatchLobby } from "./MatchLobby";
-export { BattleLobby } from "./BattleLobby";

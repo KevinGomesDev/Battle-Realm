@@ -150,7 +150,7 @@ export const QTEOverlay: React.FC<QTEOverlayProps> = ({
     ]
   );
 
-  // Hotkeys
+  // Hotkeys - WASD
   useHotkeys(
     "e",
     () => handleInput("E"),
@@ -177,6 +177,32 @@ export const QTEOverlay: React.FC<QTEOverlayProps> = ({
   );
   useHotkeys(
     "d",
+    () => handleInput("D"),
+    { enabled: isResponder && !hasResponded },
+    [handleInput, isResponder, hasResponded]
+  );
+
+  // Hotkeys - Setas (Arrow Keys)
+  useHotkeys(
+    "ArrowUp",
+    () => handleInput("W"),
+    { enabled: isResponder && !hasResponded },
+    [handleInput, isResponder, hasResponded]
+  );
+  useHotkeys(
+    "ArrowLeft",
+    () => handleInput("A"),
+    { enabled: isResponder && !hasResponded },
+    [handleInput, isResponder, hasResponded]
+  );
+  useHotkeys(
+    "ArrowDown",
+    () => handleInput("S"),
+    { enabled: isResponder && !hasResponded },
+    [handleInput, isResponder, hasResponded]
+  );
+  useHotkeys(
+    "ArrowRight",
     () => handleInput("D"),
     { enabled: isResponder && !hasResponded },
     [handleInput, isResponder, hasResponded]

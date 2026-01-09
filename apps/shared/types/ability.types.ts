@@ -389,6 +389,11 @@ export interface AbilityExecutionResult {
   damageTransferredToEidolon?: boolean;
   eidolonDefeated?: boolean;
   killedSummonIds?: string[];
+
+  // === QTE (para ATTACK) ===
+  requiresQTE?: boolean;
+  qteAttackerId?: string;
+  qteTargetId?: string;
 }
 
 /**

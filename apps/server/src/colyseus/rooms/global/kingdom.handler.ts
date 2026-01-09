@@ -38,6 +38,8 @@ export async function handleListKingdoms(client: Client): Promise<void> {
       kingdoms.map((k) => ({
         id: k.id,
         name: k.name,
+        race: k.race,
+        alignment: k.alignment,
         description: k.description,
         regent: k.regent
           ? {
@@ -390,6 +392,107 @@ export async function handleGetTroopPassives(client: Client): Promise<void> {
   } catch (error) {
     client.send("kingdom:error", {
       message: "Erro ao buscar passivas",
+      code: "INTERNAL_ERROR",
+    });
+  }
+}
+
+/**
+ * Deleta um reino e todos os dados relacionados
+ */
+export async function handleDeleteKingdom(
+  client: Client,
+  kingdomId: string
+): Promise<void> {
+  if (!isAuthenticated(client)) {
+    sendAuthError(client, "kingdom:error");
+    return;
+  }
+
+  const userData = getUserData(client)!;
+
+  try {
+    // Verificar se o reino existe e pertence ao usuário
+    const kingdom = await prisma.kingdom.findUnique({
+      where: { id: kingdomId },
+      include: { regent: true },
+    });
+
+    if (!kingdom) {
+      client.send("kingdom:error", {
+        message: "Reino não encontrado",
+        code: "NOT_FOUND",
+      });
+      return;
+    }
+
+    if (kingdom.ownerId !== userData.userId) {
+      client.send("kingdom:error", {
+        message: "Você não tem permissão para deletar este reino",
+        code: "UNAUTHORIZED",
+      });
+      return;
+    }
+
+    // Verificar se o reino está em uma partida ativa
+    const activeMatch = await prisma.matchKingdom.findFirst({
+      where: {
+        kingdomId,
+        match: {
+          status: { in: ["WAITING", "PREPARING", "IN_PROGRESS"] },
+        },
+      },
+    });
+
+    if (activeMatch) {
+      client.send("kingdom:error", {
+        message: "Não é possível deletar um reino em partida ativa",
+        code: "KINGDOM_IN_MATCH",
+      });
+      return;
+    }
+
+    // Deletar em transação (ordem importa por causa das FKs)
+    await prisma.$transaction(async (tx) => {
+      // 1. Deletar histórico de partidas
+      await tx.matchHistory.deleteMany({
+        where: { kingdomId },
+      });
+
+      // 2. Deletar participações em partidas finalizadas
+      await tx.matchKingdom.deleteMany({
+        where: { kingdomId },
+      });
+
+      // 3. TroopTemplates são deletados automaticamente (onDelete: Cascade)
+
+      // 4. Deletar o regente (Unit) se existir
+      if (kingdom.regentId) {
+        // Primeiro, remover a referência do kingdom
+        await tx.kingdom.update({
+          where: { id: kingdomId },
+          data: { regentId: null },
+        });
+        // Depois, deletar o regente
+        await tx.unit.delete({
+          where: { id: kingdom.regentId },
+        });
+      }
+
+      // 5. Finalmente, deletar o reino
+      await tx.kingdom.delete({
+        where: { id: kingdomId },
+      });
+    });
+
+    client.send("kingdom:deleted", {
+      kingdomId,
+      message: "Reino deletado com sucesso",
+    });
+  } catch (error) {
+    console.error("Erro ao deletar reino:", error);
+    client.send("kingdom:error", {
+      message: "Erro ao deletar reino",
       code: "INTERNAL_ERROR",
     });
   }

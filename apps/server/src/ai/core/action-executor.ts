@@ -406,7 +406,7 @@ export async function executeFullAITurn(
     // Resetar recursos da unidade para o turno
     unit.movesLeft = Math.max(1, unit.speed);
     unit.actionsLeft = 1;
-    unit.attacksLeftThisTurn = 1;
+    unit.attacksLeftThisTurn = 0;
 
     // Emitir que esta unidade está agindo
     emit("battle:ai-unit-acting", {

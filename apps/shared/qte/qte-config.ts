@@ -35,23 +35,11 @@ export interface QTECalculationConfig {
   /** Tempo base do QTE em ms */
   baseDuration: number;
 
-  /** Duração mínima em ms */
-  minDuration: number;
-
-  /** Duração máxima em ms */
-  maxDuration: number;
-
   /** Modificador de duração por ponto de Speed */
   speedDurationMod: number;
 
   /** Tamanho base da zona de acerto (%) */
   baseHitZone: number;
-
-  /** Tamanho mínimo da zona de acerto (%) */
-  minHitZone: number;
-
-  /** Tamanho máximo da zona de acerto (%) */
-  maxHitZone: number;
 
   /** Modificador de zona por ponto de Focus */
   focusZoneMod: number;
@@ -72,14 +60,10 @@ export interface QTECalculationConfig {
 export const QTE_DEFAULT_CONFIG: QTECalculationConfig = {
   // Tempo
   baseDuration: 1000, // 1 segundo base
-  minDuration: 400, // Mínimo 400ms (muito rápido)
-  maxDuration: 2000, // Máximo 2 segundos (muito lento)
   speedDurationMod: 15, // Cada ponto de diferença de Speed = ±15ms
 
   // Zona de acerto
   baseHitZone: 25, // 25% base
-  minHitZone: 8, // Mínimo 8%
-  maxHitZone: 50, // Máximo 50%
   focusZoneMod: 1.5, // Cada ponto de Focus = ±1.5%
 
   // Shake/Tremor
@@ -115,6 +99,12 @@ export interface QTEDamageMultipliers {
 
   /** Bloqueio - Perfeito (dano recebido) */
   blockPerfect: number;
+
+  /** Esquiva - Falha (dano recebido - não apertou nada ou errou) */
+  dodgeFail: number;
+
+  /** Esquiva - Sucesso (0 = sem dano, esquivou) */
+  dodgeSuccess: number;
 }
 
 /**
@@ -130,6 +120,10 @@ export const QTE_DAMAGE_MULTIPLIERS: QTEDamageMultipliers = {
   blockFail: 1.0, // 100% do dano (falhou em bloquear)
   blockHit: 0.5, // 50% do dano
   blockPerfect: 0.25, // 25% do dano
+
+  // Esquiva (multiplicador de dano RECEBIDO)
+  dodgeFail: 1.5, // 150% do dano (não esquivou, recebe mais dano)
+  dodgeSuccess: 0.0, // 0% do dano (esquivou com sucesso)
 };
 
 // =============================================================================

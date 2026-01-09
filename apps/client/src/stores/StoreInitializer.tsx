@@ -40,11 +40,14 @@ export function StoreInitializer({ children }: { children: React.ReactNode }) {
     return cleanup;
   }, []);
 
-  // Initialize Battle listeners (depends on userId)
+  // Initialize Battle listeners (independent of userId - uses localStorage as fallback)
   useEffect(() => {
     const cleanup = useBattleStore.getState().initializeListeners(userId);
     return cleanup;
-  }, [userId]);
+    // Só inicializa uma vez - não re-registra quando userId muda
+    // O handler usa localStorage como fallback para kingdomId
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Initialize Match listeners (depends on userId)
   useEffect(() => {

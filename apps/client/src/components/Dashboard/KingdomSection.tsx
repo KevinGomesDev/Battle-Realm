@@ -15,9 +15,12 @@ interface KingdomSectionProps {
 export const KingdomSection: React.FC<KingdomSectionProps> = ({
   onKingdomCreated,
 }) => {
-  const { kingdoms, loadKingdoms, isLoading, error } = useKingdom();
+  const { kingdoms, loadKingdoms, deleteKingdom, isLoading, error } =
+    useKingdom();
   const { user } = useAuth();
   const hasLoadedRef = useRef(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user && !hasLoadedRef.current) {
@@ -33,8 +36,62 @@ export const KingdomSection: React.FC<KingdomSectionProps> = ({
     }
   }, [onKingdomCreated, loadKingdoms]);
 
+  const handleDeleteClick = (kingdomId: string) => {
+    setConfirmDeleteId(kingdomId);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteId) return;
+
+    setDeletingId(confirmDeleteId);
+    setConfirmDeleteId(null);
+
+    try {
+      await deleteKingdom(confirmDeleteId);
+    } catch (err) {
+      console.error("Erro ao deletar reino:", err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setConfirmDeleteId(null);
+  };
+
   return (
     <div className="space-y-2">
+      {/* Confirmation Modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-surface-900 border border-red-500/50 rounded-lg p-4 max-w-sm mx-4 shadow-xl">
+            <h3 className="text-sm font-semibold text-astral-chrome mb-2">
+              ⚠️ Confirmar Deleção
+            </h3>
+            <p className="text-xs text-astral-silver mb-4">
+              Tem certeza que deseja deletar este reino? Esta ação é
+              irreversível e removerá todas as tropas e histórico de partidas.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={handleCancelDelete}
+                className="px-3 py-1.5 text-xs bg-surface-700 hover:bg-surface-600 
+                         text-astral-silver rounded transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-500 
+                         text-white rounded transition-colors"
+              >
+                Deletar Reino
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Loading */}
       {isLoading && (
         <div className="flex items-center justify-center py-4">
@@ -73,11 +130,12 @@ export const KingdomSection: React.FC<KingdomSectionProps> = ({
                 name: summary.name,
                 race: summary.race,
                 alignment: summary.alignment,
-                locationIndex: 0,
                 ownerId: "",
                 createdAt: new Date(),
                 updatedAt: new Date(),
               }}
+              onDelete={handleDeleteClick}
+              isDeleting={deletingId === summary.id}
             />
           ))}
         </div>
@@ -89,7 +147,11 @@ export const KingdomSection: React.FC<KingdomSectionProps> = ({
 /**
  * Card de Reino - Compacto
  */
-const KingdomCard: React.FC<{ kingdom: Kingdom }> = ({ kingdom }) => {
+const KingdomCard: React.FC<{
+  kingdom: Kingdom;
+  onDelete: (id: string) => void;
+  isDeleting: boolean;
+}> = ({ kingdom, onDelete, isDeleting }) => {
   const raceIcons: Record<string, string> = {
     HUMANOIDE: "👤",
     ABERRACAO: "👁️",
@@ -98,10 +160,12 @@ const KingdomCard: React.FC<{ kingdom: Kingdom }> = ({ kingdom }) => {
 
   return (
     <div
-      className="group flex items-center gap-2 p-2
+      className={`group flex items-center gap-2 p-2
                  bg-surface-800/50 border border-surface-500/30 rounded
                  hover:border-stellar-amber/50 hover:bg-surface-700/50
-                 transition-all cursor-pointer"
+                 transition-all ${
+                   isDeleting ? "opacity-50 pointer-events-none" : ""
+                 }`}
     >
       {/* Ícone */}
       <div className="w-7 h-7 bg-surface-900/50 border border-surface-500/50 rounded flex items-center justify-center">
@@ -119,18 +183,36 @@ const KingdomCard: React.FC<{ kingdom: Kingdom }> = ({ kingdom }) => {
       <div className="text-[10px] text-astral-silver px-1.5 py-0.5 bg-surface-900/30 rounded">
         💰 N/A
       </div>
+
+      {/* Delete Button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(kingdom.id);
+        }}
+        disabled={isDeleting}
+        className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-300 
+                   hover:bg-red-500/20 rounded transition-all"
+        title="Deletar Reino"
+      >
+        {isDeleting ? (
+          <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
+          </svg>
+        )}
+      </button>
     </div>
   );
-};
-
-/**
- * Hook para expor a função de abrir modal para o header
- */
-export const useKingdomSectionActions = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const openModal = () => setIsModalOpen(true);
-  const closeModal = () => setIsModalOpen(false);
-
-  return { isModalOpen, openModal, closeModal };
 };

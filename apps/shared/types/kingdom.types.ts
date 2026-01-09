@@ -186,6 +186,7 @@ export interface CreateKingdomData {
   description?: string;
   alignment: Alignment;
   race: Race;
+  raceMetadata?: string;
   regent: CreateRegentData;
   troopTemplates: CreateTroopTemplateData[];
 }

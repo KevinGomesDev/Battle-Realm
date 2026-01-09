@@ -30,7 +30,6 @@ export async function updateStats(state: GlobalRoomState): Promise<void> {
         lobby.hostUserId = room.metadata?.hostUserId || "";
         lobby.maxPlayers = room.metadata?.maxPlayers || 2;
         lobby.status = "WAITING";
-        lobby.vsBot = room.metadata?.vsBot || false;
 
         state.availableLobbies.push(lobby);
       }

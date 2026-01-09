@@ -30,13 +30,20 @@ import { findAbilityByCode } from "@boundless/shared/data/abilities.data";
 import { resolveDynamicValue } from "@boundless/shared/types/ability.types";
 import { getFullMovementInfo } from "@boundless/shared/utils/engagement.utils";
 import {
+  hasLineOfSight,
+  obstaclesToBlockers,
+  unitsToBlockers,
+} from "@boundless/shared/utils/line-of-sight.utils";
+import {
   isValidAbilityTarget,
   isValidAbilityPosition,
 } from "@boundless/shared/utils/ability-validation";
 import { useTargeting } from "../hooks/useTargeting";
 import { colyseusService } from "../../../services/colyseus.service";
+import { useBattleStore } from "../../../stores/battleStore";
 import {
   isPlayerControllable,
+  isUnitDisabled,
   getControllableUnits,
 } from "../utils/unit-control";
 import {
@@ -51,21 +58,57 @@ import {
 } from "../types/pending-ability.types";
 
 /**
- * BattleView - Wrapper com ChatProvider
+ * BattleView - Componente principal da batalha
  */
 export const BattleView: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const {
-    state: { battle, isInBattle, winnerId },
+    state: { battle, isInBattle, winnerId, isLoading },
   } = useBattle();
 
-  // Se não está em batalha e não tem resultado, redireciona para dashboard
+  // Se não está em batalha ou tem resultado, redireciona para dashboard
+  // MAS aguarda tempo suficiente para reconexão completar
   useEffect(() => {
-    if (!isInBattle && !winnerId && !battle) {
-      navigate("/dashboard", { replace: true });
+    // Se está carregando (reconectando), não redireciona
+    if (isLoading) {
+      console.log("[BattleView] Aguardando reconexão...");
+      return;
     }
-  }, [isInBattle, winnerId, battle, navigate]);
+
+    // Se está em batalha ou tem resultado, não redireciona
+    if (isInBattle || winnerId || battle) {
+      return;
+    }
+
+    // Verificar também o colyseusService para evitar redirecionamento prematuro
+    if (colyseusService.isInBattle()) {
+      console.log(
+        "[BattleView] colyseusService ainda em batalha, aguardando..."
+      );
+      return;
+    }
+
+    // Aguarda 2 segundos para dar tempo da reconexão completar
+    console.log(
+      "[BattleView] Nenhuma batalha detectada, aguardando 2s antes de redirecionar..."
+    );
+    const timer = setTimeout(() => {
+      // Verificar novamente antes de redirecionar
+      const currentState = useBattleStore.getState();
+      if (
+        !currentState.isInBattle &&
+        !currentState.isLoading &&
+        !colyseusService.isInBattle()
+      ) {
+        console.log("[BattleView] Redirecionando para dashboard");
+        navigate("/dashboard", { replace: true });
+      } else {
+        console.log("[BattleView] Cancelando redirect - batalha detectada");
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [isInBattle, winnerId, battle, isLoading, navigate]);
 
   // Precisa do battleId para o ChatProvider
   if (!battle || !user) {
@@ -160,6 +203,108 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     return units.find((u) => u.id === qteState.activeQTE?.targetId) ?? null;
   }, [qteState.activeQTE?.responderId, qteState.activeQTE?.targetId, units]);
 
+  // === CÉLULAS VISÍVEIS - Fog of War ===
+  // Calcula quais células são visíveis baseado no visionRange das unidades aliadas
+  const visibleCells = useMemo((): Set<string> => {
+    if (!user?.id || !battle) return new Set();
+
+    const visible = new Set<string>();
+    const GRID_WIDTH = battle.config.grid.width;
+    const GRID_HEIGHT = battle.config.grid.height;
+    const OBSTACLES = battle.config.map.obstacles || [];
+
+    // Obter todas as unidades aliadas vivas
+    const myUnits = units.filter((u) => u.ownerId === user.id && u.isAlive);
+
+    // Se não tem unidades, mostrar tudo (fallback)
+    if (myUnits.length === 0) {
+      for (let x = 0; x < GRID_WIDTH; x++) {
+        for (let y = 0; y < GRID_HEIGHT; y++) {
+          visible.add(`${x},${y}`);
+        }
+      }
+      return visible;
+    }
+
+    // Preparar bloqueadores para cálculo de Line of Sight
+    const obstacleBlockers = obstaclesToBlockers(
+      OBSTACLES.map((obs) => ({
+        posX: obs.posX,
+        posY: obs.posY,
+        destroyed: obs.destroyed,
+      }))
+    );
+
+    // Unidades inimigas vivas bloqueiam visão
+    const enemyUnits = units.filter((u) => u.ownerId !== user.id && u.isAlive);
+    const unitBlockers = unitsToBlockers(
+      enemyUnits.map((u) => ({
+        id: u.id,
+        posX: u.posX,
+        posY: u.posY,
+        isAlive: u.isAlive,
+        size: u.size,
+      })),
+      []
+    );
+
+    const allBlockers = [...obstacleBlockers, ...unitBlockers];
+
+    // Para cada unidade aliada, calcular células visíveis
+    myUnits.forEach((unit) => {
+      const visionRange = unit.visionRange ?? 10;
+      const unitSize = unit.size ?? "NORMAL";
+      const dimension =
+        unitSize === "NORMAL"
+          ? 1
+          : unitSize === "LARGE"
+          ? 2
+          : unitSize === "HUGE"
+          ? 4
+          : 8;
+
+      for (let dx = 0; dx < dimension; dx++) {
+        for (let dy = 0; dy < dimension; dy++) {
+          const unitCellX = unit.posX + dx;
+          const unitCellY = unit.posY + dy;
+
+          for (let vx = -visionRange; vx <= visionRange; vx++) {
+            for (let vy = -visionRange; vy <= visionRange; vy++) {
+              if (Math.abs(vx) + Math.abs(vy) <= visionRange) {
+                const targetX = unitCellX + vx;
+                const targetY = unitCellY + vy;
+
+                if (
+                  targetX >= 0 &&
+                  targetX < GRID_WIDTH &&
+                  targetY >= 0 &&
+                  targetY < GRID_HEIGHT
+                ) {
+                  const cellKey = `${targetX},${targetY}`;
+                  if (visible.has(cellKey)) continue;
+
+                  if (
+                    hasLineOfSight(
+                      unitCellX,
+                      unitCellY,
+                      targetX,
+                      targetY,
+                      allBlockers
+                    )
+                  ) {
+                    visible.add(cellKey);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return visible;
+  }, [user?.id, battle, units]);
+
   // Ouvir eventos de combate para disparar animações e centralizar câmera
   useEffect(() => {
     // Handler para ataque - anima atacante (Sword) e alvo (Damage)
@@ -245,11 +390,31 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       isMovingRef.current = false;
     };
 
+    // Handler para dodge - anima movimento de esquiva
+    const handleUnitDodged = (data: {
+      unitId: string;
+      fromX: number;
+      fromY: number;
+      toX: number;
+      toY: number;
+    }) => {
+      if (canvasRef.current) {
+        canvasRef.current.animateMovement(
+          data.unitId,
+          data.fromX,
+          data.fromY,
+          data.toX,
+          data.toY
+        );
+      }
+    };
+
     colyseusService.on("battle:unit_attacked", handleUnitAttacked);
     colyseusService.on("battle:unit_moved", handleUnitMoved);
     colyseusService.on("battle:skill_used", handleSkillUsed);
     colyseusService.on("battle:spell_cast", handleSpellCast);
     colyseusService.on("battle:error", handleBattleError);
+    colyseusService.on("battle:unit_dodged", handleUnitDodged);
 
     return () => {
       colyseusService.off("battle:unit_attacked", handleUnitAttacked);
@@ -257,6 +422,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       colyseusService.off("battle:skill_used", handleSkillUsed);
       colyseusService.off("battle:spell_cast", handleSpellCast);
       colyseusService.off("battle:error", handleBattleError);
+      colyseusService.off("battle:unit_dodged", handleUnitDodged);
     };
   }, [units, user]);
 
@@ -341,6 +507,13 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
 
     const isMyTurnNow = battle.currentPlayerId === user.id;
     const turnKey = `${battle.currentPlayerId}-${battle.round}`;
+
+    console.log("[BattleView] Auto-select check:", {
+      battleCurrentPlayerId: battle.currentPlayerId,
+      userId: user.id,
+      isMyTurnNow,
+      turnKey,
+    });
 
     // Encontrar minhas unidades vivas (exceto SUMMON/MONSTER)
     const myAliveUnits = getControllableUnits(units, user.id);
@@ -681,7 +854,6 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           onLeave={dismissBattleResult}
           rematchPending={rematchPending}
           opponentWantsRematch={opponentWantsRematch}
-          vsBot={battleResult.vsBot}
         />
       </div>
     );
@@ -753,7 +925,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           "color: #ef4444; font-weight: bold;",
           { targetId: unit.id, targetName: unit.name }
         );
-        attackUnit(selectedUnit.id, { x: unit.posX, y: unit.posY });
+        attackUnit(selectedUnit.id, { x: unit.posX, y: unit.posY }, unit.id);
         setPendingAbility(null);
       } else {
         console.log(
@@ -805,6 +977,10 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     // Comportamento padrão: selecionar unidade
     // Só permite selecionar unidades controláveis (não SUMMON/MONSTER)
     if (isPlayerControllable(unit, user.id)) {
+      // Verificar se a unidade está desabilitada (DISABLED)
+      // Unidades desabilitadas não podem iniciar ação
+      const unitIsDisabled = isUnitDisabled(unit);
+
       // Se clicar na mesma unidade E há uma ability pendente → self-cast
       if (selectedUnitId === unit.id && pendingAbility && isMyTurn) {
         const ability = pendingAbility.ability;
@@ -847,6 +1023,19 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           { unitId: unit.id }
         );
         setSelectedUnitId(null);
+        setPendingAbility(null);
+        return;
+      }
+
+      // Bloquear seleção para iniciar ação se unidade estiver desabilitada
+      if (unitIsDisabled) {
+        console.log(
+          "%c[BattleView] 🚫 Unidade desabilitada não pode ser selecionada para agir",
+          "color: #6b7280;",
+          { unitId: unit.id, unitName: unit.name }
+        );
+        // Permite selecionar para visualizar, mas não para agir
+        setSelectedUnitId(unit.id);
         setPendingAbility(null);
         return;
       }
@@ -1090,6 +1279,16 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
 
     // Tentar mover para a célula
     if (selectedUnit.movesLeft > 0) {
+      // Verificar se a célula está visível (não pode mover para fog of war)
+      const cellKey = `${x},${y}`;
+      if (!visibleCells.has(cellKey)) {
+        console.log(
+          "%c[BattleView] 🌫️ Célula não visível (fog of war)!",
+          "color: #6b7280;"
+        );
+        return;
+      }
+
       // Calcular informações completas de movimento (incluindo verificação de caminho)
       const moveInfo = getFullMovementInfo(
         selectedUnit,
@@ -1283,7 +1482,6 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           onLeave={dismissBattleResult}
           rematchPending={rematchPending}
           opponentWantsRematch={opponentWantsRematch}
-          vsBot={battleResult.vsBot}
         />
       )}
 

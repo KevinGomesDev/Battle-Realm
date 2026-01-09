@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useRef } from "react";
 import type { BattleComputed } from "../../../../stores/battleStore";
+import { useBattleStore } from "../../../../stores/battleStore";
 import type { BattleUnitState } from "@/services/colyseus.service";
 import { getHpColor } from "../../../../config/colors.config";
 import { Tooltip } from "@/components/Tooltip";
@@ -160,7 +161,7 @@ const KingdomTag: React.FC<{
           isMe ? color.text : "text-astral-chrome"
         }`}
       >
-        {kingdom.name}
+        {kingdom.kingdomName}
       </span>
       <span className="text-[10px] text-astral-steel">
         {unitsAlive}/{totalUnits}
@@ -239,10 +240,13 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
 
   const isMyTurn = battle.currentPlayerId === currentUserId;
 
+  // Consumir turnTimer diretamente do store para atualizações em tempo real
+  const turnTimer = useBattleStore((state) => state.turnTimer);
+
   const timerColor =
-    battle.turnTimer <= 5
+    turnTimer <= 5
       ? "text-red-400 animate-pulse"
-      : battle.turnTimer <= 15
+      : turnTimer <= 15
       ? "text-stellar-amber"
       : "text-ember-glow";
 
@@ -305,7 +309,7 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
 
             {/* Timer */}
             <span className={`font-bold text-sm tabular-nums ${timerColor}`}>
-              {formatTimer(battle.turnTimer)}
+              {formatTimer(turnTimer)}
             </span>
 
             {/* Divider */}

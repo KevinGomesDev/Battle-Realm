@@ -8,15 +8,34 @@ import type {
 import { TURN_CONFIG } from "@boundless/shared/config";
 
 /**
+ * Verifica se uma unidade pode agir no turno.
+ * Uma unidade pode agir se está viva E não possui a condição DISABLED.
+ */
+export function canUnitAct(unit: BattleUnitSchema | undefined): boolean {
+  if (!unit) return false;
+  if (!unit.isAlive) return false;
+  // Verifica se a unidade possui a condição DISABLED
+  const conditions = Array.from(unit.conditions || []);
+  if (conditions.includes("DISABLED")) return false;
+  return true;
+}
+
+/**
  * Calcula a ordem de ação baseada na velocidade das unidades
  */
 export function calculateActionOrder(
   state: BattleSessionState,
   onFirstUnitAI?: (unit: BattleUnitSchema) => void
 ): void {
+  console.log(
+    `[turn.handler] calculateActionOrder - actionOrder tem ${state.actionOrder.length} IDs`
+  );
+
   const unitIds = Array.from(state.actionOrder).filter(
     (id): id is string => id !== undefined
   );
+
+  console.log(`[turn.handler] unitIds filtrados: ${unitIds.length}`);
 
   unitIds.sort((a, b) => {
     const unitA = state.units.get(a);
@@ -28,40 +47,79 @@ export function calculateActionOrder(
   state.actionOrder.clear();
   unitIds.forEach((id) => state.actionOrder.push(id));
 
+  console.log(
+    `[turn.handler] actionOrder após ordenação: ${state.actionOrder.length}`
+  );
+
   if (state.actionOrder.length > 0) {
     state.currentTurnIndex = 0;
-    const firstUnitId = state.actionOrder[0];
-    if (firstUnitId) {
-      state.activeUnitId = firstUnitId;
-      const unit = state.units.get(firstUnitId);
-      if (unit) {
-        state.currentPlayerId = unit.ownerId || "";
-        unit.movesLeft = unit.speed;
-        unit.actionsLeft = 1;
-        unit.attacksLeftThisTurn = 1;
-        unit.hasStartedAction = false;
+    // Usar .at(0) em vez de [0] para ArraySchema do Colyseus
+    let firstUnitId = state.actionOrder.at(0);
+    console.log(`[turn.handler] Primeira unidade (via .at(0)): ${firstUnitId}`);
 
-        if (unit.isAIControlled && onFirstUnitAI) {
-          console.log(
-            `[BattleRoom] 🤖 Primeira unidade é IA: ${unit.name}, iniciando turno da IA`
-          );
-          onFirstUnitAI(unit);
-        }
-      }
+    // Procurar primeira unidade que pode agir (viva e sem DISABLED)
+    let index = 0;
+    while (
+      firstUnitId &&
+      !canUnitAct(state.units.get(firstUnitId)) &&
+      index < state.actionOrder.length - 1
+    ) {
+      index++;
+      firstUnitId = state.actionOrder.at(index);
     }
+
+    if (firstUnitId && canUnitAct(state.units.get(firstUnitId))) {
+      state.currentTurnIndex = index;
+      state.activeUnitId = firstUnitId;
+      const unit = state.units.get(firstUnitId)!;
+      console.log(`[turn.handler] Unidade encontrada:`, {
+        id: unit.id,
+        name: unit.name,
+        ownerId: unit.ownerId,
+        speed: unit.speed,
+      });
+
+      state.currentPlayerId = unit.ownerId || "";
+      unit.movesLeft = unit.speed;
+      unit.actionsLeft = 1;
+      unit.attacksLeftThisTurn = 0;
+      unit.hasStartedAction = false;
+
+      console.log(
+        `[turn.handler] currentPlayerId setado para: ${state.currentPlayerId}`
+      );
+
+      if (unit.isAIControlled && onFirstUnitAI) {
+        console.log(
+          `[BattleRoom] 🤖 Primeira unidade é IA: ${unit.name}, iniciando turno da IA`
+        );
+        onFirstUnitAI(unit);
+      }
+    } else {
+      console.log(
+        `[turn.handler] ERRO: Nenhuma unidade pode agir na actionOrder`
+      );
+    }
+  } else {
+    console.log(`[turn.handler] ERRO: actionOrder vazio após ordenação`);
   }
 }
 
 /**
- * Inicia o timer de turno
+ * @deprecated Use BattleTimerManager de battle-timer.handler.ts
+ * Mantido temporariamente para compatibilidade
  */
 export function startTurnTimer(
   state: BattleSessionState,
   clock: Room<BattleSessionState>["clock"],
   currentTimer: Delayed | null,
   setTimer: (timer: Delayed | null) => void,
-  onTimeExpired: () => void
+  onTimeExpired: () => void,
+  broadcast?: Room<BattleSessionState>["broadcast"]
 ): void {
+  console.warn(
+    "[turn.handler] startTurnTimer está deprecated. Use BattleTimerManager."
+  );
   if (currentTimer) {
     currentTimer.clear();
   }
@@ -73,6 +131,11 @@ export function startTurnTimer(
     }
 
     state.turnTimer--;
+
+    // Broadcast timer update a cada segundo
+    if (broadcast) {
+      broadcast("battle:timer_update", { turnTimer: state.turnTimer });
+    }
 
     if (state.turnTimer <= 0) {
       onTimeExpired();
@@ -94,11 +157,19 @@ export function advanceToNextUnit(
 ): void {
   console.log(`[BattleRoom] advanceToNextUnit chamado`);
 
+  // Verificar se a batalha já terminou
+  if (state.status === "ENDED") {
+    console.log(
+      "[BattleRoom] advanceToNextUnit: batalha já encerrada, ignorando"
+    );
+    return;
+  }
+
   let nextIndex = (state.currentTurnIndex + 1) % state.actionOrder.length;
   let attempts = 0;
 
   while (attempts < state.actionOrder.length) {
-    const unitId = state.actionOrder[nextIndex];
+    const unitId = state.actionOrder.at(nextIndex);
     if (!unitId) {
       nextIndex = (nextIndex + 1) % state.actionOrder.length;
       attempts++;
@@ -106,7 +177,8 @@ export function advanceToNextUnit(
     }
     const unit = state.units.get(unitId);
 
-    if (unit && unit.isAlive) {
+    // Usa canUnitAct para verificar se a unidade pode agir (viva E sem DISABLED)
+    if (unit && canUnitAct(unit)) {
       state.currentTurnIndex = nextIndex;
       state.activeUnitId = unitId;
       state.currentPlayerId = unit.ownerId;
@@ -115,7 +187,7 @@ export function advanceToNextUnit(
       unit.hasStartedAction = false;
       unit.movesLeft = unit.speed;
       unit.actionsLeft = 1;
-      unit.attacksLeftThisTurn = 1;
+      unit.attacksLeftThisTurn = 0;
 
       if (nextIndex === 0) {
         state.round++;
@@ -127,9 +199,17 @@ export function advanceToNextUnit(
       );
 
       broadcast("battle:turn_changed", {
-        activeUnitId: unitId,
+        unitId: unitId,
+        playerId: unit.ownerId,
         round: state.round,
         turnTimer: state.turnTimer,
+        // Dados atualizados da unidade para sync no cliente
+        unitUpdated: {
+          movesLeft: unit.movesLeft,
+          actionsLeft: unit.actionsLeft,
+          attacksLeftThisTurn: unit.attacksLeftThisTurn,
+          hasStartedAction: unit.hasStartedAction,
+        },
       });
 
       if (unit.isAIControlled) {
@@ -146,6 +226,11 @@ export function advanceToNextUnit(
     attempts++;
   }
 
+  // Não encontrou nenhuma unidade viva na actionOrder
+  // Verificar se realmente não há unidades vivas antes de terminar
+  console.log(
+    "[BattleRoom] Nenhuma unidade viva encontrada na actionOrder, verificando fim de batalha"
+  );
   onBattleEnd();
 }
 
@@ -170,7 +255,9 @@ export function processRoundEnd(
 }
 
 /**
- * Verifica se a batalha terminou
+ * @deprecated Use BattleTimerManager.forceCheckBattleEnd() de battle-timer.handler.ts
+ * A verificação de fim de batalha agora é feita pelo timer a cada segundo.
+ * Mantido temporariamente para compatibilidade.
  */
 export function checkBattleEnd(
   state: BattleSessionState,
@@ -179,14 +266,45 @@ export function checkBattleEnd(
   broadcast: Room<BattleSessionState>["broadcast"],
   onBattleEnd: (winnerId: string | undefined, reason: string) => void
 ): void {
+  console.warn(
+    "[turn.handler] checkBattleEnd está deprecated. A verificação agora é feita pelo BattleTimerManager."
+  );
+
+  // Já terminou - não verificar novamente
+  if (state.status === "ENDED") {
+    console.log("[BattleRoom] checkBattleEnd: batalha já encerrada, ignorando");
+    return;
+  }
+
   const playersAlive: string[] = [];
+  const playerUnitsInfo: Record<string, { alive: number; total: number }> = {};
 
   state.players.forEach((player: BattlePlayerSchema) => {
-    if (player.surrendered) return;
+    if (player.surrendered) {
+      console.log(`[BattleRoom] checkBattleEnd: ${player.oderId} se rendeu`);
+      return;
+    }
+
+    // Contar unidades para debug
+    let aliveCount = 0;
+    let totalCount = 0;
+    state.units.forEach((unit) => {
+      if (unit.ownerId === player.oderId) {
+        totalCount++;
+        if (unit.isAlive) aliveCount++;
+      }
+    });
+    playerUnitsInfo[player.oderId] = { alive: aliveCount, total: totalCount };
 
     if (state.playerHasAliveUnits(player.oderId)) {
       playersAlive.push(player.oderId);
     }
+  });
+
+  console.log("[BattleRoom] checkBattleEnd:", {
+    playersAliveCount: playersAlive.length,
+    playersAlive,
+    playerUnitsInfo,
   });
 
   if (playersAlive.length <= 1) {
@@ -198,6 +316,11 @@ export function checkBattleEnd(
     } else {
       state.winReason = "Empate - todos foram derrotados";
     }
+
+    console.log("[BattleRoom] Batalha encerrada:", {
+      winnerId: state.winnerId,
+      winReason: state.winReason,
+    });
 
     if (turnTimer) {
       turnTimer.clear();

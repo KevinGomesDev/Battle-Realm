@@ -125,7 +125,8 @@ export function executeAttack(
   // === CONSUMO DE AÇÃO E ATAQUES EXTRAS ===
   if (!hasAttacksRemaining) {
     attacker.actionsLeft = Math.max(0, attacker.actionsLeft - 1);
-    const hasProtection = attacker.physicalProtection > 0;
+    const hasProtection =
+      attacker.physicalProtection > 0 || attacker.magicalProtection > 0;
     const extraAttacks = getExtraAttacksFromConditions(
       attacker.conditions,
       hasProtection
@@ -363,6 +364,12 @@ export function executeAttack(
 /**
  * Wrapper para executeAttack que se encaixa na assinatura de SkillExecutorFn
  * Usado pelo sistema de skills para ação comum de ataque
+ *
+ * FLUXO UNIFICADO:
+ * 1. Valida se pode atacar (ações, condições, alcance)
+ * 2. Se alvo é unidade viva → retorna requiresQTE: true (QTE será iniciado pelo handler)
+ * 3. Se alvo é obstáculo → executa ataque direto
+ * 4. Se ataque no ar → executa miss
  */
 export function executeAttackSkill(
   caster: BattleUnit,
@@ -371,16 +378,150 @@ export function executeAttackSkill(
   skill: AbilityDefinition,
   context?: SkillExecutionContext
 ): AbilityExecutionResult {
-  // Delega para a função completa com parâmetros padrão
-  return executeAttack(
-    caster,
-    target,
-    allUnits,
-    skill,
-    "FISICO",
-    undefined,
-    context?.battleId
-  );
+  // === VALIDAÇÕES BÁSICAS ===
+  if (!caster.features.includes("ATTACK")) {
+    return { success: false, error: "Unidade não pode atacar" };
+  }
+  if (!caster.isAlive) {
+    return { success: false, error: "Unidade morta não pode atacar" };
+  }
+
+  // === VERIFICAR RECURSOS ===
+  const hasAttacksRemaining = caster.attacksLeftThisTurn > 0;
+  if (!hasAttacksRemaining && caster.actionsLeft <= 0) {
+    return { success: false, error: "Sem ações disponíveis" };
+  }
+
+  // === VERIFICAR CONDIÇÕES DO ATACANTE ===
+  const attackerScan = scanConditionsForAction(caster.conditions, "ATTACK");
+  if (!attackerScan.canPerform) {
+    return { success: false, error: attackerScan.blockReason };
+  }
+
+  // === DETERMINAR ALVO ===
+  const targetPosition = context?.targetPosition;
+
+  // Se temos um target direto (unidade)
+  if (target && "id" in target) {
+    // Verificar alcance
+    const baseAttackRange = 1;
+    const attackRangeMod = attackerScan.modifiers.basicAttackRangeMod || 0;
+    const effectiveAttackRange = baseAttackRange + attackRangeMod;
+
+    if (
+      !isWithinRange(
+        caster.posX,
+        caster.posY,
+        target.posX,
+        target.posY,
+        effectiveAttackRange
+      )
+    ) {
+      return { success: false, error: "Alvo fora de alcance" };
+    }
+
+    // Se alvo é unidade viva → precisa de QTE
+    if (target.isAlive) {
+      return {
+        success: true,
+        requiresQTE: true,
+        qteAttackerId: caster.id,
+        qteTargetId: target.id,
+      };
+    }
+
+    // Se alvo é cadáver → ataque direto sem QTE
+    return executeAttack(
+      caster,
+      target,
+      allUnits,
+      skill,
+      "FISICO",
+      undefined,
+      context?.battleId
+    );
+  }
+
+  // Se temos targetPosition, verificar o que há nessa posição
+  if (targetPosition) {
+    // Verificar alcance
+    const baseAttackRange = 1;
+    const attackRangeMod = attackerScan.modifiers.basicAttackRangeMod || 0;
+    const effectiveAttackRange = baseAttackRange + attackRangeMod;
+
+    if (
+      !isWithinRange(
+        caster.posX,
+        caster.posY,
+        targetPosition.x,
+        targetPosition.y,
+        effectiveAttackRange
+      )
+    ) {
+      return { success: false, error: "Posição fora de alcance" };
+    }
+
+    // Verificar se há unidade na posição
+    const unitAtPos = allUnits.find(
+      (u) =>
+        u.posX === targetPosition.x && u.posY === targetPosition.y && u.isAlive
+    );
+    if (unitAtPos) {
+      // Precisa de QTE
+      return {
+        success: true,
+        requiresQTE: true,
+        qteAttackerId: caster.id,
+        qteTargetId: unitAtPos.id,
+      };
+    }
+
+    // Verificar se há obstáculo na posição
+    const obstacleAtPos = context?.obstacles?.find(
+      (o) =>
+        o.posX === targetPosition.x &&
+        o.posY === targetPosition.y &&
+        !o.destroyed
+    );
+    if (obstacleAtPos) {
+      // Ataque em obstáculo - executa direto
+      const obstacle = {
+        id: obstacleAtPos.id,
+        posX: obstacleAtPos.posX,
+        posY: obstacleAtPos.posY,
+        type: "default" as any,
+        hp: obstacleAtPos.hp || 0,
+        destroyed: obstacleAtPos.destroyed || false,
+      };
+      return executeAttack(
+        caster,
+        null,
+        allUnits,
+        skill,
+        "FISICO",
+        obstacle,
+        context?.battleId
+      );
+    }
+
+    // Ataque no ar (miss) - consumir recurso e retornar
+    if (caster.attacksLeftThisTurn > 0) {
+      caster.attacksLeftThisTurn--;
+    } else {
+      caster.actionsLeft = Math.max(0, caster.actionsLeft - 1);
+    }
+
+    return {
+      success: true,
+      casterActionsLeft: caster.actionsLeft,
+      attacksLeftThisTurn: caster.attacksLeftThisTurn,
+      // Marcar como miss para o handler saber
+      damageDealt: 0,
+      error: undefined,
+    };
+  }
+
+  return { success: false, error: "Nenhum alvo especificado" };
 }
 
 /**
@@ -678,7 +819,8 @@ export function executeAttackFromQTEResult(
       return { success: false, error: "No actions left this turn" };
     }
     attacker.actionsLeft = Math.max(0, attacker.actionsLeft - 1);
-    const hasProtection = attacker.physicalProtection > 0;
+    const hasProtection =
+      attacker.physicalProtection > 0 || attacker.magicalProtection > 0;
     const extraAttacks = getExtraAttacksFromConditions(
       attacker.conditions,
       hasProtection

@@ -1,15 +1,54 @@
 // client/src/features/match/hooks/useMatch.ts
 // Hook para Match usando Zustand store
 
-import { useMatchStore, useAuthStore } from "../../../stores";
+import { useMatchStore } from "../../../stores";
 
 export function useMatch() {
   const store = useMatchStore();
-  const userId = useAuthStore((state) => state.user?.id);
 
   // Listeners são inicializados pelo StoreInitializer - não duplicar aqui
 
+  // Propriedades de compatibilidade
+  const currentMatch = store.matchId
+    ? {
+        id: store.matchId,
+        status: store.status,
+        phase: store.phase,
+      }
+    : null;
+
+  const completeMatchState = store.matchId
+    ? {
+        matchId: store.matchId,
+        status: store.status,
+        phase: store.phase,
+        currentTurn: store.currentTurn,
+        maxTurns: store.maxTurns,
+        activePlayerId: store.activePlayerId,
+        players: store.players,
+        territories: store.territories,
+      }
+    : null;
+
+  const myPlayer = store.players.find((p) => p.odataId === store.myPlayerId);
+  const preparationData = {
+    players: store.players,
+    territories: store.territories,
+    isReady: myPlayer?.isReady ?? false,
+  };
+
+  const matchMapData = {
+    territories: store.territories,
+    mapWidth: store.mapWidth,
+    mapHeight: store.mapHeight,
+    players: store.players,
+    status: store.status,
+  };
+
+  const waitingForPlayers = store.players.filter((p) => !p.hasFinishedTurn);
+
   return {
+    // State object for backwards compatibility
     state: {
       matchId: store.matchId,
       isHost: store.isHost,
@@ -33,6 +72,28 @@ export function useMatch() {
       isLoading: store.isLoading,
       error: store.error,
     },
+
+    // Direct properties for component compatibility
+    currentMatch,
+    completeMatchState,
+    preparationData,
+    matchMapData,
+    myPlayerId: store.myPlayerId,
+    isMyTurn: store.isMyTurn,
+    isLoading: store.isLoading,
+    error: store.error,
+    waitingForPlayers,
+
+    // Methods
+    getPreparationData: () => preparationData,
+    setPlayerReady: store.setReady,
+    requestMatchState: () => {
+      /* State is synced via Colyseus */
+    },
+    requestMapData: () => {
+      /* Map data is synced via Colyseus */
+    },
+    finishTurn: store.endTurn,
 
     // Room management
     createMatch: store.createMatch,

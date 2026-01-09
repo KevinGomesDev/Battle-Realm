@@ -72,9 +72,8 @@ export function calculateQTEDuration(
   // Positivo = atacante mais rápido = menos tempo
   const duration = config.baseDuration - speedDelta * config.speedDurationMod;
 
-  return Math.round(
-    Math.max(config.minDuration, Math.min(config.maxDuration, duration))
-  );
+  // Retorna duração calculada sem limites, apenas garante mínimo de 100ms para ser jogável
+  return Math.max(100, Math.round(duration));
 }
 
 /**
@@ -97,23 +96,22 @@ export function calculateShakeIntensity(
 }
 
 /**
- * Calcula o tamanho da zona de acerto baseado no duelo de Focus/Speed
+ * Calcula o tamanho da zona de acerto baseado no duelo de Focus
  * Atacante: Focus aumenta zona (mira melhor)
- * Defensor: Speed diminui zona (alvo mais difícil)
+ * Defensor: Focus diminui zona (lê a intenção e se posiciona melhor)
  */
 export function calculateHitZoneSize(
   attackerFocus: number,
-  defenderSpeed: number,
+  defenderFocus: number,
   config: QTECalculationConfig = QTE_DEFAULT_CONFIG
 ): number {
   // Para ATAQUE: atacante quer zona grande
-  // Focus do atacante aumenta, Speed do defensor diminui
-  const focusDelta = attackerFocus - defenderSpeed;
+  // Focus do atacante aumenta, Focus do defensor diminui
+  const focusDelta = attackerFocus - defenderFocus;
   const hitZone = config.baseHitZone + focusDelta * config.focusZoneMod;
 
-  return Math.round(
-    Math.max(config.minHitZone, Math.min(config.maxHitZone, hitZone))
-  );
+  // Retorna zona calculada sem limites, apenas garante mínimo de 1% para ser visível
+  return Math.max(1, Math.round(hitZone));
 }
 
 /**
@@ -129,9 +127,8 @@ export function calculateDefenseHitZoneSize(
   const focusDelta = defenderFocus - attackerFocus;
   const hitZone = config.baseHitZone + focusDelta * config.focusZoneMod;
 
-  return Math.round(
-    Math.max(config.minHitZone, Math.min(config.maxHitZone, hitZone))
-  );
+  // Retorna zona calculada sem limites, apenas garante mínimo de 1% para ser visível
+  return Math.max(1, Math.round(hitZone));
 }
 
 /**
@@ -226,8 +223,8 @@ export function generateAttackQTE(
     defenderDefense
   );
 
-  // Zona de acerto baseada em Focus vs Speed do alvo
-  const hitZoneSize = calculateHitZoneSize(attacker.focus, target.speed);
+  // Zona de acerto baseada em Focus vs Focus do alvo
+  const hitZoneSize = calculateHitZoneSize(attacker.focus, target.focus);
   const perfectZoneSize = Math.round(
     hitZoneSize * QTE_DEFAULT_CONFIG.perfectZoneRatio
   );
@@ -313,8 +310,10 @@ export function generateDefenseQTE(
     gridHeight
   );
 
-  // Input inválido = direção do ataque (correr de encontro ao golpe)
-  const invalidInputs: QTEInput[] = [directionToInput(attackDirection)];
+  // Input inválido = direção DE ONDE o ataque vem (correr de encontro ao golpe)
+  // Se o ataque vai para RIGHT, ele vem de LEFT, então LEFT (A) é inválido
+  const attackOriginDirection = OPPOSITE_DIRECTION[attackDirection];
+  const invalidInputs: QTEInput[] = [directionToInput(attackOriginDirection)];
 
   // Adicionar inputs bloqueados por obstáculos/unidades
   for (const [direction, delta] of Object.entries(DIRECTION_DELTAS) as [

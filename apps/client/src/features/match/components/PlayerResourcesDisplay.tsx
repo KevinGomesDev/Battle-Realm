@@ -7,7 +7,7 @@ import { RESOURCE_NAMES } from "@boundless/shared/config";
  * Componente que exibe os recursos do jogador atual
  */
 export const PlayerResourcesDisplay: React.FC = () => {
-  const { completeMatchState } = useMatch();
+  const { completeMatchState, myPlayerId } = useMatch();
   const { user } = useAuth();
 
   if (!completeMatchState || !user) {
@@ -15,13 +15,22 @@ export const PlayerResourcesDisplay: React.FC = () => {
   }
 
   // Encontrar o jogador atual
-  const myPlayer = completeMatchState.players.find((p) => p.userId === user.id);
+  const myPlayer = completeMatchState.players.find(
+    (p) => p.odataId === myPlayerId
+  );
 
   if (!myPlayer) {
     return null;
   }
 
-  const { resources } = myPlayer;
+  // Mapear recursos do MatchPlayerData
+  const resources = {
+    ore: myPlayer.gold ?? 0,
+    supplies: 0,
+    arcane: myPlayer.mana ?? 0,
+    experience: 0,
+    devotion: myPlayer.influence ?? 0,
+  };
 
   // Usa config global para ícones, nomes e cores
   const resourceConfig = {
@@ -69,7 +78,9 @@ export const PlayerResourcesDisplay: React.FC = () => {
               className="bg-medieval-darker rounded-lg p-2 text-center border-2 border-medieval-red-800 shadow-lg shadow-medieval-blood/10"
             >
               <div className="text-2xl mb-1">{config.icon}</div>
-              <div className={`text-xl font-bold ${config.color}`}>{value}</div>
+              <div className={`text-xl font-bold ${config.color}`}>
+                {String(value)}
+              </div>
               <div className="text-xs text-gray-400 mt-1">{config.label}</div>
             </div>
           );

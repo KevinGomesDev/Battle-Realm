@@ -4,6 +4,9 @@
 // Common
 export * from "./common.schema";
 
+// Arena (Challenge System)
+export * from "./arena.schema";
+
 // Battle Unit
 export * from "../../modules/battle/colyseus/schemas/battle-unit.schema";
 

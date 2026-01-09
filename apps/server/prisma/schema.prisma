@@ -299,12 +299,15 @@ model Battle {
   guestUserId      String?  // ID do guest
   hostKingdomId    String?  // ID do reino do host
   guestKingdomId   String?  // ID do reino do guest
-  status           String   @default("ACTIVE") // ACTIVE | ENDED
+  status           String   @default("ACTIVE") // ACTIVE | PAUSED | ENDED
   gridWidth        Int      @default(20)
   gridHeight       Int      @default(20)
   round            Int      @default(1)
   currentTurnIndex Int      @default(0)        // índice na ordem de iniciativa
-  actionOrder      String   @default("[]")      // JSON: [userId...], ordem de jogadores por iniciativa
+  actionOrder      String   @default("[]")      // JSON: [unitId...], ordem de unidades por iniciativa
+  activeUnitId     String?  // ID da unidade com turno ativo
+  currentPlayerId  String?  // ID do jogador com turno ativo
+  turnTimer        Int      @default(60)       // Segundos restantes no turno
   winnerId         String?  // ID do vencedor (userId ou matchKingdomId)
   winReason        String?  // Motivo da vitória
   ransomPrice      Int?
@@ -333,6 +336,7 @@ model BattleUnit {
   ownerId     String?     // MatchKingdom ID (for matches)
   owner       MatchKingdom? @relation(fields: [ownerId], references: [id])
   // Data copied from Unit for battle
+  oderId      String?     // ID da unidade na batalha (diferente do id do banco)
   userId      String?     // Owner User ID (for PvP battles)
   kingdomId   String?     // Owner Kingdom ID
   name        String      @default("Unit")
@@ -340,6 +344,7 @@ model BattleUnit {
   category    String      @default("TROOP")
   troopSlot   Int?        // Para TROOP: índice do template (0-4)
   level       Int         @default(1)  // Nível da unidade
+  race        String?     // Raça da unidade (ex: HUMAN, ORC)
   classCode   String?     // Código da classe (ex: BARBARIAN, WARRIOR)
   features    String      @default("[]") // Skills/features da unidade (JSON) - actions disponíveis
   learnedSkills String    @default("[]") // Skills aprendidas do DB (JSON) - fonte: Unit.features
@@ -365,19 +370,24 @@ model BattleUnit {
   attacksLeftThisTurn Int @default(0)          // Ataques restantes neste turno (extraAttacks)
   isAlive     Boolean     @default(true)
   actionMarks Int         @default(0)          // Action Marks restantes (decrementadas ao usar ação)
-  physicalProtection  Int         @default(0)
-  magicalProtection   Int         @default(0)
+  physicalProtection     Int  @default(0)
+  maxPhysicalProtection  Int  @default(0)      // Max proteção física
+  magicalProtection      Int  @default(0)
+  maxMagicalProtection   Int  @default(0)      // Max proteção mágica
   conditions  String      @default("[]")        // JSON: ["FROZEN", ...]
   grabbedByBattleUnitId String?
   corpseRemoved Boolean   @default(false)      // If true, corpse no longer blocks
   hasStartedAction Boolean @default(false)     // If unit already started action this turn
   actions     String      @default("[\"attack\",\"move\",\"dash\",\"dodge\"]") // Available actions (copied from Unit)
   isAIControlled Boolean  @default(false)     // If true, AI controls this unit (funnel)
+  aiBehavior  String      @default("AGGRESSIVE") // Comportamento da IA (AGGRESSIVE, DEFENSIVE, etc)
   // Unit size and vision
-  size        String      @default("NORMAL")   // NORMAL | LARGE | HUGE | GARGANTUAN
+  size        String      @default("MEDIUM")   // SMALL | MEDIUM | LARGE | HUGE | GARGANTUAN
   visionRange Int         @default(10)         // Vision range (max(10, focus))
   // Skill/Spell cooldowns
   unitCooldowns String     @default("{}")       // JSON: { "CODE": roundsLeft }
+  // Active effects (efeitos temporários como buffs/debuffs)
+  activeEffects String     @default("{}")       // JSON: { effectKey: { key, value, sources } }
 }
 
 // =============================================================================

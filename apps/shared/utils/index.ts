@@ -1,6 +1,9 @@
 // shared/utils/index.ts
 // Barrel export para utilitários compartilhados
 
+// Blocking - FONTE DE VERDADE para verificação de bloqueio (visão e movimento)
+export * from "./blocking.utils";
+
 // Funções de distância (fonte de verdade)
 export * from "./distance.utils";
 

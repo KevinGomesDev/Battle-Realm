@@ -15,6 +15,9 @@ COPY apps/shared ./apps/shared
 COPY apps/client ./apps/client
 COPY tsconfig.json ./
 
+# Build do shared primeiro
+RUN npm run build -w @boundless/shared
+
 # Build do client
 RUN npm run build -w @boundless/client
 

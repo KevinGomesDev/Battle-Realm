@@ -2,8 +2,9 @@
 import type { Client, Room } from "@colyseus/core";
 import type { BattleSessionState } from "../../schemas";
 import { createAndEmitEvent } from "../../../../match/services/event.service";
-import { isValidPosition } from "./utils";
+import { getAllUnitsAsBattleUnits, schemaUnitToBattleUnit } from "./utils";
 import { getUserData, sendError } from "./types";
+import { validateMove } from "@boundless/shared/utils/engagement.utils";
 
 /**
  * Handler de movimento de unidade
@@ -20,35 +21,51 @@ export function handleMove(
   const userData = getUserData(client);
   if (!userData) return;
 
-  const unit = state.units.get(unitId);
-  if (!unit) {
+  const unitSchema = state.units.get(unitId);
+  if (!unitSchema) {
     sendError(client, "Unidade não encontrada");
     return;
   }
 
-  if (unit.ownerId !== userData.userId) {
+  if (unitSchema.ownerId !== userData.userId) {
     sendError(client, "Esta unidade não é sua");
     return;
   }
 
-  const distance = Math.abs(toX - unit.posX) + Math.abs(toY - unit.posY);
+  // Converter schemas para tipos de batalha
+  const unit = schemaUnitToBattleUnit(unitSchema);
+  const allUnits = getAllUnitsAsBattleUnits(state);
+  const obstacles = Array.from(state.obstacles)
+    .filter((o): o is NonNullable<typeof o> => o !== undefined)
+    .map((o) => ({
+      posX: o.posX,
+      posY: o.posY,
+      destroyed: o.destroyed,
+    }));
 
-  if (distance > unit.movesLeft) {
-    sendError(client, "Movimento insuficiente");
+  // Validar movimento com custo de engajamento
+  const moveValidation = validateMove(
+    unit,
+    toX,
+    toY,
+    allUnits,
+    obstacles,
+    state.gridWidth,
+    state.gridHeight
+  );
+
+  if (!moveValidation.valid) {
+    sendError(client, moveValidation.error || "Movimento inválido");
     return;
   }
 
-  if (!isValidPosition(state, toX, toY)) {
-    sendError(client, "Posição inválida");
-    return;
-  }
+  const fromX = unitSchema.posX;
+  const fromY = unitSchema.posY;
 
-  const fromX = unit.posX;
-  const fromY = unit.posY;
-
-  unit.posX = toX;
-  unit.posY = toY;
-  unit.movesLeft -= distance;
+  // Aplicar movimento usando custo TOTAL (base + engajamento)
+  unitSchema.posX = toX;
+  unitSchema.posY = toY;
+  unitSchema.movesLeft -= moveValidation.totalCost;
 
   broadcast("battle:unit_moved", {
     unitId,
@@ -56,7 +73,10 @@ export function handleMove(
     fromY,
     toX,
     toY,
-    movesLeft: unit.movesLeft,
+    movesLeft: unitSchema.movesLeft,
+    baseCost: moveValidation.baseCost,
+    engagementCost: moveValidation.engagementCost,
+    totalCost: moveValidation.totalCost,
   });
 
   createAndEmitEvent({
@@ -65,17 +85,22 @@ export function handleMove(
     category: "COMBAT",
     severity: "INFO",
     battleId: roomId,
-    sourceUserId: unit.ownerId,
-    message: `${unit.name} se moveu de (${fromX}, ${fromY}) para (${toX}, ${toY})`,
+    sourceUserId: unitSchema.ownerId,
+    message:
+      moveValidation.engagementCost > 0
+        ? `${unitSchema.name} se moveu de (${fromX}, ${fromY}) para (${toX}, ${toY}) [Custo de engajamento: ${moveValidation.engagementCost}]`
+        : `${unitSchema.name} se moveu de (${fromX}, ${fromY}) para (${toX}, ${toY})`,
     code: "UNIT_MOVED",
     data: {
       fromPosition: { x: fromX, y: fromY },
       toPosition: { x: toX, y: toY },
-      distance,
-      movesLeft: unit.movesLeft,
+      baseCost: moveValidation.baseCost,
+      engagementCost: moveValidation.engagementCost,
+      totalCost: moveValidation.totalCost,
+      movesLeft: unitSchema.movesLeft,
     },
-    actorId: unit.id,
-    actorName: unit.name,
+    actorId: unitSchema.id,
+    actorName: unitSchema.name,
   }).catch((err) =>
     console.error("[BattleRoom] Erro ao criar evento de movimento:", err)
   );

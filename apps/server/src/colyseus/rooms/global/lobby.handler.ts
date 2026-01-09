@@ -16,9 +16,13 @@ export async function handleListLobbies(client: Client): Promise<void> {
       .map((room) => ({
         lobbyId: room.roomId,
         hostUserId: room.metadata?.hostUserId,
+        hostUsername: room.metadata?.hostUsername || "Unknown",
+        hostKingdomName: room.metadata?.hostKingdomName || "Unknown",
         maxPlayers: room.metadata?.maxPlayers || 2,
         playerCount: room.clients || 0,
-        vsBot: room.metadata?.vsBot || false,
+        players: [],
+        status: room.metadata?.status || "WAITING",
+        createdAt: new Date(),
       }));
 
     client.send("lobby:list", { lobbies });
@@ -71,7 +75,6 @@ export async function handleListBattleLobbies(client: Client): Promise<void> {
         hostName: room.metadata?.hostName || "Host",
         maxPlayers: room.metadata?.maxPlayers || 2,
         playerCount: room.clients || 0,
-        vsBot: room.metadata?.vsBot || false,
         status: room.metadata?.status || "WAITING",
       }));
 
@@ -88,7 +91,7 @@ export async function handleListBattleLobbies(client: Client): Promise<void> {
  */
 export async function handleCreateLobby(
   client: Client,
-  options: { kingdomId: string; maxPlayers?: number; vsBot?: boolean }
+  options: { kingdomId: string; maxPlayers?: number }
 ): Promise<void> {
   if (!isAuthenticated(client)) {
     sendAuthError(client);
@@ -102,7 +105,6 @@ export async function handleCreateLobby(
       userId: userData.userId,
       kingdomId: options.kingdomId,
       maxPlayers: options.maxPlayers || 2,
-      vsBot: options.vsBot || false,
     });
 
     client.send("lobby:created", {

@@ -10,9 +10,12 @@ export {
   useSendMessage,
 } from "./hooks/useChat";
 
+// Hook separado para HMR compatibility
+export { useBattleChat } from "./hooks/useBattleChat";
+
 // Componentes
 export { ChatBox } from "./components/ChatBox";
-export { BattleChat, useBattleChat } from "./components/BattleChat";
+export { BattleChat } from "./components/BattleChat";
 export { GlobalChat } from "./components/GlobalChat";
 export { MatchChat } from "./components/MatchChat";
 export { SpeechBubble } from "./components/SpeechBubble";

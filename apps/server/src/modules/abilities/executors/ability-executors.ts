@@ -91,6 +91,14 @@ export function executeSkill(
     };
   }
 
+  // Verificar se tem ações disponíveis (a menos que consumesAction === false)
+  if (skill.consumesAction !== false && caster.actionsLeft <= 0) {
+    return {
+      success: false,
+      error: "Sem ações disponíveis",
+    };
+  }
+
   // Executar a skill (com contexto)
   const result = executor(caster, target, allUnits, skill, context as any);
 

@@ -1,4 +1,7 @@
 services:
+  # ===========================================
+  # PostgreSQL Database
+  # ===========================================
   postgres:
     image: postgres:16-alpine
     container_name: battle-realm-db
@@ -12,6 +15,55 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - battle-realm-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # Backend Server (Colyseus + API)
+  # ===========================================
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    container_name: battle-realm-server
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/battle_realm
+      PORT: 3000
+      JWT_SECRET: battle-realm-super-secret-key-change-in-production
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - battle-realm-network
+
+  # ===========================================
+  # Frontend Client (Nginx + React)
+  # ===========================================
+  client:
+    build:
+      context: .
+      dockerfile: apps/client/Dockerfile
+    container_name: battle-realm-client
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+    networks:
+      - battle-realm-network
+
+networks:
+  battle-realm-network:
+    driver: bridge
 
 volumes:
   postgres_data:

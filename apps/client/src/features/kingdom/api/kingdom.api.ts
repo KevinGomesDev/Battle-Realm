@@ -91,6 +91,19 @@ export const kingdomApi = {
   },
 
   /**
+   * Deleta um reino
+   */
+  async delete(
+    kingdomId: string
+  ): Promise<SocketResponse<{ kingdomId: string; message: string }>> {
+    return emitWithResponse<{ kingdomId: string; message: string }>(
+      "kingdom:delete",
+      "kingdom:deleted",
+      { kingdomId }
+    );
+  },
+
+  /**
    * Obtém detalhes de um reino
    */
   async getDetails(

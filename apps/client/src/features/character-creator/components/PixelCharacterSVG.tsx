@@ -5,6 +5,7 @@ import React, { useMemo } from "react";
 import type {
   CharacterConfig,
   PixelPosition,
+  StyleOption,
 } from "@boundless/shared/types/character.types";
 import { CHARACTER_GRID } from "@boundless/shared/types/character.types";
 import {
@@ -107,7 +108,9 @@ export const PixelCharacterSVG: React.FC<PixelCharacterSVGProps> = ({
     });
 
     // 6. Calça
-    const pantsStyle = PANTS_STYLES.find((s) => s.id === config.pantsStyle);
+    const pantsStyle = PANTS_STYLES.find(
+      (s: StyleOption) => s.id === config.pantsStyle
+    );
     if (pantsStyle && pantsStyle.shape.length > 0) {
       layers.push({
         positions: pantsStyle.shape,
@@ -117,7 +120,9 @@ export const PixelCharacterSVG: React.FC<PixelCharacterSVGProps> = ({
     }
 
     // 7. Sapatos
-    const shoesStyle = SHOES_STYLES.find((s) => s.id === config.shoesStyle);
+    const shoesStyle = SHOES_STYLES.find(
+      (s: StyleOption) => s.id === config.shoesStyle
+    );
     if (shoesStyle && shoesStyle.shape.length > 0) {
       // Se descalço, usa cor de pele
       const shoeColor =
@@ -130,14 +135,16 @@ export const PixelCharacterSVG: React.FC<PixelCharacterSVGProps> = ({
     }
 
     // 8. Camisa
-    const shirtStyle = SHIRT_STYLES.find((s) => s.id === config.shirtStyle);
+    const shirtStyle = SHIRT_STYLES.find(
+      (s: StyleOption) => s.id === config.shirtStyle
+    );
     if (shirtStyle) {
       // Se multicolor, filtra posições secundárias
       if (shirtStyle.multiColor && shirtStyle.secondaryPositions) {
         const primaryPositions = shirtStyle.shape.filter(
-          (pos) =>
+          (pos: PixelPosition) =>
             !shirtStyle.secondaryPositions?.some(
-              (sp) => sp.x === pos.x && sp.y === pos.y
+              (sp: PixelPosition) => sp.x === pos.x && sp.y === pos.y
             )
         );
         layers.push({
@@ -160,7 +167,9 @@ export const PixelCharacterSVG: React.FC<PixelCharacterSVGProps> = ({
     }
 
     // 9. Cabelo
-    const hairStyle = HAIR_STYLES.find((s) => s.id === config.hairStyle);
+    const hairStyle = HAIR_STYLES.find(
+      (s: StyleOption) => s.id === config.hairStyle
+    );
     if (hairStyle && hairStyle.shape.length > 0) {
       layers.push({
         positions: hairStyle.shape,
@@ -172,7 +181,7 @@ export const PixelCharacterSVG: React.FC<PixelCharacterSVGProps> = ({
     // 10. Barba/Facial Hair
     if (config.facialHairStyle && config.facialHairStyle !== "none") {
       const facialStyle = FACIAL_HAIR_STYLES.find(
-        (s) => s.id === config.facialHairStyle
+        (s: StyleOption) => s.id === config.facialHairStyle
       );
       if (facialStyle && facialStyle.shape.length > 0) {
         layers.push({
@@ -186,7 +195,7 @@ export const PixelCharacterSVG: React.FC<PixelCharacterSVGProps> = ({
     // 11. Acessórios
     if (config.accessoryStyle && config.accessoryStyle !== "none") {
       const accessoryStyle = ACCESSORY_STYLES.find(
-        (s) => s.id === config.accessoryStyle
+        (s: StyleOption) => s.id === config.accessoryStyle
       );
       if (accessoryStyle && accessoryStyle.shape.length > 0) {
         layers.push({

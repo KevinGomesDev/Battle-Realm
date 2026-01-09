@@ -11,6 +11,7 @@
     "./types/*": "./types/*.ts",
     "./data": "./data/index.ts",
     "./data/*": "./data/*.ts",
+    "./data/character-creator": "./data/character-creator/index.ts",
     "./config": "./config/index.ts",
     "./config/*": "./config/*.ts",
     "./utils": "./utils/index.ts",

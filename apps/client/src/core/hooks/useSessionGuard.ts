@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useSession } from "./useSession";
 import { useAuth } from "../../features/auth";
 import { useBattleOptional } from "../../features/battle";
+import { colyseusService } from "../../services/colyseus.service";
 import type { SessionGuardState } from "@boundless/shared/types/session.types";
 
 // ============================================
@@ -59,7 +60,7 @@ export function useSessionGuard(): SessionGuardResult {
   const BattleState = battleStore
     ? {
         battle: battleStore.battle,
-        lobbyId: battleStore.lobbyId,
+        battleId: battleStore.battleId,
       }
     : null;
 
@@ -80,10 +81,13 @@ export function useSessionGuard(): SessionGuardResult {
   }, []);
 
   /**
-   * Verifica a sessão quando o usuário é autenticado
+   * Verifica a sessão quando o usuário é autenticado NO SERVIDOR
+   * Importante: esperar isServerValidated para garantir que o servidor
+   * reconhece o cliente antes de enviar session:check
    */
   useEffect(() => {
-    if (!authState.user?.id) {
+    // Só verificar quando o servidor validou a autenticação
+    if (!authState.user?.id || !authState.isServerValidated) {
       hasCheckedRef.current = false;
       setGuardState("idle");
       return;
@@ -106,7 +110,9 @@ export function useSessionGuard(): SessionGuardResult {
     };
 
     performCheck();
-  }, [authState.user?.id, checkSession]);
+    // checkSession é estável do Zustand, não precisa ser dependência
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authState.user?.id, authState.isServerValidated]);
 
   /**
    * Transição de checking -> restoring/ready após verificação
@@ -128,12 +134,22 @@ export function useSessionGuard(): SessionGuardResult {
       return;
     }
 
-    // Verifica se precisa aguardar restauração de batalha
-    // Para BATTLE_SESSION: aguarda até BattleState.battle existir
-    // Para BATTLE_LOBBY: aguarda até BattleState.lobbyId existir
+    // Para BATTLE_LOBBY: não bloquear, deixar o Dashboard redirecionar quando lobbyId existir
+    // A reconexão vai acontecer em background via handleSessionActive
+    if (session.type === "BATTLE_LOBBY") {
+      console.log(
+        "%c[SessionGuard] 🎮 Sessão de lobby detectada, continuando...",
+        "color: #22c55e; font-weight: bold;"
+      );
+      setGuardState("ready");
+      return;
+    }
+
+    // Para BATTLE_SESSION: verificar se precisa aguardar restauração
     const needsBattleRestore =
-      (session.type === "BATTLE_SESSION" && !BattleState.battle) ||
-      (session.type === "BATTLE_LOBBY" && !BattleState.lobbyId);
+      session.type === "BATTLE_SESSION" &&
+      !BattleState.battle &&
+      !BattleState.battleId;
 
     if (needsBattleRestore) {
       console.log(
@@ -152,8 +168,66 @@ export function useSessionGuard(): SessionGuardResult {
     sessionState.isChecking,
     sessionState.activeSession,
     BattleState?.battle,
-    BattleState?.lobbyId,
+    BattleState?.battleId,
   ]);
+
+  /**
+   * Tentativa de reconexão quando entra em restoring
+   * Serve como fallback caso o handler de evento session:active não funcione
+   */
+  useEffect(() => {
+    if (guardState !== "restoring") return;
+
+    const session = sessionState.activeSession;
+    if (!session?.type || session.type !== "BATTLE_SESSION") return;
+
+    const roomId = session.battleId || session.lobbyId;
+    if (!roomId) return;
+
+    // Verificar se já está conectado
+    if (colyseusService.isInBattle()) {
+      const currentRoom = colyseusService.getBattleRoom();
+      if (currentRoom?.id === roomId) {
+        console.log(
+          "[SessionGuard] Já conectado à batalha, aguardando sync..."
+        );
+        return;
+      }
+    }
+
+    // Tentar reconectar
+    const performReconnection = async () => {
+      try {
+        // Obter kingdomId
+        const userData = localStorage.getItem("auth_user");
+        const authUser = userData ? JSON.parse(userData) : null;
+        const selectedKingdom = localStorage.getItem("selected_kingdom");
+        const kingdomId = selectedKingdom
+          ? JSON.parse(selectedKingdom)?.id
+          : authUser?.kingdoms?.[0]?.id;
+
+        if (!kingdomId) {
+          console.error(
+            "[SessionGuard] Não foi possível encontrar kingdomId para reconexão"
+          );
+          return;
+        }
+
+        console.log(
+          "[SessionGuard] Iniciando reconexão manual à batalha:",
+          roomId
+        );
+        await colyseusService.joinBattleLobby(roomId, kingdomId);
+        console.log("[SessionGuard] Reconexão manual completada");
+      } catch (err) {
+        console.error("[SessionGuard] Erro ao reconectar manualmente:", err);
+      }
+    };
+
+    // Pequeno delay para dar tempo de handlers de eventos serem processados primeiro
+    const timer = setTimeout(performReconnection, 100);
+    return () => clearTimeout(timer);
+  }, [guardState, sessionState.activeSession]);
 
   /**
    * Transição de restoring -> ready quando Batalha restaurada
@@ -174,8 +248,8 @@ export function useSessionGuard(): SessionGuardResult {
     }
 
     const isBattleRestored =
-      (session.type === "BATTLE_SESSION" && BattleState.battle) ||
-      (session.type === "BATTLE_LOBBY" && BattleState.lobbyId);
+      session.type === "BATTLE_SESSION" &&
+      (BattleState.battle || BattleState.battleId);
 
     if (isBattleRestored) {
       console.log(
@@ -183,7 +257,7 @@ export function useSessionGuard(): SessionGuardResult {
         "color: #22c55e; font-weight: bold;",
         {
           hasBattle: !!BattleState.battle,
-          hasLobby: !!BattleState.lobbyId,
+          hasBattleId: !!BattleState.battleId,
         }
       );
       setGuardState("ready");
@@ -192,7 +266,7 @@ export function useSessionGuard(): SessionGuardResult {
     guardState,
     sessionState.activeSession,
     BattleState?.battle,
-    BattleState?.lobbyId,
+    BattleState?.battleId,
   ]);
 
   /**
@@ -214,7 +288,7 @@ export function useSessionGuard(): SessionGuardResult {
         {
           session: sessionState.activeSession,
           hasBattle: !!BattleState?.battle,
-          hasLobbyId: !!BattleState?.lobbyId,
+          hasBattleId: !!BattleState?.battleId,
         }
       );
       setError("Timeout ao restaurar sessão");
@@ -238,7 +312,9 @@ export function useSessionGuard(): SessionGuardResult {
     setGuardState("checking");
     setError(null);
     checkSession(authState.user.id);
-  }, [authState.user?.id, checkSession]);
+    // checkSession é estável do Zustand
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authState.user?.id]);
 
   // Computed values
   const isLoading = guardState === "checking" || guardState === "restoring";

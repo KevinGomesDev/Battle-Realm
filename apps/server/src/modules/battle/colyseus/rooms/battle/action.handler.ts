@@ -10,6 +10,7 @@ import { createAndEmitEvent } from "../../../../match/services/event.service";
 import { processUnitDeath } from "../../../../combat/death-logic";
 import { schemaUnitToBattleUnit, syncUnitFromResult } from "./utils";
 import { getUserData, sendError } from "./types";
+import { canUnitAct } from "./turn.handler";
 
 /**
  * Handler de início de ação
@@ -36,6 +37,12 @@ export function handleBeginAction(
 
   if (state.activeUnitId !== unitId) {
     sendError(client, "Não é o turno desta unidade");
+    return;
+  }
+
+  // Verificar se a unidade pode agir (viva e sem DISABLED)
+  if (!canUnitAct(unit)) {
+    sendError(client, "Esta unidade está desabilitada e não pode agir");
     return;
   }
 
@@ -69,6 +76,7 @@ export function handleEndAction(
 
 /**
  * Handler de execução de ação/ability
+ * FLUXO UNIFICADO: Todas as abilities passam pelo mesmo caminho
  */
 export function handleExecuteAction(
   client: Client,
@@ -77,12 +85,7 @@ export function handleExecuteAction(
   state: BattleSessionState,
   roomId: string,
   broadcast: Room<BattleSessionState>["broadcast"],
-  handleAttackFn: (
-    client: Client,
-    unitId: string,
-    targetUnitId?: string,
-    targetPosition?: { x: number; y: number }
-  ) => void,
+  startQTEFn: (client: Client, attackerId: string, targetId: string) => void,
   params?: Record<string, unknown>
 ): void {
   const userData = getUserData(client);
@@ -102,7 +105,7 @@ export function handleExecuteAction(
       state,
       roomId,
       broadcast,
-      handleAttackFn,
+      startQTEFn,
       params
     );
     return;
@@ -118,12 +121,7 @@ function handleUseAbility(
   state: BattleSessionState,
   roomId: string,
   broadcast: Room<BattleSessionState>["broadcast"],
-  handleAttackFn: (
-    client: Client,
-    unitId: string,
-    targetUnitId?: string,
-    targetPosition?: { x: number; y: number }
-  ) => void,
+  startQTEFn: (client: Client, attackerId: string, targetId: string) => void,
   params?: Record<string, unknown>
 ): void {
   const abilityCode = params?.abilityCode as string;
@@ -132,22 +130,22 @@ function handleUseAbility(
     return;
   }
 
-  // ATTACK usa handler separado (tem QTE)
-  if (abilityCode === "ATTACK") {
-    handleAttackFn(
-      client,
-      unitId,
-      params?.targetUnitId as string | undefined,
-      params?.targetPosition as { x: number; y: number } | undefined
-    );
-    return;
-  }
-
   const ability = findAbilityByCode(abilityCode);
   if (!ability) {
     sendError(client, `Ability não encontrada: ${abilityCode}`);
     return;
   }
+
+  // Log: Ability recebida e executor que será usado
+  console.log(`[BattleRoom] 📦 Ability recebida:`, {
+    abilityCode,
+    abilityName: ability.name,
+    executor: ability.functionName || "SEM_EXECUTOR",
+    caster: unit.name,
+    casterId: unitId,
+    targetUnitId: params?.targetUnitId,
+    targetPosition: params?.targetPosition,
+  });
 
   if (state.activeUnitId !== unitId) {
     sendError(client, "Não é o turno desta unidade");
@@ -159,15 +157,13 @@ function handleUseAbility(
   );
   const casterUnit = schemaUnitToBattleUnit(unit);
 
-  let target: BattleUnit | { x: number; y: number } | null = null;
+  let target: BattleUnit | null = null;
 
   if (params?.targetUnitId) {
     const targetSchema = state.units.get(params.targetUnitId as string);
     if (targetSchema) {
       target = schemaUnitToBattleUnit(targetSchema);
     }
-  } else if (params?.targetPosition) {
-    target = params.targetPosition as { x: number; y: number };
   }
 
   const obstacleArray = Array.from(state.obstacles).filter(
@@ -175,24 +171,39 @@ function handleUseAbility(
   );
   const context = {
     obstacles: obstacleArray.map((o) => ({
-      x: o.posX,
-      y: o.posY,
-      type: o.type || "default",
+      id: o.id,
+      posX: o.posX,
+      posY: o.posY,
+      hp: o.hp,
+      destroyed: o.destroyed || false,
+      type: (o.type || "default") as any,
     })),
-    gridWidth: state.gridWidth,
-    gridHeight: state.gridHeight,
     targetPosition: params?.targetPosition as
       | { x: number; y: number }
       | undefined,
+    battleId: roomId,
   };
 
+  // FLUXO UNIFICADO: Todas as abilities passam pelo executeSkill
   const result = executeSkill(
     casterUnit,
     abilityCode,
-    target as BattleUnit | null,
+    target,
     allUnits,
     true,
     context
+  );
+
+  // Log: Resultado do executor
+  console.log(
+    `[BattleRoom] 📤 Resultado do executor ${ability.functionName}:`,
+    {
+      success: result.success,
+      error: result.error,
+      requiresQTE: result.requiresQTE,
+      casterActionsLeft: result.casterActionsLeft,
+      targetHpAfter: result.targetHpAfter,
+    }
   );
 
   if (!result.success) {
@@ -200,9 +211,67 @@ function handleUseAbility(
     return;
   }
 
+  // === TRATAMENTO DE QTE (para ATTACK em unidade viva) ===
+  if (result.requiresQTE && result.qteAttackerId && result.qteTargetId) {
+    // Inicia QTE - o callback vai executar o ataque real após o QTE
+    startQTEFn(client, result.qteAttackerId, result.qteTargetId);
+    return;
+  }
+
+  // === TRATAMENTO DE ATTACK MISS (ataque no ar) ===
+  if (
+    abilityCode === "ATTACK" &&
+    result.damageDealt === 0 &&
+    !result.targetHpAfter
+  ) {
+    unit.actionsLeft = casterUnit.actionsLeft;
+    unit.attacksLeftThisTurn = casterUnit.attacksLeftThisTurn ?? 0;
+    unit.hasStartedAction = true;
+
+    const targetPos = params?.targetPosition as { x: number; y: number };
+    broadcast("battle:attack_missed", {
+      attackerId: unitId,
+      targetPosition: targetPos,
+      message: "O ataque não atingiu nenhum alvo!",
+      actionsLeft: unit.actionsLeft,
+      attacksLeftThisTurn: unit.attacksLeftThisTurn,
+    });
+
+    createAndEmitEvent({
+      context: "BATTLE",
+      scope: "GLOBAL",
+      category: "COMBAT",
+      severity: "INFO",
+      battleId: roomId,
+      sourceUserId: unit.ownerId,
+      message: `${unit.name} atacou a posição (${targetPos?.x}, ${targetPos?.y}) mas não acertou nenhum alvo!`,
+      code: "ATTACK_MISSED",
+      data: { targetPosition: targetPos },
+      actorId: unitId,
+      actorName: unit.name,
+    }).catch(console.error);
+    return;
+  }
+
+  // === FLUXO NORMAL: Sincronizar resultado ===
+  console.log(`[BattleRoom] 🔍 ANTES sync - Schema:`, {
+    actionsLeft: unit.actionsLeft,
+    movesLeft: unit.movesLeft,
+  });
+  console.log(`[BattleRoom] 🔍 ANTES sync - BattleUnit:`, {
+    actionsLeft: casterUnit.actionsLeft,
+    movesLeft: casterUnit.movesLeft,
+  });
+
   syncUnitFromResult(unit, casterUnit, result);
 
-  if (target && "id" in target && result.targetHpAfter !== undefined) {
+  console.log(`[BattleRoom] 🔍 DEPOIS sync - Schema:`, {
+    actionsLeft: unit.actionsLeft,
+    movesLeft: unit.movesLeft,
+  });
+
+  // Sincronizar alvo se houver
+  if (target && result.targetHpAfter !== undefined) {
     const targetSchema = state.units.get(target.id);
     if (targetSchema) {
       const targetUnit = allUnits.find((u) => u.id === target.id);
@@ -217,12 +286,42 @@ function handleUseAbility(
     }
   }
 
+  // Sincronizar obstáculo se foi atacado
+  if (result.obstacleDestroyed !== undefined && result.obstacleId) {
+    const obstacle = state.obstacles.find((o) => o.id === result.obstacleId);
+    if (obstacle) {
+      obstacle.hp = result.targetHpAfter ?? 0;
+      obstacle.destroyed = result.obstacleDestroyed;
+
+      broadcast("battle:obstacle_attacked", {
+        attackerId: unitId,
+        obstacleId: obstacle.id,
+        damage: result.damageDealt,
+        destroyed: obstacle.destroyed,
+      });
+    }
+  }
+
+  // Log: Enviando resposta para o client
+  console.log(`[BattleRoom] 📡 Enviando battle:skill_used para clients:`, {
+    casterUnitId: unitId,
+    skillCode: abilityCode,
+    resultSuccess: result.success,
+  });
+
   broadcast("battle:skill_used", {
     casterUnitId: unitId,
     skillCode: abilityCode,
     targetUnitId: params?.targetUnitId,
     targetPosition: params?.targetPosition,
     result,
+    casterUpdated: {
+      actionsLeft: unit.actionsLeft,
+      movesLeft: unit.movesLeft,
+      currentHp: unit.currentHp,
+      currentMana: unit.currentMana,
+      attacksLeftThisTurn: unit.attacksLeftThisTurn,
+    },
   });
 
   createAndEmitEvent({

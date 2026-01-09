@@ -23,6 +23,7 @@ export interface ResourceDefinition {
   name: string;
   shortName: string;
   icon: string;
+  color: string;
   description: string;
 }
 
@@ -37,6 +38,7 @@ export const RESOURCES: Record<ResourceId, ResourceDefinition> = {
     name: "Minério",
     shortName: "MIN",
     icon: "⛏️",
+    color: "text-gray-400",
     description: "Recurso básico para construção e equipamentos.",
   },
   2: {
@@ -45,6 +47,7 @@ export const RESOURCES: Record<ResourceId, ResourceDefinition> = {
     name: "Suprimentos",
     shortName: "SUP",
     icon: "📦",
+    color: "text-amber-400",
     description: "Mantimentos e provisões para as tropas.",
   },
   3: {
@@ -53,6 +56,7 @@ export const RESOURCES: Record<ResourceId, ResourceDefinition> = {
     name: "Arcano",
     shortName: "ARC",
     icon: "✨",
+    color: "text-purple-400",
     description: "Energia mágica para habilidades e feitiços.",
   },
   4: {
@@ -61,6 +65,7 @@ export const RESOURCES: Record<ResourceId, ResourceDefinition> = {
     name: "Experiência",
     shortName: "EXP",
     icon: "⭐",
+    color: "text-yellow-400",
     description: "Pontos de experiência para evolução.",
   },
   5: {
@@ -69,6 +74,7 @@ export const RESOURCES: Record<ResourceId, ResourceDefinition> = {
     name: "Devoção",
     shortName: "DEV",
     icon: "🙏",
+    color: "text-blue-400",
     description: "Fé e poder divino para habilidades sagradas.",
   },
 };

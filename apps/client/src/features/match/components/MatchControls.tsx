@@ -14,20 +14,22 @@ export const MatchControls: React.FC = () => {
     return null;
   }
 
-  const myPlayer = completeMatchState.players.find((p) => p.userId === user.id);
+  const myPlayer = completeMatchState.players.find(
+    (p) => p.odataUserId === user.id
+  );
 
   if (!myPlayer) {
     return null;
   }
 
-  const hasFinished = myPlayer.hasFinishedCurrentTurn;
+  const hasFinished = myPlayer.hasFinishedTurn;
   const canFinishTurn = isMyTurn && !hasFinished && !isLoading;
 
   const handleFinishTurn = async () => {
     if (!canFinishTurn || !myPlayerId) return;
 
     try {
-      await finishTurn(completeMatchState.matchId, myPlayerId);
+      finishTurn();
     } catch (error) {
       console.error("Erro ao terminar turno:", error);
     }

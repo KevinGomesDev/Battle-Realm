@@ -422,64 +422,6 @@ export function createMultiPlayerBattleUnits(
 }
 
 // =============================================================================
-// BOT UNITS FROM TEMPLATE
-// =============================================================================
-
-import {
-  type KingdomTemplateDefinition,
-  resolveKingdomTemplate,
-} from "@boundless/shared/data/kingdoms.data";
-
-/**
- * Cria unidades de BOT a partir de um template de reino
- * Retorna apenas o Regente como unidade BOT (para batalha 1v1)
- */
-export function createBotUnitsFromTemplate(
-  template: KingdomTemplateDefinition,
-  botUserId: string,
-  botKingdom: KingdomInfo
-): DBUnit[] {
-  const resolved = resolveKingdomTemplate(template);
-  if (!resolved) {
-    console.error(`Falha ao resolver template ${template.id}`);
-    return [];
-  }
-  const regent = resolved.regent;
-
-  // Criar um DBUnit fake a partir do template do regente
-  const regentUnit: DBUnit = {
-    id: `bot_regent_${Date.now()}`,
-    name: `🤖 ${regent.name}`,
-    avatar: regent.avatar || "1",
-    category: "REGENT",
-    troopSlot: null,
-    level: 1,
-    classCode: null, // BOT não tem classe específica
-    features: regent.initialSkillCode
-      ? JSON.stringify([regent.initialSkillCode])
-      : "[]",
-    equipment: "[]",
-    spells: regent.initialSpells ? JSON.stringify(regent.initialSpells) : "[]",
-    conditions: "[]",
-    unitCooldowns: "{}",
-    combat: regent.combat,
-    speed: regent.speed,
-    focus: regent.focus,
-    resistance: regent.resistance,
-    will: regent.will,
-    vitality: regent.vitality,
-    damageReduction: null,
-    maxHp: regent.vitality * HP_CONFIG.multiplier,
-    currentHp: regent.vitality * HP_CONFIG.multiplier,
-    maxMana: regent.will * MANA_CONFIG.multiplier,
-    currentMana: regent.will * MANA_CONFIG.multiplier,
-    size: "NORMAL",
-  };
-
-  return [regentUnit];
-}
-
-// =============================================================================
 // SINCRONIZAÇÃO: BattleUnit → Unit (após batalha)
 // =============================================================================
 

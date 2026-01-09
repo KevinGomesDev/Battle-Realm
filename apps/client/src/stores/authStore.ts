@@ -46,7 +46,7 @@ const initialState: AuthState = {
   error: null,
 };
 
-export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
+export const useAuthStore = create<AuthState & AuthActions>((set, _get) => ({
   ...initialState,
 
   setUser: (user) =>

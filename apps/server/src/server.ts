@@ -12,10 +12,18 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { monitor } from "@colyseus/monitor";
 
 // Colyseus Rooms
-import { BattleRoom, GlobalRoom, MatchRoom } from "./colyseus/rooms";
+import { BattleRoom, GlobalRoom, MatchRoom } from "./colyseus/rooms/index.js";
+import { ArenaRoom } from "./modules/arena/index.js";
 
 // Database
 import { prisma } from "./lib/prisma";
+
+// Workers
+import {
+  startPersistenceWorker,
+  stopPersistenceWorker,
+  forcePeristAll,
+} from "./workers/persistence.worker";
 
 const app = express();
 const server = http.createServer(app);
@@ -38,6 +46,7 @@ const gameServer = new ColyseusServer({
 
 // Registrar rooms do Colyseus
 gameServer.define("global", GlobalRoom);
+gameServer.define("arena", ArenaRoom);
 gameServer.define("battle", BattleRoom);
 gameServer.define("match", MatchRoom);
 
@@ -96,6 +105,9 @@ async function bootstrap() {
 
     await gameServer.listen(PORT);
 
+    // Iniciar worker de persistência
+    startPersistenceWorker();
+
     console.log(`[Server] ✅ Servidor rodando na porta ${PORT}`);
     console.log(`[Colyseus] Rooms disponíveis: global, battle, match`);
     console.log(`[Server] Endpoint de status: http://localhost:${PORT}/status`);
@@ -112,6 +124,8 @@ async function bootstrap() {
 // Graceful shutdown
 process.on("SIGTERM", async () => {
   console.log("[Server] Recebido SIGTERM, encerrando...");
+  stopPersistenceWorker();
+  await forcePeristAll(); // Persistir tudo antes de desligar
   await gameServer.gracefullyShutdown();
   await prisma.$disconnect();
   process.exit(0);
@@ -119,6 +133,8 @@ process.on("SIGTERM", async () => {
 
 process.on("SIGINT", async () => {
   console.log("[Server] Recebido SIGINT, encerrando...");
+  stopPersistenceWorker();
+  await forcePeristAll(); // Persistir tudo antes de desligar
   await gameServer.gracefullyShutdown();
   await prisma.$disconnect();
   process.exit(0);

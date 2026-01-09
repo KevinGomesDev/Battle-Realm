@@ -21,25 +21,8 @@ export function useBattle() {
     store.rematchRequests.length,
   ]);
 
-  // Compute currentLobby from store state
-  const currentLobby = store.lobbyId
-    ? {
-        lobbyId: store.lobbyId,
-        status: store.status,
-        maxPlayers: store.players.length > 0 ? 2 : 2, // Default
-        players: store.players.map((p) => ({
-          ...p,
-          playerIndex: p.playerIndex ?? 0,
-        })),
-      }
-    : null;
-
   return {
     state: {
-      lobbyId: store.lobbyId,
-      isHost: store.isHost,
-      lobbies: store.lobbies,
-      currentLobby,
       battleId: store.battleId,
       isInBattle: store.isInBattle,
       status: store.status,
@@ -66,16 +49,6 @@ export function useBattle() {
       opponentWantsRematch: store.opponentWantsRematch,
     },
 
-    // Lobby listing
-    listLobbies: store.listLobbies,
-
-    // Lobby
-    createLobby: store.createLobby,
-    joinLobby: store.joinLobby,
-    leaveLobby: store.leaveLobby,
-    setReady: store.setReady,
-    startBattle: store.startBattle,
-
     // Battle
     selectUnit: store.selectUnit,
     beginAction: store.beginAction,
@@ -86,6 +59,7 @@ export function useBattle() {
     castSpell: store.castSpell,
     surrender: store.surrender,
     requestRematch: store.requestRematch,
+    leaveBattle: store.leaveBattle,
 
     // Utilities
     getUnit: store.getUnit,
@@ -106,9 +80,6 @@ export function useBattleOptional() {
 export function useBattleState() {
   const store = useBattleStore();
   return {
-    lobbyId: store.lobbyId,
-    isHost: store.isHost,
-    lobbies: store.lobbies,
     battleId: store.battleId,
     isInBattle: store.isInBattle,
     status: store.status,
@@ -133,17 +104,6 @@ export function useBattleState() {
     battleResult: store.battleResult,
     rematchPending: store.rematchPending,
     opponentWantsRematch: store.opponentWantsRematch,
-  };
-}
-
-export function useBattleLobby() {
-  const store = useBattleStore();
-  return {
-    lobbyId: store.lobbyId,
-    isHost: store.isHost,
-    isInLobby: store.lobbyId !== null,
-    leaveLobby: store.leaveLobby,
-    startBattle: store.startBattle,
   };
 }
 

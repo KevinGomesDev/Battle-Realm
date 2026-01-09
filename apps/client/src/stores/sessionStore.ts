@@ -32,7 +32,11 @@ interface SessionActions {
   setChecking: (checking: boolean) => void;
   setCanJoin: (canJoin: boolean, reason: string | null) => void;
   initializeListeners: () => () => void;
+  resetCheckFlag: () => void;
 }
+
+// Flag externa para evitar múltiplas verificações entre remontagens de componentes
+let hasCheckedOnce = false;
 
 const initialState: SessionState = {
   activeSession: null,
@@ -42,7 +46,7 @@ const initialState: SessionState = {
 };
 
 export const useSessionStore = create<SessionState & SessionActions>(
-  (set, get) => ({
+  (set, _get) => ({
     ...initialState,
 
     setActiveSession: (activeSession) => set({ activeSession }),
@@ -51,11 +55,55 @@ export const useSessionStore = create<SessionState & SessionActions>(
 
     setCanJoin: (canJoin, canJoinReason) => set({ canJoin, canJoinReason }),
 
-    clearSession: () => set(initialState),
+    clearSession: () => {
+      hasCheckedOnce = false;
+      set(initialState);
+    },
+
+    resetCheckFlag: () => {
+      hasCheckedOnce = false;
+    },
 
     checkSession: async (userId) => {
       if (!userId) return;
 
+      // Prevenir chamadas duplicadas enquanto ainda está checando
+      const { isChecking, activeSession } = useSessionStore.getState();
+      if (isChecking) {
+        console.log("[Session] Já está verificando sessão, ignorando...");
+        return;
+      }
+
+      // Se já está conectado a uma batalha, não precisa verificar no servidor
+      // Também não precisa setar estado novamente para evitar re-renders
+      if (colyseusService.isInBattle()) {
+        // Só atualiza se ainda não tem activeSession ou se não marcou como verificado
+        if (!hasCheckedOnce || !activeSession) {
+          console.log("[Session] Já está em batalha, atualizando estado...");
+          const room = colyseusService.getBattleRoom();
+          if (room) {
+            hasCheckedOnce = true;
+            set({
+              activeSession: {
+                type: "BATTLE_LOBBY",
+                lobbyId: room.id,
+                battleId: room.id,
+              },
+              isChecking: false,
+            });
+          }
+        }
+        return;
+      }
+
+      // Se já verificou uma vez e tem sessão ativa, não re-emitir
+      // para evitar loops
+      if (hasCheckedOnce && activeSession) {
+        console.log("[Session] Já verificou anteriormente, ignorando...");
+        return;
+      }
+
+      hasCheckedOnce = true;
       set({ isChecking: true });
 
       try {

@@ -26,6 +26,7 @@ import {
   handleGetAlignments,
   handleGetTroopPassives,
   handleUpdateKingdomDescription,
+  handleDeleteKingdom,
   // Lobby
   handleListLobbies,
   handleListMatches,
@@ -185,6 +186,10 @@ export class GlobalRoom extends Room<GlobalRoomState> {
         await handleUpdateKingdomDescription(client, kingdomId, description);
       }
     );
+
+    this.onMessage("kingdom:delete", async (client, { kingdomId }) => {
+      await handleDeleteKingdom(client, kingdomId);
+    });
 
     // ===== CHAT =====
     this.onMessage("chat:send", (client, { message }) => {

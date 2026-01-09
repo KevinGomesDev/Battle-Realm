@@ -166,6 +166,7 @@ export function handleQTEResponse(
 
 /**
  * Executa ataque usando o executor e faz broadcast dos resultados
+ * Nota: A verificação de fim de batalha é feita pelo timer a cada segundo
  */
 export function executeAttackAndBroadcast(
   attacker: BattleUnitSchema,
@@ -174,7 +175,6 @@ export function executeAttackAndBroadcast(
   state: BattleSessionState,
   roomId: string,
   broadcast: Room<BattleSessionState>["broadcast"],
-  checkBattleEnd: () => void,
   qteData?: { attackerQTE?: unknown; defenderQTE?: unknown }
 ): void {
   const allUnits = getAllUnitsAsBattleUnits(state);
@@ -217,16 +217,9 @@ export function executeAttackAndBroadcast(
   if (result.dodged) {
     broadcastDodge(attacker, target, result, state, roomId, broadcast, qteData);
   } else {
-    broadcastAttack(
-      attacker,
-      target,
-      result,
-      state,
-      roomId,
-      broadcast,
-      checkBattleEnd
-    );
+    broadcastAttack(attacker, target, result, state, roomId, broadcast);
   }
+  // A verificação de fim de batalha é feita pelo timer a cada segundo
 }
 
 function broadcastDodge(
@@ -262,6 +255,11 @@ function broadcastDodge(
     targetId: target.id,
     attackerQTE: qteData?.attackerQTE,
     defenderQTE: qteData?.defenderQTE,
+    // Dados atualizados do atacante (mesmo em esquiva, consome recurso)
+    attackerUpdated: {
+      actionsLeft: attacker.actionsLeft,
+      attacksLeftThisTurn: attacker.attacksLeftThisTurn,
+    },
   });
 
   const perfeitaMsg = result.perfectDodgeBuff ? " com esquiva PERFEITA!" : "";
@@ -296,8 +294,7 @@ function broadcastAttack(
   result: AttackActionResult,
   state: BattleSessionState,
   roomId: string,
-  broadcast: Room<BattleSessionState>["broadcast"],
-  checkBattleEnd: () => void
+  broadcast: Room<BattleSessionState>["broadcast"]
 ): void {
   broadcast("battle:unit_attacked", {
     attackerId: attacker.id,
@@ -313,6 +310,18 @@ function broadcastAttack(
     targetDefeated: result.targetDefeated,
     damageTransferredToEidolon: result.damageTransferredToEidolon,
     eidolonDefeated: result.eidolonDefeated,
+    // Dados atualizados do alvo (proteções)
+    targetUpdated: {
+      currentHp: target.currentHp,
+      physicalProtection: target.physicalProtection,
+      magicalProtection: target.magicalProtection,
+      isAlive: target.isAlive,
+    },
+    // Dados atualizados do atacante
+    attackerUpdated: {
+      actionsLeft: attacker.actionsLeft,
+      attacksLeftThisTurn: attacker.attacksLeftThisTurn,
+    },
   });
 
   const damageMsg = result.damageTransferredToEidolon
@@ -350,7 +359,6 @@ function broadcastAttack(
     console.error("[BattleRoom] Erro ao criar evento de ataque:", err)
   );
 
-  if (result.targetDefeated || result.eidolonDefeated) {
-    checkBattleEnd();
-  }
+  // A verificação de fim de batalha é feita pelo timer a cada segundo
+  // Não é mais necessário chamar checkBattleEnd aqui
 }

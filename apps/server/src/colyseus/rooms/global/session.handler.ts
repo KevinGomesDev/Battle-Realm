@@ -20,11 +20,23 @@ export async function handleCheckSession(client: Client): Promise<void> {
 
   const userData = getUserData(client)!;
 
+  console.log(`[Session] Verificando sessão para userId: ${userData.userId}`);
+
   try {
     // 1. Verificar rooms de battle ativas (memória)
     const battleRooms = await matchMaker.query({ name: "battle" });
 
+    console.log(
+      `[Session] Encontradas ${battleRooms.length} battle rooms em memória`
+    );
+
     for (const room of battleRooms) {
+      console.log(`[Session] Room ${room.roomId}:`, {
+        players: room.metadata?.players,
+        status: room.metadata?.status,
+        hasPlayer: room.metadata?.players?.includes(userData.userId),
+      });
+
       if (room.metadata?.players?.includes(userData.userId)) {
         const isInBattle =
           room.metadata?.status === "BATTLING" ||

@@ -165,7 +165,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
   },
 
   initializeListeners: () => {
-    const { context, contextId } = get();
+    const { context: _context, contextId: _contextId } = get();
 
     const handleMessage = (data: { message: ChatMessage }) => {
       const state = get();

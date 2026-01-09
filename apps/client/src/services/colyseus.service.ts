@@ -36,7 +36,7 @@ export interface BattleSessionState {
   turnTimer: number;
   gridWidth: number;
   gridHeight: number;
-  players: Map<number, BattlePlayerState>;
+  players: BattlePlayerState[]; // ArraySchema no servidor
   actionOrder: string[];
   units: Map<string, BattleUnitState>;
   obstacles: BattleObstacleState[];
@@ -220,6 +220,7 @@ class ColyseusService {
   private globalRoom: Room<GlobalRoomState> | null = null;
   private BattleRoom: Room<BattleSessionState> | null = null;
   private matchRoom: Room<MatchState> | null = null;
+  private arenaRoom: Room | null = null;
 
   private listeners: Map<string, Set<Function>> = new Map();
   private reconnectAttempts = 0;
@@ -478,7 +479,6 @@ class ColyseusService {
   async createBattleLobby(options: {
     kingdomId: string;
     maxPlayers?: number;
-    vsBot?: boolean;
     restoreBattleId?: string; // ID da batalha para restaurar do banco
   }): Promise<Room<BattleSessionState>> {
     if (!this.client) {
@@ -498,7 +498,6 @@ class ColyseusService {
       userId: user?.id,
       kingdomId: options.kingdomId,
       maxPlayers: options.maxPlayers || 2,
-      vsBot: options.vsBot === true,
       restoreBattleId: options.restoreBattleId,
       token,
     };
@@ -518,6 +517,20 @@ class ColyseusService {
   }
 
   /**
+   * Restaura uma batalha pausada do banco de dados
+   */
+  async restoreBattle(
+    battleId: string,
+    kingdomId: string
+  ): Promise<Room<BattleSessionState>> {
+    console.log(`[Colyseus] Restaurando batalha ${battleId} do banco`);
+    return this.createBattleLobby({
+      kingdomId,
+      restoreBattleId: battleId,
+    });
+  }
+
+  /**
    * Entra em um lobby de Batalha existente
    */
   async joinBattleLobby(
@@ -528,16 +541,34 @@ class ColyseusService {
       throw new Error("Não conectado ao servidor");
     }
 
+    console.log(`[Colyseus] Tentando entrar na BattleRoom: ${roomId}`);
+
     if (this.BattleRoom) {
+      console.log(
+        `[Colyseus] Saindo da BattleRoom atual: ${this.BattleRoom.id}`
+      );
       await this.BattleRoom.leave();
+      this.BattleRoom = null;
+      // Pequena espera para garantir cleanup
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
     const userData = localStorage.getItem("auth_user");
     const user = userData ? JSON.parse(userData) : null;
 
+    console.log(
+      `[Colyseus] joinById com userId: ${user?.id}, kingdomId: ${kingdomId}`
+    );
+
     this.BattleRoom = await this.client.joinById<BattleSessionState>(roomId, {
       userId: user?.id,
       kingdomId,
+    });
+
+    console.log(`[Colyseus] BattleRoom.state após join:`, {
+      battleId: this.BattleRoom.state?.battleId,
+      status: this.BattleRoom.state?.status,
+      stateExists: !!this.BattleRoom.state,
     });
 
     this.setupBattleRoomListeners();
@@ -562,14 +593,34 @@ class ColyseusService {
     if (!this.BattleRoom) return;
 
     this.BattleRoom.onStateChange((state: BattleSessionState) => {
-      this.emit("battle:state_changed", state);
+      console.log("[Colyseus] battle:state_changed disparado:", {
+        status: state.status,
+        battleId: state.battleId,
+        playersCount: state.players?.length,
+        round: state.round,
+        gridWidth: state.gridWidth,
+        stateKeys: Object.keys(state || {}),
+      });
+      // Só emite se o estado tiver dados válidos (battleId preenchido)
+      // Isso evita emitir estado vazio durante sincronização inicial
+      if (state.battleId) {
+        this.emit("battle:state_changed", state);
+      } else {
+        console.log(
+          "[Colyseus] Ignorando state_changed - battleId vazio (sincronização inicial)"
+        );
+      }
     });
 
-    // Emitir estado inicial imediatamente (para capturar estado que já mudou)
-    // Isso é necessário porque em vsBot a batalha já iniciou antes do listener ser registrado
-    if (this.BattleRoom.state) {
-      this.emit("battle:state_changed", this.BattleRoom.state);
-    }
+    // Listener para mudanças em players (lobby)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this.BattleRoom.state as any).players?.onAdd?.(() => {
+      console.log("[Colyseus] Player adicionado, re-emitindo estado");
+      // Quando um player é adicionado, re-emitir o estado completo
+      if (this.BattleRoom?.state) {
+        this.emit("battle:state_changed", this.BattleRoom.state);
+      }
+    });
 
     // Listener específico para mudanças em unidades
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -582,6 +633,10 @@ class ColyseusService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (this.BattleRoom.state as any).units?.onChange?.(
       (unit: BattleUnitState, key: string) => {
+        console.log(`[Colyseus] Unit changed: ${key}`, {
+          actionsLeft: unit.actionsLeft,
+          movesLeft: unit.movesLeft,
+        });
         this.emit("battle:unit_changed", { unit, id: key });
       }
     );
@@ -596,6 +651,7 @@ class ColyseusService {
     this.BattleRoom.onMessage(
       "*",
       (type: string | number | Schema, message: unknown) => {
+        console.log(`[Colyseus] BattleRoom mensagem recebida: ${type}`);
         this.emit(`battle:${type}`, message);
       }
     );
@@ -610,6 +666,44 @@ class ColyseusService {
       console.error(`[Colyseus] Erro na battle: ${code} - ${message}`);
       this.emit("battle:error", { code, message });
     });
+
+    // Emitir estado atual imediatamente se já existir
+    // Isso garante que estados já sincronizados sejam propagados
+    if (this.BattleRoom.state) {
+      console.log(
+        "[Colyseus] Emitindo estado inicial:",
+        this.BattleRoom.state.status
+      );
+      // Usar setTimeout para garantir que os listeners do battleStore já estejam registrados
+      setTimeout(() => {
+        if (this.BattleRoom?.state) {
+          this.emit("battle:state_changed", this.BattleRoom.state);
+        }
+      }, 0);
+
+      // Se o estado inicial não estiver completo, fazer polling até estar
+      if (
+        !this.BattleRoom.state.status ||
+        this.BattleRoom.state.status === "WAITING" ||
+        this.BattleRoom.state.status === "READY"
+      ) {
+        const pollInterval = setInterval(() => {
+          if (!this.BattleRoom?.state) {
+            clearInterval(pollInterval);
+            return;
+          }
+          if (this.BattleRoom.state.status === "ACTIVE") {
+            console.log(
+              "[Colyseus] Estado ACTIVE detectado via polling, emitindo"
+            );
+            this.emit("battle:state_changed", this.BattleRoom.state);
+            clearInterval(pollInterval);
+          }
+        }, 50);
+        // Limpar após 5 segundos para evitar leak
+        setTimeout(() => clearInterval(pollInterval), 5000);
+      }
+    }
   }
 
   /**
@@ -627,7 +721,8 @@ class ColyseusService {
    * Obtém o estado da batalha
    */
   getBattleState(): BattleSessionState | null {
-    return this.BattleRoom?.state ?? null;
+    if (!this.BattleRoom?.state) return null;
+    return this.BattleRoom.state;
   }
 
   /**
@@ -779,6 +874,80 @@ class ColyseusService {
   }
 
   // =========================================
+  // Arena Room (Sistema de Desafios)
+  // =========================================
+
+  /**
+   * Entra na arena para receber/enviar desafios
+   */
+  async joinArena(userId: string, username: string): Promise<Room> {
+    if (!this.client) throw new Error("Client não conectado");
+
+    if (this.arenaRoom) {
+      console.log("[Colyseus] Já está na arena");
+      return this.arenaRoom;
+    }
+
+    console.log("[Colyseus] 🏟️ Entrando na Arena...");
+
+    this.arenaRoom = await this.client.joinOrCreate("arena", {
+      userId,
+      username,
+    });
+
+    // Configurar listeners de mensagens
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.arenaRoom.onMessage("*", (type: any, message: unknown) => {
+      console.log(`[Colyseus] 📩 Arena: ${type}`, message);
+      this.emit(String(type), message);
+    });
+
+    this.arenaRoom.onLeave(() => {
+      console.log("[Colyseus] 🏟️ Saiu da Arena");
+      this.arenaRoom = null;
+    });
+
+    console.log("[Colyseus] ✅ Conectado à Arena");
+    return this.arenaRoom;
+  }
+
+  /**
+   * Sai da arena
+   */
+  leaveArena(): void {
+    if (this.arenaRoom) {
+      this.arenaRoom.leave();
+      this.arenaRoom = null;
+    }
+  }
+
+  /**
+   * Envia mensagem para a arena
+   */
+  sendToArena(type: string, message?: unknown): void {
+    if (!this.arenaRoom) {
+      console.warn("[Colyseus] Arena não conectada");
+      return;
+    }
+    console.log(`[Colyseus] 📤 Arena: ${type}`, message);
+    this.arenaRoom.send(type, message);
+  }
+
+  /**
+   * Verifica se está na arena
+   */
+  isInArena(): boolean {
+    return this.arenaRoom !== null;
+  }
+
+  /**
+   * Obtém a room da arena
+   */
+  getArenaRoom(): Room | null {
+    return this.arenaRoom;
+  }
+
+  // =========================================
   // Event System
   // =========================================
 
@@ -813,7 +982,7 @@ class ColyseusService {
   /**
    * Emite um evento local
    */
-  private emit(event: string, data?: any): void {
+  emit(event: string, data?: unknown): void {
     const callbacks = this.listeners.get(event);
     if (callbacks) {
       callbacks.forEach((cb) => {
@@ -824,6 +993,13 @@ class ColyseusService {
         }
       });
     }
+  }
+
+  /**
+   * Emite um evento público (para forçar sincronização de estado)
+   */
+  emitEvent(event: string, data?: unknown): void {
+    this.emit(event, data);
   }
 
   // =========================================
