@@ -15,5 +15,14 @@ export * from "./pants-styles.data";
 export * from "./shoes-styles.data";
 export * from "./accessory-styles.data";
 
+// Armas
+export * from "./weapons.data";
+
 // Base do corpo
 export * from "./body-base.data";
+
+// Tipos de corpo
+export * from "./body-types.data";
+
+// Poses/Animações
+export * from "./poses.data";
