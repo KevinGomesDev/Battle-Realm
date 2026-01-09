@@ -37,6 +37,8 @@ export function executeDash(
   return {
     success: true,
     movementGained: result.movementChange,
-    conditionsApplied: result.wasAdded ? ["DASHING"] : [],
+    conditionsApplied: result.wasAdded
+      ? [{ targetId: caster.id, conditionId: "DASHING" }]
+      : [],
   };
 }

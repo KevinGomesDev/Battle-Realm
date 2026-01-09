@@ -1,12 +1,12 @@
 // server/src/ai/core/ai-controller.ts
 // Controlador principal da IA de batalha
 
-import type { BattleSession } from "@boundless/shared/types/battle-lobby.types";
 import type { AbilityDefinition as SkillDefinition } from "@boundless/shared/types/ability.types";
 import type {
   AIDecision,
   AIBattleContext,
   AITurnResult,
+  BattleSession,
 } from "../types/ai.types";
 import { DEFAULT_AI_PROFILES, DEFAULT_AI_TIMEOUT } from "../types/ai.types";
 import { getUnitAIProfile, processUnitWithTimeout } from "./decision-maker";

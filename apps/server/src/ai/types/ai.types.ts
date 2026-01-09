@@ -7,6 +7,24 @@ import type {
 } from "@boundless/shared/types/battle.types";
 
 /**
+ * Representação simplificada da sessão de batalha para uso na IA
+ * Contém apenas os campos necessários para tomada de decisão
+ */
+export interface BattleSession {
+  battleId: string;
+  units: BattleUnit[];
+  config: {
+    map: {
+      obstacles: BattleObstacle[];
+    };
+    grid: {
+      width: number;
+      height: number;
+    };
+  };
+}
+
+/**
  * Comportamento base da IA
  * Define como a unidade decide suas ações
  */

@@ -64,14 +64,17 @@ function buildAbilityResultMessage(
   const parts: string[] = [];
 
   // Ícone baseado no tipo de efeito
-  const icon =
-    ability.effectType === "OFFENSIVE"
-      ? "⚔️"
-      : ability.effectType === "DEFENSIVE"
-      ? "🛡️"
-      : ability.effectType === "HEALING"
-      ? "💚"
-      : "⚡";
+  const effectIcons: Record<string, string> = {
+    OFFENSIVE: "⚔️",
+    DEFENSIVE: "🛡️",
+    HEALING: "💚",
+    BUFF: "✨",
+    DEBUFF: "💀",
+    UTILITY: "⚡",
+  };
+  const icon = ability.effectType
+    ? effectIcons[ability.effectType] || "⚡"
+    : "⚡";
 
   // Mensagem principal
   parts.push(`${icon} ${caster.name} usou ${ability.name}`);
