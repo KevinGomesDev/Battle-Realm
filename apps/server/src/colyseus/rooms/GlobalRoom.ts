@@ -222,5 +222,10 @@ export class GlobalRoom extends Room<GlobalRoomState> {
     this.onMessage("battle:list_lobbies", async (client) => {
       await handleListBattleLobbies(client);
     });
+
+    // ===== HEARTBEAT =====
+    this.onMessage("ping", (client, data) => {
+      client.send("pong", { timestamp: data?.timestamp ?? Date.now() });
+    });
   }
 }

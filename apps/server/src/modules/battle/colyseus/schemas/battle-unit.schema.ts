@@ -109,7 +109,10 @@ export class BattleUnitSchema extends Schema {
     const conditions = Array.from(this.conditions).filter(
       (c): c is string => !!c
     );
-    const effects = calculateActiveEffects(conditions);
+    const effects = calculateActiveEffects(conditions, {
+      physicalProtection: this.physicalProtection,
+      magicalProtection: this.magicalProtection,
+    });
 
     this.activeEffects.clear();
     Object.entries(effects).forEach(([key, effect]) => {
@@ -338,6 +341,14 @@ export class BattleUnitSchema extends Schema {
     if (unit.actionMarks !== undefined) this.actionMarks = unit.actionMarks;
     if (unit.hasStartedAction !== undefined)
       this.hasStartedAction = unit.hasStartedAction;
+
+    // Track se proteção mudou (para recalcular activeEffects)
+    const protectionChanged =
+      (unit.physicalProtection !== undefined &&
+        unit.physicalProtection !== this.physicalProtection) ||
+      (unit.magicalProtection !== undefined &&
+        unit.magicalProtection !== this.magicalProtection);
+
     if (unit.physicalProtection !== undefined)
       this.physicalProtection = unit.physicalProtection;
     if (unit.magicalProtection !== undefined)
@@ -352,6 +363,9 @@ export class BattleUnitSchema extends Schema {
       this.conditions.clear();
       unit.conditions.forEach((c) => this.conditions.push(c));
       // Recalcular activeEffects quando conditions mudam
+      this.syncActiveEffects();
+    } else if (protectionChanged) {
+      // Recalcular activeEffects quando proteção muda (para efeitos condicionais como RECKLESS_ATTACK)
       this.syncActiveEffects();
     }
 

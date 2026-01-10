@@ -10,6 +10,7 @@ import { ReconnectingOverlay } from "../components/ReconnectingOverlay";
 export function RootLayout() {
   const connect = useColyseusStore((s) => s.connect);
   const isConnected = useColyseusStore((s) => s.isConnected);
+  const isReconnecting = useColyseusStore((s) => s.isReconnecting);
   const { user, isLoading: isAuthLoading, restoreSession } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -53,7 +54,8 @@ export function RootLayout() {
 
   // Redirecionar baseado no estado de autenticação
   useEffect(() => {
-    if (isRestoring || isAuthLoading) return;
+    // Não redirecionar durante restauração, loading, ou reconexão
+    if (isRestoring || isAuthLoading || isReconnecting) return;
 
     if (user && location.pathname === "/") {
       // Usuário logado na home -> vai para dashboard
@@ -62,7 +64,14 @@ export function RootLayout() {
       // Usuário deslogado em rota protegida -> vai para home
       navigate("/", { replace: true });
     }
-  }, [user, isRestoring, isAuthLoading, location.pathname, navigate]);
+  }, [
+    user,
+    isRestoring,
+    isAuthLoading,
+    isReconnecting,
+    location.pathname,
+    navigate,
+  ]);
 
   // Mostra loading enquanto inicializa
   const isInitializing = isRestoring || isAuthLoading || !isConnected;

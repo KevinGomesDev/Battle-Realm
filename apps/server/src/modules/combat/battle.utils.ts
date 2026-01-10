@@ -112,7 +112,10 @@ export function prepareUnitUpdateData(unit: {
   // Se conditions estiver presente, calcular activeEffects
   if (unit.conditions !== undefined) {
     data.conditions = unit.conditions;
-    data.activeEffects = calculateActiveEffects(unit.conditions);
+    data.activeEffects = calculateActiveEffects(unit.conditions, {
+      physicalProtection: unit.physicalProtection,
+      magicalProtection: unit.magicalProtection,
+    });
   }
 
   return data;
@@ -152,6 +155,8 @@ export function prepareTurnEndedData(
     movesLeft: number;
     actionsLeft: number;
     attacksLeftThisTurn: number;
+    physicalProtection?: number;
+    magicalProtection?: number;
   },
   turnEndResult: {
     damageFromConditions: number;
@@ -165,7 +170,10 @@ export function prepareTurnEndedData(
     currentHp: unit.currentHp,
     isAlive: unit.isAlive,
     conditions: unit.conditions,
-    activeEffects: calculateActiveEffects(unit.conditions),
+    activeEffects: calculateActiveEffects(unit.conditions, {
+      physicalProtection: unit.physicalProtection,
+      magicalProtection: unit.magicalProtection,
+    }),
     damageFromConditions: turnEndResult.damageFromConditions,
     conditionsRemoved: turnEndResult.conditionsRemoved,
     hasStartedAction: unit.hasStartedAction,

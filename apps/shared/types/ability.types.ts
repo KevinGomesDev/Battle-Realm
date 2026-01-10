@@ -660,6 +660,8 @@ export interface AbilityExecutionResult {
     unitId: string;
     damage: number;
     hpAfter: number;
+    physicalProtection: number;
+    magicalProtection: number;
     defeated: boolean;
   }>;
 

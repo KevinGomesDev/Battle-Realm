@@ -52,7 +52,6 @@ import {
   drawTurnIndicator,
   drawFogOfWar,
   drawTargetingPreview,
-  drawAbilityRangeIndicator,
   drawAbilityAreaPreview,
   calculateAreaPreviewCenter,
   drawSingleTargetLine,
@@ -345,7 +344,9 @@ export const BattleCanvas = memo(
           ctx.drawImage(gridCacheRef.current, 0, 0);
         }
 
-        // Highlights de células
+        // Highlights de células (desabilitado quando em modo de preview de ability)
+        const isInAbilityPreviewMode =
+          !!abilityAreaPreview || !!targetingPreview;
         drawCellHighlights({
           ctx,
           cellSize,
@@ -354,7 +355,7 @@ export const BattleCanvas = memo(
           attackableCells,
           hoveredCell,
           gridColors: GRID_COLORS,
-          hasAbilityAreaPreview: !!abilityAreaPreview,
+          hasAbilityAreaPreview: isInAbilityPreviewMode,
         });
 
         // Targeting Preview
@@ -369,17 +370,17 @@ export const BattleCanvas = memo(
           });
         }
 
-        // Ability Range Indicator
-        if (abilityAreaPreview) {
-          drawAbilityRangeIndicator({
-            ctx,
-            abilityAreaPreview,
-            gridWidth: GRID_WIDTH,
-            gridHeight: GRID_HEIGHT,
-            cellSize,
-            gridColors: GRID_COLORS,
-          });
-        }
+        // Ability Range Indicator desabilitado - não mostra área vermelha fora do alcance
+        // if (abilityAreaPreview) {
+        //   drawAbilityRangeIndicator({
+        //     ctx,
+        //     abilityAreaPreview,
+        //     gridWidth: GRID_WIDTH,
+        //     gridHeight: GRID_HEIGHT,
+        //     cellSize,
+        //     gridColors: GRID_COLORS,
+        //   });
+        // }
 
         // Ability Area Preview
         const areaPreviewCenter = calculateAreaPreviewCenter(
@@ -837,10 +838,16 @@ export const BattleCanvas = memo(
             />
           </CameraController>
 
-          {/* Tooltips */}
-          {tooltipInfo && mousePosition && (
-            <MovementTooltip info={tooltipInfo} mousePosition={mousePosition} />
-          )}
+          {/* Tooltips - não exibe tooltip de movimento quando em modo de preview de ability */}
+          {tooltipInfo &&
+            mousePosition &&
+            !abilityAreaPreview &&
+            !targetingPreview && (
+              <MovementTooltip
+                info={tooltipInfo}
+                mousePosition={mousePosition}
+              />
+            )}
 
           {hoverTooltip && mousePosition && !tooltipInfo && (
             <HoverTooltip info={hoverTooltip} mousePosition={mousePosition} />

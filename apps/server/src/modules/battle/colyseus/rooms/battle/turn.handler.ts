@@ -6,6 +6,12 @@ import type {
   BattlePlayerSchema,
 } from "../../schemas";
 import { TURN_CONFIG } from "@boundless/shared/config";
+import { CONDITIONS } from "@boundless/shared/data/conditions.data";
+import {
+  removeConditionsFromUnit,
+  syncUnitActiveEffects,
+} from "../../../../conditions/conditions";
+import { applyDamage } from "../../../../combat/damage.utils";
 
 /**
  * Verifica se uma unidade pode agir no turno.
@@ -145,6 +151,140 @@ export function startTurnTimer(
   setTimer(timer);
 }
 
+// =============================================================================
+// PROCESSAMENTO DE FIM DE TURNO DA UNIDADE
+// =============================================================================
+
+/**
+ * Interface mínima de unidade para processamento de condições (compatível com Schema)
+ */
+interface UnitForConditionProcessing {
+  conditions: { has(condId: string): boolean } & Iterable<string>;
+  speed: number;
+  movesLeft: number;
+  actionsLeft: number;
+  currentHp: number;
+  maxHp: number;
+  activeEffects?: any;
+  physicalProtection: number;
+  magicalProtection: number;
+  isAlive: boolean;
+  id: string;
+  name: string;
+}
+
+/**
+ * Processa as condições que expiram no fim do turno de uma unidade.
+ * Remove condições com expiry="end_of_turn" (como DASHING, STUNNED, BURNING, etc.)
+ * Aplica dano de condições (BURNING, POISON, etc.)
+ */
+export function processUnitEndOfTurnConditions(
+  unit: UnitForConditionProcessing,
+  broadcast: Room<BattleSessionState>["broadcast"]
+): { conditionsRemoved: string[]; damageDealt: number; unitDefeated: boolean } {
+  const conditionsToRemove: string[] = [];
+  let damageFromConditions = 0;
+
+  // Converter conditions para array (Colyseus ArraySchema)
+  const conditionsArray = Array.from(unit.conditions);
+
+  // 1. Processar dano de condições e identificar condições a remover
+  for (const condId of conditionsArray) {
+    const condition = CONDITIONS[condId];
+    if (!condition) continue;
+
+    // Dano de condições (BURNING, POISON, etc.)
+    if (condition.effects?.damagePerTurn) {
+      damageFromConditions += condition.effects.damagePerTurn;
+    }
+
+    // Marcar condições que expiram no fim do turno
+    if (condition.expiry === "end_of_turn") {
+      conditionsToRemove.push(condId);
+    }
+  }
+
+  // 2. Aplicar dano de condições (dano verdadeiro - ignora proteção)
+  if (damageFromConditions > 0) {
+    const damageResult = applyDamage(
+      unit.physicalProtection,
+      unit.magicalProtection,
+      unit.currentHp,
+      damageFromConditions,
+      "VERDADEIRO"
+    );
+    unit.physicalProtection = damageResult.newPhysicalProtection;
+    unit.magicalProtection = damageResult.newMagicalProtection;
+    unit.currentHp = damageResult.newHp;
+    if (unit.currentHp <= 0) {
+      unit.isAlive = false;
+    }
+  }
+
+  // 3. Remover condições expiradas
+  if (conditionsToRemove.length > 0) {
+    // Para Colyseus Schema, precisamos manipular o ArraySchema diretamente
+    const unitConditions = unit.conditions as unknown as {
+      length: number;
+      splice(start: number, deleteCount: number): void;
+      indexOf(item: string): number;
+    };
+
+    for (const condId of conditionsToRemove) {
+      const index = conditionsArray.indexOf(condId);
+      if (index !== -1) {
+        // Remover do ArraySchema
+        unitConditions.splice(index, 1);
+        // Atualizar array local para próximas iterações
+        conditionsArray.splice(index, 1);
+      }
+    }
+
+    console.log(
+      `[turn.handler] Condições removidas de ${unit.name}:`,
+      conditionsToRemove
+    );
+
+    // Broadcast para cliente sobre condições removidas
+    broadcast("battle:conditions_expired", {
+      unitId: unit.id,
+      conditionsRemoved: conditionsToRemove,
+      damageFromConditions,
+    });
+  }
+
+  // 4. Sincronizar activeEffects
+  if (unit.activeEffects && typeof syncUnitActiveEffects === "function") {
+    // Converter para formato esperado
+    const unitForSync = {
+      conditions: Array.from(unit.conditions),
+      speed: unit.speed,
+      movesLeft: unit.movesLeft,
+      actionsLeft: unit.actionsLeft,
+      currentHp: unit.currentHp,
+      maxHp: unit.maxHp,
+      physicalProtection: unit.physicalProtection,
+      magicalProtection: unit.magicalProtection,
+      activeEffects: {},
+    };
+    syncUnitActiveEffects(unitForSync);
+
+    // Atualizar activeEffects do Schema com os valores recalculados
+    unit.activeEffects.clear();
+    for (const [key, value] of Object.entries(
+      unitForSync.activeEffects as Record<string, any>
+    )) {
+      unit.activeEffects.set(key, value);
+    }
+  }
+
+  return {
+    conditionsRemoved: conditionsToRemove,
+    damageDealt: damageFromConditions,
+    unitDefeated: !unit.isAlive,
+  };
+}
+
 /**
  * Avança para a próxima unidade viva
  */
@@ -163,6 +303,32 @@ export function advanceToNextUnit(
       "[BattleRoom] advanceToNextUnit: batalha já encerrada, ignorando"
     );
     return;
+  }
+
+  // =========================================================================
+  // PROCESSAR FIM DO TURNO DA UNIDADE ATUAL
+  // =========================================================================
+  const currentUnitId = state.activeUnitId;
+  if (currentUnitId) {
+    const currentUnit = state.units.get(currentUnitId);
+    if (currentUnit && currentUnit.isAlive) {
+      const result = processUnitEndOfTurnConditions(currentUnit, broadcast);
+      console.log(
+        `[turn.handler] Fim do turno de ${currentUnit.name}:`,
+        result
+      );
+
+      // Se a unidade morreu por dano de condição, notificar
+      if (result.unitDefeated) {
+        console.log(
+          `[turn.handler] ${currentUnit.name} morreu por dano de condição!`
+        );
+        broadcast("battle:unit_defeated", {
+          unitId: currentUnitId,
+          reason: "condition_damage",
+        });
+      }
+    }
   }
 
   let nextIndex = (state.currentTurnIndex + 1) % state.actionOrder.length;
@@ -216,6 +382,12 @@ export function advanceToNextUnit(
         };
       });
 
+      // Serializar cooldowns para envio
+      const serializedCooldowns: Record<string, number> = {};
+      unit.unitCooldowns?.forEach((value: number, key: string) => {
+        serializedCooldowns[key] = value;
+      });
+
       broadcast("battle:turn_changed", {
         unitId: unitId,
         playerId: unit.ownerId,
@@ -229,6 +401,7 @@ export function advanceToNextUnit(
           hasStartedAction: unit.hasStartedAction,
           conditions: Array.from(unit.conditions),
           activeEffects: serializedActiveEffects,
+          unitCooldowns: serializedCooldowns,
         },
       });
 
@@ -261,6 +434,9 @@ export function processRoundEnd(
   state: BattleSessionState,
   broadcast: Room<BattleSessionState>["broadcast"]
 ): void {
+  // Coletar cooldowns atualizados de todas as unidades para enviar ao cliente
+  const updatedCooldowns: Record<string, Record<string, number>> = {};
+
   state.units.forEach((unit) => {
     if (!unit.isAlive) return;
 
@@ -269,9 +445,19 @@ export function processRoundEnd(
         unit.unitCooldowns.set(key, value - 1);
       }
     });
+
+    // Serializar cooldowns atualizados para esta unidade
+    const unitCooldowns: Record<string, number> = {};
+    unit.unitCooldowns.forEach((value: number, key: string) => {
+      unitCooldowns[key] = value;
+    });
+    updatedCooldowns[unit.id] = unitCooldowns;
   });
 
-  broadcast("battle:round_ended", { round: state.round - 1 });
+  broadcast("battle:round_ended", {
+    round: state.round - 1,
+    updatedCooldowns,
+  });
 }
 
 /**

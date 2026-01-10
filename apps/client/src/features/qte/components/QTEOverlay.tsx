@@ -32,6 +32,7 @@ import type {
   QTEInput,
   QTEResultGrade,
 } from "@boundless/shared/qte";
+import { audioService } from "../../../services/audio.service";
 
 // =============================================================================
 // PROPS
@@ -110,10 +111,14 @@ export const QTEOverlay: React.FC<QTEOverlayProps> = ({
   const [resultGrade, setResultGrade] = useState<QTEResultGrade | null>(null);
   // Indica se o jogador está "hovering" no modo block (para preview visual)
   const [isBlockMode, setIsBlockMode] = useState(false);
+  // Shake offset para tremor dinâmico
+  const [shakeOffset, setShakeOffset] = useState({ x: 0, y: 0 });
 
   // Refs para animação
   const animationRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
+  const countdownPlayedRef = useRef<boolean>(false);
+  const startSoundPlayedRef = useRef<string | null>(null);
 
   // Calcular zonas de ESQUIVA (Focus vs Focus)
   const dodgeHitZoneStart = config ? 50 - config.hitZoneSize / 2 : 0;
@@ -158,6 +163,13 @@ export const QTEOverlay: React.FC<QTEOverlayProps> = ({
       setResultGrade(null);
       setIsBlockMode(false);
       startTimeRef.current = performance.now();
+      countdownPlayedRef.current = false;
+
+      // Tocar som de início apenas uma vez por QTE
+      if (startSoundPlayedRef.current !== config.qteId) {
+        startSoundPlayedRef.current = config.qteId;
+        audioService.play("START");
+      }
     }
   }, [config?.qteId, isVisualActive]);
 
@@ -187,6 +199,12 @@ export const QTEOverlay: React.FC<QTEOverlayProps> = ({
 
       // Indicador vai de 0 a 100
       setIndicatorPosition(progress * 100);
+
+      // Som de countdown nos últimos 30% do tempo
+      if (progress >= 0.7 && !countdownPlayedRef.current) {
+        countdownPlayedRef.current = true;
+        audioService.play("COUNTDOWN");
+      }
 
       if (progress < 1) {
         animationRef.current = requestAnimationFrame(animate);
@@ -248,6 +266,20 @@ export const QTEOverlay: React.FC<QTEOverlayProps> = ({
       }
 
       console.log("[QTE] Resultado:", grade);
+
+      // Tocar som baseado no resultado
+      if (grade === "PERFECT") {
+        // Para bloqueio perfeito, usar som específico
+        if (input === "E" && isDefenseQTE) {
+          audioService.play("BLOCK");
+        } else {
+          audioService.play("PERFECT");
+        }
+      } else if (grade === "HIT") {
+        audioService.play("HIT");
+      } else {
+        audioService.play("MISS");
+      }
 
       setResultGrade(grade);
       setShowResult(true);
@@ -357,13 +389,10 @@ export const QTEOverlay: React.FC<QTEOverlayProps> = ({
     [handleInput, isResponder, hasResponded, isVisualActive]
   );
 
-  // Não renderizar se não há QTE ou visual não está ativo
-  if (!config || !isVisualActive) return null;
-
-  // Cores e estilos
-  const isAttack = config.actionType === "ATTACK";
+  // Cores e estilos - calculados mesmo quando config é null (usa valores default)
+  const isAttack = config?.actionType === "ATTACK";
   const isDefense =
-    config.actionType === "DODGE" || config.actionType === "BLOCK";
+    config?.actionType === "DODGE" || config?.actionType === "BLOCK";
 
   const getResultColor = (grade: QTEResultGrade | null) => {
     switch (grade) {
@@ -403,9 +432,6 @@ export const QTEOverlay: React.FC<QTEOverlayProps> = ({
       }
     }
   };
-
-  // Shake offset para tremor dinâmico
-  const [shakeOffset, setShakeOffset] = useState({ x: 0, y: 0 });
 
   // ==========================================================================
   // CORES DINÂMICAS BASEADAS NOS PARÂMETROS DO QTE
@@ -524,13 +550,20 @@ export const QTEOverlay: React.FC<QTEOverlayProps> = ({
   };
 
   // ==========================================================================
-  // RENDER - MODO INLINE (sobre unidade no campo de batalha)
+  // EARLY RETURN - Não renderizar se não há QTE ou visual não está ativo
   // ==========================================================================
-  if (isInlineMode) {
-    // Posição padrão se não fornecida
-    const posX = position?.x ?? 0;
-    const posY = position?.y ?? 0;
+  if (!config || !isVisualActive) return null;
 
+  // ==========================================================================
+  // RENDER - Unified return (inline ou modal baseado no modo)
+  // ==========================================================================
+
+  // Posição para modo inline
+  const posX = position?.x ?? 0;
+  const posY = position?.y ?? 0;
+
+  // Modo inline: renderizar sobre a unidade no campo de batalha
+  if (isInlineMode) {
     return (
       <AnimatePresence>
         <motion.div

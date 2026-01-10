@@ -7,5 +7,4 @@ export * from "./game";
 export * from "./battle";
 export * from "./events";
 export * from "./chat";
-export * from "./character-creator";
 export * from "./commands";

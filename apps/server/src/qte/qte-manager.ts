@@ -289,12 +289,8 @@ export class QTEManager {
     pending.timeoutId = timeout;
 
     // Broadcast QTE de DODGE para todos os jogadores
-    this.broadcastFn("qte:projectile_dodge", {
-      config: dodgeQTE,
-      casterId: caster.id,
-      casterName: caster.name,
-      projectileType: "area", // Pode ser expandido para diferentes tipos
-    });
+    // Usa o mesmo evento qte:start para que o cliente possa tratar de forma unificada
+    this.broadcastFn("qte:start", dodgeQTE);
 
     return dodgeQTE;
   }

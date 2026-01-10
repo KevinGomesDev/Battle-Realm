@@ -15,6 +15,28 @@ import type { SpellExecutionContext } from "../types";
 import { scanConditionsForAction } from "../../../conditions/conditions";
 import { processUnitDeath } from "../../../combat/death-logic";
 import { applyDamage } from "../../../combat/damage.utils";
+import { getUnitSizeDefinition, type UnitSize } from "@boundless/shared/config";
+
+/**
+ * Helper para verificar se uma unidade ocupa uma célula específica
+ * Considera o tamanho da unidade (unidades grandes ocupam múltiplas células)
+ */
+function unitOccupiesCell(
+  unit: BattleUnit,
+  cellX: number,
+  cellY: number
+): boolean {
+  const sizeDef = getUnitSizeDefinition((unit.size || "NORMAL") as UnitSize);
+  const dimension = sizeDef.dimension;
+  for (let dx = 0; dx < dimension; dx++) {
+    for (let dy = 0; dy < dimension; dy++) {
+      if (unit.posX + dx === cellX && unit.posY + dy === cellY) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 /**
  * 🔥 FIRE - Lança uma bola de fogo que viaja até o alvo e explode em 3x3
@@ -36,15 +58,25 @@ export function executeFire(
   spell: AbilityDefinition,
   context?: SpellExecutionContext
 ): AbilityExecutionResult {
-  // Validação: target deve ser uma posição
-  if (!target || "id" in target) {
+  // Determinar a posição alvo:
+  // 1. Se target é uma posição direta {x, y}, usa ela
+  // 2. Se target é null ou uma unidade, usa context.targetPosition
+  let position: { x: number; y: number } | null = null;
+
+  if (target && !("id" in target)) {
+    // target é uma posição direta
+    position = target as { x: number; y: number };
+  } else if (context?.targetPosition) {
+    // Usar targetPosition do contexto (enviado pelo frontend)
+    position = context.targetPosition;
+  }
+
+  if (!position) {
     return {
       success: false,
       error: "Fogo requer uma posição válida como alvo",
     };
   }
-
-  const position = target as { x: number; y: number };
   const battleId = context?.battleId;
   const pattern = spell.targetingPattern;
 
@@ -88,21 +120,41 @@ export function executeFire(
 
   const { targets: targetsInArea, impactPoint, intercepted } = targetingResult;
 
-  // Se foi interceptado por uma unidade e não estamos pulando QTE
-  // Verificar se há uma unidade inimiga exatamente no ponto de impacto
-  if (intercepted && !skipQTE && !forcedImpactPoint) {
+  console.log(`🔥 [FIRE DEBUG] Targeting result:`, {
+    position,
+    impactPoint,
+    intercepted,
+    skipQTE,
+    forcedImpactPoint,
+    targetsInArea: targetsInArea.map((t) => ({
+      id: t.id,
+      name: t.name,
+      posX: t.posX,
+      posY: t.posY,
+      ownerId: t.ownerId,
+    })),
+    caster: { id: caster.id, ownerId: caster.ownerId },
+  });
+
+  // Verificar se há uma unidade inimiga no ponto de impacto (para QTE de DODGE)
+  // O QTE deve ser acionado se:
+  // 1. Não estamos pulando QTE (skipQTE = false)
+  // 2. Não temos ponto de impacto forçado (primeira execução)
+  // 3. Há uma unidade inimiga no ponto de impacto
+  // NOTA: Não depende mais de 'intercepted' - qualquer unidade no ponto de impacto aciona QTE
+  if (!skipQTE && !forcedImpactPoint) {
+    // Encontrar a primeira unidade inimiga que seria atingida pelo projétil
     const interceptorUnit = allUnits.find(
       (u) =>
         u.isAlive &&
-        u.posX === impactPoint.x &&
-        u.posY === impactPoint.y &&
+        unitOccupiesCell(u, impactPoint.x, impactPoint.y) &&
         u.id !== caster.id &&
         u.ownerId !== caster.ownerId // Apenas inimigos ativam QTE
     );
 
     if (interceptorUnit) {
       console.log(
-        `🔥 Bola de fogo interceptada por ${interceptorUnit.name}! Iniciando QTE de DODGE...`
+        `🔥 Bola de fogo vai atingir ${interceptorUnit.name} em (${impactPoint.x}, ${impactPoint.y})! Iniciando QTE de DODGE...`
       );
 
       // Retornar para iniciar QTE de DODGE
@@ -131,6 +183,10 @@ export function executeFire(
   }
 
   if (targetsInArea.length === 0) {
+    console.log(
+      `🔥 Bola de fogo explodiu em (${impactPoint.x}, ${impactPoint.y}) mas não atingiu nenhuma unidade. Células afetadas:`,
+      targetingResult.affectedCells.map((c) => `(${c.x},${c.y})`).join(", ")
+    );
     return {
       success: true,
       damageDealt: 0,
@@ -198,6 +254,8 @@ export function executeFire(
       unitId: targetUnit.id,
       damage: finalDamage,
       hpAfter: targetUnit.currentHp,
+      physicalProtection: targetUnit.physicalProtection,
+      magicalProtection: targetUnit.magicalProtection,
       defeated,
     });
 

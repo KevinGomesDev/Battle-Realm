@@ -10,7 +10,9 @@ import {
 import { QTEManager, type QTECombatResult } from "../../../../qte";
 import {
   createAndEmitEvent,
-  setEventEmitter,
+  getBattleEventsFromCache,
+  registerBattleBroadcast,
+  unregisterBattleBroadcast,
 } from "../../../match/services/event.service";
 import { markBattleEnded } from "../../../match/services/battle-persistence.service";
 import { persistBattle } from "../../../../workers";
@@ -81,21 +83,6 @@ import {
   startBattle,
 } from "./battle";
 
-// Configurar o callback de emissão de eventos uma vez
-let eventEmitterConfigured = false;
-function configureEventEmitter(
-  broadcastFn: (event: string, data: any) => void
-) {
-  if (eventEmitterConfigured) return;
-
-  setEventEmitter((event) => {
-    broadcastFn("event:new", event);
-  });
-
-  eventEmitterConfigured = true;
-  console.log("[BattleRoom] Event emitter configurado");
-}
-
 export class BattleRoom extends Room<BattleSessionState> {
   maxClients = 8;
 
@@ -121,7 +108,8 @@ export class BattleRoom extends Room<BattleSessionState> {
       JSON.stringify(options, null, 2)
     );
 
-    configureEventEmitter((event: string, data: any) =>
+    // Registrar broadcast para eventos desta batalha
+    registerBattleBroadcast(this.roomId, (event: string, data: any) =>
       this.broadcast(event, data)
     );
 
@@ -263,6 +251,9 @@ export class BattleRoom extends Room<BattleSessionState> {
   async onDispose() {
     console.log(`[BattleRoom] Sala ${this.roomId} sendo destruída`);
 
+    // Remover registro do broadcast de eventos
+    unregisterBattleBroadcast(this.roomId);
+
     if (this.battleTimerManager) {
       this.battleTimerManager.stop();
       this.battleTimerManager = null;
@@ -389,10 +380,15 @@ export class BattleRoom extends Room<BattleSessionState> {
 
     // Events
     this.onMessage("event:subscribe", (client, { context, contextId }) => {
+      // Buscar eventos do cache (GameEvent[]) em vez dos logs do schema
+      const battleId = contextId || this.state.battleId;
+      const events = getBattleEventsFromCache(battleId);
+
       client.send("event:subscribed", {
+        success: true,
         context,
-        contextId,
-        events: Array.from(this.state.logs || []),
+        contextId: battleId,
+        events,
       });
     });
 

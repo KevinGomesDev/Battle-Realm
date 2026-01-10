@@ -180,7 +180,12 @@ export function createBattleUnit(
     maxMagicalProtection:
       (dbUnit.will || 0) * MAGICAL_PROTECTION_CONFIG.multiplier,
     conditions: initialConditions, // Condições do Unit + passivas de skills/raça
-    activeEffects: calculateActiveEffects(initialConditions), // Efeitos calculados para o cliente
+    activeEffects: calculateActiveEffects(initialConditions, {
+      physicalProtection:
+        (dbUnit.resistance || 0) * PHYSICAL_PROTECTION_CONFIG.multiplier,
+      magicalProtection:
+        (dbUnit.will || 0) * MAGICAL_PROTECTION_CONFIG.multiplier,
+    }), // Efeitos calculados para o cliente
     spells, // Lista de spells da unidade (copiada do DB)
     hasStartedAction: false,
     // Tamanho da unidade (default: NORMAL 1x1)
@@ -542,6 +547,75 @@ export function extractAllSyncData(battleUnits: BattleUnit[]): UnitSyncData[] {
  * @param gridWidth - Largura do grid
  * @param gridHeight - Altura do grid
  */
+/**
+ * Encontra uma posição livre próxima à posição desejada
+ */
+function findFreePosition(
+  desiredX: number,
+  desiredY: number,
+  gridWidth: number,
+  gridHeight: number,
+  occupiedPositions: Set<string>,
+  playerIndex: number
+): Position {
+  const key = `${desiredX},${desiredY}`;
+  if (!occupiedPositions.has(key)) {
+    return { x: desiredX, y: desiredY };
+  }
+
+  // Procurar posição livre em espiral ao redor da posição desejada
+  // Priorizando manter-se no lado correto do mapa
+  const isLeftSide = playerIndex === 0;
+  const maxDistance = Math.max(gridWidth, gridHeight);
+
+  for (let distance = 1; distance < maxDistance; distance++) {
+    // Priorizar movimento vertical primeiro (manter X)
+    for (let dy = -distance; dy <= distance; dy++) {
+      const newY = desiredY + dy;
+      if (newY < 0 || newY >= gridHeight) continue;
+
+      // Tentar na mesma coluna X primeiro
+      const sameXKey = `${desiredX},${newY}`;
+      if (!occupiedPositions.has(sameXKey)) {
+        return { x: desiredX, y: newY };
+      }
+    }
+
+    // Depois tentar mover horizontalmente (para dentro do mapa)
+    for (let dx = 1; dx <= distance; dx++) {
+      // Mover para dentro do mapa (esquerda vai para direita, direita vai para esquerda)
+      const newX = isLeftSide ? desiredX + dx : desiredX - dx;
+      if (newX < 0 || newX >= gridWidth) continue;
+
+      for (let dy = -distance; dy <= distance; dy++) {
+        const newY = desiredY + dy;
+        if (newY < 0 || newY >= gridHeight) continue;
+
+        const newKey = `${newX},${newY}`;
+        if (!occupiedPositions.has(newKey)) {
+          return { x: newX, y: newY };
+        }
+      }
+    }
+  }
+
+  // Fallback: qualquer posição livre
+  for (let x = 0; x < gridWidth; x++) {
+    for (let y = 0; y < gridHeight; y++) {
+      const fallbackKey = `${x},${y}`;
+      if (!occupiedPositions.has(fallbackKey)) {
+        return { x, y };
+      }
+    }
+  }
+
+  // Último fallback (não deveria acontecer)
+  console.error(
+    `[battle-unit.factory] Não foi possível encontrar posição livre!`
+  );
+  return { x: desiredX, y: desiredY };
+}
+
 export async function createBattleUnitsForBattle(
   kingdom: {
     id: string;
@@ -603,7 +677,9 @@ export async function createBattleUnitsForBattle(
   ownerId: string,
   playerIndex: number,
   gridWidth: number,
-  gridHeight: number
+  gridHeight: number,
+  obstaclePositions: Set<string> = new Set(),
+  unitPositions: Set<string> = new Set()
 ): Promise<BattleUnit[]> {
   const units: BattleUnit[] = [];
   const kingdomInfo: KingdomInfo = {
@@ -612,6 +688,9 @@ export async function createBattleUnitsForBattle(
     race: kingdom.race,
   };
 
+  // Combinar posições ocupadas (obstáculos + unidades já posicionadas)
+  const occupiedPositions = new Set([...obstaclePositions, ...unitPositions]);
+
   // Determinar posição inicial baseado no índice do jogador
   // Player 0: lado esquerdo (x=0 ou x=1)
   // Player 1+: lado direito (x=gridWidth-1 ou gridWidth-2)
@@ -619,7 +698,17 @@ export async function createBattleUnitsForBattle(
 
   // Adicionar regente primeiro
   if (kingdom.regent) {
-    const regentPosition = { x: startX, y: Math.floor(gridHeight / 2) };
+    const desiredRegentPos = { x: startX, y: Math.floor(gridHeight / 2) };
+    const regentPosition = findFreePosition(
+      desiredRegentPos.x,
+      desiredRegentPos.y,
+      gridWidth,
+      gridHeight,
+      occupiedPositions,
+      playerIndex
+    );
+    occupiedPositions.add(`${regentPosition.x},${regentPosition.y}`);
+
     const regentUnit = createBattleUnit(
       kingdom.regent as DBUnit,
       ownerId,
@@ -637,14 +726,24 @@ export async function createBattleUnitsForBattle(
 
     kingdom.troops.forEach((troop, index) => {
       // Posicionar tropas verticalmente ao lado do regente
-      const troopX = playerIndex === 0 ? startX + 1 : startX - 1;
-      const troopY = startY + index;
+      const desiredTroopX = playerIndex === 0 ? startX + 1 : startX - 1;
+      const desiredTroopY = startY + index;
+
+      const troopPosition = findFreePosition(
+        desiredTroopX,
+        desiredTroopY,
+        gridWidth,
+        gridHeight,
+        occupiedPositions,
+        playerIndex
+      );
+      occupiedPositions.add(`${troopPosition.x},${troopPosition.y}`);
 
       const troopUnit = createBattleUnit(
         troop as DBUnit,
         ownerId,
         kingdomInfo,
-        { x: troopX, y: troopY },
+        troopPosition,
         "battle"
       );
       units.push(troopUnit);

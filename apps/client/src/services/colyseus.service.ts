@@ -230,6 +230,16 @@ class ColyseusService {
   private connectionPromise: Promise<void> | null = null;
   private connectionId: string | null = null;
 
+  // Controle de conexão simultânea para rooms
+  private arenaJoinPromise: Promise<Room> | null = null;
+
+  // Heartbeat (tic-tac) system
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private lastPongTimestamp: number = 0;
+  private heartbeatTimeoutMs = 10000; // 10 segundos sem resposta = reconectar
+  private heartbeatIntervalMs = 5000; // Envia ping a cada 5 segundos
+  private pendingPing = false;
+
   /**
    * Gera um ID único para a conexão
    */
@@ -338,6 +348,9 @@ class ColyseusService {
       this.reconnectAttempts = 0;
       this.isConnecting = false;
 
+      // Inicia heartbeat (tic-tac)
+      this.startHeartbeat();
+
       this.emit("connected", { roomId: this.globalRoom.id });
     } catch (error) {
       this.isConnecting = false;
@@ -367,6 +380,9 @@ class ColyseusService {
    * Desconecta de todas as rooms
    */
   async disconnect(): Promise<void> {
+    // Para heartbeat
+    this.stopHeartbeat();
+
     // Invalidar connectionId para cancelar conexões em andamento
     this.connectionId = null;
     this.connectionPromise = null;
@@ -411,6 +427,167 @@ class ColyseusService {
   }
 
   // =========================================
+  // Heartbeat (Tic-Tac) System
+  // =========================================
+
+  /**
+   * Inicia o sistema de heartbeat para detectar quedas de conexão
+   */
+  private startHeartbeat(): void {
+    this.stopHeartbeat(); // Limpa qualquer heartbeat anterior
+    this.lastPongTimestamp = Date.now();
+    this.pendingPing = false;
+
+    console.log("[Colyseus] 💓 Heartbeat iniciado");
+
+    this.heartbeatInterval = setInterval(() => {
+      this.sendHeartbeat();
+    }, this.heartbeatIntervalMs);
+  }
+
+  /**
+   * Para o sistema de heartbeat
+   */
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+      console.log("[Colyseus] 💔 Heartbeat parado");
+    }
+    this.pendingPing = false;
+  }
+
+  /**
+   * Envia um ping e verifica se a última resposta está dentro do timeout
+   */
+  private sendHeartbeat(): void {
+    const now = Date.now();
+
+    // Verifica se a room ainda existe e está conectada
+    if (!this.globalRoom || !this.isConnected()) {
+      console.warn("[Colyseus] ⚠️ Heartbeat detectou room desconectada");
+      this.handleHeartbeatTimeout();
+      return;
+    }
+
+    // Verifica se passou muito tempo desde o último pong
+    if (now - this.lastPongTimestamp > this.heartbeatTimeoutMs) {
+      console.warn(
+        `[Colyseus] ⚠️ Heartbeat timeout (${
+          now - this.lastPongTimestamp
+        }ms sem resposta)`
+      );
+      this.handleHeartbeatTimeout();
+      return;
+    }
+
+    // Verifica se há ping pendente sem resposta (possível conexão zombie)
+    if (this.pendingPing) {
+      const pendingTime =
+        now - (this.lastPongTimestamp + this.heartbeatIntervalMs);
+      if (pendingTime > this.heartbeatTimeoutMs) {
+        console.warn(
+          `[Colyseus] ⚠️ Ping pendente há muito tempo (${pendingTime}ms)`
+        );
+        this.handleHeartbeatTimeout();
+        return;
+      }
+    }
+
+    // Envia ping
+    try {
+      this.pendingPing = true;
+      this.globalRoom.send("ping", { timestamp: now });
+    } catch (error) {
+      console.error("[Colyseus] ❌ Erro ao enviar ping:", error);
+      this.handleHeartbeatTimeout();
+    }
+  }
+
+  /**
+   * Processa a resposta pong do servidor
+   */
+  private handlePong(data: { timestamp: number }): void {
+    this.lastPongTimestamp = Date.now();
+    this.pendingPing = false;
+    const latency = Date.now() - (data.timestamp ?? Date.now());
+    this.emit("heartbeat:pong", { latency, timestamp: this.lastPongTimestamp });
+  }
+
+  /**
+   * Lida com timeout do heartbeat (força reconexão)
+   */
+  private handleHeartbeatTimeout(): void {
+    console.error("[Colyseus] ❌ Conexão perdida detectada via heartbeat");
+    this.stopHeartbeat();
+    this.emit("heartbeat:timeout", {});
+
+    // Força reconexão
+    this.forceReconnect();
+  }
+
+  /**
+   * Força reconexão após perda de heartbeat
+   */
+  private async forceReconnect(): Promise<void> {
+    console.log("[Colyseus] 🔄 Forçando reconexão...");
+
+    // Emitir evento de reconexão (para UI mostrar overlay)
+    this.emit("reconnecting", { attempt: 1 });
+
+    // Limpa estado atual sem chamar disconnect completo
+    if (this.globalRoom) {
+      try {
+        await this.globalRoom.leave(false);
+      } catch {
+        // Ignora erros ao sair
+      }
+      this.globalRoom = null;
+    }
+
+    this.client = null;
+    this.connectionPromise = null;
+    this.isConnecting = false;
+
+    // Tenta reconectar com retry
+    let attempts = 0;
+    const maxAttempts = 10;
+    const baseDelay = 1000;
+
+    while (attempts < maxAttempts) {
+      attempts++;
+      // Emite número de tentativa atualizado para o UI
+      this.emit("reconnecting", { attempt: attempts });
+      console.log(
+        `[Colyseus] 🔄 Tentativa de reconexão ${attempts}/${maxAttempts}...`
+      );
+
+      try {
+        await this.connect();
+
+        // Conexão bem sucedida - emitir evento de reconexão completa
+        console.log("[Colyseus] ✅ Reconectado com sucesso!");
+        this.emit("reconnected", {});
+        return;
+      } catch (error) {
+        console.warn(`[Colyseus] ⚠️ Tentativa ${attempts} falhou:`, error);
+
+        if (attempts < maxAttempts) {
+          // Aguarda com backoff exponencial (max 10 segundos)
+          const delay = Math.min(
+            baseDelay * Math.pow(1.5, attempts - 1),
+            10000
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    console.error("[Colyseus] ❌ Falha ao reconectar após todas as tentativas");
+    this.emit("reconnect_failed", { attempts: maxAttempts });
+  }
+
+  // =========================================
   // Room Global
   // =========================================
 
@@ -424,6 +601,11 @@ class ColyseusService {
     this.globalRoom.onMessage(
       "*",
       (type: string | number | Schema, message: unknown) => {
+        // Trata pong separadamente para o heartbeat
+        if (type === "pong") {
+          this.handlePong(message as { timestamp: number });
+          return;
+        }
         console.log(`[Colyseus] 📩 Mensagem recebida: ${type}`, message);
         this.emit(`global:${type}`, message);
         this.emit(type as string, message);
@@ -432,8 +614,20 @@ class ColyseusService {
 
     this.globalRoom.onLeave((code: number) => {
       console.log(`[Colyseus] Saiu da room global (code: ${code})`);
+      this.stopHeartbeat(); // Para heartbeat ao sair
       this.globalRoom = null; // Limpar referência
       this.emit("disconnected", { code });
+
+      // Códigos que indicam desconexão inesperada e devem tentar reconexão
+      // 1000 = fechamento normal, 1001 = going away, 4000+ = aplicação
+      // Outros códigos (1006 = abnormal closure, etc) são desconexões inesperadas
+      const unexpectedCodes = [1006, 1011, 1012, 1013, 1014, 1015];
+      if (unexpectedCodes.includes(code) || (code >= 1002 && code <= 1005)) {
+        console.log(
+          "[Colyseus] ⚠️ Desconexão inesperada detectada, tentando reconectar..."
+        );
+        this.forceReconnect();
+      }
     });
 
     this.globalRoom.onError((code: number, message?: string) => {

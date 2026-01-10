@@ -26,10 +26,14 @@ export function drawCellHighlights({
   movableCellsMap,
   dashableCellsMap,
   attackableCells,
-  hoveredCell,
   gridColors,
   hasAbilityAreaPreview,
 }: DrawCellHighlightsParams): void {
+  // Não desenhar highlights de movimento quando em modo de preview de ability
+  if (hasAbilityAreaPreview) {
+    return;
+  }
+
   // Desenhar células de disparada primeiro (ficam atrás)
   dashableCellsMap.forEach((cellInfo, cellKey) => {
     const [x, y] = cellKey.split(",").map(Number);

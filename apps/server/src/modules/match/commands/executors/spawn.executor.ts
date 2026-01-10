@@ -289,7 +289,10 @@ export const executeSpawnCommand: CommandExecutorFn = (
     newUnit.isAIControlled = false; // Sem IA vinculada como solicitado
 
     // Calcular efeitos ativos
-    const activeEffects = calculateActiveEffects(initialConditions);
+    const activeEffects = calculateActiveEffects(initialConditions, {
+      physicalProtection,
+      magicalProtection,
+    });
     // Os activeEffects são calculados dinamicamente pelo state
 
     // Adicionar ao estado da batalha

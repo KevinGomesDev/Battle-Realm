@@ -5,6 +5,7 @@ import {
   getAllBlockers,
   createBlockerSet,
   getMovementBlockingOptions,
+  isCellBlocked,
 } from "./blocking.utils";
 
 /**
@@ -85,6 +86,25 @@ export function validateMove(
         engagementCost > 0
           ? `Movimento bloqueado por engajamento inimigo (custo: ${totalCost}, disponível: ${unit.movesLeft})`
           : "Movimento excede pontos disponíveis",
+      baseCost,
+      engagementCost,
+      totalCost,
+    };
+  }
+
+  // Verificar se o destino está ocupado (obstáculo ou unidade)
+  // Usar função unificada que considera tamanho de obstáculos e unidades
+  const isDestinationBlocked = isCellBlocked(
+    toX,
+    toY,
+    obstacles as ObstacleForBlocking[],
+    allUnits as UnitForBlocking[],
+    getMovementBlockingOptions([unit.id])
+  );
+  if (isDestinationBlocked) {
+    return {
+      valid: false,
+      error: "Destino ocupado",
       baseCost,
       engagementCost,
       totalCost,
@@ -379,18 +399,29 @@ export function getFullMovementInfo(
   const engagementCost = calculateEngagementCost(unit, toX, toY, allUnits);
   const totalCost = baseCost + engagementCost;
 
-  // Verificar se há caminho livre
-  const pathFree = hasFreePath(
-    unit.posX,
-    unit.posY,
+  // Verificar se o destino está ocupado (obstáculo ou unidade)
+  const isDestinationBlocked = isCellBlocked(
     toX,
     toY,
-    allUnits,
-    obstacles,
-    unit.id,
-    gridWidth,
-    gridHeight
+    obstacles as ObstacleForBlocking[],
+    allUnits as UnitForBlocking[],
+    getMovementBlockingOptions([unit.id])
   );
+
+  // Verificar se há caminho livre (células intermediárias)
+  const pathFree =
+    !isDestinationBlocked &&
+    hasFreePath(
+      unit.posX,
+      unit.posY,
+      toX,
+      toY,
+      allUnits,
+      obstacles,
+      unit.id,
+      gridWidth,
+      gridHeight
+    );
 
   let type: MovementCellType;
   if (!pathFree) {

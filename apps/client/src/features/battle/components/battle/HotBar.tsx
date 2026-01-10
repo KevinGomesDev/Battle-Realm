@@ -85,17 +85,23 @@ const HotBarSlot: React.FC<HotBarSlotProps> = ({
     // Verificar cooldown
     const cooldownLeft = unit.unitCooldowns?.[abilityCode] ?? 0;
     if (cooldownLeft > 0) {
-      return { canExecute: false, disabledReason: `Cooldown: ${cooldownLeft}` };
+      return {
+        canExecute: false,
+        disabledReason: `Em recarga (${cooldownLeft} ${
+          cooldownLeft === 1 ? "turno" : "turnos"
+        })`,
+      };
     }
 
-    // Verificar ações disponíveis
+    // Verificar ações disponíveis (apenas se a habilidade consome ação)
+    const consumesAction = abilityDef.consumesAction !== false;
     const isAttackAction = abilityCode === "ATTACK";
     const hasExtraAttacks = (unit.attacksLeftThisTurn ?? 0) > 0;
     if (isAttackAction) {
       if (unit.actionsLeft <= 0 && !hasExtraAttacks) {
         return { canExecute: false, disabledReason: "Sem ações" };
       }
-    } else if (unit.actionsLeft <= 0) {
+    } else if (consumesAction && unit.actionsLeft <= 0) {
       return { canExecute: false, disabledReason: "Sem ações" };
     }
 
@@ -213,7 +219,8 @@ const HotBarSlot: React.FC<HotBarSlotProps> = ({
 
       {/* Indicador de cooldown */}
       {cooldownLeft > 0 && (
-        <div className="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/70 rounded-lg flex flex-col items-center justify-center">
+          <span className="text-xs text-surface-400">⏳</span>
           <span className="text-red-400 font-bold text-sm">{cooldownLeft}</span>
         </div>
       )}
@@ -295,8 +302,20 @@ export const HotBar: React.FC<HotBarProps> = ({
       }
     }
 
-    // Criar hotbar default baseado nas features e spells da unidade
-    return createDefaultHotbar(unit.features || [], unit.spells || []);
+    // Filtrar passivas das features (só mostrar habilidades ativas)
+    const activeFeatures = (unit.features || []).filter((code) => {
+      const ability = findAbilityByCode(code);
+      return ability && ability.activationType !== "PASSIVE";
+    });
+
+    // Filtrar passivas dos spells também
+    const activeSpells = (unit.spells || []).filter((code) => {
+      const ability = findAbilityByCode(code);
+      return ability && ability.activationType !== "PASSIVE";
+    });
+
+    // Criar hotbar default baseado nas features e spells ATIVAS da unidade
+    return createDefaultHotbar(activeFeatures, activeSpells);
   }, [hotbarProp, unit.hotbar, unit.features, unit.spells]);
 
   // Verificar se a barra secundária tem slots
@@ -345,6 +364,29 @@ export const HotBar: React.FC<HotBarProps> = ({
       const abilityDef = findAbilityByCode(abilityCode);
       if (!abilityDef) return;
 
+      // Passivas não podem ser ativadas
+      if (abilityDef.activationType === "PASSIVE") return;
+
+      // Verificar cooldown
+      const cooldownLeft = unit.unitCooldowns?.[abilityCode] ?? 0;
+      if (cooldownLeft > 0) return;
+
+      // Verificar ações disponíveis (apenas se a habilidade consome ação)
+      const consumesAction = abilityDef.consumesAction !== false;
+      const isAttackAction = abilityCode === "ATTACK";
+      const hasExtraAttacks = (unit.attacksLeftThisTurn ?? 0) > 0;
+      if (isAttackAction) {
+        if (unit.actionsLeft <= 0 && !hasExtraAttacks) return;
+      } else if (consumesAction && unit.actionsLeft <= 0) {
+        return;
+      }
+
+      // Verificar mana para spells
+      if (abilityDef.category === "SPELL") {
+        const manaCost = abilityDef.manaCost ?? 0;
+        if ((unit.currentMana ?? 0) < manaCost) return;
+      }
+
       if (abilityDef.targetType === "SELF" || !abilityDef.targetType) {
         // Executa imediatamente
         onExecuteAbility(abilityCode, unit.id);
@@ -353,7 +395,7 @@ export const HotBar: React.FC<HotBarProps> = ({
         onSelectAbility(abilityCode);
       }
     },
-    [unit.id, onSelectAbility, onExecuteAbility]
+    [unit, onSelectAbility, onExecuteAbility]
   );
 
   // Atalhos de teclado para barra primária (1-9)

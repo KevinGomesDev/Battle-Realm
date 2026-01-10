@@ -836,40 +836,72 @@ export async function emitAbilityExecutedEvent(
 ): Promise<void> {
   // Construir mensagem detalhada
   let message = `⚡ ${caster.name} usou ${ability.name}`;
-  if (target) {
+
+  // Se temos múltiplas unidades afetadas (spell de área)
+  if (result.affectedUnits && result.affectedUnits.length > 0) {
+    const affectedNames = result.affectedUnits.map((affected) => {
+      const unit = allUnits.find((u) => u.id === affected.unitId);
+      const name = unit?.name ?? "Unidade";
+      const deathIndicator = affected.defeated ? " 💀" : "";
+      return `${name} (-${affected.damage} HP)${deathIndicator}`;
+    });
+    message += ` atingindo: ${affectedNames.join(", ")}`;
+  } else if (target) {
     message += ` em ${target.name}`;
+    // Adicionar detalhes de combate para alvo único
+    if (result.damageDealt !== undefined && result.damageDealt > 0) {
+      if (result.damageReduction && result.damageReduction > 0) {
+        message += ` [${result.rawDamage ?? result.damageDealt} - ${
+          result.damageReduction
+        } redução = ${result.damageDealt} dano]`;
+      } else {
+        message += ` [${result.damageDealt} dano]`;
+      }
+    }
+    if (result.targetDefeated) {
+      message += ` [alvo derrotado!]`;
+    }
+  } else if (result.damageDealt !== undefined && result.damageDealt > 0) {
+    // Dano sem alvo específico (posição vazia)
+    message += ` [${result.damageDealt} dano total]`;
   }
 
-  // Adicionar detalhes de combate
-  if (result.damageDealt !== undefined && result.damageDealt > 0) {
-    if (result.damageReduction && result.damageReduction > 0) {
-      message += ` [${result.rawDamage ?? result.damageDealt} - ${
-        result.damageReduction
-      } redução = ${result.damageDealt} dano]`;
-    } else {
-      message += ` [${result.damageDealt} dano]`;
-    }
-  }
   if (result.healAmount) {
     message += ` [+${result.healAmount} HP]`;
   }
   if (result.conditionApplied) {
     message += ` [aplicou ${result.conditionApplied}]`;
   }
-  if (result.targetDefeated) {
-    message += ` [alvo derrotado!]`;
-  }
 
   message += "!";
 
-  // Calcular visibilidade
+  // Calcular visibilidade - incluir posições de unidades afetadas
+  const affectedPositions = (result.affectedUnits ?? [])
+    .map((affected) => {
+      const unit = allUnits.find((u) => u.id === affected.unitId);
+      return unit ? { x: unit.posX, y: unit.posY } : null;
+    })
+    .filter((pos): pos is { x: number; y: number } => pos !== null);
+
+  const affectedOwners = (result.affectedUnits ?? [])
+    .map((affected) => {
+      const unit = allUnits.find((u) => u.id === affected.unitId);
+      return unit?.ownerId;
+    })
+    .filter((id): id is string => id !== undefined);
+
   const visibility = {
     allUnits,
     positions: [
       { x: caster.posX, y: caster.posY },
       ...(target ? [{ x: target.posX, y: target.posY }] : []),
+      ...affectedPositions,
     ],
-    alwaysInclude: [caster.ownerId, ...(target ? [target.ownerId] : [])],
+    alwaysInclude: [
+      caster.ownerId,
+      ...(target ? [target.ownerId] : []),
+      ...affectedOwners,
+    ],
   };
 
   await createSkillEvent({
@@ -895,6 +927,8 @@ export async function emitAbilityExecutedEvent(
       healAmount: result.healAmount,
       conditionApplied: result.conditionApplied,
       targetDefeated: result.targetDefeated,
+      affectedUnits: result.affectedUnits,
+      impactPoint: result.metadata?.impactPoint,
     },
     visibility,
   });

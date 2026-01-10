@@ -47,11 +47,8 @@ import {
   isUnitDisabled,
   getControllableUnits,
 } from "../utils/unit-control";
-import {
-  useHotkey,
-  useMovementKeys,
-  useEnterKey,
-} from "../../../hooks/useHotkey";
+import { useHotkey, useEnterKey } from "../../../hooks/useHotkey";
+import { useMovementController } from "../hooks/useMovementController";
 import { useQTE, QTEOverlay } from "../../qte";
 import {
   type PendingAbility,
@@ -247,6 +244,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
         posX: obs.posX,
         posY: obs.posY,
         destroyed: obs.destroyed,
+        size: obs.size,
       }))
     );
 
@@ -424,13 +422,22 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     const handleSkillUsed = (data: {
       casterUnitId: string;
       targetPosition?: { x: number; y: number };
+      impactPoint?: { x: number; y: number };
       skillCode: string;
+      isAreaAbility?: boolean;
+      affectedCells?: Array<{ x: number; y: number }>;
     }) => {
       const casterUnit = units.find((u) => u.id === data.casterUnitId);
-      const targetPos = data.targetPosition;
+      // Usar impactPoint se disponível, senão targetPosition
+      const targetPos = data.impactPoint ?? data.targetPosition;
 
       // Disparar projétil se houver caster e posição alvo
       if (casterUnit && targetPos && canvasRef.current) {
+        // Calcular tamanho da explosão baseado nas células afetadas
+        const explosionSize = data.affectedCells?.length
+          ? Math.ceil(Math.sqrt(data.affectedCells.length))
+          : undefined;
+
         canvasRef.current.fireProjectile({
           abilityCode: data.skillCode,
           startX: casterUnit.posX,
@@ -438,6 +445,8 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           endX: targetPos.x,
           endY: targetPos.y,
           casterId: casterUnit.id,
+          isAreaProjectile: data.isAreaAbility,
+          explosionSize,
         });
       }
     };
@@ -446,13 +455,22 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     const handleSpellCast = (data: {
       casterUnitId: string;
       targetPosition?: { x: number; y: number };
+      impactPoint?: { x: number; y: number };
       spellCode: string;
+      isAreaAbility?: boolean;
+      affectedCells?: Array<{ x: number; y: number }>;
     }) => {
       const casterUnit = units.find((u) => u.id === data.casterUnitId);
-      const targetPos = data.targetPosition;
+      // Usar impactPoint se disponível, senão targetPosition
+      const targetPos = data.impactPoint ?? data.targetPosition;
 
       // Disparar projétil se houver caster e posição alvo
       if (casterUnit && targetPos && canvasRef.current) {
+        // Calcular tamanho da explosão baseado nas células afetadas
+        const explosionSize = data.affectedCells?.length
+          ? Math.ceil(Math.sqrt(data.affectedCells.length))
+          : undefined;
+
         canvasRef.current.fireProjectile({
           abilityCode: data.spellCode,
           startX: casterUnit.posX,
@@ -460,6 +478,8 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           endX: targetPos.x,
           endY: targetPos.y,
           casterId: casterUnit.id,
+          isAreaProjectile: data.isAreaAbility,
+          explosionSize,
         });
       }
     };
@@ -488,12 +508,46 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       }
     };
 
+    // Handler para projétil lançado (antes do QTE resolver)
+    // Isso permite que a animação do projétil rode enquanto o QTE está ativo
+    const handleProjectileLaunched = (data: {
+      casterUnitId: string;
+      skillCode: string;
+      targetPosition?: { x: number; y: number };
+      impactPoint?: { x: number; y: number };
+      targetId?: string;
+      requiresQTE?: boolean;
+    }) => {
+      const casterUnit = units.find((u) => u.id === data.casterUnitId);
+      const targetPos = data.impactPoint ?? data.targetPosition;
+
+      console.log(`[BattleView] 🚀 Projétil lançado: ${data.skillCode}`, {
+        casterUnit: casterUnit?.name,
+        targetPos,
+        requiresQTE: data.requiresQTE,
+      });
+
+      if (casterUnit && targetPos && canvasRef.current) {
+        canvasRef.current.fireProjectile({
+          abilityCode: data.skillCode,
+          startX: casterUnit.posX,
+          startY: casterUnit.posY,
+          endX: targetPos.x,
+          endY: targetPos.y,
+          casterId: casterUnit.id,
+          targetId: data.targetId,
+          isAreaProjectile: true, // Projéteis com QTE são de área
+        });
+      }
+    };
+
     colyseusService.on("battle:unit_attacked", handleUnitAttacked);
     colyseusService.on("battle:unit_moved", handleUnitMoved);
     colyseusService.on("battle:skill_used", handleSkillUsed);
     colyseusService.on("battle:spell_cast", handleSpellCast);
     colyseusService.on("battle:error", handleBattleError);
     colyseusService.on("battle:unit_dodged", handleUnitDodged);
+    colyseusService.on("battle:projectile_launched", handleProjectileLaunched);
 
     return () => {
       colyseusService.off("battle:unit_attacked", handleUnitAttacked);
@@ -502,6 +556,10 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       colyseusService.off("battle:spell_cast", handleSpellCast);
       colyseusService.off("battle:error", handleBattleError);
       colyseusService.off("battle:unit_dodged", handleUnitDodged);
+      colyseusService.off(
+        "battle:projectile_launched",
+        handleProjectileLaunched
+      );
     };
   }, [units, user]);
 
@@ -693,6 +751,11 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     [user]
   );
 
+  // Callback para verificar se uma unidade está visível (exposto para BattleHeader)
+  const isUnitVisibleForHeader = useCallback((unitId: string): boolean => {
+    return canvasRef.current?.isUnitVisible(unitId) ?? false;
+  }, []);
+
   // === VARIÁVEIS DERIVADAS (antes dos early returns para usar nos hooks) ===
   const isMyTurn = battle?.currentPlayerId === user?.id;
   const selectedUnit = units.find((u) => u.id === selectedUnitId);
@@ -842,118 +905,29 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
   // Para compatibilidade com UI existente, pegar primeiro oponente
   const opponentKingdom = opponentKingdoms?.[0];
 
-  // === MOVIMENTAÇÃO COM WASD ===
-  const handleKeyboardMove = useCallback(
-    (direction: "up" | "down" | "left" | "right") => {
-      // Bloquear se já há movimento em andamento
-      if (isMovingRef.current) return;
-
-      // Guards para battle e user
-      if (!battle || !user) return;
-
-      if (
-        !selectedUnit ||
-        !isMyTurn ||
-        !isPlayerControllable(selectedUnit, user.id)
-      )
-        return;
-      if (selectedUnit.movesLeft <= 0) return;
-
-      // Usar tamanho do grid do config da batalha
-      const gridWidth = battle.config.grid.width;
-      const gridHeight = battle.config.grid.height;
-
-      let newX = selectedUnit.posX;
-      let newY = selectedUnit.posY;
-
-      switch (direction) {
-        case "up":
-          newY = Math.max(0, selectedUnit.posY - 1);
-          break;
-        case "down":
-          newY = Math.min(gridHeight - 1, selectedUnit.posY + 1);
-          break;
-        case "left":
-          newX = Math.max(0, selectedUnit.posX - 1);
-          break;
-        case "right":
-          newX = Math.min(gridWidth - 1, selectedUnit.posX + 1);
-          break;
-      }
-
-      // Verificar se a célula está ocupada (considerando tamanho de unidades)
-      let occupied = false;
-      for (const u of units) {
-        if (!u.isAlive) continue;
-        const sizeDef = getUnitSizeDefinition(u.size as UnitSize);
-        const dimension = sizeDef.dimension;
-        for (let dx = 0; dx < dimension; dx++) {
-          for (let dy = 0; dy < dimension; dy++) {
-            if (u.posX + dx === newX && u.posY + dy === newY) {
-              occupied = true;
-              break;
-            }
-          }
-          if (occupied) break;
-        }
-        if (occupied) break;
-      }
-
-      // Calcular direção para sprite (baseado no movimento horizontal)
-      const deltaX = newX - selectedUnit.posX;
-      const spriteDirection: SpriteDirection = deltaX < 0 ? "left" : "right";
-      setUnitDirection({ unitId: selectedUnit.id, direction: spriteDirection });
-
-      // Bloquear cliques rápidos enquanto movimento está sendo processado
-      if (isMovingRef.current) {
-        return;
-      }
-
-      // Verificar custo de movimento (para movimento de 1 célula, caminho está sempre livre)
-      const moveInfo = getFullMovementInfo(
-        selectedUnit,
-        newX,
-        newY,
-        units,
-        battle.config.map.obstacles || [],
-        battle.config.grid.width,
-        battle.config.grid.height
-      );
-
-      if (
-        !occupied &&
-        (newX !== selectedUnit.posX || newY !== selectedUnit.posY) &&
-        !moveInfo.isBlocked &&
-        moveInfo.totalCost <= selectedUnit.movesLeft
-      ) {
-        console.log(
-          "%c[BattleView] ⌨️ Movimento WASD",
-          "color: #22c55e; font-weight: bold;",
-          {
-            direction,
-            from: { x: selectedUnit.posX, y: selectedUnit.posY },
-            to: { x: newX, y: newY },
-            totalCost: moveInfo.totalCost,
-            engagementCost: moveInfo.engagementCost,
-          }
-        );
-        isMovingRef.current = true; // Lock para evitar movimentos rápidos
-        moveUnit(selectedUnit.id, newX, newY);
-      }
+  // === MOVIMENTAÇÃO FLUIDA COM WASD (movimento contínuo) ===
+  useMovementController({
+    selectedUnit,
+    isMyTurn,
+    currentUserId: user?.id ?? null,
+    enabled: !isPauseMenuOpen && !pendingAbility && !isQTEVisualActive,
+    units,
+    obstacles: battle?.config.map.obstacles ?? [],
+    gridWidth: battle?.config.grid.width ?? 0,
+    gridHeight: battle?.config.grid.height ?? 0,
+    visibleCells,
+    onDirectionChange: (unitId, direction) => {
+      setUnitDirection({ unitId, direction });
     },
-    [selectedUnit, isMyTurn, user, units, moveUnit, battle]
-  );
-
-  // Teclas WASD para movimento usando react-hotkeys-hook
-  useMovementKeys(
-    {
-      onUp: () => handleKeyboardMove("up"),
-      onDown: () => handleKeyboardMove("down"),
-      onLeft: () => handleKeyboardMove("left"),
-      onRight: () => handleKeyboardMove("right"),
+    onMove: (unitId, toX, toY) => {
+      isMovingRef.current = true;
+      moveUnit(unitId, toX, toY);
     },
-    { ignoreInputs: true }
-  );
+    // Client-side prediction: anima ANTES do servidor confirmar
+    onAnimateMove: (unitId, fromX, fromY, toX, toY) => {
+      canvasRef.current?.animateMovement(unitId, fromX, fromY, toX, toY);
+    },
+  });
 
   // Wrapper para executar abilities sem alvo (self-cast)
   // Movido para ANTES dos early returns para seguir as regras de hooks
@@ -1684,7 +1658,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           pendingAction={pendingAbility?.code ?? null}
           activeBubbles={activeBubbles}
           abilityAreaPreview={areaPreview}
-          targetingPreview={targetingPreview}
+          targetingPreview={areaPreview ? null : targetingPreview}
           singleTargetLinePreview={singleTargetLinePreview}
         />
 
@@ -1697,6 +1671,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           onUnitClick={handleInitiativeUnitClick}
           onEndTurn={handleEndAction}
           canEndTurn={isMyTurn && !!selectedUnit}
+          isUnitVisible={isUnitVisibleForHeader}
         />
 
         {/* UnitPanel - Overlay na parte inferior (dentro do Canvas) */}
@@ -1730,8 +1705,9 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       )}
 
       {/* QTE Overlay - Quick Time Event para ataques */}
-      {/* Modo inline: aparece sobre a unidade que está realizando o QTE */}
+      {/* Só aparece para o jogador que precisa responder ao QTE */}
       {qteState.activeQTE &&
+        isQTEResponder &&
         (() => {
           // Determinar qual unidade está fazendo o QTE atualmente
           // Se é fase de ATTACK, mostrar sobre o atacante

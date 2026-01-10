@@ -729,6 +729,7 @@ export const useBattleStore = create<BattleState & BattleActions>(
           hasStartedAction: boolean;
           conditions?: string[];
           activeEffects?: Record<string, any>;
+          unitCooldowns?: Record<string, number>;
         };
       }) => {
         console.log("[Battle] turn_changed:", data);
@@ -755,6 +756,8 @@ export const useBattleStore = create<BattleState & BattleActions>(
                     conditions: data.unitUpdated!.conditions ?? u.conditions,
                     activeEffects:
                       data.unitUpdated!.activeEffects ?? u.activeEffects,
+                    unitCooldowns:
+                      data.unitUpdated!.unitCooldowns ?? u.unitCooldowns,
                   }
                 : u
             ),
@@ -843,6 +846,16 @@ export const useBattleStore = create<BattleState & BattleActions>(
       const handleSkillUsed = (data: {
         casterUnitId: string;
         skillCode: string;
+        result?: {
+          affectedUnits?: Array<{
+            unitId: string;
+            damage: number;
+            hpAfter: number;
+            physicalProtection: number;
+            magicalProtection: number;
+            defeated: boolean;
+          }>;
+        };
         casterUpdated?: {
           actionsLeft: number;
           movesLeft: number;
@@ -851,9 +864,12 @@ export const useBattleStore = create<BattleState & BattleActions>(
           attacksLeftThisTurn: number;
           conditions?: string[];
           activeEffects?: Record<string, any>;
+          unitCooldowns?: Record<string, number>;
         };
       }) => {
         console.log("[Battle] skill_used:", data);
+
+        // Atualizar caster
         if (data.casterUpdated) {
           set((state) => ({
             units: state.units.map((u) =>
@@ -869,9 +885,35 @@ export const useBattleStore = create<BattleState & BattleActions>(
                     conditions: data.casterUpdated!.conditions ?? u.conditions,
                     activeEffects:
                       data.casterUpdated!.activeEffects ?? u.activeEffects,
+                    unitCooldowns:
+                      data.casterUpdated!.unitCooldowns ?? u.unitCooldowns,
                   }
                 : u
             ),
+          }));
+        }
+
+        // Atualizar unidades afetadas (dano de área, projéteis, etc)
+        if (
+          data.result?.affectedUnits &&
+          data.result.affectedUnits.length > 0
+        ) {
+          set((state) => ({
+            units: state.units.map((u) => {
+              const affected = data.result!.affectedUnits!.find(
+                (a) => a.unitId === u.id
+              );
+              if (affected) {
+                return {
+                  ...u,
+                  currentHp: affected.hpAfter,
+                  physicalProtection: affected.physicalProtection,
+                  magicalProtection: affected.magicalProtection,
+                  isAlive: !affected.defeated,
+                };
+              }
+              return u;
+            }),
           }));
         }
       };
@@ -949,6 +991,47 @@ export const useBattleStore = create<BattleState & BattleActions>(
         }));
       };
 
+      // Handler para condições expiradas no fim do turno
+      const handleConditionsExpired = (data: {
+        unitId: string;
+        conditionsRemoved: string[];
+        damageFromConditions: number;
+      }) => {
+        console.log("[Battle] conditions_expired:", data);
+        set((state) => ({
+          units: state.units.map((u) =>
+            u.id === data.unitId
+              ? {
+                  ...u,
+                  conditions: u.conditions.filter(
+                    (c) => !data.conditionsRemoved.includes(c)
+                  ),
+                  // Se teve dano de condição, atualizar HP (será sincronizado pelo state)
+                }
+              : u
+          ),
+        }));
+      };
+
+      // Handler para round_ended - atualiza cooldowns de todas as unidades
+      const handleRoundEnded = (data: {
+        round: number;
+        updatedCooldowns?: Record<string, Record<string, number>>;
+      }) => {
+        console.log("[Battle] round_ended:", data);
+        if (data.updatedCooldowns) {
+          set((state) => ({
+            units: state.units.map((u) => {
+              const cooldowns = data.updatedCooldowns![u.id];
+              if (cooldowns !== undefined) {
+                return { ...u, unitCooldowns: cooldowns };
+              }
+              return u;
+            }),
+          }));
+        }
+      };
+
       // Handler para lobby:joined - quando entra no lobby
       const handleLobbyJoined = (data: {
         lobbyId: string;
@@ -994,6 +1077,11 @@ export const useBattleStore = create<BattleState & BattleActions>(
       colyseusService.on("battle:battle:action_started", handleActionStarted);
       colyseusService.on("battle:battle:skill_used", handleSkillUsed);
       colyseusService.on("battle:battle:ended", handleBattleEnded);
+      colyseusService.on("battle:battle:round_ended", handleRoundEnded);
+      colyseusService.on(
+        "battle:battle:conditions_expired",
+        handleConditionsExpired
+      );
 
       // Check if already in battle
       if (colyseusService.isInBattle()) {
@@ -1028,6 +1116,11 @@ export const useBattleStore = create<BattleState & BattleActions>(
         );
         colyseusService.off("battle:battle:skill_used", handleSkillUsed);
         colyseusService.off("battle:battle:ended", handleBattleEnded);
+        colyseusService.off("battle:battle:round_ended", handleRoundEnded);
+        colyseusService.off(
+          "battle:battle:conditions_expired",
+          handleConditionsExpired
+        );
       };
     },
   })

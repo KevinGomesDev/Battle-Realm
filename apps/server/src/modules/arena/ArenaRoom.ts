@@ -51,6 +51,7 @@ export class ArenaRoom extends Room<ArenaState> {
   // ============================================
 
   onCreate() {
+    this.autoDispose = false; // Manter arena sempre ativa (singleton)
     this.setState(new ArenaState());
     this.maxClients = 1000; // Muitos clientes podem estar na arena
 

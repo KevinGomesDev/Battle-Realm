@@ -104,7 +104,7 @@ export function BattleEventLogButton({ battleId }: BattleEventLogButtonProps) {
       }
     };
 
-    colyseusService.on("event:subscribed", handleSubscribed);
+    colyseusService.on("battle:event:subscribed", handleSubscribed);
 
     colyseusService.sendToBattle("event:subscribe", {
       context: "BATTLE",
@@ -112,7 +112,7 @@ export function BattleEventLogButton({ battleId }: BattleEventLogButtonProps) {
     });
 
     return () => {
-      colyseusService.off("event:subscribed", handleSubscribed);
+      colyseusService.off("battle:event:subscribed", handleSubscribed);
       colyseusService.sendToBattle("event:unsubscribe", {
         context: "BATTLE",
         contextId: battleId,
@@ -131,10 +131,10 @@ export function BattleEventLogButton({ battleId }: BattleEventLogButtonProps) {
       }
     };
 
-    colyseusService.on("event:new", handleNewEvent);
+    colyseusService.on("battle:event:new", handleNewEvent);
 
     return () => {
-      colyseusService.off("event:new", handleNewEvent);
+      colyseusService.off("battle:event:new", handleNewEvent);
     };
   }, [battleId, isOpen]);
 

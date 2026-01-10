@@ -247,10 +247,14 @@ export const useEventStore = create<EventState & EventActions>((set, get) => ({
       }
     };
 
+    // Ouvir eventos de GlobalRoom
     colyseusService.on("event:new", handleNewEvent);
+    // Ouvir eventos de BattleRoom (prefixado com battle:)
+    colyseusService.on("battle:event:new", handleNewEvent);
 
     return () => {
       colyseusService.off("event:new", handleNewEvent);
+      colyseusService.off("battle:event:new", handleNewEvent);
     };
   },
 }));

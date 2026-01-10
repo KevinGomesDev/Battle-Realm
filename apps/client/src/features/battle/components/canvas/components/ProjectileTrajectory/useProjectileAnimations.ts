@@ -139,11 +139,19 @@ export function useProjectileAnimations(): UseProjectileAnimationsReturn {
     const now = performance.now();
     const toRemove: string[] = [];
 
+    // Duração extra para explosão de área (em ms)
+    const EXPLOSION_DURATION = 400;
+
     // Atualizar projéteis
     projectilesRef.current.forEach((projectile, id) => {
       const elapsed = now - projectile.startTime;
 
-      if (elapsed >= projectile.duration) {
+      // Para projéteis de área, adicionar tempo extra para a explosão
+      const totalDuration = projectile.isAreaProjectile
+        ? projectile.duration + EXPLOSION_DURATION
+        : projectile.duration;
+
+      if (elapsed >= totalDuration) {
         // Animação terminou
         toRemove.push(id);
 
@@ -152,26 +160,28 @@ export function useProjectileAnimations(): UseProjectileAnimationsReturn {
           projectile.onComplete();
         }
       } else {
-        // Adicionar partículas de rastro
-        const config = getProjectileConfig(projectile.type);
-        if (config.hasParticles) {
-          const progress = elapsed / projectile.duration;
-          const currentX =
-            projectile.startPos.x +
-            (projectile.endPos.x - projectile.startPos.x) * progress;
-          const currentY =
-            projectile.startPos.y +
-            (projectile.endPos.y - projectile.startPos.y) * progress;
+        // Adicionar partículas de rastro (apenas durante viagem)
+        if (elapsed < projectile.duration) {
+          const config = getProjectileConfig(projectile.type);
+          if (config.hasParticles) {
+            const progress = elapsed / projectile.duration;
+            const currentX =
+              projectile.startPos.x +
+              (projectile.endPos.x - projectile.startPos.x) * progress;
+            const currentY =
+              projectile.startPos.y +
+              (projectile.endPos.y - projectile.startPos.y) * progress;
 
-          // Adicionar partícula ocasionalmente
-          if (Math.random() < 0.3) {
-            trailParticlesRef.current.push({
-              x: currentX + (Math.random() - 0.5) * 0.3,
-              y: currentY + (Math.random() - 0.5) * 0.3,
-              alpha: 1,
-              size: config.size * 0.3 * Math.random(),
-              createdAt: now,
-            });
+            // Adicionar partícula ocasionalmente
+            if (Math.random() < 0.3) {
+              trailParticlesRef.current.push({
+                x: currentX + (Math.random() - 0.5) * 0.3,
+                y: currentY + (Math.random() - 0.5) * 0.3,
+                alpha: 1,
+                size: config.size * 0.3 * Math.random(),
+                createdAt: now,
+              });
+            }
           }
         }
       }

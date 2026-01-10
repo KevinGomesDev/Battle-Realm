@@ -57,6 +57,7 @@ export function useVisibleCells({
         posX: obs.posX,
         posY: obs.posY,
         destroyed: obs.destroyed,
+        size: obs.size,
       }))
     );
 

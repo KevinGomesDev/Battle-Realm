@@ -14,6 +14,26 @@ export async function createBattleUnits(
     `[units.handler] Criando unidades para ${state.players.length} jogadores`
   );
 
+  // Coletar posições ocupadas por obstáculos
+  const obstaclePositions = new Set<string>();
+  for (const obstacle of state.obstacles) {
+    // Obstáculos podem ocupar múltiplas células
+    const { getObstacleSizeDefinition, getObstacleOccupiedCells } =
+      await import("@boundless/shared/config");
+    const sizeDef = getObstacleSizeDefinition(obstacle.size);
+    const cells = getObstacleOccupiedCells(
+      obstacle.posX,
+      obstacle.posY,
+      obstacle.size
+    );
+    for (const cell of cells) {
+      obstaclePositions.add(`${cell.x},${cell.y}`);
+    }
+  }
+
+  // Coletar posições já ocupadas por unidades
+  const unitPositions = new Set<string>();
+
   for (const player of state.players) {
     console.log(`[units.handler] Processando player:`, {
       oderId: player.oderId,
@@ -44,8 +64,15 @@ export async function createBattleUnits(
       player.oderId,
       player.playerIndex,
       state.gridWidth,
-      state.gridHeight
+      state.gridHeight,
+      obstaclePositions,
+      unitPositions
     );
+
+    // Adicionar posições das unidades criadas ao set de ocupadas
+    for (const unit of units) {
+      unitPositions.add(`${unit.posX},${unit.posY}`);
+    }
 
     console.log(
       `[units.handler] Unidades criadas para ${player.oderId}:`,

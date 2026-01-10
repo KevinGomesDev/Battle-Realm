@@ -85,4 +85,68 @@ export const BATTLE_COLORS = {
     { primary: "#e74c3c", secondary: "#b03a2e" },
     { primary: "#3498db", secondary: "#2471a3" },
   ],
+
+  // Cores dos obstáculos (2.5D)
+  obstacle: {
+    rock: {
+      top: "#7f8c8d",
+      sideX: "#5d6d7e",
+      sideY: "#4d5d6e",
+      highlight: "#95a5a6",
+    },
+    tree: {
+      top: "#27ae60",
+      sideX: "#1e8449",
+      sideY: "#145a32",
+      highlight: "#2ecc71",
+    },
+    pillar: {
+      top: "#bdc3c7",
+      sideX: "#95a5a6",
+      sideY: "#7f8c8d",
+      highlight: "#ecf0f1",
+    },
+    crate: {
+      top: "#d35400",
+      sideX: "#ba4a00",
+      sideY: "#a04000",
+      highlight: "#e67e22",
+    },
+    crystal: {
+      top: "#9b59b6",
+      sideX: "#8e44ad",
+      sideY: "#7d3c98",
+      highlight: "#bb8fce",
+    },
+    ruins: {
+      top: "#5d6d7e",
+      sideX: "#4a5a6a",
+      sideY: "#3a4a5a",
+      highlight: "#85929e",
+    },
+    iceSpike: {
+      top: "#85c1e9",
+      sideX: "#5dade2",
+      sideY: "#3498db",
+      highlight: "#aed6f1",
+    },
+    cactus: {
+      top: "#58d68d",
+      sideX: "#28b463",
+      sideY: "#1d8348",
+      highlight: "#82e0aa",
+    },
+    mushroom: {
+      top: "#e74c3c",
+      sideX: "#f5b7b1",
+      sideY: "#fadbd8",
+      highlight: "#f1948a",
+    },
+    tombstone: {
+      top: "#566573",
+      sideX: "#2c3e50",
+      sideY: "#1c2833",
+      highlight: "#aab7b8",
+    },
+  },
 } as const;

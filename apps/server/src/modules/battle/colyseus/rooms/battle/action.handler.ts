@@ -201,6 +201,7 @@ function handleUseAbility(
       hp: o.hp,
       destroyed: o.destroyed || false,
       type: (o.type || "default") as any,
+      size: o.size || "SMALL",
     })),
     targetPosition: params?.targetPosition as
       | { x: number; y: number }
@@ -263,6 +264,16 @@ function handleUseAbility(
       | { x: number; y: number }
       | undefined;
 
+    // Emitir evento para o client disparar a animação do projétil ANTES do QTE
+    broadcast("battle:projectile_launched", {
+      casterUnitId: unitId,
+      skillCode: abilityCode,
+      targetPosition: originalTargetPosition,
+      impactPoint: impactPoint,
+      targetId: result.qteTargetId,
+      requiresQTE: true,
+    });
+
     startProjectileDodgeQTE(
       casterSchema,
       targetSchema,
@@ -317,6 +328,7 @@ function handleUseAbility(
             hp: o.hp,
             destroyed: o.destroyed || false,
             type: (o.type || "default") as any,
+            size: o.size || "SMALL",
           })),
           targetPosition: finalImpactPoint,
           battleId: roomId,
@@ -345,6 +357,8 @@ function handleUseAbility(
               const affectedSchema = state.units.get(affected.unitId);
               if (affectedSchema) {
                 affectedSchema.currentHp = affected.hpAfter;
+                affectedSchema.physicalProtection = affected.physicalProtection;
+                affectedSchema.magicalProtection = affected.magicalProtection;
                 if (affected.hpAfter <= 0 && affectedSchema.isAlive) {
                   affectedSchema.isAlive = false;
                   const affectedUnit = allUnits.find(
@@ -375,6 +389,9 @@ function handleUseAbility(
               currentHp: casterSchema.currentHp,
               currentMana: casterSchema.currentMana,
               attacksLeftThisTurn: casterSchema.attacksLeftThisTurn,
+              unitCooldowns: Object.fromEntries(
+                casterSchema.unitCooldowns.entries()
+              ),
             },
           });
 
@@ -474,6 +491,27 @@ function handleUseAbility(
     }
   }
 
+  // Sincronizar múltiplas unidades afetadas (spells de área)
+  if (result.affectedUnits && result.affectedUnits.length > 0) {
+    for (const affected of result.affectedUnits) {
+      const affectedSchema = state.units.get(affected.unitId);
+      if (affectedSchema) {
+        const affectedUnit = allUnits.find((u) => u.id === affected.unitId);
+        if (affectedUnit) {
+          // Sincronizar HP
+          affectedSchema.currentHp = affected.hpAfter;
+          affectedUnit.currentHp = affected.hpAfter;
+
+          // Verificar morte
+          if (affected.defeated && affectedSchema.isAlive) {
+            affectedSchema.isAlive = false;
+            processUnitDeath(affectedUnit, allUnits);
+          }
+        }
+      }
+    }
+  }
+
   // Sincronizar obstáculo se foi atacado
   if (result.obstacleDestroyed !== undefined && result.obstacleId) {
     const obstacle = state.obstacles.find((o) => o.id === result.obstacleId);
@@ -519,6 +557,13 @@ function handleUseAbility(
     casterUnitId: unitId,
     skillCode: abilityCode,
     targetPosition: params?.targetPosition,
+    // Enviar impactPoint do resultado (pode ser diferente do targetPosition se interceptado)
+    impactPoint: result.metadata?.impactPoint ?? params?.targetPosition,
+    affectedCells: result.metadata?.affectedCells,
+    isAreaAbility: !!(
+      result.metadata?.affectedCells?.length &&
+      result.metadata.affectedCells.length > 1
+    ),
     result,
     casterUpdated: {
       actionsLeft: unit.actionsLeft,
@@ -528,6 +573,7 @@ function handleUseAbility(
       attacksLeftThisTurn: unit.attacksLeftThisTurn,
       conditions: Array.from(unit.conditions),
       activeEffects: serializedActiveEffects,
+      unitCooldowns: Object.fromEntries(unit.unitCooldowns.entries()),
     },
   });
 

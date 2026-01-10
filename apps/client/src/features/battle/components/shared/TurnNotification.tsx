@@ -33,21 +33,11 @@ export function TurnNotification({
 }: TurnNotificationProps) {
   // Estado do componente
   const [showTurnStart, setShowTurnStart] = useState(false);
-  const [autoEndCountdown, setAutoEndCountdown] = useState<number | null>(null);
 
   // Refs para controle
   const turnKeyRef = useRef<string | null>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
-    null
-  );
   const autoEndTriggeredRef = useRef<boolean>(false);
-  const countdownStartedRef = useRef<boolean>(false); // Flag separada para rastrear countdown
-
-  // Refs para monitorar mudanças de recursos
-  const prevMovesRef = useRef<number>(myUnitMovesLeft);
-  const prevActionsRef = useRef<number>(myUnitActionsLeft);
-  const prevAttacksRef = useRef<number>(myUnitAttacksLeft);
 
   const isMyTurn = currentPlayerId === myUserId;
 
@@ -65,17 +55,11 @@ export function TurnNotification({
 
       // Resetar estados
       autoEndTriggeredRef.current = false;
-      countdownStartedRef.current = false;
-      setAutoEndCountdown(null);
 
       // Limpar timers anteriores
       if (hideTimerRef.current) {
         clearTimeout(hideTimerRef.current);
         hideTimerRef.current = null;
-      }
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
-        countdownIntervalRef.current = null;
       }
 
       // Mostrar modal de início de turno após delay
@@ -110,60 +94,20 @@ export function TurnNotification({
     onEndAction();
   }, [onEndAction]);
 
-  // Cancelar countdown se recursos aumentarem (ex: Disparada dá +1 ação)
-  useEffect(() => {
-    const movesIncreased = myUnitMovesLeft > prevMovesRef.current;
-    const actionsIncreased = myUnitActionsLeft > prevActionsRef.current;
-    const attacksIncreased = myUnitAttacksLeft > prevAttacksRef.current;
-
-    // Atualizar refs
-    prevMovesRef.current = myUnitMovesLeft;
-    prevActionsRef.current = myUnitActionsLeft;
-    prevAttacksRef.current = myUnitAttacksLeft;
-
-    // Se algum recurso aumentou E countdown está ativo, cancelar
-    if (
-      (movesIncreased || actionsIncreased || attacksIncreased) &&
-      countdownStartedRef.current
-    ) {
-      console.log(
-        "[TurnNotification] ⏹️ Cancelando countdown - recursos aumentaram:",
-        {
-          moves: movesIncreased,
-          actions: actionsIncreased,
-          attacks: attacksIncreased,
-        }
-      );
-
-      // Cancelar countdown
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
-        countdownIntervalRef.current = null;
-      }
-      countdownStartedRef.current = false;
-      setAutoEndCountdown(null);
-    }
-  }, [myUnitMovesLeft, myUnitActionsLeft, myUnitAttacksLeft]);
-
-  // Lógica de auto-end: iniciar countdown quando condições são atendidas
+  // Lógica de auto-end: encerrar turno instantaneamente quando condições são atendidas
   useEffect(() => {
     // Não é meu turno - não fazer nada
     if (!isMyTurn) {
       return;
     }
 
-    // Modal de turn-start ainda visível - não iniciar countdown
+    // Modal de turn-start ainda visível - não encerrar
     if (showTurnStart) {
       return;
     }
 
     // Já disparou auto-end neste turno
     if (autoEndTriggeredRef.current) {
-      return;
-    }
-
-    // Já iniciou countdown neste turno - não iniciar novo
-    if (countdownStartedRef.current) {
       return;
     }
 
@@ -179,29 +123,8 @@ export function TurnNotification({
       return;
     }
 
-    // Marcar que countdown foi iniciado (ANTES de criar o interval)
-    countdownStartedRef.current = true;
-    console.log("[TurnNotification] ▶️ Iniciando countdown de 3 segundos");
-
-    let countdown = 3;
-    setAutoEndCountdown(countdown);
-
-    const intervalId = setInterval(() => {
-      countdown -= 1;
-
-      if (countdown <= 0) {
-        clearInterval(intervalId);
-        setAutoEndCountdown(null);
-        triggerEndAction();
-      } else {
-        setAutoEndCountdown(countdown);
-      }
-    }, 1000);
-
-    // Salvar ref para cleanup no reset de turno
-    countdownIntervalRef.current = intervalId;
-
-    // SEM cleanup aqui - o interval roda até completar ou até reset de turno
+    // Encerrar turno instantaneamente
+    triggerEndAction();
   }, [
     isMyTurn,
     showTurnStart,
@@ -213,14 +136,7 @@ export function TurnNotification({
   ]);
 
   // Determinar o que mostrar
-  const showAutoEnd = autoEndCountdown !== null && autoEndCountdown > 0;
-
-  let content: "turn-start" | "auto-end" | null = null;
-  if (showTurnStart) {
-    content = "turn-start";
-  } else if (showAutoEnd) {
-    content = "auto-end";
-  }
+  const content: "turn-start" | null = showTurnStart ? "turn-start" : null;
 
   // Cores
   const colors = isMyTurn
@@ -364,67 +280,7 @@ export function TurnNotification({
                   )}
                 </motion.div>
               </>
-            ) : (
-              <>
-                {/* Countdown */}
-                <div className="flex items-center gap-4">
-                  <div className="relative flex items-center justify-center w-12 h-12">
-                    <motion.div
-                      className="text-2xl font-bold text-amber-400 z-10"
-                      key={autoEndCountdown}
-                      initial={{ scale: 1.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 500,
-                        damping: 25,
-                      }}
-                    >
-                      {autoEndCountdown}
-                    </motion.div>
-                    <svg
-                      className="absolute w-12 h-12 -rotate-90"
-                      viewBox="0 0 48 48"
-                    >
-                      <circle
-                        cx="24"
-                        cy="24"
-                        r="20"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        className="text-amber-500/30"
-                      />
-                      <motion.circle
-                        cx="24"
-                        cy="24"
-                        r="20"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                        className="text-amber-500"
-                        initial={{
-                          strokeDasharray: 125.6,
-                          strokeDashoffset: 0,
-                        }}
-                        animate={{ strokeDashoffset: 125.6 }}
-                        transition={{ duration: 1, ease: "linear" }}
-                        key={autoEndCountdown}
-                      />
-                    </svg>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs text-gray-400 uppercase tracking-wider">
-                      Encerrando turno
-                    </span>
-                    <span className="text-lg text-amber-300 font-semibold">
-                      em {autoEndCountdown}...
-                    </span>
-                  </div>
-                </div>
-              </>
-            )}
+            ) : null}
 
             {/* Decoração inferior */}
             <div

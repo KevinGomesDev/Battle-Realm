@@ -36,6 +36,31 @@ const MAX_BATTLE_EVENTS = 500;
 type EventEmitter = (event: GameEvent) => void;
 let eventEmitter: EventEmitter | null = null;
 
+// Mapa de broadcast functions por battleId
+const battleBroadcasters = new Map<
+  string,
+  (event: string, data: any) => void
+>();
+
+/**
+ * Registra o broadcast de uma sala de batalha
+ */
+export function registerBattleBroadcast(
+  battleId: string,
+  broadcastFn: (event: string, data: any) => void
+): void {
+  battleBroadcasters.set(battleId, broadcastFn);
+  console.log(`[EventService] Broadcast registrado para batalha ${battleId}`);
+}
+
+/**
+ * Remove o broadcast de uma sala de batalha
+ */
+export function unregisterBattleBroadcast(battleId: string): void {
+  battleBroadcasters.delete(battleId);
+  console.log(`[EventService] Broadcast removido para batalha ${battleId}`);
+}
+
 /**
  * Configura o callback de emissão de eventos
  * Usado pelas Colyseus Rooms para receber eventos e broadcast
@@ -219,7 +244,8 @@ export async function createAndEmitEvent(
     category: dbEvent.category as GameEvent["category"],
     severity: dbEvent.severity as GameEvent["severity"],
     matchId: dbEvent.matchId || undefined,
-    battleId: dbEvent.battleId || undefined,
+    // Usar o battleId original para cache e broadcast, mesmo se não foi salvo no banco
+    battleId: eventData.battleId || dbEvent.battleId || undefined,
     battleLobbyId: dbEvent.battleLobbyId || undefined,
     targetUserIds: JSON.parse(dbEvent.targetUserIds),
     sourceUserId: dbEvent.sourceUserId || undefined,
@@ -233,6 +259,7 @@ export async function createAndEmitEvent(
   };
 
   // Guardar em cache de memória (para eventos de BATTLE)
+  // Usar eventData.battleId pois o evento pode não ter sido salvo com battleId no banco
   if (eventData.context === "BATTLE" && eventData.battleId) {
     addBattleEventToCache(event);
   }
@@ -245,16 +272,32 @@ export async function createAndEmitEvent(
 
 /**
  * Emite evento para os destinatários apropriados
- * Usa o callback configurado pelas Colyseus Rooms
+ * Usa broadcast específico por batalha ou callback global
  */
 function emitEvent(event: GameEvent): void {
-  if (!eventEmitter) {
-    // Sem emitter configurado, evento só fica no cache/banco
-    return;
+  // Para eventos de batalha, usar o broadcast específico da sala
+  if (event.battleId) {
+    const broadcaster = battleBroadcasters.get(event.battleId);
+    if (broadcaster) {
+      console.log(
+        `[EventService] Emitindo evento ${event.code} para batalha ${event.battleId}`
+      );
+      broadcaster("event:new", event);
+      return;
+    } else {
+      console.warn(
+        `[EventService] Nenhum broadcaster registrado para batalha ${event.battleId}. ` +
+          `Broadcasters ativos: [${Array.from(battleBroadcasters.keys()).join(
+            ", "
+          )}]`
+      );
+    }
   }
 
-  // Delegar emissão para o callback configurado
-  eventEmitter(event);
+  // Fallback para emitter global (se configurado)
+  if (eventEmitter) {
+    eventEmitter(event);
+  }
 }
 
 // =============================================================================

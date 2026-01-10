@@ -113,6 +113,8 @@ export interface ProjectileUnit {
   isAlive: boolean;
   /** Owner ID para filtrar aliados/inimigos */
   ownerId?: string;
+  /** Tamanho da unidade para cálculo de células ocupadas */
+  size?: string;
 }
 
 // =============================================================================
@@ -928,11 +930,18 @@ export function processAreaAbility(
     gridHeight
   );
 
-  // Encontrar unidades na área afetada
+  // Encontrar unidades na área afetada (considerando tamanho da unidade)
   const aliveUnits = units.filter((u) => u.isAlive);
-  const affectedUnits = aliveUnits.filter((unit) =>
-    affectedCells.some((cell) => cell.x === unit.posX && cell.y === unit.posY)
-  );
+  const affectedUnits = aliveUnits.filter((unit) => {
+    // Obter todas as células ocupadas pela unidade
+    const unitCells = getUnitOccupiedCells(unit);
+    // Verificar se alguma célula da unidade está na área afetada
+    return unitCells.some((unitCell) =>
+      affectedCells.some(
+        (areaCell) => areaCell.x === unitCell.x && areaCell.y === unitCell.y
+      )
+    );
+  });
 
   return {
     impactPoint,

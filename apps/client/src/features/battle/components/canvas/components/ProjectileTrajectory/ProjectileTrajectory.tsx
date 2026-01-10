@@ -449,24 +449,39 @@ function drawExplosion(
   y: number,
   size: number,
   color: string,
-  progress: number, // 0-1, onde 1 = explosão completa
+  explosionProgress: number, // 0-1, progresso da explosão (0 = início, 1 = fim)
   cellSize: number
 ): void {
-  // Explosão aparece nos últimos 20% da animação
-  const explosionProgress = Math.max(0, (progress - 0.8) / 0.2);
   if (explosionProgress <= 0) return;
 
-  const maxRadius = size * cellSize * 0.4;
-  const currentRadius = maxRadius * explosionProgress;
-  const alpha = 1 - explosionProgress;
+  const maxRadius = size * cellSize * 0.6;
+
+  // Explosão expande rapidamente no início e depois some
+  const expandProgress = Math.min(explosionProgress * 2, 1); // Expande em 50% do tempo
+  const fadeProgress = Math.max(0, (explosionProgress - 0.5) * 2); // Fade nos outros 50%
+
+  const currentRadius = maxRadius * expandProgress;
+  const alpha = 1 - fadeProgress;
+
+  if (alpha <= 0) return;
 
   ctx.save();
 
+  // Efeito de glow externo
+  ctx.shadowColor = color;
+  ctx.shadowBlur = currentRadius * 0.5;
+
+  // Gradiente da explosão
   const gradient = ctx.createRadialGradient(x, y, 0, x, y, currentRadius);
   gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+  gradient.addColorStop(0.2, `rgba(255, 200, 100, ${alpha * 0.9})`);
   gradient.addColorStop(
-    0.3,
-    color.replace(")", `, ${alpha * 0.8})`).replace("rgb", "rgba")
+    0.5,
+    color.includes("rgba")
+      ? color
+      : `${color}${Math.floor(alpha * 255)
+          .toString(16)
+          .padStart(2, "0")}`
   );
   gradient.addColorStop(1, "transparent");
 
@@ -474,6 +489,19 @@ function drawExplosion(
   ctx.beginPath();
   ctx.arc(x, y, currentRadius, 0, Math.PI * 2);
   ctx.fill();
+
+  // Anel de onda de choque
+  if (expandProgress > 0.3) {
+    const ringProgress = (expandProgress - 0.3) / 0.7;
+    const ringRadius = maxRadius * (0.5 + ringProgress * 0.5);
+    const ringAlpha = (1 - ringProgress) * alpha * 0.6;
+
+    ctx.strokeStyle = `rgba(255, 255, 255, ${ringAlpha})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y, ringRadius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
   ctx.restore();
 }
@@ -528,55 +556,76 @@ export function renderProjectiles(props: ProjectileRendererProps): void {
     // Desenhar rastro
     drawTrail(ctx, projectile, x, y, progress, cellSize);
 
-    // Desenhar projétil baseado no tipo
-    switch (projectile.type) {
-      case "MELEE":
-        drawMeleeProjectile(ctx, x, y, angle, config, progress, animationTime);
-        break;
+    // Desenhar projétil baseado no tipo (apenas se ainda está viajando)
+    if (progress < 1) {
+      switch (projectile.type) {
+        case "MELEE":
+          drawMeleeProjectile(
+            ctx,
+            x,
+            y,
+            angle,
+            config,
+            progress,
+            animationTime
+          );
+          break;
 
-      case "ARROW":
-        drawArrowProjectile(ctx, x, y, angle, config);
-        break;
+        case "ARROW":
+          drawArrowProjectile(ctx, x, y, angle, config);
+          break;
 
-      case "FIREBALL":
-        drawFireballProjectile(ctx, x, y, config, pulse, animationTime);
-        break;
+        case "FIREBALL":
+          drawFireballProjectile(ctx, x, y, config, pulse, animationTime);
+          break;
 
-      case "ICE":
-        drawIceProjectile(ctx, x, y, angle, config, pulse, animationTime);
-        break;
+        case "ICE":
+          drawIceProjectile(ctx, x, y, angle, config, pulse, animationTime);
+          break;
 
-      case "LIGHTNING":
-        drawLightningProjectile(
-          ctx,
-          startX,
-          startY,
-          endX,
-          endY,
-          progress,
-          pulse,
-          cellSize
-        );
-        break;
+        case "LIGHTNING":
+          drawLightningProjectile(
+            ctx,
+            startX,
+            startY,
+            endX,
+            endY,
+            progress,
+            pulse,
+            cellSize
+          );
+          break;
 
-      case "MAGIC":
-      case "PROJECTILE":
-      default:
-        drawGenericProjectile(ctx, x, y, config, pulse);
-        break;
+        case "MAGIC":
+        case "PROJECTILE":
+        default:
+          drawGenericProjectile(ctx, x, y, config, pulse);
+          break;
+      }
     }
 
     // Desenhar explosão (se for projétil de área)
-    if (projectile.isAreaProjectile && projectile.explosionSize) {
-      drawExplosion(
-        ctx,
-        endX,
-        endY,
-        projectile.explosionSize,
-        config.color,
-        progress,
-        cellSize
-      );
+    if (projectile.isAreaProjectile) {
+      // Calcular progresso da explosão (0 quando projétil chega, 1 quando termina)
+      const EXPLOSION_DURATION_MS = 400;
+      const explosionElapsed = elapsed - projectile.duration;
+      const explosionProgress =
+        progress >= 1
+          ? Math.min(explosionElapsed / EXPLOSION_DURATION_MS, 1)
+          : 0;
+
+      if (explosionProgress > 0) {
+        const explosionSize = projectile.explosionSize ?? 3;
+        drawExplosion(
+          ctx,
+          endX,
+          endY,
+          explosionSize,
+          config.color,
+          explosionProgress,
+          cellSize
+        );
+      }
     }
   });
 }

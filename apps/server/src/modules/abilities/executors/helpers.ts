@@ -55,6 +55,7 @@ function toProjectileUnit(unit: BattleUnit): ProjectileUnit {
     posY: unit.posY,
     isAlive: unit.isAlive,
     ownerId: unit.ownerId,
+    size: unit.size,
   };
 }
 

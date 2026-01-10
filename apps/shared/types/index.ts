@@ -9,7 +9,6 @@ export * from "./conditions.types";
 // Domain types
 export * from "./arena.types";
 export * from "./auth.types";
-export * from "./character.types";
 export * from "./chat.types";
 export * from "./commands.types";
 export * from "./dice.types";

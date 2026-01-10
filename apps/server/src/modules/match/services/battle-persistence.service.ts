@@ -333,7 +333,10 @@ function parseUnitFromDb(unit: BattleUnit): PersistedBattleUnit {
     size: unit.size,
     visionRange: unit.visionRange,
     unitCooldowns: JSON.parse(unit.unitCooldowns || "{}"),
-    activeEffects: calculateActiveEffects(conditions),
+    activeEffects: calculateActiveEffects(conditions, {
+      physicalProtection: unit.physicalProtection,
+      magicalProtection: unit.magicalProtection,
+    }),
     // === NEMESIS SYSTEM ===
     nemesisId: unit.nemesisId,
     isNemesis: unit.isNemesis,

@@ -44,23 +44,35 @@ const InitiativeIcon: React.FC<{
   isActive: boolean;
   isSelected: boolean;
   isOwned: boolean;
+  isVisible: boolean;
   onClick?: () => void;
-}> = ({ unit, colorIndex, isActive, isSelected, isOwned, onClick }) => {
+}> = ({
+  unit,
+  colorIndex,
+  isActive,
+  isSelected,
+  isOwned,
+  isVisible,
+  onClick,
+}) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const iconRef = useRef<HTMLDivElement>(null);
   const isDead = !unit.isAlive;
   const color = PLAYER_COLORS[colorIndex % PLAYER_COLORS.length];
   const hpColors = getHpColor(unit.currentHp, unit.maxHp);
+  // Pode clicar se está viva e é visível (própria ou no campo de visão)
+  const canClick = !isDead && isVisible;
 
   return (
     <div
       ref={iconRef}
-      onClick={isOwned && !isDead ? onClick : undefined}
+      onClick={canClick ? onClick : undefined}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
       className={`
         relative w-8 h-8 rounded flex items-center justify-center transition-all
-        ${isOwned && !isDead ? "cursor-pointer" : "cursor-default"}
+        ${canClick ? "cursor-pointer" : "cursor-default"}
+        ${!isVisible && !isOwned ? "opacity-40" : ""}
         ${
           isDead
             ? "opacity-25 grayscale"
@@ -68,7 +80,9 @@ const InitiativeIcon: React.FC<{
             ? `ring-2 ring-stellar-amber ${color.glow} shadow-lg`
             : isSelected
             ? "ring-1 ring-astral-chrome/50"
-            : "hover:ring-1 hover:ring-surface-400"
+            : canClick
+            ? "hover:ring-1 hover:ring-surface-400"
+            : ""
         }
       `}
       style={{
@@ -185,6 +199,7 @@ interface BattleHeaderProps {
   onUnitClick?: (unit: BattleUnitState) => void;
   onEndTurn?: () => void;
   canEndTurn?: boolean;
+  isUnitVisible?: (unitId: string) => boolean;
 }
 
 export const BattleHeader: React.FC<BattleHeaderProps> = ({
@@ -195,6 +210,7 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
   onUnitClick,
   onEndTurn,
   canEndTurn = false,
+  isUnitVisible,
 }) => {
   // Processar dados
   const { kingdomStats, sortedUnits, kingdomColorMap } = useMemo(() => {
@@ -287,6 +303,7 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
                     isActive={battle.activeUnitId === unit.id}
                     isSelected={selectedUnitId === unit.id}
                     isOwned={isOwned}
+                    isVisible={isOwned || (isUnitVisible?.(unit.id) ?? true)}
                     onClick={() => onUnitClick?.(unit)}
                   />
                 </React.Fragment>

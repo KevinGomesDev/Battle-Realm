@@ -18,8 +18,6 @@ import { SessionGuard } from "../components/SessionGuard";
 import { Topbar } from "../components/Topbar";
 import { CreateKingdomModal, useKingdom } from "../features/kingdom";
 import { GlobalChat } from "../features/chat";
-import { CharacterCreatorModal } from "../features/character-creator";
-import type { CharacterConfig } from "@boundless/shared/types/character.types";
 import { MAX_KINGDOMS_PER_USER } from "@boundless/shared/data/units.data";
 import { Button } from "../components/Button";
 
@@ -62,15 +60,6 @@ const CriarPartidaBtn: React.FC<{
   </Button>
 );
 
-/** Botão compacto para header - Criar Personagem */
-const CriarPersonagemBtn: React.FC<{
-  onClick: () => void;
-}> = ({ onClick }) => (
-  <Button variant="secondary" size="xs" onClick={onClick} icon="🎨">
-    Criar Avatar
-  </Button>
-);
-
 // =============================================================================
 // COMPONENTE PRINCIPAL
 // =============================================================================
@@ -86,7 +75,6 @@ const DashboardPage: React.FC = () => {
   const { kingdoms, loadKingdoms } = useKingdom();
 
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
-  const [isCharacterCreatorOpen, setIsCharacterCreatorOpen] = useState(false);
   const [isCombatTrainingOpen, setIsCombatTrainingOpen] = useState(false);
 
   // Hooks para ações dos headers
@@ -148,9 +136,6 @@ const DashboardPage: React.FC = () => {
                   >
                     Treino
                   </Button>
-                  <CriarPersonagemBtn
-                    onClick={() => setIsCharacterCreatorOpen(true)}
-                  />
                   <FundarReinoBtn
                     onClick={kingdomActions.openModal}
                     disabled={isKingdomLimitReached}
@@ -229,17 +214,6 @@ const DashboardPage: React.FC = () => {
           }}
         />
       )}
-
-      {/* === MODAL DE CRIADOR DE PERSONAGEM === */}
-      <CharacterCreatorModal
-        isOpen={isCharacterCreatorOpen}
-        onClose={() => setIsCharacterCreatorOpen(false)}
-        onSave={(config: CharacterConfig, svgString: string) => {
-          console.log("Personagem salvo:", config);
-          console.log("SVG:", svgString);
-          // TODO: Salvar personagem no backend
-        }}
-      />
 
       {/* === TREINAMENTO DE COMBATE === */}
       <CombatTraining

@@ -245,6 +245,63 @@ export const AMBIENT_SOUNDS: Record<string, SoundDefinition> = {
   },
 };
 
+// ===== QTE SOUNDS =====
+export const QTE_SOUNDS: Record<string, SoundDefinition> = {
+  // Som de início do QTE - toca quando o círculo aparece
+  START: {
+    id: "qte_start",
+    src: "/sounds/qte/qte-start.mp3",
+    category: "combat",
+    volume: 0.7,
+    preload: true,
+  },
+  // Tick suave durante o círculo fechando (loop)
+  TICK: {
+    id: "qte_tick",
+    src: "/sounds/qte/qte-tick.mp3",
+    category: "combat",
+    volume: 0.3,
+  },
+  // Bip de urgência nos últimos 30% do tempo
+  COUNTDOWN: {
+    id: "qte_countdown",
+    src: "/sounds/qte/qte-countdown.mp3",
+    category: "combat",
+    volume: 0.5,
+  },
+  // Acerto perfeito - som épico
+  PERFECT: {
+    id: "qte_perfect",
+    src: "/sounds/qte/qte-perfect.mp3",
+    category: "combat",
+    volume: 0.9,
+    preload: true,
+  },
+  // Acerto normal
+  HIT: {
+    id: "qte_hit",
+    src: "/sounds/qte/qte-hit.mp3",
+    category: "combat",
+    volume: 0.7,
+    preload: true,
+  },
+  // Falha/erro
+  MISS: {
+    id: "qte_miss",
+    src: "/sounds/qte/qte-miss.mp3",
+    category: "combat",
+    volume: 0.6,
+    preload: true,
+  },
+  // Bloqueio bem-sucedido
+  BLOCK: {
+    id: "qte_block",
+    src: "/sounds/qte/qte-block.mp3",
+    category: "combat",
+    volume: 0.8,
+  },
+};
+
 // ===== ALL SOUNDS =====
 export const ALL_SOUNDS: Record<string, SoundDefinition> = {
   ...UI_SOUNDS,
@@ -252,6 +309,7 @@ export const ALL_SOUNDS: Record<string, SoundDefinition> = {
   ...SPELL_SOUNDS,
   ...MUSIC_TRACKS,
   ...AMBIENT_SOUNDS,
+  ...QTE_SOUNDS,
 };
 
 // ===== SOUND IDS (para type-safety) =====
@@ -260,4 +318,5 @@ export type CombatSoundId = keyof typeof COMBAT_SOUNDS;
 export type SpellSoundId = keyof typeof SPELL_SOUNDS;
 export type MusicTrackId = keyof typeof MUSIC_TRACKS;
 export type AmbientSoundId = keyof typeof AMBIENT_SOUNDS;
+export type QTESoundId = keyof typeof QTE_SOUNDS;
 export type SoundId = keyof typeof ALL_SOUNDS;

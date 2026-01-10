@@ -119,7 +119,39 @@ export function ColyseusProvider({ children }: { children: React.ReactNode }) {
 
     const handleDisconnected = () => {
       if (mountedRef.current) {
+        // Não marcar como desconectado se estiver reconectando
+        if (!state.isReconnecting) {
+          dispatch({ type: "SET_CONNECTED", payload: false });
+        }
+      }
+    };
+
+    const handleReconnecting = (data?: { attempt?: number }) => {
+      if (mountedRef.current) {
+        dispatch({ type: "SET_RECONNECTING", payload: true });
         dispatch({ type: "SET_CONNECTED", payload: false });
+        if (data?.attempt !== undefined) {
+          dispatch({ type: "SET_RECONNECT_ATTEMPT", payload: data.attempt });
+        }
+      }
+    };
+
+    const handleReconnected = () => {
+      if (mountedRef.current) {
+        dispatch({ type: "SET_CONNECTED", payload: true });
+        dispatch({ type: "SET_RECONNECTING", payload: false });
+        dispatch({ type: "SET_ERROR", payload: null });
+      }
+    };
+
+    const handleReconnectFailed = () => {
+      if (mountedRef.current) {
+        dispatch({ type: "SET_RECONNECTING", payload: false });
+        dispatch({ type: "SET_CONNECTED", payload: false });
+        dispatch({
+          type: "SET_ERROR",
+          payload: "Não foi possível reconectar ao servidor",
+        });
       }
     };
 
@@ -151,6 +183,9 @@ export function ColyseusProvider({ children }: { children: React.ReactNode }) {
     // Registrar listeners
     colyseusService.on("connected", handleConnected);
     colyseusService.on("disconnected", handleDisconnected);
+    colyseusService.on("reconnecting", handleReconnecting);
+    colyseusService.on("reconnected", handleReconnected);
+    colyseusService.on("reconnect_failed", handleReconnectFailed);
     colyseusService.on("error", handleError);
     colyseusService.on("global:state_changed", handleGlobalState);
     colyseusService.on("connection_failed", handleConnectionFailed);
@@ -168,6 +203,9 @@ export function ColyseusProvider({ children }: { children: React.ReactNode }) {
       mountedRef.current = false;
       colyseusService.off("connected", handleConnected);
       colyseusService.off("disconnected", handleDisconnected);
+      colyseusService.off("reconnecting", handleReconnecting);
+      colyseusService.off("reconnected", handleReconnected);
+      colyseusService.off("reconnect_failed", handleReconnectFailed);
       colyseusService.off("error", handleError);
       colyseusService.off("global:state_changed", handleGlobalState);
       colyseusService.off("connection_failed", handleConnectionFailed);

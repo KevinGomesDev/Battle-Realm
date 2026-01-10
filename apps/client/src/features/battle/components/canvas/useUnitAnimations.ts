@@ -56,10 +56,14 @@ interface UseUnitAnimationsReturn {
   updateAnimations: () => boolean;
 }
 
-// Duração da animação de movimento em ms (mais lenta para ser visível)
-const MOVE_ANIMATION_DURATION = 500;
+/**
+ * Duração da animação de movimento em ms.
+ * 250ms = movimento visível e suave, mas ainda responsivo.
+ * Para movimento contínuo, deve ser próximo do cooldown de input.
+ */
+const MOVE_ANIMATION_DURATION = 250;
 
-// Função de easing (ease-out cubic)
+// Função de easing (ease-out cubic para desaceleração suave)
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }

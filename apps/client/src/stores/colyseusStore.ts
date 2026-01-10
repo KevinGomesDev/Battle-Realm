@@ -95,7 +95,39 @@ export const useColyseusStore = create<ConnectionState & ConnectionActions>(
       };
 
       const handleDisconnected = () => {
-        set({ isConnected: false });
+        // Apenas marca como desconectado se não estiver em processo de reconexão
+        const { isReconnecting } = _get();
+        if (!isReconnecting) {
+          set({ isConnected: false });
+        }
+      };
+
+      const handleReconnecting = (data?: { attempt?: number }) => {
+        console.log("[ColyseusStore] 🔄 Iniciando reconexão...", data?.attempt);
+        set({
+          isReconnecting: true,
+          isConnected: false,
+          reconnectAttempt: data?.attempt ?? 0,
+        });
+      };
+
+      const handleReconnected = () => {
+        console.log("[ColyseusStore] ✅ Reconectado!");
+        set({
+          isConnected: true,
+          isReconnecting: false,
+          reconnectAttempt: 0,
+          error: null,
+        });
+      };
+
+      const handleReconnectFailed = () => {
+        console.error("[ColyseusStore] ❌ Falha ao reconectar");
+        set({
+          isReconnecting: false,
+          isConnected: false,
+          error: "Não foi possível reconectar ao servidor",
+        });
       };
 
       const handleError = (data: { code?: number; message?: string }) => {
@@ -118,6 +150,9 @@ export const useColyseusStore = create<ConnectionState & ConnectionActions>(
 
       colyseusService.on("connected", handleConnected);
       colyseusService.on("disconnected", handleDisconnected);
+      colyseusService.on("reconnecting", handleReconnecting);
+      colyseusService.on("reconnected", handleReconnected);
+      colyseusService.on("reconnect_failed", handleReconnectFailed);
       colyseusService.on("error", handleError);
       colyseusService.on("global:state_changed", handleGlobalState);
       colyseusService.on("connection_failed", handleConnectionFailed);
@@ -135,6 +170,9 @@ export const useColyseusStore = create<ConnectionState & ConnectionActions>(
       return () => {
         colyseusService.off("connected", handleConnected);
         colyseusService.off("disconnected", handleDisconnected);
+        colyseusService.off("reconnecting", handleReconnecting);
+        colyseusService.off("reconnected", handleReconnected);
+        colyseusService.off("reconnect_failed", handleReconnectFailed);
         colyseusService.off("error", handleError);
         colyseusService.off("global:state_changed", handleGlobalState);
         colyseusService.off("connection_failed", handleConnectionFailed);

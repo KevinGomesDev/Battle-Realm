@@ -271,6 +271,8 @@ export interface UnitForCondition {
   currentHp: number;
   maxHp: number;
   activeEffects?: ActiveEffectsMap;
+  physicalProtection?: number;
+  magicalProtection?: number;
 }
 
 /**
@@ -308,16 +310,18 @@ export function applyConditionToUnit(
     hpChange: 0,
   };
 
-  // Se já tem a condição, não adiciona novamente
-  if (unit.conditions.includes(conditionId)) {
-    return result;
+  // Verificar se já tem a condição
+  const alreadyHasCondition = unit.conditions.includes(conditionId);
+
+  // Se NÃO tem a condição, adicionar
+  if (!alreadyHasCondition) {
+    unit.conditions.push(conditionId);
+    result.wasAdded = true;
   }
 
-  // Adicionar condição
-  unit.conditions.push(conditionId);
-  result.wasAdded = true;
-
   // Buscar definição da condição para aplicar efeitos imediatos
+  // NOTA: Efeitos imediatos são SEMPRE reaplicados, mesmo se já tinha a condição!
+  // Ex: Duas Disparadas em um turno = 2x movimento extra
   const condDef = CONDITIONS[conditionId];
   if (!condDef?.effects) {
     return result;
@@ -326,6 +330,7 @@ export function applyConditionToUnit(
   const effects = condDef.effects;
 
   // === EFEITOS IMEDIATOS DE MOVIMENTO ===
+  // Sempre aplica, mesmo se já tinha a condição (stackable)
   if (effects.immediateMovementBonus !== undefined) {
     if (effects.immediateMovementBonus === "speed") {
       result.movementChange = Math.max(1, unit.speed);
@@ -336,6 +341,7 @@ export function applyConditionToUnit(
   }
 
   // === EFEITOS IMEDIATOS DE AÇÕES ===
+  // Sempre aplica, mesmo se já tinha a condição (stackable)
   if (effects.actionsMod !== undefined && effects.actionsMod !== 0) {
     // actionsMod é aplicado imediatamente para condições como "EXTRA_ACTION"
     result.actionsChange = effects.actionsMod;
@@ -352,7 +358,10 @@ export function applyConditionToUnit(
   }
 
   // === ATUALIZAR ACTIVE EFFECTS (fonte da verdade) ===
-  unit.activeEffects = calculateActiveEffects(unit.conditions);
+  unit.activeEffects = calculateActiveEffects(unit.conditions, {
+    physicalProtection: unit.physicalProtection,
+    magicalProtection: unit.magicalProtection,
+  });
 
   return result;
 }
@@ -390,7 +399,10 @@ export function removeConditionFromUnit(
   unit.conditions.splice(index, 1);
 
   // Atualizar activeEffects (fonte da verdade)
-  unit.activeEffects = calculateActiveEffects(unit.conditions);
+  unit.activeEffects = calculateActiveEffects(unit.conditions, {
+    physicalProtection: unit.physicalProtection,
+    magicalProtection: unit.magicalProtection,
+  });
 
   return true;
 }
@@ -411,7 +423,10 @@ export function removeConditionsFromUnit(
 
   if (removedCount > 0) {
     // Atualizar activeEffects (fonte da verdade)
-    unit.activeEffects = calculateActiveEffects(unit.conditions);
+    unit.activeEffects = calculateActiveEffects(unit.conditions, {
+      physicalProtection: unit.physicalProtection,
+      magicalProtection: unit.magicalProtection,
+    });
   }
 
   return removedCount;
@@ -423,7 +438,10 @@ export function removeConditionsFromUnit(
  * @param unit Unidade para sincronizar
  */
 export function syncUnitActiveEffects(unit: UnitForCondition): void {
-  unit.activeEffects = calculateActiveEffects(unit.conditions);
+  unit.activeEffects = calculateActiveEffects(unit.conditions, {
+    physicalProtection: unit.physicalProtection,
+    magicalProtection: unit.magicalProtection,
+  });
 }
 
 // =============================================================================
@@ -655,11 +673,33 @@ export function getMinAttackSuccesses(conditions: string[]): number {
 // =============================================================================
 
 /**
+ * Contexto opcional para cálculo de efeitos condicionais
+ */
+export interface CalculateEffectsContext {
+  /** Se a unidade ainda tem proteção física > 0 */
+  physicalProtection?: number;
+  /** Se a unidade ainda tem proteção mágica > 0 */
+  magicalProtection?: number;
+}
+
+/**
  * Calcula todos os efeitos ativos agregados das condições de uma unidade
  * Retorna um mapa de efeitos com valores somados/combinados e fontes
+ * @param conditions Lista de IDs de condições ativas
+ * @param context Contexto opcional para avaliação de efeitos condicionais (ex: proteção para RECKLESS_ATTACK)
  */
-export function calculateActiveEffects(conditions: string[]): ActiveEffectsMap {
+export function calculateActiveEffects(
+  conditions: string[],
+  context?: CalculateEffectsContext
+): ActiveEffectsMap {
   const result: ActiveEffectsMap = {};
+
+  // Determina se a unidade tem proteção (para efeitos condicionais como RECKLESS_ATTACK)
+  const hasProtection =
+    context !== undefined
+      ? (context.physicalProtection ?? 0) > 0 ||
+        (context.magicalProtection ?? 0) > 0
+      : undefined;
 
   for (const conditionId of conditions) {
     const condition = getCondition(conditionId);
@@ -673,6 +713,17 @@ export function calculateActiveEffects(conditions: string[]): ActiveEffectsMap {
 
       // Pular arrays e outros tipos complexos (bonusActionSkills, immuneToConditions, etc.)
       if (Array.isArray(effectValue)) continue;
+
+      // === LÓGICA CONDICIONAL PARA EFEITOS ESPECÍFICOS ===
+
+      // RECKLESS_ATTACK: extraAttacks só conta se NÃO tiver proteção
+      if (conditionId === "RECKLESS_ATTACK" && key === "extraAttacks") {
+        // Se temos contexto e a unidade TEM proteção, pula esse efeito
+        if (hasProtection !== undefined && hasProtection) {
+          continue;
+        }
+        // Se não temos contexto, assumimos que não tem proteção (comportamento legado)
+      }
 
       // Inicializar o efeito se não existir
       if (!result[key]) {
@@ -717,8 +768,16 @@ export function calculateActiveEffects(conditions: string[]): ActiveEffectsMap {
  * Modifica a unidade in-place e retorna ela para conveniência
  */
 export function updateUnitActiveEffects<
-  T extends { conditions: string[]; activeEffects?: ActiveEffectsMap }
+  T extends {
+    conditions: string[];
+    activeEffects?: ActiveEffectsMap;
+    physicalProtection?: number;
+    magicalProtection?: number;
+  }
 >(unit: T): T {
-  unit.activeEffects = calculateActiveEffects(unit.conditions);
+  unit.activeEffects = calculateActiveEffects(unit.conditions, {
+    physicalProtection: unit.physicalProtection,
+    magicalProtection: unit.magicalProtection,
+  });
   return unit;
 }

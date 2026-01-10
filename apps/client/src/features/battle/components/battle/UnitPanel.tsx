@@ -353,7 +353,7 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
       )}
 
       {/* Panel de informações da unidade */}
-      <div className="w-full flex items-stretch bg-surface-900/95 backdrop-blur-sm border-t-2 border-stellar-amber/30 shadow-cosmic min-h-[56px]">
+      <div className="flex items-stretch justify-center bg-surface-900/95 backdrop-blur-sm border-t-2 border-stellar-amber/30 shadow-cosmic min-h-[56px]">
         {/* FAIXA: Avatar e Identificação */}
         <PanelStrip>
           <div className="flex items-center gap-2">
@@ -495,10 +495,7 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
           />
         )}
 
-        {/* Spacer */}
-        <div className="flex-1 min-w-0" />
-
-        {/* Mensagem de visualização */}
+        {/* Mensagem de visualização (quando está visualizando outra unidade) */}
         {isMyTurn &&
           selectedUnit &&
           isPlayerControllable(selectedUnit, currentUserId) &&
