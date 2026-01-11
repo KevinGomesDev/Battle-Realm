@@ -5,11 +5,9 @@
 import type { BattleUnit } from "../types/battle.types";
 import {
   type AbilityDefinition,
+  type CoordinatePattern,
   resolveDynamicValue,
-  DEFAULT_RANGE_DISTANCE,
-  mapLegacyRange,
   isActive,
-  isSpell,
 } from "../types/ability.types";
 import {
   getManhattanDistance,
@@ -62,15 +60,12 @@ export type AbilityValidationErrorCode =
 
 /**
  * Verifica se uma unidade possui uma habilidade
- * Skills usam features[], Spells usam spells[]
+ * Todas as habilidades estão no array features[]
  */
 export function unitHasAbility(
   unit: BattleUnit,
   ability: AbilityDefinition
 ): boolean {
-  if (isSpell(ability)) {
-    return unit.spells?.includes(ability.code) ?? false;
-  }
   return unit.features.includes(ability.code);
 }
 
@@ -79,21 +74,81 @@ export function unitHasAbility(
 // =============================================================================
 
 /**
- * Calcula o alcance máximo de uma habilidade baseado no range e no caster
+ * Calcula o alcance máximo de uma habilidade baseado no targetingPattern
  * Suporta valores dinâmicos (números ou referências a atributos)
  */
 export function getAbilityMaxRange(
   ability: AbilityDefinition,
   caster: BattleUnit
 ): number {
-  // 1. Fonte de verdade: targetingPattern.maxRange
+  // Fonte de verdade: targetingPattern.maxRange
   if (ability.targetingPattern?.maxRange !== undefined) {
     return resolveDynamicValue(ability.targetingPattern.maxRange, caster);
   }
 
-  // 2. Fallback final: valor padrão baseado no tipo de range
-  const normalizedRange = mapLegacyRange(ability.range || "MELEE");
-  return DEFAULT_RANGE_DISTANCE[normalizedRange];
+  // CASTER origin sem maxRange = alcance 0 (SELF)
+  if (ability.targetingPattern?.origin === "CASTER") {
+    return 0;
+  }
+
+  return 0;
+}
+
+/**
+ * Infere o tipo de alvo a partir do targetingPattern
+ * SELF: origin CASTER sem coordenadas ou apenas (0,0)
+ * POSITION: origin TARGET ou DIRECTION
+ * UNIT: pattern com alvo único (SINGLE)
+ */
+export type InferredTargetType = "SELF" | "UNIT" | "POSITION";
+
+export function inferTargetType(
+  ability: AbilityDefinition
+): InferredTargetType {
+  const pattern = ability.targetingPattern;
+
+  if (!pattern) {
+    return "SELF";
+  }
+
+  // Origin CASTER com coordenadas apenas em (0,0) = SELF
+  if (pattern.origin === "CASTER") {
+    const hasOnlySelf =
+      pattern.coordinates.length === 0 ||
+      (pattern.coordinates.length === 1 &&
+        pattern.coordinates[0].x === 0 &&
+        pattern.coordinates[0].y === 0);
+    if (hasOnlySelf) {
+      return "SELF";
+    }
+    // CASTER com área = ainda SELF (afeta área ao redor do caster)
+    return "SELF";
+  }
+
+  // Origin TARGET ou DIRECTION = precisa selecionar posição
+  // Se maxRange === 0 ou undefined, é SELF
+  if (!pattern.maxRange || pattern.maxRange === 0) {
+    return "SELF";
+  }
+
+  // Pattern SINGLE (1 coordenada em 0,0) = alvo único (UNIT)
+  if (
+    pattern.coordinates.length === 1 &&
+    pattern.coordinates[0].x === 0 &&
+    pattern.coordinates[0].y === 0
+  ) {
+    return "UNIT";
+  }
+
+  // Patterns com múltiplas coordenadas = POSITION (área)
+  return "POSITION";
+}
+
+/**
+ * Verifica se ability é SELF (não precisa de alvo)
+ */
+export function isSelfAbility(ability: AbilityDefinition): boolean {
+  return inferTargetType(ability) === "SELF";
 }
 
 // =============================================================================
@@ -158,8 +213,8 @@ export function validateAbilityUse(
     };
   }
 
-  // Verificar mana para spells
-  if (checkMana && isSpell(ability) && ability.manaCost) {
+  // Verificar mana
+  if (checkMana && ability.manaCost) {
     const currentMana = caster.currentMana ?? 0;
     if (currentMana < ability.manaCost) {
       return {
@@ -210,9 +265,9 @@ export function validateAbilityRange(
 ): AbilityValidationResult {
   // Calcular alcance máximo dinamicamente
   const maxRange = getAbilityMaxRange(ability, caster);
-  const normalizedRange = mapLegacyRange(ability.range || "MELEE");
+  const targetType = inferTargetType(ability);
 
-  if (normalizedRange === "SELF") {
+  if (targetType === "SELF") {
     // Habilidades SELF não precisam de alvo ou o alvo é o próprio caster
     if (target && "id" in target && target.id !== caster.id) {
       return {
@@ -224,10 +279,10 @@ export function validateAbilityRange(
     return { valid: true };
   }
 
-  // Para outros ranges, pode precisar de alvo
+  // Para outros tipos, pode precisar de alvo
   if (!target) {
-    // Skills UNIT permitem self-cast implícito
-    if (ability.targetType === "UNIT" || ability.targetType === "SELF") {
+    // UNIT permite self-cast implícito
+    if (targetType === "UNIT") {
       return { valid: true };
     }
     return {
@@ -287,19 +342,18 @@ export function validateAbilityTargetType(
   ability: AbilityDefinition,
   target: BattleUnit | { x: number; y: number } | null
 ): AbilityValidationResult {
+  const targetType = inferTargetType(ability);
+
   // SELF - válido sem alvo ou com self
-  if (ability.targetType === "SELF") {
+  if (targetType === "SELF") {
     return { valid: true };
   }
 
-  // POSITION/GROUND - precisa ser uma posição
-  if (ability.targetType === "POSITION" || ability.targetType === "GROUND") {
+  // POSITION - precisa ser uma posição
+  if (targetType === "POSITION") {
     if (target && "id" in target) {
-      return {
-        valid: false,
-        error: "Esta habilidade requer uma posição como alvo",
-        errorCode: "INVALID_TARGET_TYPE",
-      };
+      // Aceitar unidade como posição (usa posição da unidade)
+      return { valid: true };
     }
     return { valid: true };
   }
@@ -369,8 +423,8 @@ export function canUseAbility(
     return { canUse: false, reason: "Sem ações" };
   }
 
-  // Verificar mana para spells
-  if (isSpell(ability) && ability.manaCost) {
+  // Verificar mana
+  if (ability.manaCost) {
     const currentMana = caster.currentMana ?? 0;
     if (currentMana < ability.manaCost) {
       return {
@@ -400,9 +454,11 @@ export function isValidAbilityTarget(
   ability: AbilityDefinition,
   potentialTarget: BattleUnit
 ): boolean {
+  const targetType = inferTargetType(ability);
+
   // Self-cast é sempre válido para habilidades UNIT e SELF
   if (
-    (ability.targetType === "UNIT" || ability.targetType === "SELF") &&
+    (targetType === "UNIT" || targetType === "SELF") &&
     potentialTarget.id === caster.id
   ) {
     return true;
@@ -432,8 +488,10 @@ export function getValidAbilityTargets(
   ability: AbilityDefinition,
   allUnits: BattleUnit[]
 ): BattleUnit[] {
-  // Habilidades de posição não retornam unidades
-  if (ability.targetType === "POSITION" || ability.targetType === "GROUND") {
+  const targetType = inferTargetType(ability);
+
+  // Habilidades de posição não retornam unidades (usam área)
+  if (targetType === "POSITION") {
     return [];
   }
 
@@ -451,8 +509,10 @@ export function isValidAbilityPosition(
   gridWidth: number,
   gridHeight: number
 ): boolean {
-  // Verificar se habilidade aceita posição
-  if (ability.targetType !== "POSITION" && ability.targetType !== "GROUND") {
+  const targetType = inferTargetType(ability);
+
+  // Verificar se habilidade aceita posição (POSITION ou UNIT)
+  if (targetType === "SELF") {
     return false;
   }
 
@@ -503,36 +563,3 @@ export function isValidAbilityPosition(
 
   return true;
 }
-
-// =============================================================================
-// ALIASES PARA COMPATIBILIDADE (DEPRECADOS)
-// =============================================================================
-
-/** @deprecated Use validateAbilityUse */
-export const validateSkillUse = validateAbilityUse;
-/** @deprecated Use validateAbilityUse */
-export const validateSpellUse = validateAbilityUse;
-/** @deprecated Use canUseAbility */
-export const canUseSkill = canUseAbility;
-/** @deprecated Use canUseAbility */
-export const canUseSpell = (
-  caster: BattleUnit,
-  ability: AbilityDefinition,
-  options?: { checkActions?: boolean; checkCooldown?: boolean }
-): boolean => canUseAbility(caster, ability, options).canUse;
-/** @deprecated Use isValidAbilityTarget */
-export const isValidSkillTarget = isValidAbilityTarget;
-/** @deprecated Use isValidAbilityTarget */
-export const isValidSpellTarget = isValidAbilityTarget;
-/** @deprecated Use getValidAbilityTargets */
-export const getValidSkillTargets = getValidAbilityTargets;
-/** @deprecated Use getValidAbilityTargets */
-export const getValidSpellTargets = getValidAbilityTargets;
-/** @deprecated Use getAbilityMaxRange */
-export const getSkillMaxRange = getAbilityMaxRange;
-/** @deprecated Use getAbilityMaxRange */
-export const getSpellMaxRange = getAbilityMaxRange;
-/** @deprecated Use isValidAbilityPosition */
-export const isValidSkillPosition = isValidAbilityPosition;
-/** @deprecated Use isValidAbilityPosition */
-export const isValidSpellPosition = isValidAbilityPosition;

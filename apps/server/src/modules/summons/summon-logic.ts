@@ -303,9 +303,6 @@ export function createEidolon(
   };
 
   // Log de criação
-  console.log(
-    `[EIDOLON] 🎭 Criado com bônus +${killBonus}, stats totais: ${totalStats}, tamanho: ${initialSize}`
-  );
 
   // Inicializar estado se não existir
   if (!state) {
@@ -444,14 +441,7 @@ export function processUnitDeathForEidolon(
   killer.size = newSize;
 
   if (oldSize !== newSize) {
-    console.log(
-      `[EIDOLON] 📈 Eidolon cresceu de ${oldSize} para ${newSize}! Total stats: ${totalStats}`
-    );
   }
-
-  console.log(
-    `[EIDOLON] 📈 Eidolon ganhou +1 em todos stats! Bônus total: +${newBonus}`
-  );
 
   return { eidolonGrew: true, newBonus, newSize };
 }
@@ -483,10 +473,6 @@ export function processEidolonDeath(
 
   // Resetar tamanho para NORMAL (será aplicado quando reinvocar)
   eidolon.size = "NORMAL";
-
-  console.log(
-    `[EIDOLON] 💀 Eidolon morreu! Perdeu ${lostBonus} de bônus acumulado e voltou de ${lostSize} para NORMAL`
-  );
 }
 
 // =============================================================================
@@ -512,7 +498,6 @@ export function processEidolonSummonsOnBattleStart(
   );
 
   for (const summoner of summoners) {
-    console.log(`[EIDOLON] 👻 Invocando Eidolon para ${summoner.name}...`);
 
     // Criar lista de unidades incluindo as já invocadas
     const currentUnits = [...allUnits, ...summonedUnits];
@@ -528,9 +513,6 @@ export function processEidolonSummonsOnBattleStart(
 
     if (result.success && result.summon) {
       summonedUnits.push(result.summon);
-      console.log(
-        `[EIDOLON] ✅ Eidolon invocado em (${result.position?.x}, ${result.position?.y})`
-      );
     } else {
       console.warn(
         `[EIDOLON] ⚠️ Falha ao invocar Eidolon para ${summoner.name}: ${result.error}`
@@ -593,14 +575,9 @@ export function processSummonerDeath(
     return [];
   }
 
-  console.log(
-    `[SUMMON] 💀 Invocador ${deadUnit.name} morreu - matando ${summons.length} invocação(ões)`
-  );
-
   const killedSummons: BattleUnit[] = [];
 
   for (const summon of summons) {
-    console.log(`[SUMMON] ❌ Matando invocação: ${summon.name}`);
 
     // Marcar como morto
     summon.currentHp = 0;

@@ -13,7 +13,7 @@ export {
   isCommonAction,
   getCommonActions,
   getCommonActionCodes,
-  getSkillInfo,
+  getAbilityInfo,
 } from "@boundless/shared/data/abilities.data";
 
 // Importar cores centralizadas
@@ -25,19 +25,18 @@ import {
 
 import {
   COMMON_ACTIONS,
-  getSkillInfo,
+  getAbilityInfo,
 } from "@boundless/shared/data/abilities.data";
 
 /**
- * Informações sobre ações disponíveis (formato legado para compatibilidade)
- * @deprecated Use getSkillInfo() do shared/data/skills.data
+ * Informações sobre ações disponíveis
  */
 export const ACTIONS_INFO: Record<
   string,
   { icon: string; name: string; description: string }
 > = Object.fromEntries(
   COMMON_ACTIONS.map((action) => {
-    const info = getSkillInfo(action.code);
+    const info = getAbilityInfo(action.code);
     return [
       action.code,
       {

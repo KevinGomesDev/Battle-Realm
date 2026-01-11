@@ -3,6 +3,7 @@ import React, { useState, useRef, useCallback, useMemo } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip } from "@/components/Tooltip";
+import { useBattleStore } from "@/stores/battleStore";
 import {
   getAbilityInfo,
   findAbilityByCode,
@@ -24,8 +25,9 @@ interface HotBarProps {
   canAct: boolean;
   pendingAbilityCode: string | null;
   onSelectAbility: (abilityCode: string) => void;
-  onExecuteAbility: (abilityCode: string, unitId: string) => void;
   onUpdateHotbar: (hotbar: UnitHotbarConfig) => void;
+  /** Callback quando o mouse passa sobre uma ability (para mostrar zona de dash) */
+  onAbilityHover?: (abilityCode: string | null) => void;
 }
 
 interface HotBarSlotProps {
@@ -40,6 +42,8 @@ interface HotBarSlotProps {
   onDragEnd: () => void;
   onDrop: (targetIndex: number, isSecondary: boolean) => void;
   dragState: DragState | null;
+  /** Callback quando o mouse passa sobre a ability */
+  onAbilityHover?: (abilityCode: string | null) => void;
 }
 
 interface DragState {
@@ -63,6 +67,7 @@ const HotBarSlot: React.FC<HotBarSlotProps> = ({
   onDragEnd,
   onDrop,
   dragState,
+  onAbilityHover,
 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -105,9 +110,9 @@ const HotBarSlot: React.FC<HotBarSlotProps> = ({
       return { canExecute: false, disabledReason: "Sem ações" };
     }
 
-    // Verificar mana para spells
-    if (abilityDef.category === "SPELL") {
-      const manaCost = abilityDef.manaCost ?? 0;
+    // Verificar mana
+    if (abilityDef.manaCost) {
+      const manaCost = abilityDef.manaCost;
       if ((unit.currentMana ?? 0) < manaCost) {
         return { canExecute: false, disabledReason: `Mana: ${manaCost}` };
       }
@@ -153,8 +158,7 @@ const HotBarSlot: React.FC<HotBarSlotProps> = ({
   // Cores baseadas no tipo de ability
   const getSlotColor = () => {
     if (!abilityDef) return { main: "#4b5563", hover: "#6b7280" }; // gray
-    if (abilityDef.category === "SPELL")
-      return { main: "#3b82f6", hover: "#60a5fa" }; // blue
+    if (abilityDef.manaCost) return { main: "#3b82f6", hover: "#60a5fa" }; // blue (mana-based)
     if (abilityDef.commonAction) return { main: "#f59e0b", hover: "#fbbf24" }; // amber
     return { main: "#a855f7", hover: "#c084fc" }; // purple
   };
@@ -176,8 +180,16 @@ const HotBarSlot: React.FC<HotBarSlotProps> = ({
           onActivate();
         }
       }}
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
+      onMouseEnter={() => {
+        setShowTooltip(true);
+        if (abilityCode) {
+          onAbilityHover?.(abilityCode);
+        }
+      }}
+      onMouseLeave={() => {
+        setShowTooltip(false);
+        onAbilityHover?.(null);
+      }}
       disabled={!canAct || !canExecute}
       className={`
         relative w-10 h-10 rounded-lg border-2 flex flex-col items-center justify-center
@@ -274,11 +286,14 @@ export const HotBar: React.FC<HotBarProps> = ({
   canAct,
   pendingAbilityCode,
   onSelectAbility,
-  onExecuteAbility,
   onUpdateHotbar,
+  onAbilityHover,
 }) => {
   const [showSecondary, setShowSecondary] = useState(false);
   const [dragState, setDragState] = useState<DragState | null>(null);
+
+  // PONTO ÚNICO: Acessa executeAbility diretamente do store
+  const executeAbility = useBattleStore((state) => state.executeAbility);
 
   // Inicializar hotbar se não existir
   const hotbar = useMemo(() => {
@@ -381,21 +396,21 @@ export const HotBar: React.FC<HotBarProps> = ({
         return;
       }
 
-      // Verificar mana para spells
-      if (abilityDef.category === "SPELL") {
-        const manaCost = abilityDef.manaCost ?? 0;
+      // Verificar mana
+      if (abilityDef.manaCost) {
+        const manaCost = abilityDef.manaCost;
         if ((unit.currentMana ?? 0) < manaCost) return;
       }
 
       if (abilityDef.targetType === "SELF" || !abilityDef.targetType) {
-        // Executa imediatamente
-        onExecuteAbility(abilityCode, unit.id);
+        // Executa imediatamente - PONTO ÚNICO de envio para servidor
+        executeAbility(unit.id, abilityCode);
       } else {
         // Precisa de alvo
         onSelectAbility(abilityCode);
       }
     },
-    [unit, onSelectAbility, onExecuteAbility]
+    [unit, onSelectAbility, executeAbility]
   );
 
   // Atalhos de teclado para barra primária (1-9)
@@ -461,6 +476,7 @@ export const HotBar: React.FC<HotBarProps> = ({
                 onDragEnd={handleDragEnd}
                 onDrop={handleDrop}
                 dragState={dragState}
+                onAbilityHover={onAbilityHover}
               />
             ))}
           </motion.div>
@@ -483,6 +499,7 @@ export const HotBar: React.FC<HotBarProps> = ({
             onDragEnd={handleDragEnd}
             onDrop={handleDrop}
             dragState={dragState}
+            onAbilityHover={onAbilityHover}
           />
         ))}
 

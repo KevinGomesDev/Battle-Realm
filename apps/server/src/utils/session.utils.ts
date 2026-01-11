@@ -74,30 +74,17 @@ export async function getUserActiveSession(
     const lobby = battleLobbiesRef?.get(lobbyId);
 
     if (lobby) {
-      console.log(
-        `[SESSION] Usuário ${userId} encontrado no lobby ${lobbyId}, status: ${lobby.status}`
-      );
 
       // Se o lobby está encerrado, não é uma sessão ativa
       if (lobby.status === "ENDED") {
-        console.log(
-          `[SESSION] Lobby ${lobbyId} está ENDED, limpando referência do usuário`
-        );
         userToLobbyRef.delete(userId);
         // Continuar para retornar sessão vazia (não fazer return aqui)
       } else if (lobby.status === "BATTLING") {
         // Encontrar a batalha associada
         const battlesCount = BattleSessionsRef?.size ?? 0;
-        console.log(
-          `[SESSION] Procurando batalha para lobby ${lobbyId} entre ${battlesCount} batalhas`
-        );
 
         for (const [battleId, battle] of BattleSessionsRef?.entries() ?? []) {
-          console.log(
-            `[SESSION] Verificando batalha ${battleId}: lobbyId=${battle.lobbyId}, status=${battle.status}`
-          );
           if (battle.lobbyId === lobbyId && battle.status === "ACTIVE") {
-            console.log(`[SESSION] ✅ Batalha encontrada: ${battleId}`);
             return {
               type: "BATTLE_SESSION",
               sessionId: battleId,
@@ -112,9 +99,6 @@ export async function getUserActiveSession(
         console.warn(
           `[SESSION] ⚠️ Lobby ${lobbyId} está BATTLING mas nenhuma batalha ativa foi encontrada!`
         );
-        console.log(
-          `[SESSION] 🧹 Limpando lobby órfão ${lobbyId} e referências de usuários...`
-        );
 
         // Limpar referências de usuários para este lobby
         for (const player of lobby.players) {
@@ -123,10 +107,6 @@ export async function getUserActiveSession(
 
         // Deletar o lobby órfão
         battleLobbiesRef?.delete(lobbyId);
-
-        console.log(
-          `[SESSION] ✅ Lobby órfão ${lobbyId} foi limpo com sucesso`
-        );
 
         // Retornar sessão vazia - usuário está livre
         return {

@@ -19,7 +19,7 @@ import {
   makeDefensiveDecision,
 } from "../behaviors";
 
-import { getUnitSpells } from "./ability-evaluator";
+import { getUnitAbilities } from "./ability-evaluator";
 
 import {
   assessSelf,
@@ -84,11 +84,11 @@ export function makeDecision(
     "assessSelf"
   );
 
-  // Obter spells disponíveis da unidade
+  // Obter abilities disponíveis da unidade
   const availableSpells = safeExecute(
-    () => getUnitSpells(unit),
+    () => getUnitAbilities(unit),
     [],
-    `getUnitSpells-${unit.name}`
+    `getUnitAbilities-${unit.name}`
   );
 
   // Contexto enriquecido com self-assessment e spells

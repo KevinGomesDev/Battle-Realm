@@ -9,6 +9,8 @@ import {
   validateAbilityUse,
   getValidAbilityTargets,
   isValidAbilityTarget,
+  inferTargetType,
+  isSelfAbility,
 } from "@boundless/shared/utils/ability-validation";
 import { getAbilityByCode } from "@boundless/shared/data/abilities.data";
 import { getChebyshevDistance } from "@boundless/shared/utils/distance.utils";
@@ -40,15 +42,20 @@ export function getAbilityEffectiveRange(
   ability: AbilityDefinition,
   caster?: BattleUnit
 ): number {
-  // Se não tiver caster, usar valores padrão baseados no tipo de range
+  // Se não tiver caster, usar maxRange do pattern
   if (!caster) {
-    const DEFAULT_RANGE_VALUES: Record<string, number> = {
-      SELF: 0,
-      MELEE: 1,
-      RANGED: 5,
-      AREA: 5,
-    };
-    return DEFAULT_RANGE_VALUES[ability.range || "MELEE"] || 1;
+    const pattern = ability.targetingPattern;
+    if (!pattern) return 1; // fallback melee
+
+    // SELF abilities têm range 0
+    if (pattern.origin === "CASTER") return 0;
+
+    // Resolver maxRange se for número
+    if (typeof pattern.maxRange === "number") {
+      return pattern.maxRange;
+    }
+
+    return 1; // fallback melee
   }
   return getAbilityMaxRange(ability, caster);
 }
@@ -127,8 +134,10 @@ function evaluateDamageAbility(
     return { score: 0, bestTarget: null, reason: "Sem inimigos" };
   }
 
+  const targetType = inferTargetType(ability);
+
   // Para abilities de área (POSITION target)
-  if (ability.targetType === "POSITION") {
+  if (targetType === "POSITION") {
     let bestPos: { x: number; y: number } | null = null;
     let bestScore = 0;
     let bestHitCount = 0;
@@ -257,7 +266,7 @@ function evaluateBuffAbility(
   ability: AbilityDefinition,
   allUnits: BattleUnit[]
 ): { score: number; bestTarget: BattleUnit | null; reason: string } {
-  if (ability.targetType === "SELF") {
+  if (isSelfAbility(ability)) {
     return {
       score: 35,
       bestTarget: caster,
@@ -343,9 +352,11 @@ export function evaluateAbility(
     };
   }
 
+  const targetType = inferTargetType(ability);
+
   // Obter alvos válidos
   const validTargets =
-    ability.targetType === "POSITION"
+    targetType === "POSITION"
       ? [] // Posições são avaliadas diferentemente
       : getValidTargetsForAbility(caster, ability, allUnits);
 
@@ -367,7 +378,7 @@ export function evaluateAbility(
     evaluation = evaluateHealAbility(caster, ability, allUnits);
   } else if (ability.effectType === "BUFF" || ability.conditionApplied) {
     // Se aplica condição benéfica, é buff (SELF, ou UNIT usado em aliados)
-    if (ability.targetType === "SELF") {
+    if (isSelfAbility(ability)) {
       evaluation = evaluateBuffAbility(caster, ability, allUnits);
     } else {
       evaluation = evaluateDebuffAbility(caster, ability, allUnits);
@@ -426,40 +437,3 @@ export function chooseBestAbility(
   const evaluations = evaluateAllAbilities(caster, allUnits, profile);
   return evaluations.length > 0 ? evaluations[0] : null;
 }
-
-// =============================================================================
-// ALIASES PARA COMPATIBILIDADE (deprecated)
-// =============================================================================
-
-/** @deprecated Use evaluateAbility */
-export const evaluateSkill = evaluateAbility;
-
-/** @deprecated Use evaluateAbility */
-export const evaluateSpell = evaluateAbility;
-
-/** @deprecated Use evaluateAllAbilities */
-export const evaluateAllSkills = evaluateAllAbilities;
-
-/** @deprecated Use evaluateAllAbilities */
-export const evaluateAllSpells = evaluateAllAbilities;
-
-/** @deprecated Use getAbilityEffectiveRange */
-export const getSkillEffectiveRange = getAbilityEffectiveRange;
-
-/** @deprecated Use canUseAbilityOnTarget */
-export const canUseSkillOnTarget = canUseAbilityOnTarget;
-
-/** @deprecated Use getValidTargetsForAbility */
-export const getValidTargetsForSkill = getValidTargetsForAbility;
-
-/** @deprecated Use getUnitAbilities */
-export const getUnitSpells = (unit: BattleUnit): AbilityDefinition[] => {
-  if (!unit.spells || unit.spells.length === 0) return [];
-  return unit.spells
-    .map((code) => getAbilityByCode(code))
-    .filter(
-      (r): r is { ability: AbilityDefinition; classCode?: string } =>
-        r !== undefined
-    )
-    .map((r) => r.ability);
-};

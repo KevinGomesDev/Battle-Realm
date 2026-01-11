@@ -168,10 +168,6 @@ export async function restoreFromDatabase(
     // Deletar do banco (já está na memória agora)
     await deleteBattle(battleId);
 
-    console.log(
-      `[BattleRoom] Restauração completa: ${persistedBattle.units.length} unidades, ${persistedBattle.obstacles.length} obstáculos`
-    );
-
     return true;
   } catch (error) {
     console.error(`[BattleRoom] Erro ao restaurar batalha:`, error);

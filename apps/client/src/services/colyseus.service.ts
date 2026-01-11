@@ -253,19 +253,16 @@ class ColyseusService {
   async connect(url: string = "ws://localhost:3000"): Promise<void> {
     // Se já está conectado e a conexão está ativa, não faz nada
     if (this.isConnected()) {
-      console.log("[Colyseus] Já conectado, reutilizando conexão");
       return;
     }
 
     // Se já há uma conexão em andamento, aguarda ela terminar
     if (this.connectionPromise) {
-      console.log("[Colyseus] Conexão em andamento, aguardando...");
       return this.connectionPromise;
     }
 
     // Se está conectando (flag), aguarda
     if (this.isConnecting) {
-      console.log("[Colyseus] Flag isConnecting ativa, aguardando...");
       // Aguarda até não estar mais conectando
       await new Promise<void>((resolve) => {
         const checkInterval = setInterval(() => {
@@ -302,12 +299,9 @@ class ColyseusService {
     const thisConnectionId = this.generateConnectionId();
     this.connectionId = thisConnectionId;
 
-    console.log(`[Colyseus] Iniciando conexão ${thisConnectionId}`);
-
     try {
       // Limpar conexões anteriores
       if (this.globalRoom) {
-        console.log("[Colyseus] Limpando room global anterior");
         try {
           await this.globalRoom.leave(false);
         } catch {
@@ -325,23 +319,15 @@ class ColyseusService {
 
       // Verificar se esta ainda é a conexão atual
       if (this.connectionId !== thisConnectionId) {
-        console.log(
-          `[Colyseus] Conexão ${thisConnectionId} foi substituída, saindo`
-        );
         await this.globalRoom.leave(false);
         return;
       }
-
-      console.log(
-        `[Colyseus] ✅ Conectado à room global: ${this.globalRoom.id} (${thisConnectionId})`
-      );
 
       this.setupGlobalRoomListeners();
 
       // Reautenticar automaticamente se houver token salvo
       const savedToken = localStorage.getItem("auth_token");
       if (savedToken) {
-        console.log("[Colyseus] 🔐 Reautenticando com token salvo...");
         this.globalRoom.send("auth:validate", { token: savedToken });
       }
 
@@ -362,9 +348,6 @@ class ColyseusService {
         this.reconnectAttempts < this.maxReconnectAttempts
       ) {
         this.reconnectAttempts++;
-        console.log(
-          `[Colyseus] Tentando reconectar (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`
-        );
         await new Promise((resolve) =>
           setTimeout(resolve, 2000 * this.reconnectAttempts)
         );
@@ -406,8 +389,6 @@ class ColyseusService {
     this.client = null;
     this.listeners.clear();
     this.reconnectAttempts = 0;
-
-    console.log("[Colyseus] Desconectado");
   }
 
   /**
@@ -438,8 +419,6 @@ class ColyseusService {
     this.lastPongTimestamp = Date.now();
     this.pendingPing = false;
 
-    console.log("[Colyseus] 💓 Heartbeat iniciado");
-
     this.heartbeatInterval = setInterval(() => {
       this.sendHeartbeat();
     }, this.heartbeatIntervalMs);
@@ -452,7 +431,6 @@ class ColyseusService {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
-      console.log("[Colyseus] 💔 Heartbeat parado");
     }
     this.pendingPing = false;
   }
@@ -530,7 +508,6 @@ class ColyseusService {
    * Força reconexão após perda de heartbeat
    */
   private async forceReconnect(): Promise<void> {
-    console.log("[Colyseus] 🔄 Forçando reconexão...");
 
     // Emitir evento de reconexão (para UI mostrar overlay)
     this.emit("reconnecting", { attempt: 1 });
@@ -558,15 +535,11 @@ class ColyseusService {
       attempts++;
       // Emite número de tentativa atualizado para o UI
       this.emit("reconnecting", { attempt: attempts });
-      console.log(
-        `[Colyseus] 🔄 Tentativa de reconexão ${attempts}/${maxAttempts}...`
-      );
 
       try {
         await this.connect();
 
         // Conexão bem sucedida - emitir evento de reconexão completa
-        console.log("[Colyseus] ✅ Reconectado com sucesso!");
         this.emit("reconnected", {});
         return;
       } catch (error) {
@@ -606,14 +579,12 @@ class ColyseusService {
           this.handlePong(message as { timestamp: number });
           return;
         }
-        console.log(`[Colyseus] 📩 Mensagem recebida: ${type}`, message);
         this.emit(`global:${type}`, message);
         this.emit(type as string, message);
       }
     );
 
     this.globalRoom.onLeave((code: number) => {
-      console.log(`[Colyseus] Saiu da room global (code: ${code})`);
       this.stopHeartbeat(); // Para heartbeat ao sair
       this.globalRoom = null; // Limpar referência
       this.emit("disconnected", { code });
@@ -623,9 +594,6 @@ class ColyseusService {
       // Outros códigos (1006 = abnormal closure, etc) são desconexões inesperadas
       const unexpectedCodes = [1006, 1011, 1012, 1013, 1014, 1015];
       if (unexpectedCodes.includes(code) || (code >= 1002 && code <= 1005)) {
-        console.log(
-          "[Colyseus] ⚠️ Desconexão inesperada detectada, tentando reconectar..."
-        );
         this.forceReconnect();
       }
     });
@@ -697,16 +665,12 @@ class ColyseusService {
       token,
     };
 
-    console.log(`[Colyseus] Criando battle com options:`, createOptions);
-
     this.BattleRoom = await this.client.create<BattleSessionState>(
       "battle",
       createOptions
     );
 
     this.setupBattleRoomListeners();
-
-    console.log(`[Colyseus] Battle Lobby criado: ${this.BattleRoom.id}`);
 
     return this.BattleRoom;
   }
@@ -718,7 +682,6 @@ class ColyseusService {
     battleId: string,
     kingdomId: string
   ): Promise<Room<BattleSessionState>> {
-    console.log(`[Colyseus] Restaurando batalha ${battleId} do banco`);
     return this.createBattleLobby({
       kingdomId,
       restoreBattleId: battleId,
@@ -736,12 +699,7 @@ class ColyseusService {
       throw new Error("Não conectado ao servidor");
     }
 
-    console.log(`[Colyseus] Tentando entrar na BattleRoom: ${roomId}`);
-
     if (this.BattleRoom) {
-      console.log(
-        `[Colyseus] Saindo da BattleRoom atual: ${this.BattleRoom.id}`
-      );
       await this.BattleRoom.leave();
       this.BattleRoom = null;
       // Pequena espera para garantir cleanup
@@ -751,24 +709,12 @@ class ColyseusService {
     const userData = localStorage.getItem("auth_user");
     const user = userData ? JSON.parse(userData) : null;
 
-    console.log(
-      `[Colyseus] joinById com userId: ${user?.id}, kingdomId: ${kingdomId}`
-    );
-
     this.BattleRoom = await this.client.joinById<BattleSessionState>(roomId, {
       userId: user?.id,
       kingdomId,
     });
 
-    console.log(`[Colyseus] BattleRoom.state após join:`, {
-      battleId: this.BattleRoom.state?.battleId,
-      status: this.BattleRoom.state?.status,
-      stateExists: !!this.BattleRoom.state,
-    });
-
     this.setupBattleRoomListeners();
-
-    console.log(`[Colyseus] Entrou no Battle Lobby: ${this.BattleRoom.id}`);
 
     return this.BattleRoom;
   }
@@ -780,7 +726,6 @@ class ColyseusService {
     if (this.BattleRoom) {
       await this.BattleRoom.leave();
       this.BattleRoom = null;
-      console.log("[Colyseus] Saiu da batalha");
     }
   }
 
@@ -788,29 +733,17 @@ class ColyseusService {
     if (!this.BattleRoom) return;
 
     this.BattleRoom.onStateChange((state: BattleSessionState) => {
-      console.log("[Colyseus] battle:state_changed disparado:", {
-        status: state.status,
-        battleId: state.battleId,
-        playersCount: state.players?.length,
-        round: state.round,
-        gridWidth: state.gridWidth,
-        stateKeys: Object.keys(state || {}),
-      });
       // Só emite se o estado tiver dados válidos (battleId preenchido)
       // Isso evita emitir estado vazio durante sincronização inicial
       if (state.battleId) {
         this.emit("battle:state_changed", state);
       } else {
-        console.log(
-          "[Colyseus] Ignorando state_changed - battleId vazio (sincronização inicial)"
-        );
       }
     });
 
     // Listener para mudanças em players (lobby)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (this.BattleRoom.state as any).players?.onAdd?.(() => {
-      console.log("[Colyseus] Player adicionado, re-emitindo estado");
       // Quando um player é adicionado, re-emitir o estado completo
       if (this.BattleRoom?.state) {
         this.emit("battle:state_changed", this.BattleRoom.state);
@@ -828,10 +761,6 @@ class ColyseusService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (this.BattleRoom.state as any).units?.onChange?.(
       (unit: BattleUnitState, key: string) => {
-        console.log(`[Colyseus] Unit changed: ${key}`, {
-          actionsLeft: unit.actionsLeft,
-          movesLeft: unit.movesLeft,
-        });
         this.emit("battle:unit_changed", { unit, id: key });
       }
     );
@@ -846,13 +775,11 @@ class ColyseusService {
     this.BattleRoom.onMessage(
       "*",
       (type: string | number | Schema, message: unknown) => {
-        console.log(`[Colyseus] BattleRoom mensagem recebida: ${type}`);
         this.emit(`battle:${type}`, message);
       }
     );
 
     this.BattleRoom.onLeave((code: number) => {
-      console.log(`[Colyseus] Saiu da battle (code: ${code})`);
       this.emit("battle:left", { code });
       this.BattleRoom = null;
     });
@@ -865,10 +792,6 @@ class ColyseusService {
     // Emitir estado atual imediatamente se já existir
     // Isso garante que estados já sincronizados sejam propagados
     if (this.BattleRoom.state) {
-      console.log(
-        "[Colyseus] Emitindo estado inicial:",
-        this.BattleRoom.state.status
-      );
       // Usar setTimeout para garantir que os listeners do battleStore já estejam registrados
       setTimeout(() => {
         if (this.BattleRoom?.state) {
@@ -888,9 +811,6 @@ class ColyseusService {
             return;
           }
           if (this.BattleRoom.state.status === "ACTIVE") {
-            console.log(
-              "[Colyseus] Estado ACTIVE detectado via polling, emitindo"
-            );
             this.emit("battle:state_changed", this.BattleRoom.state);
             clearInterval(pollInterval);
           }
@@ -964,8 +884,6 @@ class ColyseusService {
 
     this.setupMatchRoomListeners();
 
-    console.log(`[Colyseus] Match criado: ${this.matchRoom.id}`);
-
     return this.matchRoom;
   }
 
@@ -994,8 +912,6 @@ class ColyseusService {
 
     this.setupMatchRoomListeners();
 
-    console.log(`[Colyseus] Entrou no match: ${this.matchRoom.id}`);
-
     return this.matchRoom;
   }
 
@@ -1006,7 +922,6 @@ class ColyseusService {
     if (this.matchRoom) {
       await this.matchRoom.leave();
       this.matchRoom = null;
-      console.log("[Colyseus] Saiu do match");
     }
   }
 
@@ -1025,7 +940,6 @@ class ColyseusService {
     );
 
     this.matchRoom.onLeave((code: number) => {
-      console.log(`[Colyseus] Saiu do match (code: ${code})`);
       this.emit("match:left", { code });
       this.matchRoom = null;
     });
@@ -1079,11 +993,8 @@ class ColyseusService {
     if (!this.client) throw new Error("Client não conectado");
 
     if (this.arenaRoom) {
-      console.log("[Colyseus] Já está na arena");
       return this.arenaRoom;
     }
-
-    console.log("[Colyseus] 🏟️ Entrando na Arena...");
 
     this.arenaRoom = await this.client.joinOrCreate("arena", {
       userId,
@@ -1093,16 +1004,12 @@ class ColyseusService {
     // Configurar listeners de mensagens
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.arenaRoom.onMessage("*", (type: any, message: unknown) => {
-      console.log(`[Colyseus] 📩 Arena: ${type}`, message);
       this.emit(String(type), message);
     });
 
     this.arenaRoom.onLeave(() => {
-      console.log("[Colyseus] 🏟️ Saiu da Arena");
       this.arenaRoom = null;
     });
-
-    console.log("[Colyseus] ✅ Conectado à Arena");
     return this.arenaRoom;
   }
 
@@ -1124,7 +1031,6 @@ class ColyseusService {
       console.warn("[Colyseus] Arena não conectada");
       return;
     }
-    console.log(`[Colyseus] 📤 Arena: ${type}`, message);
     this.arenaRoom.send(type, message);
   }
 
@@ -1397,19 +1303,16 @@ class ColyseusService {
       };
 
       const successHandler = (responseData: T) => {
-        console.log(`[Colyseus] ✅ Recebido ${successEvent}:`, responseData);
         cleanup();
         resolve(responseData);
       };
 
       const errorHandler = (error: { message?: string; error?: string }) => {
-        console.log(`[Colyseus] ❌ Recebido ${errorEvent}:`, error);
         cleanup();
         reject(new Error(error.message || error.error || "Request failed"));
       };
 
       timeoutId = setTimeout(() => {
-        console.log(`[Colyseus] ⏰ Timeout esperando ${successEvent}`);
         cleanup();
         reject(new Error(`Timeout waiting for ${successEvent}`));
       }, timeout);
@@ -1417,8 +1320,6 @@ class ColyseusService {
       // IMPORTANTE: Registrar listeners ANTES de enviar a mensagem
       this.on(successEvent, successHandler);
       this.on(errorEvent, errorHandler);
-
-      console.log(`[Colyseus] 📤 Enviando ${emitEvent}:`, data);
 
       // Envia diretamente já que verificamos conexão acima
       if (this.globalRoom) {

@@ -49,7 +49,6 @@ import {
 } from "../utils/unit-control";
 import { useHotkey, useEnterKey } from "../../../hooks/useHotkey";
 import { useMovementController } from "../hooks/useMovementController";
-import { useQTE, QTEOverlay } from "../../qte";
 import {
   type PendingAbility,
   createPendingAbility,
@@ -156,7 +155,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     moveUnit,
     attackUnit,
     endAction,
-    executeAction,
+    executeAbility,
     surrender,
     requestRematch,
     dismissBattleResult,
@@ -191,29 +190,11 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
   const lastRoundRef = useRef<number | null>(null); // Rastreia a última rodada para detectar mudança
   // Ref para movimento pendente após disparada automática
   const pendingDashMoveRef = useRef<{ x: number; y: number } | null>(null);
-
-  // Hook do QTE (Quick Time Event)
-  const {
-    state: qteState,
-    isLocalResponder: isQTEResponder,
-    respondToQTE,
-    isQTEVisualActive,
-  } = useQTE({
-    battleId,
-    localPlayerId: user?.id ?? null,
-  });
-
-  // Encontrar nomes das unidades do QTE
-  const qteAttackerUnit = useMemo(() => {
-    if (!qteState.activeQTE?.attackerId) return null;
-    return units.find((u) => u.id === qteState.activeQTE?.attackerId) ?? null;
-  }, [qteState.activeQTE?.attackerId, units]);
-
-  const qteResponderUnit = useMemo(() => {
-    if (!qteState.activeQTE?.responderId) return null;
-    // O responder pode ser o defensor (targetId diferente do attackerId)
-    return units.find((u) => u.id === qteState.activeQTE?.targetId) ?? null;
-  }, [qteState.activeQTE?.responderId, qteState.activeQTE?.targetId, units]);
+  // Ref para manter units atualizado nos handlers de eventos Colyseus
+  const unitsRef = useRef<BattleUnit[]>(units);
+  useEffect(() => {
+    unitsRef.current = units;
+  }, [units]);
 
   // === CÉLULAS VISÍVEIS - Fog of War ===
   // Calcula quais células são visíveis baseado no visionRange das unidades aliadas
@@ -330,9 +311,11 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       damage?: number;
       targetDefeated?: boolean;
     }) => {
-      const attackerUnit = units.find((u) => u.id === data.attackerUnitId);
+      const attackerUnit = unitsRef.current.find(
+        (u) => u.id === data.attackerUnitId
+      );
       const targetUnit = data.targetUnitId
-        ? units.find((u) => u.id === data.targetUnitId)
+        ? unitsRef.current.find((u) => u.id === data.targetUnitId)
         : null;
 
       // Centralizar câmera no alvo se estiver na visão do jogador
@@ -427,7 +410,9 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       isAreaAbility?: boolean;
       affectedCells?: Array<{ x: number; y: number }>;
     }) => {
-      const casterUnit = units.find((u) => u.id === data.casterUnitId);
+      const casterUnit = unitsRef.current.find(
+        (u) => u.id === data.casterUnitId
+      );
       // Usar impactPoint se disponível, senão targetPosition
       const targetPos = data.impactPoint ?? data.targetPosition;
 
@@ -440,39 +425,6 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
 
         canvasRef.current.fireProjectile({
           abilityCode: data.skillCode,
-          startX: casterUnit.posX,
-          startY: casterUnit.posY,
-          endX: targetPos.x,
-          endY: targetPos.y,
-          casterId: casterUnit.id,
-          isAreaProjectile: data.isAreaAbility,
-          explosionSize,
-        });
-      }
-    };
-
-    // Handler para spell cast - dispara projétil até posição alvo
-    const handleSpellCast = (data: {
-      casterUnitId: string;
-      targetPosition?: { x: number; y: number };
-      impactPoint?: { x: number; y: number };
-      spellCode: string;
-      isAreaAbility?: boolean;
-      affectedCells?: Array<{ x: number; y: number }>;
-    }) => {
-      const casterUnit = units.find((u) => u.id === data.casterUnitId);
-      // Usar impactPoint se disponível, senão targetPosition
-      const targetPos = data.impactPoint ?? data.targetPosition;
-
-      // Disparar projétil se houver caster e posição alvo
-      if (casterUnit && targetPos && canvasRef.current) {
-        // Calcular tamanho da explosão baseado nas células afetadas
-        const explosionSize = data.affectedCells?.length
-          ? Math.ceil(Math.sqrt(data.affectedCells.length))
-          : undefined;
-
-        canvasRef.current.fireProjectile({
-          abilityCode: data.spellCode,
           startX: casterUnit.posX,
           startY: casterUnit.posY,
           endX: targetPos.x,
@@ -508,24 +460,18 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       }
     };
 
-    // Handler para projétil lançado (antes do QTE resolver)
-    // Isso permite que a animação do projétil rode enquanto o QTE está ativo
+    // Handler para projétil lançado - dispara animação visual
     const handleProjectileLaunched = (data: {
       casterUnitId: string;
       skillCode: string;
       targetPosition?: { x: number; y: number };
       impactPoint?: { x: number; y: number };
       targetId?: string;
-      requiresQTE?: boolean;
     }) => {
-      const casterUnit = units.find((u) => u.id === data.casterUnitId);
+      const casterUnit = unitsRef.current.find(
+        (u) => u.id === data.casterUnitId
+      );
       const targetPos = data.impactPoint ?? data.targetPosition;
-
-      console.log(`[BattleView] 🚀 Projétil lançado: ${data.skillCode}`, {
-        casterUnit: casterUnit?.name,
-        targetPos,
-        requiresQTE: data.requiresQTE,
-      });
 
       if (casterUnit && targetPos && canvasRef.current) {
         canvasRef.current.fireProjectile({
@@ -536,32 +482,110 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           endY: targetPos.y,
           casterId: casterUnit.id,
           targetId: data.targetId,
-          isAreaProjectile: true, // Projéteis com QTE são de área
+          isAreaProjectile: true,
         });
       }
+    };
+
+    // === NOVO SISTEMA DE PROJÉTEIS ===
+    // Handlers para eventos do ProjectileHandler do servidor
+    const handleProjectileStart = (data: {
+      projectileId: string;
+      abilityId: string;
+      casterId: string;
+      origin: { x: number; y: number };
+      destination: { x: number; y: number };
+      path: Array<{ x: number; y: number }>;
+    }) => {
+      console.log("[BattleView] 🚀 projectile:start recebido", data);
+      if (canvasRef.current) {
+        canvasRef.current.fireProjectile({
+          abilityCode: data.abilityId,
+          startX: data.origin.x,
+          startY: data.origin.y,
+          endX: data.destination.x,
+          endY: data.destination.y,
+          casterId: data.casterId,
+          isAreaProjectile: true,
+        });
+      }
+    };
+
+    const handleProjectileIntercept = (data: {
+      projectileId: string;
+      unitId: string;
+      unitName: string;
+      position: { x: number; y: number };
+    }) => {
+      console.log("[BattleView] ⚡ projectile:intercept recebido", data);
+      // Interceptação de projétil - unidade será atingida
+    };
+
+    const handleProjectileDodge = (data: {
+      projectileId: string;
+      unitId: string;
+      dodged: boolean;
+      newPosition?: { x: number; y: number };
+    }) => {
+      console.log("[BattleView] 🏃 projectile:dodge recebido", data);
+      // Animação de esquiva pode ser adicionada aqui
+    };
+
+    const handleProjectileImpact = (data: {
+      projectileId: string;
+      position: { x: number; y: number };
+      affectedUnits: string[];
+    }) => {
+      console.log("[BattleView] 💥 projectile:impact recebido", data);
+      // Animação de explosão será tratada pelo sistema de projéteis do canvas
+    };
+
+    const handleProjectileFinish = (data: {
+      projectileId: string;
+      reason: string;
+      finalPosition: { x: number; y: number };
+    }) => {
+      console.log("[BattleView] ✅ projectile:finish recebido", data);
     };
 
     colyseusService.on("battle:unit_attacked", handleUnitAttacked);
     colyseusService.on("battle:unit_moved", handleUnitMoved);
     colyseusService.on("battle:skill_used", handleSkillUsed);
-    colyseusService.on("battle:spell_cast", handleSpellCast);
     colyseusService.on("battle:error", handleBattleError);
     colyseusService.on("battle:unit_dodged", handleUnitDodged);
     colyseusService.on("battle:projectile_launched", handleProjectileLaunched);
+    // Novos eventos de projétil
+    colyseusService.on("battle:projectile:start", handleProjectileStart);
+    colyseusService.on(
+      "battle:projectile:intercept",
+      handleProjectileIntercept
+    );
+    colyseusService.on("battle:projectile:dodge", handleProjectileDodge);
+    colyseusService.on("battle:projectile:impact", handleProjectileImpact);
+    colyseusService.on("battle:projectile:finish", handleProjectileFinish);
 
     return () => {
       colyseusService.off("battle:unit_attacked", handleUnitAttacked);
       colyseusService.off("battle:unit_moved", handleUnitMoved);
       colyseusService.off("battle:skill_used", handleSkillUsed);
-      colyseusService.off("battle:spell_cast", handleSpellCast);
       colyseusService.off("battle:error", handleBattleError);
       colyseusService.off("battle:unit_dodged", handleUnitDodged);
       colyseusService.off(
         "battle:projectile_launched",
         handleProjectileLaunched
       );
+      // Novos eventos de projétil
+      colyseusService.off("battle:projectile:start", handleProjectileStart);
+      colyseusService.off(
+        "battle:projectile:intercept",
+        handleProjectileIntercept
+      );
+      colyseusService.off("battle:projectile:dodge", handleProjectileDodge);
+      colyseusService.off("battle:projectile:impact", handleProjectileImpact);
+      colyseusService.off("battle:projectile:finish", handleProjectileFinish);
     };
-  }, [units, user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]); // unitsRef usado para evitar stale closures
 
   // Handler para ESC - abrir menu de pausa
   useHotkey(
@@ -857,10 +881,18 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       ? resolveDynamicValue(pattern.maxRange, selectedUnit)
       : undefined;
 
+    // Verificar se é SELF (origin CASTER sem coords ou apenas 0,0)
+    const isSelf =
+      pattern.origin === "CASTER" &&
+      (pattern.coordinates.length === 0 ||
+        (pattern.coordinates.length === 1 &&
+          pattern.coordinates[0].x === 0 &&
+          pattern.coordinates[0].y === 0));
+
     return {
       size,
       color: ability.color || "#4ade80",
-      centerOnSelf: ability.range === "SELF",
+      centerOnSelf: isSelf,
       maxRange,
       casterPos,
     };
@@ -910,7 +942,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     selectedUnit,
     isMyTurn,
     currentUserId: user?.id ?? null,
-    enabled: !isPauseMenuOpen && !pendingAbility && !isQTEVisualActive,
+    enabled: !isPauseMenuOpen && !pendingAbility,
     units,
     obstacles: battle?.config.map.obstacles ?? [],
     gridWidth: battle?.config.grid.width ?? 0,
@@ -929,26 +961,6 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     },
   });
 
-  // Wrapper para executar abilities sem alvo (self-cast)
-  // Movido para ANTES dos early returns para seguir as regras de hooks
-  const handleExecuteAbility = useCallback(
-    (abilityCode: string, unitId: string) => {
-      console.log(
-        "%c[BattleView] 🎯 Executando ability sem alvo (self-cast)",
-        "color: #10b981; font-weight: bold;",
-        { abilityCode, unitId }
-      );
-
-      // Tudo é enviado como use_ability agora (unificado)
-      executeAction("use_ability", unitId, {
-        abilityCode,
-        casterUnitId: unitId,
-        // targetUnitId omitido = self-cast
-      });
-    },
-    [executeAction]
-  );
-
   // Handler para selecionar uma ability (quando clica em ação que requer alvo)
   const handleSelectAbility = useCallback((abilityCode: string) => {
     const ability = findAbilityByCode(abilityCode);
@@ -963,7 +975,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
     console.log(
       "%c[BattleView] 🎯 Ability selecionada, aguardando alvo",
       "color: #f59e0b; font-weight: bold;",
-      { abilityCode, ability: ability.name, targetType: ability.targetType }
+      { abilityCode, ability: ability.name }
     );
   }, []);
 
@@ -1031,35 +1043,18 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       }
     );
 
-    // Se há uma ability de área pendente (targetType: POSITION/GROUND), tratar como clique de célula
+    // Se há uma ability de área pendente, tratar como clique de célula
     if (pendingAbility && selectedUnit && isMyTurn) {
       const ability = pendingAbility.ability;
       const hasAreaPattern =
         ability.targetingPattern?.coordinates &&
         ability.targetingPattern.coordinates.length > 1;
 
-      if (
-        (ability.targetType === "POSITION" ||
-          ability.targetType === "GROUND") &&
-        hasAreaPattern
-      ) {
+      // Área = pattern com múltiplas coordenadas
+      if (hasAreaPattern) {
         console.log(
           "%c[BattleView] 🔮 Ability de área: delegando para handleCellClick",
           "color: #a855f7;",
-          {
-            abilityCode: pendingAbility.code,
-            position: { x: unit.posX, y: unit.posY },
-          }
-        );
-        handleCellClick(unit.posX, unit.posY);
-        return;
-      }
-
-      // Skills de área com range: AREA
-      if (ability.range === "AREA" && hasAreaPattern) {
-        console.log(
-          "%c[BattleView] ✨ Ability de área: delegando para handleCellClick",
-          "color: #fbbf24;",
           {
             abilityCode: pendingAbility.code,
             position: { x: unit.posX, y: unit.posY },
@@ -1109,10 +1104,9 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           targetPosition: { x: unit.posX, y: unit.posY },
         }
       );
-      executeAction("use_ability", selectedUnit.id, {
-        abilityCode: pendingAbility.code,
-        casterUnitId: selectedUnit.id,
-        targetPosition: { x: unit.posX, y: unit.posY },
+      executeAbility(selectedUnit.id, pendingAbility.code, {
+        x: unit.posX,
+        y: unit.posY,
       });
       setPendingAbility(null);
       return;
@@ -1128,9 +1122,16 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
       // Se clicar na mesma unidade E há uma ability pendente → self-cast (enviar posição)
       if (selectedUnitId === unit.id && pendingAbility && isMyTurn) {
         const ability = pendingAbility.ability;
+        const pattern = ability.targetingPattern;
 
-        // Self-cast: enviar a posição da própria unidade
-        if (ability.targetType === "SELF" || ability.targetType === "UNIT") {
+        // Self-cast: origin CASTER ou padrão SINGLE
+        const isSingleTarget =
+          pattern?.coordinates?.length === 1 &&
+          pattern.coordinates[0].x === 0 &&
+          pattern.coordinates[0].y === 0;
+        const isSelf = pattern?.origin === "CASTER" || isSingleTarget;
+
+        if (isSelf) {
           console.log(
             "%c[BattleView] ✨ Executando ability em si mesmo!",
             "color: #a855f7; font-weight: bold;",
@@ -1139,10 +1140,9 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
               targetPosition: { x: unit.posX, y: unit.posY },
             }
           );
-          executeAction("use_ability", unit.id, {
-            abilityCode: pendingAbility.code,
-            casterUnitId: unit.id,
-            targetPosition: { x: unit.posX, y: unit.posY },
+          executeAbility(unit.id, pendingAbility.code, {
+            x: unit.posX,
+            y: unit.posY,
           });
           setPendingAbility(null);
           return;
@@ -1361,24 +1361,23 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           }
         );
 
-        executeAction("use_ability", selectedUnit.id, {
-          abilityCode: pendingAbility.code,
-          casterUnitId: selectedUnit.id,
-          targetPosition: { x: targetCell.x, y: targetCell.y },
+        executeAbility(selectedUnit.id, pendingAbility.code, {
+          x: targetCell.x,
+          y: targetCell.y,
         });
         setPendingAbility(null);
         return;
       }
     }
 
-    // Se há uma ability pendente que targetiza posição (POSITION/GROUND)
+    // Se há uma ability pendente que targetiza posição (pattern de área)
     if (pendingAbility && pendingAbility.type === "ABILITY" && selectedUnit) {
       const ability = pendingAbility.ability;
+      const hasAreaPattern =
+        ability.targetingPattern?.coordinates &&
+        ability.targetingPattern.coordinates.length > 1;
 
-      if (
-        ability.targetType === "POSITION" ||
-        ability.targetType === "GROUND"
-      ) {
+      if (hasAreaPattern) {
         // Usar validação centralizada
         const isValid = isValidAbilityPosition(
           selectedUnit,
@@ -1395,11 +1394,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
             "color: #a855f7; font-weight: bold;",
             { abilityCode: pendingAbility.code, position: { x, y } }
           );
-          executeAction("use_ability", selectedUnit.id, {
-            abilityCode: pendingAbility.code,
-            casterUnitId: selectedUnit.id,
-            targetPosition: { x, y },
-          });
+          executeAbility(selectedUnit.id, pendingAbility.code, { x, y });
           setPendingAbility(null);
         } else {
           console.log(
@@ -1411,11 +1406,11 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
         return;
       }
 
-      // Skills de área (range: AREA com targetingPattern.coordinates)
+      // Skills de área (targetingPattern.type: AREA com coordinates)
       const hasAreaCoordinates =
         ability?.targetingPattern?.coordinates &&
         ability.targetingPattern.coordinates.length > 1;
-      if (ability?.range === "AREA" && hasAreaCoordinates) {
+      if (ability?.targetingPattern?.type === "AREA" && hasAreaCoordinates) {
         // Verificar se está dentro do alcance
         const distance =
           Math.abs(x - selectedUnit.posX) + Math.abs(y - selectedUnit.posY);
@@ -1429,11 +1424,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
             "color: #fbbf24; font-weight: bold;",
             { abilityCode: pendingAbility.code, position: { x, y } }
           );
-          executeAction("use_ability", selectedUnit.id, {
-            abilityCode: pendingAbility.code,
-            casterUnitId: selectedUnit.id,
-            targetPosition: { x, y },
-          });
+          executeAbility(selectedUnit.id, pendingAbility.code, { x, y });
           setPendingAbility(null);
           return;
         } else {
@@ -1539,10 +1530,7 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           isMovingRef.current = true;
 
           // Executar DASH (dispara movimento quando receber confirmação)
-          executeAction("use_ability", selectedUnit.id, {
-            abilityCode: "DASH",
-            casterUnitId: selectedUnit.id,
-          });
+          executeAbility(selectedUnit.id, "DASH");
         } else {
           console.log(
             "%c[BattleView] ❌ Custo de movimento muito alto (sem dash disponível)",
@@ -1683,7 +1671,6 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           pendingAbility={pendingAbility}
           hotbar={selectedUnit ? unitHotbars[selectedUnit.id] ?? null : null}
           onSelectAbility={handleSelectAbility}
-          onExecuteAbility={handleExecuteAbility}
           onUpdateHotbar={handleUpdateHotbar}
         />
       </div>
@@ -1703,61 +1690,6 @@ const BattleViewInner: React.FC<{ battleId: string }> = ({ battleId }) => {
           opponentWantsRematch={opponentWantsRematch}
         />
       )}
-
-      {/* QTE Overlay - Quick Time Event para ataques */}
-      {/* Só aparece para o jogador que precisa responder ao QTE */}
-      {qteState.activeQTE &&
-        isQTEResponder &&
-        (() => {
-          // Determinar qual unidade está fazendo o QTE atualmente
-          // Se é fase de ATTACK, mostrar sobre o atacante
-          // Se é fase de DODGE/BLOCK, mostrar sobre o defensor
-          const isAttackPhase = qteState.activeQTE.actionType === "ATTACK";
-          const qteUnitId = isAttackPhase
-            ? qteState.activeQTE.attackerId
-            : qteState.activeQTE.targetId;
-
-          // Obter posição na tela da unidade
-          const screenPos = qteUnitId
-            ? canvasRef.current?.getUnitScreenPosition(qteUnitId)
-            : null;
-
-          // Se conseguimos obter a posição, usar modo inline
-          // Caso contrário, fallback para modo modal
-          if (screenPos) {
-            return (
-              <QTEOverlay
-                config={qteState.activeQTE}
-                onResponse={respondToQTE}
-                isResponder={isQTEResponder}
-                isVisualActive={isQTEVisualActive}
-                responderName={qteResponderUnit?.name ?? "Unidade"}
-                attackerName={qteAttackerUnit?.name ?? "Inimigo"}
-                externalResult={qteState.result?.grade ?? null}
-                displayMode="inline"
-                position={screenPos}
-                size={100}
-              />
-            );
-          }
-
-          // Fallback: modo modal centralizado
-          return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-              <div className="pointer-events-auto">
-                <QTEOverlay
-                  config={qteState.activeQTE}
-                  onResponse={respondToQTE}
-                  isResponder={isQTEResponder}
-                  isVisualActive={isQTEVisualActive}
-                  responderName={qteResponderUnit?.name ?? "Unidade"}
-                  attackerName={qteAttackerUnit?.name ?? "Inimigo"}
-                  externalResult={qteState.result?.grade ?? null}
-                />
-              </div>
-            </div>
-          );
-        })()}
 
       {/* Notificação de Turno (Início e Auto-End) */}
       <TurnNotification

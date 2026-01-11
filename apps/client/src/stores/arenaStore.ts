@@ -102,7 +102,6 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
     try {
       await colyseusService.joinArena(userId, username);
       set({ isLoading: false });
-      console.log("[Arena] ✅ Conectado à Arena");
     } catch (error: unknown) {
       console.error("[Arena] Erro ao conectar:", error);
       set({
@@ -116,7 +115,6 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
   disconnect: () => {
     colyseusService.leaveArena();
     set(initialState);
-    console.log("[Arena] Desconectado da Arena");
   },
 
   // ============================================
@@ -211,7 +209,6 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
           myPendingChallenges: [...state.myPendingChallenges, data.challenge!],
           isCreatingChallenge: false,
         }));
-        console.log("[Arena] ✅ Desafio criado:", data.challenge.challengeId);
       } else {
         set({
           isCreatingChallenge: false,
@@ -225,10 +222,6 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
       set((state) => ({
         incomingChallenges: [...state.incomingChallenges, data.challenge],
       }));
-      console.log(
-        "[Arena] 📩 Desafio recebido de:",
-        data.challenge.challenger.username
-      );
     };
 
     // Desafio aceito (ambos recebem)
@@ -248,7 +241,6 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
           (c) => c.challengeId !== data.challenge.challengeId
         ),
       });
-      console.log("[Arena] ✅ Desafio aceito! Countdown:", data.countdown);
     };
 
     // Desafio recusado
@@ -261,7 +253,6 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
           (c) => c.challengeId !== data.challengeId
         ),
       }));
-      console.log("[Arena] ❌ Desafio recusado por:", data.declinedBy);
     };
 
     // Desafio expirado
@@ -274,7 +265,6 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
           (c) => c.challengeId !== data.challengeId
         ),
       }));
-      console.log("[Arena] ⏰ Desafio expirado:", data.challengeId);
     };
 
     // Desafio cancelado
@@ -287,7 +277,6 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
           (c) => c.challengeId !== data.challengeId
         ),
       }));
-      console.log("[Arena] 🚫 Desafio cancelado:", data.challengeId);
     };
 
     // Lista de desafios abertos
@@ -315,7 +304,6 @@ export const useArenaStore = create<ArenaState & ArenaActions>((set, get) => ({
 
     // Batalha iniciando
     const handleBattleStarting = (data: BattleStartingNotification) => {
-      console.log("[Arena] ⚔️ Batalha iniciando! Room:", data.battleRoomId);
       // Limpar estado da arena quando batalha inicia
       set({
         activeChallenge: null,

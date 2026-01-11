@@ -198,11 +198,11 @@ export async function validateTributeSubmission(
     return {
       valid: false,
       reason:
-        "Quantidade deve ser maior que 0 se decidir contribuir ou sabotar",
+        "Amount must be greater than 0 if deciding to contribute or sabotage",
     };
   }
 
-  // Verifica se jogador tem recursos suficientes (apenas para não-naointervier)
+  // Check if player has enough resources (only for non-neutral)
   if (decision !== TributeDecision.NAOINTERVIER) {
     const player = await prisma.matchKingdom.findUnique({
       where: { id: playerId },
@@ -211,7 +211,7 @@ export async function validateTributeSubmission(
     if (!player) {
       return {
         valid: false,
-        reason: "Jogador não encontrado",
+        reason: "Player not found",
       };
     }
 
@@ -222,9 +222,9 @@ export async function validateTributeSubmission(
     if (availableAmount < amount) {
       return {
         valid: false,
-        reason: `${getResourceName(
+        reason: `Insufficient ${getResourceName(
           resourceKey
-        )} insuficiente. Disponível: ${availableAmount}, Necessário: ${amount}`,
+        )}. Available: ${availableAmount}, Required: ${amount}`,
       };
     }
   }

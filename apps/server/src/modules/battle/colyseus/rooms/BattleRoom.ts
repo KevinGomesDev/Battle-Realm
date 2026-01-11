@@ -7,7 +7,6 @@ import {
   BattlePlayerSchema,
   BattleUnitSchema,
 } from "../schemas";
-import { QTEManager, type QTECombatResult } from "../../../../qte";
 import {
   createAndEmitEvent,
   getBattleEventsFromCache,
@@ -16,9 +15,7 @@ import {
 } from "../../../match/services/event.service";
 import { markBattleEnded } from "../../../match/services/battle-persistence.service";
 import { persistBattle } from "../../../../workers";
-import type { QTEResponse } from "@boundless/shared/qte";
 import type { CommandPayload } from "@boundless/shared/types/commands.types";
-import type { QTEResultForExecutor } from "../../../abilities/executors/types";
 
 // Importar handlers modulares
 import {
@@ -52,20 +49,13 @@ import {
   // AI
   executeAITurn,
 
-  // QTE
-  initializeQTEManager,
-  updateQTEManagerUnits,
-  startAttackQTE,
-  handleQTEResponse,
-  executeAttackAndBroadcast,
-
   // Movement
   handleMove,
 
   // Action
   handleBeginAction,
   handleEndAction,
-  handleExecuteAction,
+  handleAbility,
   handleBattleCommand,
 
   // Surrender
@@ -93,7 +83,6 @@ export class BattleRoom extends Room<BattleSessionState> {
   private disconnectedPlayers = new Map<string, DisconnectedPlayer>();
   private rematchRequests = new Set<string>();
   private restoredFromDb = false;
-  private qteManager: QTEManager | null = null;
   private fromArena: boolean = false;
 
   // =========================================
@@ -102,11 +91,6 @@ export class BattleRoom extends Room<BattleSessionState> {
 
   async onCreate(options: BattleRoomOptions) {
     this.autoDispose = true;
-    console.log(`[BattleRoom] Criando sala: ${this.roomId}`);
-    console.log(
-      `[BattleRoom] Options recebidas:`,
-      JSON.stringify(options, null, 2)
-    );
 
     // Registrar broadcast para eventos desta batalha
     registerBattleBroadcast(this.roomId, (event: string, data: any) =>
@@ -122,22 +106,12 @@ export class BattleRoom extends Room<BattleSessionState> {
         (meta) => this.setMetadata(meta)
       );
       if (restored) {
-        console.log(
-          `[BattleRoom] Batalha ${options.restoreBattleId} restaurada`
-        );
         this.restoredFromDb = true;
         this.lobbyPhase = false;
         this.registerMessageHandlers();
 
-        // Inicializar QTE Manager após restauração
-        this.initQTEInternal();
-        console.log(`[BattleRoom] QTE Manager inicializado após restauração`);
-
         // Iniciar timer após restauração se houver unidade ativa
         if (this.state.activeUnitId && this.state.status === "ACTIVE") {
-          console.log(
-            `[BattleRoom] Iniciando timer após restauração. activeUnitId=${this.state.activeUnitId}, turnTimer=${this.state.turnTimer}`
-          );
           this.startTurnTimerInternal();
         }
         return;
@@ -154,14 +128,6 @@ export class BattleRoom extends Room<BattleSessionState> {
     this.state.lobbyId = this.roomId;
     this.state.status = "WAITING";
     this.state.maxPlayers = Math.min(8, Math.max(2, options.maxPlayers || 2));
-
-    console.log(`[BattleRoom] Estado inicializado em onCreate:`, {
-      battleId: this.state.battleId,
-      status: this.state.status,
-      maxPlayers: this.state.maxPlayers,
-      gridWidth: this.state.gridWidth,
-      gridHeight: this.state.gridHeight,
-    });
 
     this.setMetadata({
       hostUserId: options.userId,
@@ -197,7 +163,6 @@ export class BattleRoom extends Room<BattleSessionState> {
     if (!userData) return;
 
     const { userId } = userData;
-    console.log(`[BattleRoom] ${userId} saiu (consented: ${consented})`);
 
     if (this.lobbyPhase) {
       handleLobbyLeave(
@@ -211,7 +176,6 @@ export class BattleRoom extends Room<BattleSessionState> {
     }
 
     if (this.state.status === "ENDED" || this.state.winnerId) {
-      console.log(`[BattleRoom] ${userId} saiu após fim - ignorando`);
       return;
     }
 
@@ -227,16 +191,10 @@ export class BattleRoom extends Room<BattleSessionState> {
           // Verificar se o jogador já reconectou via outro client antes de render
           const currentPlayer = this.state.getPlayer(userId);
           if (currentPlayer && !currentPlayer.isConnected) {
-            console.log(
-              `[BattleRoom] ${userId} não reconectou a tempo, rendição automática`
-            );
             handleSurrender(userId, this.state, this.broadcast.bind(this), () =>
               this.forceCheckBattleEndInternal()
             );
           } else {
-            console.log(
-              `[BattleRoom] ${userId} já reconectou via novo client, ignorando timeout`
-            );
           }
         }
       } else {
@@ -249,8 +207,6 @@ export class BattleRoom extends Room<BattleSessionState> {
   }
 
   async onDispose() {
-    console.log(`[BattleRoom] Sala ${this.roomId} sendo destruída`);
-
     // Remover registro do broadcast de eventos
     unregisterBattleBroadcast(this.roomId);
 
@@ -267,9 +223,6 @@ export class BattleRoom extends Room<BattleSessionState> {
     ) {
       try {
         await persistBattle(this.roomId, this.state);
-        console.log(
-          `[BattleRoom] Batalha ${this.roomId} persistida no onDispose`
-        );
       } catch (error) {
         console.error(
           `[BattleRoom] Erro ao persistir batalha no onDispose:`,
@@ -324,35 +277,22 @@ export class BattleRoom extends Room<BattleSessionState> {
       );
     });
 
-    // FLUXO UNIFICADO: Todas as abilities (incluindo ATTACK) passam por aqui
+    // PONTO ÚNICO: Todas as abilities passam por aqui
     this.onMessage(
-      "battle:execute_action",
-      (client, { actionName, unitId, params }) => {
-        handleExecuteAction(
+      "battle:use_ability",
+      (client, { unitId, abilityCode, targetPosition, targetUnitId }) => {
+        handleAbility(
           client,
-          actionName,
           unitId,
+          abilityCode,
           this.state,
           this.roomId,
           this.broadcast.bind(this),
-          (c, attackerId, targetId) => {
-            // Callback para iniciar QTE quando ATTACK retornar requiresQTE: true
-            const attacker = this.state.units.get(attackerId);
-            const target = this.state.units.get(targetId);
-            if (attacker && target) {
-              this.startAttackQTEInternal(c, attacker, target);
-            }
-          },
-          this.qteManager,
-          params
+          targetPosition,
+          targetUnitId
         );
       }
     );
-
-    // QTE
-    this.onMessage("qte:response", (client, response: QTEResponse) => {
-      handleQTEResponse(client, response, this.state, this.qteManager);
-    });
 
     // Surrender/Rematch
     this.onMessage("battle:surrender", (client) => {
@@ -463,7 +403,6 @@ export class BattleRoom extends Room<BattleSessionState> {
         this.lobbyPhase = v;
       },
       () => this.createBattleUnitsInternal(),
-      () => this.initQTEInternal(),
       () => this.calculateActionOrderInternal(),
       () => this.startTurnTimerInternal()
     );
@@ -472,15 +411,6 @@ export class BattleRoom extends Room<BattleSessionState> {
 
   private async createBattleUnitsInternal(): Promise<void> {
     await createBattleUnits(this.state);
-  }
-
-  private initQTEInternal(): void {
-    this.qteManager = initializeQTEManager(
-      this.state,
-      this.broadcast.bind(this),
-      this.clients,
-      this.clock
-    );
   }
 
   private calculateActionOrderInternal(): void {
@@ -538,70 +468,9 @@ export class BattleRoom extends Room<BattleSessionState> {
       unit,
       this.broadcast.bind(this),
       (x, y) => isValidPosition(this.state, x, y),
-      (attacker, target, qteResult) =>
-        this.executeAttackInternal(attacker, target, qteResult),
       () => this.advanceToNextUnitInternal(),
       this.roomId
     );
-  }
-
-  private startAttackQTEInternal(
-    client: Client,
-    attacker: BattleUnitSchema,
-    target: BattleUnitSchema
-  ): void {
-    startAttackQTE(
-      client,
-      attacker,
-      target,
-      this.state,
-      this.qteManager,
-      (attackerId, targetId, result) =>
-        this.handleQTEComplete(attackerId, targetId, result),
-      (a, t, qte) => this.executeAttackInternal(a, t, qte)
-    );
-  }
-
-  private handleQTEComplete(
-    attackerId: string,
-    targetId: string,
-    result: QTECombatResult
-  ): void {
-    const attacker = this.state.units.get(attackerId);
-    const target = this.state.units.get(targetId);
-    if (!attacker || !target) return;
-
-    const qteResult: QTEResultForExecutor = {
-      dodged: result.dodged,
-      attackerDamageModifier: result.attackerDamageModifier,
-      defenderDamageModifier: result.defenderDamageModifier,
-      newDefenderPosition: result.newDefenderPosition,
-      defenderGrade: result.defenderQTE?.grade,
-    };
-
-    this.executeAttackInternal(attacker, target, qteResult, {
-      attackerQTE: result.attackerQTE,
-      defenderQTE: result.defenderQTE,
-    });
-  }
-
-  private executeAttackInternal(
-    attacker: BattleUnitSchema,
-    target: BattleUnitSchema,
-    qteResult: QTEResultForExecutor,
-    qteData?: { attackerQTE?: unknown; defenderQTE?: unknown }
-  ): void {
-    executeAttackAndBroadcast(
-      attacker,
-      target,
-      qteResult,
-      this.state,
-      this.roomId,
-      this.broadcast.bind(this),
-      qteData
-    );
-    // O timer vai verificar fim de batalha a cada segundo
-    // Não é mais necessário chamar checkBattleEnd aqui
   }
 
   private resetForRematchInternal(): void {

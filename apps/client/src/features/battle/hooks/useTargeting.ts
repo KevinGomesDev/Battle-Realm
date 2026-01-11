@@ -6,7 +6,6 @@ import { useMemo, useCallback } from "react";
 import type { BattleUnitState } from "@/services/colyseus.service";
 import {
   calculateTargetingPreview,
-  handleQTE,
   type TargetingPreview,
   type GridContext,
   type UnitStats,
@@ -14,6 +13,7 @@ import {
   type CoordinatePattern,
 } from "@boundless/shared/utils/targeting.utils";
 import { PATTERNS } from "@boundless/shared/data/targeting-patterns.data";
+import { inferTargetType } from "@boundless/shared/utils/ability-validation";
 import type { PendingAbility } from "../types/pending-ability.types";
 
 /**
@@ -48,8 +48,6 @@ interface UseTargetingResult {
   targetingPattern: CoordinatePattern | null;
   /** Se está em modo de targeting (tem preview ativo) */
   isTargeting: boolean;
-  /** Confirmar o alvo atual */
-  confirmTarget: () => void;
   /** Verificar se uma célula está no range selecionável */
   isCellSelectable: (x: number, y: number) => boolean;
   /** Verificar se uma célula será afetada */
@@ -106,11 +104,9 @@ export function useTargeting({
 
     const { ability, code } = pendingAbility;
 
-    // DODGE é self-target, não precisa de preview
-    if (code === "DODGE") return null;
-
     // SELF abilities não precisam de targeting visual
-    if (ability.targetType === "SELF" || ability.range === "SELF") return null;
+    const targetType = inferTargetType(ability);
+    if (targetType === "SELF") return null;
 
     // Se a ability tem targetingPattern definido, usar diretamente
     if (ability.targetingPattern) {
@@ -128,28 +124,15 @@ export function useTargeting({
       return ability.targetingPattern;
     }
 
-    // Fallback: criar pattern básico baseado na ability
-    // ATTACK usa SINGLE com range = 1 + mod
+    // Fallback: ATTACK usa range 1 + mod
     if (code === "ATTACK") {
-      // Usar valor padrão 1 (targetingPattern já foi tratado acima)
-      const baseRange = 1;
-      const finalRange = baseRange + attackRangeMod;
       return {
         ...PATTERNS.SINGLE,
-        maxRange: finalRange,
+        maxRange: 1 + attackRangeMod,
       };
     }
 
-    // DASH usa SINGLE com range = speed da unidade
-    if (code === "DASH") {
-      const dashRange = selectedUnit.speed ?? 3;
-      return {
-        ...PATTERNS.SINGLE,
-        maxRange: dashRange,
-      };
-    }
-
-    // Fallback genérico: SINGLE com range 1
+    // Fallback: usar SINGLE com range 1 (melee)
     return {
       ...PATTERNS.SINGLE,
       maxRange: 1,
@@ -197,27 +180,10 @@ export function useTargeting({
     [targetingPreview]
   );
 
-  // Confirmar o alvo atual (chama handleQTE)
-  const confirmTarget = useCallback(() => {
-    if (!selectedUnit || !hoveredCell || !targetingPreview?.isValidTarget)
-      return;
-    if (!pendingAbility) return;
-
-    // Chamar handleQTE com tipo unificado ABILITY
-    handleQTE(
-      pendingAbility.type === "ATTACK" ? "ATTACK" : "ABILITY",
-      selectedUnit.id,
-      hoveredCell.x,
-      hoveredCell.y,
-      pendingAbility.code
-    );
-  }, [selectedUnit, hoveredCell, targetingPreview, pendingAbility]);
-
   return {
     targetingPreview,
     targetingPattern,
     isTargeting: targetingPattern !== null && targetingPreview !== null,
-    confirmTarget,
     isCellSelectable,
     isCellAffected,
   };

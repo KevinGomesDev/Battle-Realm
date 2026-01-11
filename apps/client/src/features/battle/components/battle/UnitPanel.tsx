@@ -286,8 +286,9 @@ interface UnitPanelProps {
   pendingAbility: PendingAbility | null;
   hotbar: UnitHotbarConfig | null;
   onSelectAbility: (abilityCode: string) => void;
-  onExecuteAbility: (abilityCode: string, unitId: string) => void;
   onUpdateHotbar: (unitId: string, hotbar: UnitHotbarConfig) => void;
+  /** Callback quando o mouse passa sobre uma ability (para mostrar zona de dash) */
+  onAbilityHover?: (abilityCode: string | null) => void;
 }
 
 export const UnitPanel: React.FC<UnitPanelProps> = ({
@@ -298,8 +299,8 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
   pendingAbility,
   hotbar,
   onSelectAbility,
-  onExecuteAbility,
   onUpdateHotbar,
+  onAbilityHover,
 }) => {
   // Categorizar abilities (ações comuns, skills de classe, spells)
   // Skills passivas NÃO aparecem (já mostradas como condições)
@@ -346,8 +347,8 @@ export const UnitPanel: React.FC<UnitPanelProps> = ({
             canAct={canAct}
             pendingAbilityCode={pendingAbility?.code ?? null}
             onSelectAbility={onSelectAbility}
-            onExecuteAbility={onExecuteAbility}
             onUpdateHotbar={handleUpdateHotbar}
+            onAbilityHover={onAbilityHover}
           />
         </div>
       )}

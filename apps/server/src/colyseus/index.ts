@@ -45,7 +45,6 @@ export function createColyseusServer(config: ColyseusConfig = {}) {
   // Endpoints de desenvolvimento
   if (enableMonitor) {
     app.use("/monitor", monitor());
-    console.log(`[Colyseus] Monitor habilitado em /monitor`);
   }
 
   // Health check
@@ -88,8 +87,6 @@ export function createColyseusServer(config: ColyseusConfig = {}) {
      */
     async start() {
       await gameServer.listen(port);
-      console.log(`[Colyseus] Servidor rodando na porta ${port}`);
-      console.log(`[Colyseus] Rooms disponíveis: global, battle, match`);
       return { app, server, gameServer };
     },
 
@@ -98,7 +95,6 @@ export function createColyseusServer(config: ColyseusConfig = {}) {
      */
     async stop() {
       await gameServer.gracefullyShutdown();
-      console.log("[Colyseus] Servidor encerrado");
     },
   };
 }

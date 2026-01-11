@@ -65,7 +65,6 @@ export class GlobalRoom extends Room<GlobalRoomState> {
 
   async onCreate(_options: any) {
     this.autoDispose = false;
-    console.log("[GlobalRoom] Room global criada");
 
     this.setState(new GlobalRoomState());
 
@@ -82,7 +81,6 @@ export class GlobalRoom extends Room<GlobalRoomState> {
   }
 
   async onJoin(client: Client, options: JoinOptions) {
-    console.log(`[GlobalRoom] Cliente conectou: ${client.sessionId}`);
 
     this.state.connectedPlayers++;
 
@@ -93,14 +91,12 @@ export class GlobalRoom extends Room<GlobalRoomState> {
   }
 
   onLeave(client: Client, _consented: boolean) {
-    console.log(`[GlobalRoom] Cliente saiu: ${client.sessionId}`);
 
     this.state.connectedPlayers--;
     this.authenticatedClients.delete(client.sessionId);
   }
 
   onDispose() {
-    console.log("[GlobalRoom] Room global sendo destruída");
 
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);

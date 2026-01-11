@@ -55,8 +55,7 @@ export function useBattle() {
     moveUnit: store.moveUnit,
     attackUnit: store.attackUnit,
     endAction: store.endAction,
-    executeAction: store.executeAction,
-    castSpell: store.castSpell,
+    executeAbility: store.executeAbility,
     surrender: store.surrender,
     requestRematch: store.requestRematch,
     leaveBattle: store.leaveBattle,
@@ -120,8 +119,7 @@ export function useBattleSession() {
     moveUnit: store.moveUnit,
     attackUnit: store.attackUnit,
     endAction: store.endAction,
-    executeAction: store.executeAction,
-    castSpell: store.castSpell,
+    executeAbility: store.executeAbility,
     surrender: store.surrender,
   };
 }

@@ -133,8 +133,8 @@ export function getUnitSkills(unit: BattleUnit): SkillDefinition[] {
     );
 }
 
-// Re-exportar getUnitSpells do ability-evaluator (unificado)
-export { getUnitSpells } from "./ability-evaluator";
+// Re-exportar getUnitAbilities do ability-evaluator (unificado)
+export { getUnitAbilities } from "./ability-evaluator";
 
 // =============================================================================
 // PROCESSAMENTO DO TURNO DA IA
@@ -160,8 +160,6 @@ export async function processAITurn(
     let aiUnits = getAIUnits(battle);
     aiUnits = limitArray(aiUnits, MAX_AI_UNITS_PER_TURN, "aiUnits");
 
-    console.log(`[AI] Processando turno da IA - ${aiUnits.length} unidades`);
-
     // Ordenar unidades por speed (mais rápidas primeiro)
     aiUnits.sort((a, b) => b.speed - a.speed);
 
@@ -184,17 +182,11 @@ export async function processAITurn(
         break;
       }
 
-      console.log(`[AI] Processando ${unit.name} (${unit.id})`);
-
       // Obter perfil da unidade com fallback
       const profile = safeExecute(
         () => getUnitAIProfile(unit, DEFAULT_AI_PROFILES),
         DEFAULT_AI_PROFILES.MONSTER,
         `getUnitAIProfile-${unit.name}`
-      );
-
-      console.log(
-        `[AI] Perfil: ${profile.behavior}, Skills: ${profile.skillPriority}`
       );
 
       // Criar contexto com proteção
@@ -230,16 +222,9 @@ export async function processAITurn(
 
       decisions.push(decision);
       processedUnitIds.push(unit.id);
-
-      console.log(
-        `[AI] Decisão: ${decision.type} - ${decision.reason || "sem razão"}`
-      );
     }
 
     const elapsed = Date.now() - startTime;
-    console.log(
-      `[AI] Turno processado em ${elapsed}ms - ${decisions.length} decisões`
-    );
 
     return {
       aiPlayerId: AI_PLAYER_ID,
@@ -330,11 +315,6 @@ export async function processBotUnitDecision(
   const startTime = Date.now();
 
   try {
-    console.log(`[BOT-AI] Processando decisão para ${unit.name}`);
-    console.log(
-      `[BOT-AI] Unit state: movesLeft=${unit.movesLeft}, actionsLeft=${unit.actionsLeft}, pos=(${unit.posX}, ${unit.posY})`
-    );
-
     // Determinar perfil baseado no aiBehavior da unidade ou categoria/classe
     let profile = DEFAULT_AI_PROFILES.WARRIOR; // Padrão para Regentes
 
@@ -363,8 +343,6 @@ export async function processBotUnitDecision(
         DEFAULT_AI_PROFILES[unit.classCode as keyof typeof DEFAULT_AI_PROFILES];
     }
 
-    console.log(`[BOT-AI] Perfil: ${profile.behavior}`);
-
     // Criar contexto (com fog of war - filtra unidades por visão)
     const context = createBattleContext(battle, unit);
 
@@ -376,19 +354,8 @@ export async function processBotUnitDecision(
     const visibleEnemies = context.units.filter(
       (u: BattleUnit) => u.isAlive && u.ownerId !== unit.ownerId
     );
-    console.log(
-      `[BOT-AI] Visão: ${visionRange} blocos | Inimigos: ${visibleEnemies.length}/${totalEnemies} visíveis`
-    );
     if (visibleEnemies.length === 0 && totalEnemies > 0) {
-      console.log(
-        `[BOT-AI] ⚠️ Nenhum inimigo no campo de visão - vai explorar`
-      );
     }
-    visibleEnemies.forEach((e: BattleUnit) =>
-      console.log(
-        `[BOT-AI]   - Inimigo: ${e.name} em (${e.posX}, ${e.posY}) HP=${e.currentHp}`
-      )
-    );
 
     // Obter skills da unidade
     const skills = getUnitSkills(unit);
@@ -403,9 +370,6 @@ export async function processBotUnitDecision(
     );
 
     const elapsed = Date.now() - startTime;
-    console.log(
-      `[BOT-AI] Decisão: ${decision.type} em ${elapsed}ms - ${decision.reason}`
-    );
 
     return decision;
   } catch (error) {
@@ -482,6 +446,4 @@ export function logAIDecision(decision: AIDecision, unit: BattleUnit): void {
     DASH: `usar corrida`,
     PASS: "passar turno",
   }[decision.type];
-
-  console.log(`[AI] ${unit.name}: ${actionDesc} - ${decision.reason}`);
 }

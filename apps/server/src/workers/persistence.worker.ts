@@ -80,7 +80,7 @@ function serializeUnit(unit: BattleUnitSchema): Record<string, any> {
   });
 
   return {
-    oderId: unit.id, // ID da unidade na batalha
+    unitBattleId: unit.id, // ID da unidade na batalha
     unitId: unit.sourceUnitId || null, // Prisma usa unitId, não sourceUnitId
     userId: unit.ownerId || null,
     kingdomId: unit.ownerKingdomId || null,
@@ -93,7 +93,6 @@ function serializeUnit(unit: BattleUnitSchema): Record<string, any> {
     race: unit.race || null,
     classCode: unit.classCode || null,
     features: JSON.stringify(Array.from(unit.features || [])),
-    learnedSkills: JSON.stringify([]),
     equipment: JSON.stringify(Array.from(unit.equipment || [])),
     spells: JSON.stringify(Array.from(unit.spells || [])),
     combat: unit.combat,
@@ -109,7 +108,6 @@ function serializeUnit(unit: BattleUnitSchema): Record<string, any> {
     currentMana: unit.currentMana || 0,
     posX: unit.posX,
     posY: unit.posY,
-    initiative: 0,
     movesLeft: unit.movesLeft,
     actionsLeft: unit.actionsLeft,
     attacksLeftThisTurn: unit.attacksLeftThisTurn || 0,
@@ -121,9 +119,7 @@ function serializeUnit(unit: BattleUnitSchema): Record<string, any> {
     maxMagicalProtection: unit.maxMagicalProtection || 0,
     conditions: JSON.stringify(Array.from(unit.conditions || [])),
     grabbedByBattleUnitId: unit.grabbedByUnitId || null,
-    corpseRemoved: !unit.isAlive && unit.currentHp <= -10,
     hasStartedAction: unit.hasStartedAction || false,
-    actions: JSON.stringify([]),
     isAIControlled: unit.isAIControlled || false,
     aiBehavior: unit.aiBehavior || "AGGRESSIVE",
     size: unit.size || "MEDIUM",
@@ -322,9 +318,6 @@ async function persistAllBattles(): Promise<void> {
     }
 
     if (persistedCount > 0 || unchangedCount > 0) {
-      console.log(
-        `[PersistenceWorker] Batalhas: ${persistedCount} persistidas, ${unchangedCount} sem mudanças, ${skippedCount} ignoradas`
-      );
     }
   } catch (error) {
     console.error("[PersistenceWorker] Erro ao buscar batalhas:", error);
@@ -374,10 +367,6 @@ export function startPersistenceWorker(): void {
   intervalId = setInterval(() => {
     runPersistenceCycle();
   }, PERSISTENCE_INTERVAL);
-
-  console.log(
-    `[PersistenceWorker] Iniciado (intervalo: ${PERSISTENCE_INTERVAL / 1000}s)`
-  );
 }
 
 /**
@@ -392,8 +381,6 @@ export function stopPersistenceWorker(): void {
     clearInterval(intervalId);
     intervalId = null;
   }
-
-  console.log("[PersistenceWorker] Parado");
 }
 
 /**
@@ -401,11 +388,8 @@ export function stopPersistenceWorker(): void {
  * Útil para chamar antes de desligar o servidor
  */
 export async function forcePeristAll(): Promise<void> {
-  console.log("[PersistenceWorker] Forçando persistência de todas as sessões");
-
   // Limpar cache de hashes para forçar persistência
   battleStateHashes.clear();
 
   await Promise.all([persistAllBattles(), persistAllMatches()]);
-  console.log("[PersistenceWorker] Persistência forçada concluída");
 }

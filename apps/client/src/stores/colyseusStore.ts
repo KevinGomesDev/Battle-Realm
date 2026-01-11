@@ -103,7 +103,6 @@ export const useColyseusStore = create<ConnectionState & ConnectionActions>(
       };
 
       const handleReconnecting = (data?: { attempt?: number }) => {
-        console.log("[ColyseusStore] 🔄 Iniciando reconexão...", data?.attempt);
         set({
           isReconnecting: true,
           isConnected: false,
@@ -112,7 +111,6 @@ export const useColyseusStore = create<ConnectionState & ConnectionActions>(
       };
 
       const handleReconnected = () => {
-        console.log("[ColyseusStore] ✅ Reconectado!");
         set({
           isConnected: true,
           isReconnecting: false,

@@ -91,9 +91,17 @@ export {
   getSkillEffectiveRange,
   canUseSkillOnTarget,
   getValidTargetsForSkill,
-  evaluateSkill,
   selectBestSkill,
 } from "./core/skill-evaluator";
+
+// Core - Ability Evaluator
+export {
+  evaluateAbility,
+  evaluateAllAbilities,
+  getAbilityEffectiveRange,
+  canUseAbilityOnTarget,
+  getValidTargetsForAbility,
+} from "./core/ability-evaluator";
 
 // Core - Decision Maker
 export {

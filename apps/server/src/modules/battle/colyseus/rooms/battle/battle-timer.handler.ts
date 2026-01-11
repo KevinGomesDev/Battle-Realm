@@ -91,9 +91,6 @@ export class BattleTimerManager {
 
     // Já terminou - não verificar novamente
     if (state.status === "ENDED") {
-      console.log(
-        "[BattleTimer] checkBattleEnd: batalha já encerrada, ignorando"
-      );
       return true;
     }
 
@@ -103,7 +100,6 @@ export class BattleTimerManager {
 
     state.players.forEach((player: BattlePlayerSchema) => {
       if (player.surrendered) {
-        console.log(`[BattleTimer] checkBattleEnd: ${player.oderId} se rendeu`);
         return;
       }
 
@@ -125,12 +121,6 @@ export class BattleTimerManager {
 
     // Só logar se houver mudança significativa (para evitar spam)
     if (playersAlive.length <= 1) {
-      console.log("[BattleTimer] checkBattleEnd - possível fim de batalha:", {
-        roomId,
-        playersAliveCount: playersAlive.length,
-        playersAlive,
-        playerUnitsInfo,
-      });
     }
 
     if (playersAlive.length <= 1) {
@@ -142,12 +132,6 @@ export class BattleTimerManager {
       } else {
         state.winReason = "Empate - todos foram derrotados";
       }
-
-      console.log("[BattleTimer] Batalha encerrada:", {
-        roomId,
-        winnerId: state.winnerId,
-        winReason: state.winReason,
-      });
 
       // Parar o timer
       this.stop();
@@ -175,16 +159,4 @@ export class BattleTimerManager {
   forceCheckBattleEnd(): boolean {
     return this.checkBattleEnd();
   }
-}
-
-/**
- * Cria e inicia um novo timer de batalha
- * @deprecated Use BattleTimerManager diretamente para melhor controle
- */
-export function createBattleTimer(
-  context: BattleTimerContext
-): BattleTimerManager {
-  const manager = new BattleTimerManager(context);
-  manager.start();
-  return manager;
 }

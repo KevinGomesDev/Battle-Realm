@@ -1,5 +1,5 @@
 // server/src/ai/core/spell-evaluator.ts
-// Avalia��o e sele��o de spells para a IA
+// Avaliação e seleção de spells para a IA
 
 import { BattleUnit } from "@boundless/shared/types/battle.types";
 import type { AbilityDefinition as SpellDefinition } from "@boundless/shared/types/ability.types";
@@ -7,6 +7,8 @@ import { getAbilityByCode as getSpellByCode } from "@boundless/shared/data/abili
 import {
   validateAbilityUse as validateSpellUse,
   getValidAbilityTargets as getValidSpellTargets,
+  inferTargetType,
+  isSelfAbility,
 } from "@boundless/shared/utils/ability-validation";
 import { getChebyshevDistance } from "@boundless/shared/utils/distance.utils";
 import { getUnitSizeDefinition, type UnitSize } from "@boundless/shared/config";
@@ -68,8 +70,9 @@ function evaluateDamageSpell(
     return { score: 0, bestTarget: null, reason: "Sem inimigos" };
   }
 
-  // Para spells de �rea (FIRE), encontrar posi��o que atinge mais inimigos
-  if (spell.targetType === "POSITION") {
+  // Para spells de área (FIRE), encontrar posição que atinge mais inimigos
+  const targetType = inferTargetType(spell);
+  if (targetType === "POSITION") {
     let bestPos: { x: number; y: number } | null = null;
     let bestScore = 0;
     let bestHitCount = 0;
@@ -130,8 +133,8 @@ function evaluateDamageSpell(
     }
   }
 
-  // Para spells de alvo �nico com dano (UNIT ofensivo)
-  if (spell.targetType === "UNIT" && spell.baseDamage !== undefined) {
+  // Para spells de alvo único com dano (UNIT ofensivo)
+  if (targetType === "UNIT" && spell.baseDamage !== undefined) {
     const targetsWithScores = enemies.map((enemy) => {
       const hpPercent = enemy.currentHp / enemy.maxHp;
       let score = 40;
@@ -170,9 +173,10 @@ function evaluateSupportSpell(
   allUnits: BattleUnit[]
 ): { score: number; bestTarget: BattleUnit | null; reason: string } {
   const allies = getAllies(caster, allUnits);
+  const targetType = inferTargetType(spell);
 
-  if (spell.targetType === "SELF") {
-    // Self-buff sempre � v�lido
+  if (targetType === "SELF" || isSelfAbility(spell)) {
+    // Self-buff sempre é válido
     return {
       score: 35,
       bestTarget: caster,
@@ -180,7 +184,7 @@ function evaluateSupportSpell(
     };
   }
 
-  if (spell.targetType === "UNIT") {
+  if (targetType === "UNIT") {
     // Encontrar aliado que mais se beneficiaria
     const validAllies = allies.filter((a) => a.id !== caster.id);
 

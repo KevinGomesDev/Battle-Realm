@@ -301,7 +301,5 @@ export interface GameClassDefinition {
   id: string;
   code: string;
   name: string;
-  archetype: string;
-  resourceUsed: string;
   description: string;
 }

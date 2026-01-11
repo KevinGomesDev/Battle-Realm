@@ -2,7 +2,7 @@
 
 import { PrismaClient } from "@prisma/client";
 import { prisma } from "../../../lib/prisma";
-import { TROOP_ABILITY_MAP as TROOP_SKILLS_MAP } from "@boundless/shared/data/abilities.data";
+import { TROOP_ABILITY_MAP } from "@boundless/shared/data/abilities.data";
 import {
   TROOP_RECRUITMENT_BASE_COST,
   TROOP_LEVELUP_COSTS,
@@ -76,7 +76,7 @@ export function validateTroopAttributes(data: TroopTemplateData): {
 
 // Validar passiva
 export function validateTroopPassive(passiveId: string): boolean {
-  return TROOP_SKILLS_MAP[passiveId] !== undefined;
+  return TROOP_ABILITY_MAP[passiveId] !== undefined;
 }
 
 // Validar recurso
@@ -219,10 +219,10 @@ export async function recruitTroop(
     });
 
     if (!player) {
-      return { success: false, message: "Jogador não encontrado." };
+      return { success: false, message: "Player not found." };
     }
 
-    // Buscar template da tropa
+    // Find troop template
     const template = await prisma.troopTemplate.findFirst({
       where: {
         kingdomId: player.kingdomId,
@@ -231,7 +231,7 @@ export async function recruitTroop(
     });
 
     if (!template) {
-      return { success: false, message: "Template de tropa não encontrado." };
+      return { success: false, message: "Troop template not found." };
     }
 
     // Calcular custo
@@ -259,11 +259,9 @@ export async function recruitTroop(
     if ((resources[resourceKey] || 0) < cost) {
       return {
         success: false,
-        message: `${getResourceName(
+        message: `Insufficient ${getResourceName(
           resourceKey as any
-        )} insuficiente. Custo: ${cost}, disponível: ${
-          resources[resourceKey] || 0
-        }`,
+        )}. Cost: ${cost}, available: ${resources[resourceKey] || 0}`,
       };
     }
 
@@ -334,7 +332,7 @@ export async function recruitTroop(
   } catch (error: any) {
     return {
       success: false,
-      message: error.message || "Erro ao recrutar tropa.",
+      message: error.message || "Error recruiting troop.",
     };
   }
 }
@@ -361,10 +359,10 @@ export async function getTroopCategoryInfo(
   });
 
   if (!player) {
-    throw new Error("Jogador não encontrado.");
+    throw new Error("Player not found.");
   }
 
-  // Buscar template
+  // Find template
   const template = await prisma.troopTemplate.findFirst({
     where: {
       kingdomId: player.kingdomId,
@@ -373,7 +371,7 @@ export async function getTroopCategoryInfo(
   });
 
   if (!template) {
-    throw new Error("Template de tropa não encontrado.");
+    throw new Error("Troop template not found.");
   }
 
   // Obter nível
@@ -431,10 +429,10 @@ export async function upgradeTroopCategory(
     });
 
     if (!player) {
-      return { success: false, message: "Jogador não encontrado." };
+      return { success: false, message: "Player not found." };
     }
 
-    // Obter nível atual
+    // Get current level
     let troopLevels: Record<string, number>;
     try {
       troopLevels = JSON.parse(player.troopLevels);
@@ -444,13 +442,13 @@ export async function upgradeTroopCategory(
     const currentLevel = troopLevels[String(troopSlotIndex)] || 1;
 
     if (currentLevel >= MAX_TROOP_LEVEL) {
-      return { success: false, message: "Nível máximo atingido." };
+      return { success: false, message: "Maximum level reached." };
     }
 
-    // Verificar custo
+    // Check cost
     const cost = TROOP_LEVELUP_COSTS[currentLevel];
     if (!cost) {
-      return { success: false, message: "Custo de level up não definido." };
+      return { success: false, message: "Level up cost not defined." };
     }
 
     // Verificar recursos (usa experiência para level up)
@@ -470,13 +468,13 @@ export async function upgradeTroopCategory(
     if (resources.experience < cost) {
       return {
         success: false,
-        message: `${getResourceName(
+        message: `Insufficient ${getResourceName(
           "experience"
-        )} insuficiente. Custo: ${cost}, disponível: ${resources.experience}`,
+        )}. Cost: ${cost}, available: ${resources.experience}`,
       };
     }
 
-    // Deduzir recursos e aumentar nível do TEMPLATE
+    // Deduct resources and increase TEMPLATE level
     resources.experience -= cost;
     troopLevels[String(troopSlotIndex)] = currentLevel + 1;
 
@@ -488,25 +486,25 @@ export async function upgradeTroopCategory(
       },
     });
 
-    // Obter novos stats para futuras tropas
+    // Get new stats for future troops
     const info = await getTroopCategoryInfo(playerId, troopSlotIndex);
 
-    // NOTA: NÃO atualizamos tropas existentes!
-    // Cada tropa é uma Unit única que pode ter modificações individuais.
-    // O upgrade do template só afeta NOVAS tropas recrutadas.
+    // NOTE: We do NOT update existing troops!
+    // Each troop is a unique Unit that can have individual modifications.
+    // Template upgrade only affects NEW recruited troops.
 
     return {
       success: true,
       newLevel: currentLevel + 1,
       newStats: info.stats,
-      message: `Template de tropa evoluído para nível ${
+      message: `Troop template upgraded to level ${
         currentLevel + 1
-      }! Novas tropas recrutadas terão stats melhores.`,
+      }! New recruited troops will have better stats.`,
     };
   } catch (error: any) {
     return {
       success: false,
-      message: error.message || "Erro ao evoluir tropa.",
+      message: error.message || "Error upgrading troop.",
     };
   }
 }

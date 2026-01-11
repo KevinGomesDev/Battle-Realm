@@ -10,10 +10,6 @@ import { createBattleUnitsForBattle } from "../../../../units/battle-unit.factor
 export async function createBattleUnits(
   state: BattleSessionState
 ): Promise<void> {
-  console.log(
-    `[units.handler] Criando unidades para ${state.players.length} jogadores`
-  );
-
   // Coletar posições ocupadas por obstáculos
   const obstaclePositions = new Set<string>();
   for (const obstacle of state.obstacles) {
@@ -35,29 +31,14 @@ export async function createBattleUnits(
   const unitPositions = new Set<string>();
 
   for (const player of state.players) {
-    console.log(`[units.handler] Processando player:`, {
-      oderId: player.oderId,
-      kingdomId: player.kingdomId,
-      playerIndex: player.playerIndex,
-    });
-
     const kingdom = await prisma.kingdom.findUnique({
       where: { id: player.kingdomId },
       include: { regent: true },
     });
 
     if (!kingdom) {
-      console.log(
-        `[units.handler] Kingdom não encontrado: ${player.kingdomId}`
-      );
       continue;
     }
-
-    console.log(`[units.handler] Kingdom encontrado:`, {
-      id: kingdom.id,
-      name: kingdom.name,
-      hasRegent: !!kingdom.regent,
-    });
 
     const units = await createBattleUnitsForBattle(
       { ...kingdom },
@@ -74,18 +55,10 @@ export async function createBattleUnits(
       unitPositions.add(`${unit.posX},${unit.posY}`);
     }
 
-    console.log(
-      `[units.handler] Unidades criadas para ${player.oderId}:`,
-      units.map((u) => ({ id: u.id, name: u.name, ownerId: u.ownerId }))
-    );
-
     units.forEach((unit) => {
       const schema = BattleUnitSchema.fromBattleUnit(unit);
       state.units.set(unit.id, schema);
       state.actionOrder.push(unit.id);
     });
   }
-
-  console.log(`[units.handler] Total unidades: ${state.units.size}`);
-  console.log(`[units.handler] ActionOrder: ${state.actionOrder.length} IDs`);
 }

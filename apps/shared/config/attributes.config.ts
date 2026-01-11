@@ -208,10 +208,10 @@ export function getAttributeValueById(
 }
 
 // =============================================================================
-// COMPATIBILIDADE LEGADA
+// MAPEAMENTOS POR KEY (para uso no frontend)
 // =============================================================================
 
-/** @deprecated Use ATTRIBUTES[id] */
+/** Mapeamento de atributos por key string */
 export const ATTRIBUTE_NAMES: Record<AttributeKey, AttributeDefinition> =
   Object.fromEntries(
     ALL_ATTRIBUTE_IDS.map((id) => [ATTRIBUTES[id].key, ATTRIBUTES[id]])

@@ -50,7 +50,6 @@ export function registerBattleBroadcast(
   broadcastFn: (event: string, data: any) => void
 ): void {
   battleBroadcasters.set(battleId, broadcastFn);
-  console.log(`[EventService] Broadcast registrado para batalha ${battleId}`);
 }
 
 /**
@@ -58,7 +57,6 @@ export function registerBattleBroadcast(
  */
 export function unregisterBattleBroadcast(battleId: string): void {
   battleBroadcasters.delete(battleId);
-  console.log(`[EventService] Broadcast removido para batalha ${battleId}`);
 }
 
 /**
@@ -153,7 +151,6 @@ export async function loadBattleEventsFromDB(
  */
 export function clearBattleEventsCache(battleId: string): void {
   battleEventsCache.delete(battleId);
-  console.log(`[EventService] Cleared battle events cache for ${battleId}`);
 }
 
 /**
@@ -279,9 +276,6 @@ function emitEvent(event: GameEvent): void {
   if (event.battleId) {
     const broadcaster = battleBroadcasters.get(event.battleId);
     if (broadcaster) {
-      console.log(
-        `[EventService] Emitindo evento ${event.code} para batalha ${event.battleId}`
-      );
       broadcaster("event:new", event);
       return;
     } else {
@@ -427,17 +421,6 @@ export async function getEvents(
       : undefined,
     hasMore,
   };
-}
-
-/**
- * Busca eventos legados (sem paginação) - para compatibilidade
- * @deprecated Use getEvents com paginação
- */
-export async function getEventsLegacy(
-  filter: EventFilter
-): Promise<GameEvent[]> {
-  const result = await getEvents({ ...filter, limit: filter.limit || 100 });
-  return result.events;
 }
 
 // =============================================================================
@@ -836,16 +819,6 @@ export async function cleanupOldEvents(): Promise<{
 
     const duration = Date.now() - startTime;
 
-    console.log(`[EventService] Cleanup completed:`, {
-      battle: battleDeleted.count,
-      battleLobby: battleLobbyDeleted.count,
-      match: matchDeleted.count,
-      global: globalDeleted.count,
-      account: accountDeleted.count,
-      total: totalDeleted,
-      duration: `${duration}ms`,
-    });
-
     return { deleted: totalDeleted, duration };
   } catch (error) {
     console.error("[EventService] Cleanup failed:", error);
@@ -914,14 +887,11 @@ export function startAutoCleanup(intervalHours: number = 24): void {
   cleanupInterval = setInterval(() => {
     cleanupOldEvents().catch(console.error);
   }, intervalMs);
-
-  console.log(`[EventService] Auto cleanup started (every ${intervalHours}h)`);
 }
 
 export function stopAutoCleanup(): void {
   if (cleanupInterval) {
     clearInterval(cleanupInterval);
     cleanupInterval = null;
-    console.log("[EventService] Auto cleanup stopped");
   }
 }

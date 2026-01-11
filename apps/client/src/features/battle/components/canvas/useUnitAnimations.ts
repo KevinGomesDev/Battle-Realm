@@ -58,10 +58,8 @@ interface UseUnitAnimationsReturn {
 
 /**
  * Duração da animação de movimento em ms.
- * 250ms = movimento visível e suave, mas ainda responsivo.
- * Para movimento contínuo, deve ser próximo do cooldown de input.
  */
-const MOVE_ANIMATION_DURATION = 250;
+const MOVE_ANIMATION_DURATION = 700;
 
 // Função de easing (ease-out cubic para desaceleração suave)
 function easeOutCubic(t: number): number {
@@ -153,7 +151,7 @@ export function useUnitAnimations(): UseUnitAnimationsReturn {
       toX: number,
       toY: number
     ) => {
-      // Só animar se realmente houver movimento
+      // Não animar se já estiver na posição destino
       if (fromX === toX && fromY === toY) return;
 
       const anim: UnitMoveAnimation = {

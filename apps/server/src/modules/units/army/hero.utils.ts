@@ -128,31 +128,31 @@ export async function canRecruitHero(
   playerId: string,
   heroCode: string
 ): Promise<{ canRecruit: boolean; reason?: string }> {
-  // Verifica se o template existe
+  // Verify if template exists
   const template = getHeroTemplate(heroCode);
   if (!template) {
-    return { canRecruit: false, reason: "Herói não encontrado" };
+    return { canRecruit: false, reason: "Hero not found" };
   }
 
-  // Verifica se já foi recrutado na partida
+  // Check if already recruited in match
   const recruited = await getRecruitedHeroesInMatch(matchId);
   if (recruited.includes(heroCode)) {
     return {
       canRecruit: false,
-      reason: `${template.name} já foi recrutado por outro jogador`,
+      reason: `${template.name} has already been recruited by another player`,
     };
   }
 
-  // Obtém o MatchKingdom
+  // Get the MatchKingdom
   const matchKingdom = await prisma.matchKingdom.findUnique({
     where: { id: playerId },
   });
 
   if (!matchKingdom) {
-    return { canRecruit: false, reason: "Jogador não encontrado" };
+    return { canRecruit: false, reason: "Player not found" };
   }
 
-  // Conta heróis atuais do MatchKingdom na partida
+  // Count current heroes of MatchKingdom in match
   const heroCount = await prisma.unit.count({
     where: {
       ownerId: playerId,
@@ -163,11 +163,11 @@ export async function canRecruitHero(
   if (heroCount >= MAX_HEROES_PER_KINGDOM) {
     return {
       canRecruit: false,
-      reason: `Limite de ${MAX_HEROES_PER_KINGDOM} heróis atingido`,
+      reason: `Maximum of ${MAX_HEROES_PER_KINGDOM} heroes reached`,
     };
   }
 
-  // Verifica se já tem esse herói na partida
+  // Check if already has this hero in match
   const existingHero = await prisma.unit.findFirst({
     where: {
       ownerId: playerId,
@@ -179,7 +179,7 @@ export async function canRecruitHero(
   if (existingHero) {
     return {
       canRecruit: false,
-      reason: `Você já possui ${template.name} no seu reino`,
+      reason: `You already have ${template.name} in your kingdom`,
     };
   }
 
@@ -195,40 +195,40 @@ export async function recruitHeroFromTemplate(
   playerId: string,
   heroCode: string
 ): Promise<{ success: boolean; message: string; hero?: any }> {
-  // Verifica se pode recrutar
+  // Check if can recruit
   const validation = await canRecruitHero(matchId, playerId, heroCode);
   if (!validation.canRecruit) {
     return {
       success: false,
-      message: validation.reason || "Não pode recrutar",
+      message: validation.reason || "Cannot recruit",
     };
   }
 
   const template = getHeroTemplate(heroCode)!;
 
-  // Obtém o MatchKingdom
+  // Get the MatchKingdom
   const matchKingdom = await prisma.matchKingdom.findUnique({
     where: { id: playerId },
   });
 
   if (!matchKingdom) {
-    return { success: false, message: "Reino não encontrado" };
+    return { success: false, message: "Kingdom not found" };
   }
 
-  // Verifica recursos
+  // Check resources
   const resources = JSON.parse(matchKingdom.resources || "{}");
   const cost = template.recruitCost;
 
   if (cost.ore && (resources.minerio || 0) < cost.ore) {
     return {
       success: false,
-      message: `${getResourceName("ore")} insuficiente. Precisa: ${cost.ore}`,
+      message: `Insufficient ${getResourceName("ore")}. Need: ${cost.ore}`,
     };
   }
   if (cost.supplies && (resources.suprimentos || 0) < cost.supplies) {
     return {
       success: false,
-      message: `${getResourceName("supplies")} insuficiente. Precisa: ${
+      message: `Insufficient ${getResourceName("supplies")}. Need: ${
         cost.supplies
       }`,
     };
@@ -236,7 +236,7 @@ export async function recruitHeroFromTemplate(
   if (cost.arcane && (resources.arcana || 0) < cost.arcane) {
     return {
       success: false,
-      message: `${getResourceName("arcane")} insuficiente. Precisa: ${
+      message: `Insufficient ${getResourceName("arcane")}. Need: ${
         cost.arcane
       }`,
     };
@@ -244,15 +244,15 @@ export async function recruitHeroFromTemplate(
   if (cost.devotion && (resources.devocao || 0) < cost.devotion) {
     return {
       success: false,
-      message: `${getResourceName("devotion")} insuficiente. Precisa: ${
+      message: `Insufficient ${getResourceName("devotion")}. Need: ${
         cost.devotion
       }`,
     };
   }
 
-  // Busca a capital do jogador
+  // Find player's capital
   if (!matchKingdom.capitalTerritoryId) {
-    return { success: false, message: "Capital não encontrada" };
+    return { success: false, message: "Capital not found" };
   }
 
   const capital = await prisma.territory.findUnique({
@@ -260,7 +260,7 @@ export async function recruitHeroFromTemplate(
   });
 
   if (!capital) {
-    return { success: false, message: "Território da capital não encontrado" };
+    return { success: false, message: "Capital territory not found" };
   }
 
   // Gasta recursos
@@ -313,7 +313,7 @@ export async function recruitHeroFromTemplate(
 
   return {
     success: true,
-    message: `${template.icon} ${template.name} recrutado com sucesso!`,
+    message: `${template.icon} ${template.name} recruited successfully!`,
     hero,
   };
 }

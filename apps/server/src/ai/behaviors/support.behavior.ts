@@ -20,6 +20,7 @@ import {
   getSkillEffectiveRange,
 } from "../core/skill-evaluator";
 import { BattleUnit } from "@boundless/shared/types/battle.types";
+import { isSelfAbility } from "@boundless/shared/utils/ability-validation";
 import {
   tryRetreat,
   tryDash,
@@ -59,7 +60,7 @@ export function makeSupportDecision(
     // 1. Auto-cura se HP baixo
     if (selfAssessment?.isWounded) {
       const selfHealSkills = availableSkills.filter(
-        (s) => s.effectType === "HEALING" && s.targetType === "SELF"
+        (s) => s.effectType === "HEALING" && isSelfAbility(s)
       );
 
       if (selfHealSkills.length > 0) {

@@ -25,27 +25,20 @@ export const useMatchSectionActions = () => {
   }, [kingdoms, selectedKingdom]);
 
   const handleCreate = async (onSuccess?: () => void) => {
-    console.log("[MatchSection] handleCreate called", {
-      selectedKingdom,
-      hasKingdoms: kingdoms.length > 0,
-    });
     if (!selectedKingdom) {
       alert("Selecione um reino primeiro");
       return;
     }
     if (authState.user?.id) {
       const canJoin = await canJoinSession(authState.user.id);
-      console.log("[MatchSection] canJoinSession result:", canJoin);
       if (!canJoin) {
         alert(sessionState.canJoinReason || "Você já está em uma sessão ativa");
         return;
       }
     }
-    console.log("[MatchSection] Creating match with kingdom:", selectedKingdom);
     setIsCreating(true);
     try {
       await createMatch(selectedKingdom);
-      console.log("[MatchSection] Match created successfully");
       onSuccess?.();
     } catch (err: any) {
       console.error("[MatchSection] Error creating match:", err);

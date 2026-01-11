@@ -1,9 +1,9 @@
 // server/src/modules/abilities/executors/registry.ts
-// Registry unificado de todos os executores de abilities (skills + spells)
+// Registry unificado de todos os executores de abilities
 
 import type { ExecutorRegistry } from "./types";
 
-// Skills executors
+// Ability executors (unificado)
 import {
   executeAttackSkill,
   executeDash,
@@ -21,16 +21,16 @@ import {
   executeHuntersMark,
   executeVolley,
   executeEidolonResistance,
-} from "./skills";
-
-// Spells executors
-import { executeTeleport, executeFire, executeEmpower } from "./spells";
+  executeTeleport,
+  executeFire,
+  executeEmpower,
+} from "./abilities";
 
 /**
- * Mapa de functionName -> função executora (SKILLS)
+ * Registry unificado de todos os executores de abilities
  * Adicione novos executores aqui
  */
-export const SKILL_EXECUTORS: ExecutorRegistry = {
+export const ABILITY_EXECUTORS: ExecutorRegistry = {
   // Ações Comuns
   executeAttackSkill,
   executeDash,
@@ -53,6 +53,8 @@ export const SKILL_EXECUTORS: ExecutorRegistry = {
   // Mago
   executeMagicWeapon,
   executeArcaneShield,
+  executeFire,
+  executeTeleport,
 
   // Ranger
   executeHuntersMark,
@@ -60,29 +62,12 @@ export const SKILL_EXECUTORS: ExecutorRegistry = {
 
   // Invocador
   executeEidolonResistance,
-};
-
-/**
- * Mapa de executores de spells
- */
-export const SPELL_EXECUTORS: ExecutorRegistry = {
-  executeTeleport,
-  executeFire,
   executeEmpower,
-};
-
-/**
- * Mapa unificado de todos os executores (skills + spells)
- * Use este para buscar qualquer executor por functionName
- */
-export const ALL_ABILITY_EXECUTORS: ExecutorRegistry = {
-  ...SKILL_EXECUTORS,
-  ...SPELL_EXECUTORS,
 };
 
 /**
  * Busca um executor por functionName
  */
 export function getAbilityExecutor(functionName: string) {
-  return ALL_ABILITY_EXECUTORS[functionName];
+  return ABILITY_EXECUTORS[functionName];
 }

@@ -57,8 +57,6 @@ export class ArenaRoom extends Room<ArenaState> {
 
     this.setupMessageHandlers();
     this.startCleanupInterval();
-
-    console.log("[ArenaRoom] ⚔️ Arena criada");
   }
 
   async onJoin(
@@ -73,8 +71,6 @@ export class ArenaRoom extends Room<ArenaState> {
       this.state.onlineUsers.push(options.userId);
     }
 
-    console.log(`[ArenaRoom] 👤 ${options.username} entrou na arena`);
-
     // Enviar desafios pendentes para este usuário
     await this.sendPendingChallenges(client);
   }
@@ -88,8 +84,6 @@ export class ArenaRoom extends Room<ArenaState> {
 
       // Cancelar desafios pendentes deste usuário
       this.cancelUserChallenges(client.userId);
-
-      console.log(`[ArenaRoom] 👤 ${client.username} saiu da arena`);
     }
   }
 
@@ -99,8 +93,6 @@ export class ArenaRoom extends Room<ArenaState> {
     }
     this.countdownIntervals.forEach((interval) => clearInterval(interval));
     this.countdownIntervals.clear();
-
-    console.log("[ArenaRoom] Arena encerrada");
   }
 
   // ============================================
@@ -218,10 +210,6 @@ export class ArenaRoom extends Room<ArenaState> {
           challenge: this.schemaToChallenge(challenge),
         });
       }
-
-      console.log(
-        `[ArenaRoom] ⚔️ Desafio direto: ${challengerInfo.username} → ${challengedInfo.username}`
-      );
     } catch (error) {
       console.error("[ArenaRoom] Erro ao criar desafio direto:", error);
       client.send(ARENA_MESSAGES.ERROR, { error: "Erro ao criar desafio" });
@@ -260,10 +248,6 @@ export class ArenaRoom extends Room<ArenaState> {
       this.broadcast(ARENA_MESSAGES.OPEN_CHALLENGES_LIST, {
         challenges: this.getOpenChallenges(),
       });
-
-      console.log(
-        `[ArenaRoom] 📢 Desafio aberto criado: ${challengerInfo.username}`
-      );
     } catch (error) {
       console.error("[ArenaRoom] Erro ao criar desafio aberto:", error);
       client.send(ARENA_MESSAGES.ERROR, { error: "Erro ao criar desafio" });
@@ -318,10 +302,6 @@ export class ArenaRoom extends Room<ArenaState> {
 
     // Iniciar countdown
     this.startBattleCountdown(challenge);
-
-    console.log(
-      `[ArenaRoom] ✅ Desafio aceito: ${challenge.challenger.username} vs ${challenge.challenged?.username}`
-    );
   }
 
   private handleDeclineChallenge(
@@ -346,8 +326,6 @@ export class ArenaRoom extends Room<ArenaState> {
 
     // Remover desafio
     this.state.challenges.delete(challengeId);
-
-    console.log(`[ArenaRoom] ❌ Desafio recusado: ${challengeId}`);
   }
 
   private handleCancelChallenge(
@@ -387,8 +365,6 @@ export class ArenaRoom extends Room<ArenaState> {
     }
 
     this.state.challenges.delete(challengeId);
-
-    console.log(`[ArenaRoom] 🚫 Desafio cancelado: ${challengeId}`);
   }
 
   private handleListOpenChallenges(client: ArenaClient) {
@@ -513,8 +489,6 @@ export class ArenaRoom extends Room<ArenaState> {
 
       challengerClient?.send(ARENA_MESSAGES.BATTLE_STARTING, notification);
       challengedClient?.send(ARENA_MESSAGES.BATTLE_STARTING, notification);
-
-      console.log(`[ArenaRoom] ⚔️ Batalha iniciada: ${battleRoom.roomId}`);
 
       // Remover desafio após um tempo
       setTimeout(() => {

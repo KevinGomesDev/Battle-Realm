@@ -27,17 +27,11 @@ export async function startBattle(
   setMetadata: Room<BattleSessionState>["setMetadata"],
   setLobbyPhase: (value: boolean) => void,
   createBattleUnitsFn: () => Promise<void>,
-  initQTEFn: () => void,
   calculateActionOrderFn: () => void,
   startTurnTimerFn: () => void
 ): Promise<void> {
-  console.log(`[BattleRoom] ========== START BATTLE ==========`);
-  console.log(`[BattleRoom] Room: ${roomId}`);
-  console.log(`[BattleRoom] Players: ${state.players.length}`);
-
   setLobbyPhase(false);
   state.status = "ACTIVE";
-  console.log(`[BattleRoom] Status setado para: ${state.status}`);
 
   // Gerar configuração do mapa
   const terrainType = getRandomTerrain();
@@ -60,15 +54,8 @@ export async function startBattle(
   // Criar unidades para cada jogador (ANTES de persistir para ter os dados completos)
   await createBattleUnitsFn();
 
-  console.log(`[BattleRoom] Unidades criadas: ${state.units.size}`);
-
-  // Inicializar QTE Manager
-  initQTEFn();
-
   // Definir ordem de ação
   calculateActionOrderFn();
-
-  console.log(`[BattleRoom] actionOrder: ${state.actionOrder.length} unidades`);
 
   // Iniciar timer de turno
   state.turnTimer = TURN_CONFIG.timerSeconds;
@@ -78,28 +65,9 @@ export async function startBattle(
   // Isso inclui todas as unidades, obstáculos, actionOrder, etc.
   // Usa status "ACTIVE" para criação inicial
   await persistBattle(roomId, state, "ACTIVE");
-  console.log(
-    `[BattleRoom] Batalha ${roomId} persistida completamente no banco de dados`
-  );
 
   // Preparar lista de players para uso no metadata
   const playerIds = state.players.map((p: BattlePlayerSchema) => p.oderId);
-
-  console.log(`[BattleRoom] Estado final antes de broadcast:`, {
-    battleId: state.battleId,
-    status: state.status,
-    round: state.round,
-    gridWidth: state.gridWidth,
-    gridHeight: state.gridHeight,
-    playersCount: state.players.length,
-    unitsCount: state.units.size,
-    obstaclesCount: state.obstacles.length,
-    turnTimer: state.turnTimer,
-    currentPlayerId: state.currentPlayerId,
-    activeUnitId: state.activeUnitId,
-    actionOrderLength: state.actionOrder.length,
-    firstUnitInOrder: state.actionOrder.at(0),
-  });
 
   // Preparar lista de players e kingdoms para metadata (reutilizando playerIds já definido)
   const playerKingdoms: Record<string, string> = {};
@@ -114,8 +82,6 @@ export async function startBattle(
     players: playerIds,
     playerKingdoms,
   });
-
-  console.log(`[BattleRoom] Metadata atualizado com players:`, playerIds);
 
   // Serializar estado completo para o broadcast
   const serializedState = {

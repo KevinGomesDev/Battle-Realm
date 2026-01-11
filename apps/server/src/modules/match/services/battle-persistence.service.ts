@@ -166,16 +166,9 @@ export async function markBattleEnded(
 
     // Deletar a batalha
     await prisma.battle.delete({ where: { id: battleId } });
-
-    console.log(
-      `[BattlePersistence] Batalha ${battleId} finalizada e deletada (winner: ${winnerId}, reason: ${winReason})`
-    );
   } catch (error: any) {
     // Se a batalha não existe no banco, não é um erro crítico
     if (error?.code === "P2025") {
-      console.log(
-        `[BattlePersistence] Batalha ${battleId} não encontrada no banco para deleção`
-      );
       return;
     }
     throw error;
@@ -189,7 +182,6 @@ export async function deleteBattle(battleId: string): Promise<void> {
   try {
     await prisma.battleUnit.deleteMany({ where: { battleId } });
     await prisma.battle.delete({ where: { id: battleId } });
-    console.log(`[BattlePersistence] Batalha ${battleId} deletada do banco`);
   } catch (error) {
     console.error(
       `[BattlePersistence] Erro ao deletar batalha ${battleId}:`,
@@ -228,8 +220,6 @@ export async function pauseMatch(matchId: string): Promise<void> {
       updatedAt: new Date(),
     },
   });
-
-  console.log(`[BattlePersistence] Match ${matchId} pausado`);
 }
 
 export async function findActiveMatchForUser(
@@ -289,7 +279,7 @@ function parseUnitFromDb(unit: BattleUnit): PersistedBattleUnit {
   const conditions = JSON.parse(unit.conditions || "[]");
 
   return {
-    id: unit.oderId || unit.id, // oderId é o ID da unidade na batalha
+    id: unit.unitBattleId || unit.id, // unitBattleId é o ID da unidade na batalha
     sourceUnitId: unit.unitId,
     ownerId: unit.userId, // Prisma usa userId, mapeamos para ownerId do schema
     ownerKingdomId: unit.kingdomId, // Prisma usa kingdomId, mapeamos para ownerKingdomId do schema

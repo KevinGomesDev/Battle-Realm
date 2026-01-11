@@ -206,8 +206,6 @@ model Unit {
   spells         String       @default("[]") // Códigos das spells disponíveis (concedidas via eventos/skills)
   // Condições permanentes da unidade (ex: buffs de eventos, maldições, etc)
   conditions     String       @default("[]") // Códigos das condições ativas (JSON array)
-  // Cooldowns de skills/spells entre batalhas
-  unitCooldowns  String       @default("{}") // { code: turnosRestantes } (JSON object)
   // Hotbar - Barra de atalhos (1-9 e Shift+1-9) - JSON: UnitHotbarConfig
   hotbar         String       @default("{}") // { primary: [9 slots], secondary: [9 slots] }
   combat         Int
@@ -221,18 +219,12 @@ model Unit {
   currentHp      Int
   maxMana        Int          @default(0)  // Mana máximo (Will * MANA_CONFIG.multiplier)
   currentMana    Int          @default(0)  // Mana atual
-  movesLeft      Int
-  actionsLeft    Int
   isAlive        Boolean      @default(true) // Morte permanente em partidas
   locationIndex  Int?
-  // NOTA: Campo 'actions' foi REMOVIDO - ações são calculadas em runtime
-  // a partir de DEFAULT_UNIT_ACTIONS + skills ativas do features
   
   // === NEMESIS SYSTEM ===
   // Identificador único se esta unidade é/foi um Nemesis
   nemesisId           String?     // ID do Nemesis (se for um)
-  // Dados de Nemesis (apenas para unidades que são Nemesis)
-  nemesisData         String      @default("{}") // JSON: NemesisData completo
 }
 
 model Structure {
@@ -344,7 +336,7 @@ model BattleUnit {
   ownerId     String?     // MatchKingdom ID (for matches)
   owner       MatchKingdom? @relation(fields: [ownerId], references: [id])
   // Data copied from Unit for battle
-  oderId      String?     // ID da unidade na batalha (diferente do id do banco)
+  unitBattleId String?    // ID da unidade na batalha (diferente do id do banco)
   userId      String?     // Owner User ID (for PvP battles)
   kingdomId   String?     // Owner Kingdom ID
   name        String      @default("Unit")
@@ -355,7 +347,6 @@ model BattleUnit {
   race        String?     // Raça da unidade (ex: HUMAN, ORC)
   classCode   String?     // Código da classe (ex: BARBARIAN, WARRIOR)
   features    String      @default("[]") // Skills/features da unidade (JSON) - actions disponíveis
-  learnedSkills String    @default("[]") // Skills aprendidas do DB (JSON) - fonte: Unit.features
   equipment   String      @default("[]") // Itens equipados (JSON)
   spells      String      @default("[]") // Códigos das spells disponíveis (JSON)
   combat      Int         @default(1)
@@ -372,7 +363,6 @@ model BattleUnit {
   // Battle state
   posX        Int         @default(0)
   posY        Int         @default(0)
-  initiative  Int         @default(0)
   movesLeft   Int         @default(3)
   actionsLeft Int         @default(1)
   attacksLeftThisTurn Int @default(0)          // Ataques restantes neste turno (extraAttacks)
@@ -384,9 +374,7 @@ model BattleUnit {
   maxMagicalProtection   Int  @default(0)      // Max proteção mágica
   conditions  String      @default("[]")        // JSON: ["FROZEN", ...]
   grabbedByBattleUnitId String?
-  corpseRemoved Boolean   @default(false)      // If true, corpse no longer blocks
   hasStartedAction Boolean @default(false)     // If unit already started action this turn
-  actions     String      @default("[\"attack\",\"move\",\"dash\",\"dodge\"]") // Available actions (copied from Unit)
   isAIControlled Boolean  @default(false)     // If true, AI controls this unit (funnel)
   aiBehavior  String      @default("AGGRESSIVE") // Comportamento da IA (AGGRESSIVE, DEFENSIVE, etc)
   // Unit size and vision

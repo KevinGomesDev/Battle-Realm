@@ -20,11 +20,14 @@ import {
   schemaUnitToBattleUnit,
   canAttack,
   consumeAttackResource,
+  syncUnitFromResult,
 } from "./utils";
 import { getUserData, sendError } from "./types";
+import { processUnitDeath } from "../../../../combat/death-logic";
 
 /**
  * Handler principal de ataque
+ * Sem QTE - executa ataque diretamente
  */
 export function handleAttack(
   client: Client,
@@ -32,11 +35,6 @@ export function handleAttack(
   state: BattleSessionState,
   roomId: string,
   broadcast: Room<BattleSessionState>["broadcast"],
-  startQTEFn: (
-    client: Client,
-    attacker: BattleUnitSchema,
-    target: BattleUnitSchema
-  ) => void,
   targetId?: string,
   targetObstacleId?: string,
   targetPosition?: { x: number; y: number }
@@ -61,7 +59,7 @@ export function handleAttack(
   }
 
   if (targetId) {
-    handleUnitAttack(client, attacker, targetId, state, startQTEFn);
+    handleUnitAttack(attacker, targetId, state, roomId, broadcast);
   } else if (targetObstacleId) {
     handleObstacleAttack(
       client,
@@ -73,43 +71,82 @@ export function handleAttack(
     );
   } else if (targetPosition) {
     handlePositionAttack(
-      client,
       attackerId,
       attacker,
       targetPosition,
       state,
       roomId,
-      broadcast,
-      startQTEFn
+      broadcast
     );
   }
 }
 
 function handleUnitAttack(
-  client: Client,
   attacker: BattleUnitSchema,
   targetId: string,
   state: BattleSessionState,
-  startQTEFn: (
-    client: Client,
-    attacker: BattleUnitSchema,
-    target: BattleUnitSchema
-  ) => void
+  roomId: string,
+  broadcast: Room<BattleSessionState>["broadcast"]
 ): void {
   const target = state.units.get(targetId);
   if (!target) {
-    sendError(client, "Alvo não encontrado");
     return;
   }
 
   if (
     !isWithinRange(attacker.posX, attacker.posY, target.posX, target.posY, 1)
   ) {
-    sendError(client, "Alvo fora de alcance");
     return;
   }
 
-  startQTEFn(client, attacker, target);
+  // Executar ataque diretamente (sem QTE)
+  const allUnits: BattleUnit[] = Array.from(state.units.values()).map((u) =>
+    schemaUnitToBattleUnit(u)
+  );
+  const attackerUnit = schemaUnitToBattleUnit(attacker);
+  const targetUnit = schemaUnitToBattleUnit(target);
+
+  const result = executeAttack(
+    attackerUnit,
+    targetUnit,
+    allUnits,
+    { code: "ATTACK" } as any,
+    "FISICO",
+    undefined,
+    roomId
+  );
+
+  if (!result.success) {
+    console.error("[combat.handler] Ataque falhou:", result.error);
+    return;
+  }
+
+  // Sincronizar attacker
+  syncUnitFromResult(attacker, attackerUnit, result);
+
+  // Sincronizar target
+  if (result.targetHpAfter !== undefined) {
+    target.currentHp = result.targetHpAfter;
+    if (result.targetHpAfter <= 0 && target.isAlive) {
+      target.isAlive = false;
+      processUnitDeath(targetUnit, allUnits);
+    }
+  }
+
+  // Broadcast ataque
+  broadcast("battle:skill_used", {
+    casterUnitId: attacker.id,
+    skillCode: "ATTACK",
+    targetPosition: { x: target.posX, y: target.posY },
+    result,
+    casterUpdated: {
+      actionsLeft: attacker.actionsLeft,
+      movesLeft: attacker.movesLeft,
+      currentHp: attacker.currentHp,
+      currentMana: attacker.currentMana,
+      attacksLeftThisTurn: attacker.attacksLeftThisTurn,
+    },
+  });
 }
 
 function handleObstacleAttack(
@@ -143,18 +180,12 @@ function handleObstacleAttack(
 }
 
 function handlePositionAttack(
-  client: Client,
   attackerId: string,
   attacker: BattleUnitSchema,
   targetPosition: { x: number; y: number },
   state: BattleSessionState,
   roomId: string,
-  broadcast: Room<BattleSessionState>["broadcast"],
-  startQTEFn: (
-    client: Client,
-    attacker: BattleUnitSchema,
-    target: BattleUnitSchema
-  ) => void
+  broadcast: Room<BattleSessionState>["broadcast"]
 ): void {
   if (
     !isWithinRange(
@@ -165,7 +196,6 @@ function handlePositionAttack(
       1
     )
   ) {
-    sendError(client, "Posição fora de alcance");
     return;
   }
 
@@ -188,7 +218,7 @@ function handlePositionAttack(
   });
 
   if (unitAtPosition) {
-    handleUnitAttack(client, attacker, unitAtPosition.id, state, startQTEFn);
+    handleUnitAttack(attacker, unitAtPosition.id, state, roomId, broadcast);
     return;
   }
 
@@ -210,10 +240,9 @@ function handlePositionAttack(
   });
 
   if (obstacleAtPosition) {
-    handleObstacleAttack(
-      client,
+    performObstacleAttack(
       attacker,
-      obstacleAtPosition.id,
+      obstacleAtPosition,
       state,
       roomId,
       broadcast
@@ -252,10 +281,6 @@ function handlePositionAttack(
   }).catch((err) =>
     console.error("[BattleRoom] Erro ao criar evento de miss:", err)
   );
-
-  console.log(
-    `[BattleRoom] ⚔️ Ataque no ar: ${attacker.name} atacou posição (${targetPosition.x}, ${targetPosition.y}) sem alvo`
-  );
 }
 
 /**
@@ -276,6 +301,7 @@ export function performObstacleAttack(
     type: obstacle.type as ObstacleType,
     hp: obstacle.hp,
     destroyed: obstacle.destroyed,
+    size: obstacle.size as any,
   };
 
   const result = executeAttack(

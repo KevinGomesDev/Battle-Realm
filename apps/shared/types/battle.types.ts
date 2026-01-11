@@ -3,6 +3,18 @@
 // NOTA: As definições de configuração estão centralizadas em global.config.ts
 // Este arquivo re-exporta para compatibilidade
 
+// =============================================================================
+// TIPOS BASE
+// =============================================================================
+
+/**
+ * Posição no grid de batalha
+ */
+export interface Position {
+  x: number;
+  y: number;
+}
+
 // Re-exportar tipos e configurações de global.config.ts
 export type {
   TerritorySize,
@@ -59,7 +71,7 @@ export interface BattleObstacle {
   type: ObstacleType;
   /** Tamanho do obstáculo (SMALL=1x1, MEDIUM=2x2, LARGE=3x3, HUGE=4x4) */
   size: ObstacleSize;
-  /** @deprecated Use 'type' - mantido apenas para compatibilidade */
+  /** Emoji para exibição (fallback se não houver sprite) */
   emoji?: string;
   hp?: number; // HP do obstáculo (default: baseado no tamanho)
   maxHp?: number; // HP máximo (default: baseado no tamanho)

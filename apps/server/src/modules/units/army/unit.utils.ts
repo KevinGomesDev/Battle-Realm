@@ -44,7 +44,7 @@ export async function addExperience(
     return {
       success: false,
       leveledUp: false,
-      message: "Unidade não encontrada",
+      message: "Unit not found",
     };
   }
 
@@ -55,13 +55,13 @@ export async function addExperience(
       return {
         ...result,
         redirectedTo: unit.summonerId,
-        message: `XP redirecionado para invocador: ${result.message}`,
+        message: `XP redirected to summoner: ${result.message}`,
       };
     }
     return {
       success: false,
       leveledUp: false,
-      message: "Invocação sem invocador - XP perdido",
+      message: "Summon without summoner - XP lost",
     };
   }
 
@@ -80,7 +80,7 @@ export async function addExperience(
       success: true,
       leveledUp: true,
       newLevel,
-      message: `+${xpAmount} XP! Subiu para nível ${newLevel}!`,
+      message: `+${xpAmount} XP! Leveled up to ${newLevel}!`,
     };
   }
 
@@ -88,7 +88,7 @@ export async function addExperience(
   return {
     success: true,
     leveledUp: false,
-    message: `+${xpAmount} XP (${xpToNext} para próximo nível)`,
+    message: `+${xpAmount} XP (${xpToNext} to next level)`,
   };
 }
 
@@ -104,21 +104,21 @@ export async function canLevelUp(
   });
 
   if (!unit) {
-    return { canLevel: false, reason: "Unidade não encontrada" };
+    return { canLevel: false, reason: "Unit not found" };
   }
 
-  // SUMMON não pode fazer level up
+  // SUMMON cannot level up
   if (unit.category === "SUMMON") {
     return {
       canLevel: false,
-      reason: "Invocações não podem subir de nível",
+      reason: "Summons cannot level up",
     };
   }
 
   if (unit.level >= MAX_HERO_LEVEL) {
     return {
       canLevel: false,
-      reason: `Nível máximo (${MAX_HERO_LEVEL}) atingido`,
+      reason: `Maximum level (${MAX_HERO_LEVEL}) reached`,
     };
   }
 
@@ -126,7 +126,7 @@ export async function canLevelUp(
   const pendingLevels = expectedLevel - unit.level;
 
   if (pendingLevels <= 0) {
-    return { canLevel: false, reason: "XP insuficiente para subir de nível" };
+    return { canLevel: false, reason: "Insufficient XP to level up" };
   }
 
   return { canLevel: true, pendingLevels };
@@ -152,19 +152,19 @@ export async function processLevelUp(
   });
 
   if (!unit) {
-    return { success: false, message: "Unidade não encontrada" };
+    return { success: false, message: "Unit not found" };
   }
 
-  // Verifica se deve subir de nível baseado no XP
+  // Check if should level up based on XP
   const expectedLevel = calculateLevelFromXP(unit.experience || 0);
   if (expectedLevel <= unit.level) {
-    return { success: false, message: "XP insuficiente para subir de nível" };
+    return { success: false, message: "Insufficient XP to level up" };
   }
 
   if (unit.level >= MAX_HERO_LEVEL) {
     return {
       success: false,
-      message: `Nível máximo (${MAX_HERO_LEVEL}) atingido`,
+      message: `Maximum level (${MAX_HERO_LEVEL}) reached`,
     };
   }
 
@@ -183,15 +183,15 @@ export async function processLevelUp(
   if (totalDistributed !== pointsPerLevel) {
     return {
       success: false,
-      message: `Distribua exatamente ${pointsPerLevel} pontos (${unit.category})`,
+      message: `Distribute exactly ${pointsPerLevel} points (${unit.category})`,
     };
   }
 
-  // Valida que não há valores negativos
+  // Validate no negative values
   if (Object.values(attributeDistribution).some((v) => v < 0)) {
     return {
       success: false,
-      message: "Valores de atributo não podem ser negativos",
+      message: "Attribute values cannot be negative",
     };
   }
 
@@ -321,10 +321,10 @@ export async function addUnitFeature(
   });
 
   if (!unit) {
-    return { success: false, message: "Unidade não encontrada" };
+    return { success: false, message: "Unit not found" };
   }
 
-  // Validação opcional de classe (só para skills, não spells)
+  // Optional class validation (only for skills, not spells)
   if (validateClass && unit.classCode && target === "features") {
     const unitClass = getClassByCode(unit.classCode);
     if (unitClass) {
@@ -335,7 +335,7 @@ export async function addUnitFeature(
       if (!isValidSkill) {
         return {
           success: false,
-          message: "Esta skill não está disponível para esta classe",
+          message: "This skill is not available for this class",
         };
       }
     }
@@ -346,7 +346,7 @@ export async function addUnitFeature(
   ) as string[];
 
   if (currentList.includes(featureCode)) {
-    return { success: false, message: "Habilidade já adicionada" };
+    return { success: false, message: "Ability already added" };
   }
 
   currentList.push(featureCode);
@@ -356,8 +356,8 @@ export async function addUnitFeature(
     data: { [target]: JSON.stringify(currentList) },
   });
 
-  const typeName = target === "spells" ? "Magia" : "Skill";
-  return { success: true, message: `${typeName} ${featureCode} adicionada!` };
+  const typeName = target === "spells" ? "Spell" : "Skill";
+  return { success: true, message: `${typeName} ${featureCode} added!` };
 }
 
 /**
@@ -373,7 +373,7 @@ export async function removeUnitFeature(
   });
 
   if (!unit) {
-    return { success: false, message: "Unidade não encontrada" };
+    return { success: false, message: "Unit not found" };
   }
 
   const currentList = JSON.parse(
@@ -382,7 +382,7 @@ export async function removeUnitFeature(
 
   const index = currentList.indexOf(featureCode);
   if (index === -1) {
-    return { success: false, message: "Habilidade não encontrada" };
+    return { success: false, message: "Ability not found" };
   }
 
   currentList.splice(index, 1);
@@ -392,8 +392,8 @@ export async function removeUnitFeature(
     data: { [target]: JSON.stringify(currentList) },
   });
 
-  const typeName = target === "spells" ? "Magia" : "Skill";
-  return { success: true, message: `${typeName} ${featureCode} removida!` };
+  const typeName = target === "spells" ? "Spell" : "Skill";
+  return { success: true, message: `${typeName} ${featureCode} removed!` };
 }
 
 // =============================================================================
@@ -413,33 +413,33 @@ export async function canPurchaseLevelUp(
   });
 
   if (!unit) {
-    return { canLevel: false, reason: "Unidade não encontrada" };
+    return { canLevel: false, reason: "Unit not found" };
   }
 
-  // SUMMON não pode fazer level up
+  // SUMMON cannot level up
   if (unit.category === "SUMMON") {
     return {
       canLevel: false,
-      reason: "Invocações não podem subir de nível",
+      reason: "Summons cannot level up",
     };
   }
 
   if (unit.ownerId !== playerId) {
-    return { canLevel: false, reason: "Você não é dono desta unidade" };
+    return { canLevel: false, reason: "You do not own this unit" };
   }
 
   if (unit.level >= MAX_HERO_LEVEL) {
     return {
       canLevel: false,
-      reason: `Nível máximo (${MAX_HERO_LEVEL}) atingido`,
+      reason: `Maximum level (${MAX_HERO_LEVEL}) reached`,
     };
   }
 
-  // Verifica se está em território adequado (com Batalha ou Capital)
+  // Check if in appropriate territory (with Battle or Capital)
   if (!unit.matchId || unit.locationIndex === null) {
     return {
       canLevel: false,
-      reason: "Unidade deve estar em uma partida e em um território",
+      reason: "Unit must be in a match and in a territory",
     };
   }
 
@@ -451,7 +451,7 @@ export async function canPurchaseLevelUp(
   });
 
   if (!territory) {
-    return { canLevel: false, reason: "Território não encontrado" };
+    return { canLevel: false, reason: "Territory not found" };
   }
 
   const isInCapital = territory.isCapital && territory.ownerId === playerId;
@@ -468,9 +468,9 @@ export async function canPurchaseLevelUp(
   if (!isInCapital && !hasXpProducer) {
     return {
       canLevel: false,
-      reason: `Unidade precisa estar na Capital ou em território com Produtor de ${getResourceName(
+      reason: `Unit must be in the Capital or in a territory with ${getResourceName(
         "experience"
-      )} (Battle)`,
+      )} Producer (Battle)`,
     };
   }
 
@@ -500,7 +500,7 @@ export async function purchaseLevelUp(
   if (!validation.canLevel) {
     return {
       success: false,
-      message: validation.reason || "Não pode fazer level up",
+      message: validation.reason || "Cannot level up",
     };
   }
 
@@ -511,13 +511,13 @@ export async function purchaseLevelUp(
   });
 
   if (!unit) {
-    return { success: false, message: "Unidade não encontrada" };
+    return { success: false, message: "Unit not found" };
   }
 
-  // Determina pontos por nível baseado na categoria
+  // Determine points per level based on category
   const pointsPerLevel = ATTRIBUTE_POINTS_PER_LEVEL[unit.category] || 2;
 
-  // Valida distribuição de pontos
+  // Validate point distribution
   const totalDistributed =
     attributeDistribution.combat +
     attributeDistribution.speed +
@@ -529,25 +529,25 @@ export async function purchaseLevelUp(
   if (totalDistributed !== pointsPerLevel) {
     return {
       success: false,
-      message: `Distribua exatamente ${pointsPerLevel} pontos (${unit.category})`,
+      message: `Distribute exactly ${pointsPerLevel} points (${unit.category})`,
     };
   }
 
-  // Valida que não há valores negativos
+  // Validate no negative values
   if (Object.values(attributeDistribution).some((v) => v < 0)) {
     return {
       success: false,
-      message: "Valores de atributo não podem ser negativos",
+      message: "Attribute values cannot be negative",
     };
   }
 
-  // Gasta experiência
+  // Spend experience
   try {
     await spendResources(playerId, { experience: cost } as any);
   } catch (error) {
     return {
       success: false,
-      message: `${getResourceName("experience")} insuficiente. Custo: ${cost}`,
+      message: `Insufficient ${getResourceName("experience")}. Cost: ${cost}`,
     };
   }
 
@@ -570,7 +570,7 @@ export async function purchaseLevelUp(
     success: true,
     message: `${
       unit.name || unit.category
-    } subiu para nível ${newLevel}! Custo: ${cost} ${getResourceName(
+    } leveled up to ${newLevel}! Cost: ${cost} ${getResourceName(
       "experience"
     )}`,
     unit: updatedUnit,

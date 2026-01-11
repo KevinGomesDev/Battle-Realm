@@ -21,28 +21,28 @@ export async function validateMovement(
   });
 
   if (!unit) {
-    return { valid: false, reason: "Unidade não encontrada" };
+    return { valid: false, reason: "Unit not found" };
   }
 
-  // Verifica se é dono da unidade
+  // Check if owns the unit
   if (unit.ownerId !== playerId) {
-    return { valid: false, reason: "Você não é dono desta unidade" };
+    return { valid: false, reason: "You do not own this unit" };
   }
 
-  // Verifica se está em uma partida (matchId deve estar setado)
+  // Check if in a match (matchId must be set)
   if (!unit.matchId) {
-    return { valid: false, reason: "Unidade não está em uma partida" };
+    return { valid: false, reason: "Unit is not in a match" };
   }
 
-  // Verifica se está no território correto
+  // Check if in the correct territory
   if (unit.locationIndex !== sourceTerritory) {
     return {
       valid: false,
-      reason: "Unidade não está no território indicado",
+      reason: "Unit is not in the indicated territory",
     };
   }
 
-  // Valida destino
+  // Validate destination
   const destination = await prisma.territory.findFirst({
     where: {
       matchId: unit.matchId,
@@ -51,7 +51,7 @@ export async function validateMovement(
   });
 
   if (!destination) {
-    return { valid: false, reason: "Território de destino não existe" };
+    return { valid: false, reason: "Destination territory does not exist" };
   }
 
   // Calcula custo de movimento
@@ -84,7 +84,7 @@ export async function moveUnit(
   if (!validation.valid) {
     return {
       success: false,
-      message: validation.reason || "Movimento inválido",
+      message: validation.reason || "Invalid movement",
     };
   }
 
@@ -188,22 +188,22 @@ export async function getUnitMovementInfo(
   if (!unit) {
     return {
       canMove: false,
-      reason: "Unidade não encontrada",
+      reason: "Unit not found",
     };
   }
 
   if (unit.ownerId !== playerId) {
     return {
       canMove: false,
-      reason: "Você não é dono desta unidade",
+      reason: "You do not own this unit",
     };
   }
 
-  // Verifica se a unidade está em uma partida
+  // Check if unit is in a match
   if (!unit.matchId || unit.locationIndex === null) {
     return {
       canMove: false,
-      reason: "Unidade não está em uma partida ou posição válida",
+      reason: "Unit is not in a match or valid position",
     };
   }
 

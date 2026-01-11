@@ -2,6 +2,11 @@
 // Tipagem para ação pendente aguardando alvo
 
 import type { AbilityDefinition } from "@shared/types";
+import {
+  inferTargetType,
+  isSelfAbility,
+} from "@boundless/shared/utils/ability-validation";
+import { getAbilityEffectiveRange } from "@boundless/shared/types/ability.types";
 
 /**
  * Tipo de ação pendente
@@ -51,7 +56,7 @@ export function pendingAbilityRequiresTarget(
   const { ability } = pending;
 
   // SELF não requer seleção de alvo
-  if (ability.targetType === "SELF" || ability.range === "SELF") {
+  if (isSelfAbility(ability)) {
     return false;
   }
 
@@ -67,26 +72,21 @@ export function getPendingAbilityTargetText(
   if (!pending) return "um alvo";
 
   const { ability } = pending;
+  const targetType = inferTargetType(ability);
+  const range = getAbilityEffectiveRange(ability);
 
-  if (ability.targetType === "POSITION" || ability.targetType === "GROUND") {
-    return "uma posição no mapa";
-  }
-
-  if (ability.range === "MELEE") {
-    return "um alvo adjacente";
-  }
-
-  if (ability.range === "RANGED") {
-    return "um alvo no alcance";
-  }
-
-  if (ability.range === "AREA") {
+  if (targetType === "POSITION") {
     return "uma posição para a área";
   }
 
-  if (ability.targetType === "UNIT") {
-    return "uma unidade alvo";
+  if (targetType === "SELF") {
+    return "si mesmo";
   }
 
-  return "um alvo";
+  // UNIT target type - range determina texto
+  if (range <= 1) {
+    return "um alvo adjacente";
+  }
+
+  return "um alvo no alcance";
 }

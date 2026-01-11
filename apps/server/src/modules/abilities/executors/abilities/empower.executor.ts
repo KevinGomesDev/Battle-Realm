@@ -40,10 +40,6 @@ export function executeEmpower(
   // Valor do boost baseado no Focus do conjurador
   const boostValue = Math.floor(caster.focus / 2);
 
-  console.log(
-    `⚡ ${targetUnit.name} foi potencializado por ${duration} turno(s)! (+${boostValue} em todos atributos)`
-  );
-
   return {
     success: true,
     conditionsApplied: [

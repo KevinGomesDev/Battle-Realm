@@ -75,17 +75,6 @@ export interface BattleContextType {
     targetPosition: { x: number; y: number }
   ) => void;
   endAction: (unitId: string) => void;
-  executeAction: (
-    actionName: string,
-    unitId: string,
-    params?: Record<string, unknown>
-  ) => void;
-  castSpell: (
-    unitId: string,
-    spellCode: string,
-    targetId?: string,
-    targetPosition?: { x: number; y: number }
-  ) => void;
   surrender: () => void;
   requestRematch: () => void;
   dismissBattleResult: () => void;

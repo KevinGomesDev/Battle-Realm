@@ -13,6 +13,5 @@ export * from "./registry";
 // Executor unificado (principal)
 export * from "./ability-executors";
 
-// Re-exports individuais para compatibilidade
-export * from "./skills";
-export * from "./spells";
+// Re-exports individuais
+export * from "./abilities";

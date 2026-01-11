@@ -2,7 +2,7 @@
 // Factory para criação de BattleUnits - elimina duplicação de código
 
 import { determineUnitActions } from "./unit-actions";
-import { findAbilityByCode as findSkillByCode } from "@boundless/shared/data/abilities.data";
+import { findAbilityByCode } from "@boundless/shared/data/abilities.data";
 import { getRacePassiveCondition } from "@boundless/shared/data/races.data";
 import { calculateActiveEffects } from "../conditions/conditions";
 import {
@@ -87,12 +87,6 @@ export function createBattleUnit(
 
   // Parse spells do JSON
   const spells: string[] = JSON.parse(dbUnit.spells || "[]");
-  console.log("[BATTLE_UNIT_FACTORY] Creating unit with spells:", {
-    unitId: dbUnit.id,
-    unitName: dbUnit.name,
-    rawSpells: dbUnit.spells,
-    parsedSpells: spells,
-  });
 
   // Parse conditions permanentes do Unit (Nexus)
   const unitConditions: string[] = JSON.parse(dbUnit.conditions || "[]");
@@ -121,7 +115,7 @@ export function createBattleUnit(
 
   // Adicionar condições de skills passivas (se ainda não estiverem)
   for (const skillCode of learnedSkills) {
-    const skill = findSkillByCode(skillCode);
+    const skill = findAbilityByCode(skillCode);
     if (skill && skill.activationType === "PASSIVE" && skill.conditionApplied) {
       if (!initialConditions.includes(skill.conditionApplied)) {
         initialConditions.push(skill.conditionApplied);

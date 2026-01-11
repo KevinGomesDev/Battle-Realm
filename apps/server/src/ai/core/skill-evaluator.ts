@@ -1,5 +1,5 @@
 // server/src/ai/core/skill-evaluator.ts
-// Avalia��o e sele��o de skills para a IA
+// Avaliação e seleção de skills para a IA
 
 import { BattleUnit } from "@boundless/shared/types/battle.types";
 import type { AbilityDefinition as SkillDefinition } from "@boundless/shared/types/ability.types";
@@ -29,22 +29,26 @@ export function getSkillEffectiveRange(
   skill: SkillDefinition,
   caster?: BattleUnit
 ): number {
-  // Se não tiver caster, usar valores padrão
+  // Se não tiver caster, usar maxRange do pattern
   if (!caster) {
-    const DEFAULT_RANGE_VALUES: Record<string, number> = {
-      SELF: 0,
-      MELEE: 1,
-      RANGED: 5,
-      AREA: 5,
-    };
-    return DEFAULT_RANGE_VALUES[skill.range || "MELEE"] || 1;
+    const pattern = skill.targetingPattern;
+    if (!pattern) return 1; // fallback melee
+
+    // SELF abilities têm range 0
+    if (pattern.origin === "CASTER") return 0;
+
+    // Resolver maxRange se for número
+    if (typeof pattern.maxRange === "number") {
+      return pattern.maxRange;
+    }
+
+    return 1; // fallback melee
   }
   return getSkillRangeShared(skill, caster);
 }
 
 /**
- * Verifica se uma skill pode ser usada em um alvo espec�fico
- * @deprecated Use isValidAbilityTarget de shared/utils/ability-validation
+ * Verifica se uma skill pode ser usada em um alvo específico
  */
 export function canUseSkillOnTarget(
   caster: BattleUnit,

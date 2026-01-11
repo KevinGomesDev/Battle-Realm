@@ -56,7 +56,6 @@ export class MatchRoom extends Room<MatchState> {
 
   async onCreate(options: MatchRoomOptions) {
     this.autoDispose = true;
-    console.log(`[MatchRoom] Criando partida: ${this.roomId}`);
 
     this.setState(new MatchState());
     this.state.matchId = this.roomId;
@@ -78,15 +77,11 @@ export class MatchRoom extends Room<MatchState> {
   async onJoin(client: Client, options: JoinOptions) {
     const { userId, kingdomId } = options;
 
-    console.log(`[MatchRoom] ${userId} entrando na partida ${this.roomId}`);
-
     // Verificar se o jogador já existe (reconexão)
     const existingPlayer = this.state.getPlayer(userId);
     if (existingPlayer) {
       // Permitir reconexão em qualquer status da partida
       client.userData = { userId, kingdomId };
-
-      console.log(`[MatchRoom] Jogador ${userId} reconectado à partida`);
 
       // Cancelar persistência pendente
       this.cancelPersistence();
@@ -180,7 +175,6 @@ export class MatchRoom extends Room<MatchState> {
     if (!userData) return;
 
     const { userId } = userData;
-    console.log(`[MatchRoom] ${userId} saiu da partida`);
 
     if (this.state.status === "WAITING") {
       this.state.players.delete(userId);
@@ -211,9 +205,6 @@ export class MatchRoom extends Room<MatchState> {
     if (this.state.status === "ACTIVE" || this.state.status === "PREPARATION") {
       // Para Match, verificamos se não há nenhum client conectado
       if (this.clients.length === 0) {
-        console.log(
-          `[MatchRoom] Todos os jogadores desconectaram. Pausando partida em 30s...`
-        );
 
         this.persistenceTimer = this.clock.setTimeout(async () => {
           await this.pauseMatchToDb();
@@ -229,7 +220,6 @@ export class MatchRoom extends Room<MatchState> {
     if (this.persistenceTimer) {
       this.persistenceTimer.clear();
       this.persistenceTimer = null;
-      console.log(`[MatchRoom] Persistência cancelada - jogador reconectou`);
     }
   }
 
@@ -239,14 +229,12 @@ export class MatchRoom extends Room<MatchState> {
   private async pauseMatchToDb() {
     try {
       await pauseMatch(this.roomId);
-      console.log(`[MatchRoom] Partida ${this.roomId} pausada no banco`);
     } catch (error) {
       console.error(`[MatchRoom] Erro ao pausar partida:`, error);
     }
   }
 
   async onDispose() {
-    console.log(`[MatchRoom] Partida ${this.roomId} sendo destruída`);
 
     if (this.turnTimer) {
       this.turnTimer.clear();
@@ -258,9 +246,6 @@ export class MatchRoom extends Room<MatchState> {
 
     // Se a partida estava ativa, pausar no banco
     if (this.state.status === "ACTIVE" || this.state.status === "PREPARATION") {
-      console.log(
-        `[MatchRoom] Partida ativa não finalizada. Pausando antes de destruir...`
-      );
       await this.pauseMatchToDb();
     }
   }
@@ -312,7 +297,6 @@ export class MatchRoom extends Room<MatchState> {
   // =========================================
 
   private async startPreparation() {
-    console.log(`[MatchRoom] Iniciando preparação: ${this.roomId}`);
 
     this.state.status = "PREPARATION";
     this.inPreparation = true;
@@ -447,7 +431,6 @@ export class MatchRoom extends Room<MatchState> {
   }
 
   private startGame() {
-    console.log(`[MatchRoom] Iniciando jogo: ${this.roomId}`);
 
     this.state.status = "ACTIVE";
     this.inPreparation = false;

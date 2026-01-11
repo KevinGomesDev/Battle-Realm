@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useSession } from "./useSession";
 import { useAuth } from "../../features/auth";
 import { useBattleOptional } from "../../features/battle";
+import { useKingdomStore } from "../../stores";
 import { colyseusService } from "../../services/colyseus.service";
 import type { SessionGuardState } from "@boundless/shared/types/session.types";
 
@@ -137,10 +138,6 @@ export function useSessionGuard(): SessionGuardResult {
     // Para BATTLE_LOBBY: não bloquear, deixar o Dashboard redirecionar quando lobbyId existir
     // A reconexão vai acontecer em background via handleSessionActive
     if (session.type === "BATTLE_LOBBY") {
-      console.log(
-        "%c[SessionGuard] 🎮 Sessão de lobby detectada, continuando...",
-        "color: #22c55e; font-weight: bold;"
-      );
       setGuardState("ready");
       return;
     }
@@ -152,11 +149,6 @@ export function useSessionGuard(): SessionGuardResult {
       !BattleState.battleId;
 
     if (needsBattleRestore) {
-      console.log(
-        "%c[SessionGuard] ⏳ Aguardando restauração de batalha...",
-        "color: #f59e0b; font-weight: bold;",
-        { sessionType: session.type }
-      );
       setGuardState("restoring");
       return;
     }
@@ -188,9 +180,6 @@ export function useSessionGuard(): SessionGuardResult {
     if (colyseusService.isInBattle()) {
       const currentRoom = colyseusService.getBattleRoom();
       if (currentRoom?.id === roomId) {
-        console.log(
-          "[SessionGuard] Já conectado à batalha, aguardando sync..."
-        );
         return;
       }
     }
@@ -198,13 +187,9 @@ export function useSessionGuard(): SessionGuardResult {
     // Tentar reconectar
     const performReconnection = async () => {
       try {
-        // Obter kingdomId
-        const userData = localStorage.getItem("auth_user");
-        const authUser = userData ? JSON.parse(userData) : null;
-        const selectedKingdom = localStorage.getItem("selected_kingdom");
-        const kingdomId = selectedKingdom
-          ? JSON.parse(selectedKingdom)?.id
-          : authUser?.kingdoms?.[0]?.id;
+        // Obter kingdomId do store Zustand
+        const kingdomFromStore = useKingdomStore.getState().kingdom;
+        const kingdomId = kingdomFromStore?.id;
 
         if (!kingdomId) {
           console.error(
@@ -212,13 +197,7 @@ export function useSessionGuard(): SessionGuardResult {
           );
           return;
         }
-
-        console.log(
-          "[SessionGuard] Iniciando reconexão manual à batalha:",
-          roomId
-        );
         await colyseusService.joinBattleLobby(roomId, kingdomId);
-        console.log("[SessionGuard] Reconexão manual completada");
       } catch (err) {
         console.error("[SessionGuard] Erro ao reconectar manualmente:", err);
       }
@@ -252,14 +231,6 @@ export function useSessionGuard(): SessionGuardResult {
       (BattleState.battle || BattleState.battleId);
 
     if (isBattleRestored) {
-      console.log(
-        "%c[SessionGuard] ✅ Batalha restaurada!",
-        "color: #22c55e; font-weight: bold;",
-        {
-          hasBattle: !!BattleState.battle,
-          hasBattleId: !!BattleState.battleId,
-        }
-      );
       setGuardState("ready");
     }
   }, [

@@ -13,8 +13,6 @@ import { processUnitDeath } from "../../../../combat/death-logic";
 import { schemaUnitToBattleUnit, syncUnitFromResult } from "./utils";
 import { getUserData, sendError } from "./types";
 import { canUnitAct } from "./turn.handler";
-import { QTEManager } from "../../../../../qte";
-import { startProjectileDodgeQTE } from "./qte.handler";
 
 /**
  * Handler de início de ação
@@ -79,19 +77,18 @@ export function handleEndAction(
 }
 
 /**
- * Handler de execução de ação/ability
- * FLUXO UNIFICADO: Todas as abilities passam pelo mesmo caminho
+ * Handler ÚNICO para execução de abilities (skills + spells)
+ * PONTO DE ENTRADA: battle:use_ability
  */
-export function handleExecuteAction(
+export function handleAbility(
   client: Client,
-  actionName: string,
   unitId: string,
+  abilityCode: string,
   state: BattleSessionState,
   roomId: string,
   broadcast: Room<BattleSessionState>["broadcast"],
-  startQTEFn: (client: Client, attackerId: string, targetId: string) => void,
-  qteManager: QTEManager | null,
-  params?: Record<string, unknown>
+  targetPosition?: { x: number; y: number },
+  targetUnitId?: string
 ): void {
   const userData = getUserData(client);
   if (!userData) return;
@@ -102,36 +99,6 @@ export function handleExecuteAction(
     return;
   }
 
-  if (actionName === "use_ability") {
-    handleUseAbility(
-      client,
-      unit,
-      unitId,
-      state,
-      roomId,
-      broadcast,
-      startQTEFn,
-      qteManager,
-      params
-    );
-    return;
-  }
-
-  sendError(client, `Ação desconhecida: ${actionName}`);
-}
-
-function handleUseAbility(
-  client: Client,
-  unit: BattleUnitSchema,
-  unitId: string,
-  state: BattleSessionState,
-  roomId: string,
-  broadcast: Room<BattleSessionState>["broadcast"],
-  startQTEFn: (client: Client, attackerId: string, targetId: string) => void,
-  qteManager: QTEManager | null,
-  params?: Record<string, unknown>
-): void {
-  const abilityCode = params?.abilityCode as string;
   if (!abilityCode) {
     sendError(client, "abilityCode é obrigatório");
     return;
@@ -150,7 +117,7 @@ function handleUseAbility(
     executor: ability.functionName || "SEM_EXECUTOR",
     caster: unit.name,
     casterId: unitId,
-    targetPosition: params?.targetPosition,
+    targetPosition,
   });
 
   if (state.activeUnitId !== unitId) {
@@ -166,11 +133,8 @@ function handleUseAbility(
   // Target é encontrado pela targetPosition (células) - NÃO pelo targetUnitId
   // O frontend envia apenas as células, o servidor encontra as unidades afetadas
   let target: BattleUnit | null = null;
-  const targetPos = params?.targetPosition as
-    | { x: number; y: number }
-    | undefined;
 
-  if (targetPos) {
+  if (targetPosition) {
     // Buscar unidade viva na posição alvo (considerando tamanho)
     const targetUnit = allUnits.find((u) => {
       if (!u.isAlive) return false;
@@ -178,7 +142,10 @@ function handleUseAbility(
       const dimension = sizeDef.dimension;
       for (let dx = 0; dx < dimension; dx++) {
         for (let dy = 0; dy < dimension; dy++) {
-          if (u.posX + dx === targetPos.x && u.posY + dy === targetPos.y) {
+          if (
+            u.posX + dx === targetPosition.x &&
+            u.posY + dy === targetPosition.y
+          ) {
             return true;
           }
         }
@@ -203,9 +170,7 @@ function handleUseAbility(
       type: (o.type || "default") as any,
       size: o.size || "SMALL",
     })),
-    targetPosition: params?.targetPosition as
-      | { x: number; y: number }
-      | undefined,
+    targetPosition,
     battleId: roomId,
     gridWidth: state.gridWidth,
     gridHeight: state.gridHeight,
@@ -227,7 +192,6 @@ function handleUseAbility(
     {
       success: result.success,
       error: result.error,
-      requiresQTE: result.requiresQTE,
       casterActionsLeft: result.casterActionsLeft,
       targetHpAfter: result.targetHpAfter,
     }
@@ -238,205 +202,15 @@ function handleUseAbility(
     return;
   }
 
-  // === TRATAMENTO DE QTE DODGE PARA PROJÉTIL DE ÁREA ===
-  if (
-    result.requiresQTE &&
-    result.isAreaProjectile &&
-    result.qteType === "DODGE" &&
-    result.qteTargetId
-  ) {
-    console.log(
-      `[BattleRoom] 🔥 Projétil de área interceptado! Iniciando QTE de DODGE...`
-    );
-
-    const casterSchema = unit;
-    const targetSchema = state.units.get(result.qteTargetId);
-
-    if (!targetSchema) {
-      sendError(client, "Alvo interceptado não encontrado");
-      return;
-    }
-
-    // Salvar informações necessárias para continuar após o QTE
-    const pendingAbilityCode = result.pendingAbilityCode || abilityCode;
-    const impactPoint = result.qteImpactPoint;
-    const originalTargetPosition = params?.targetPosition as
-      | { x: number; y: number }
-      | undefined;
-
-    // Emitir evento para o client disparar a animação do projétil ANTES do QTE
-    broadcast("battle:projectile_launched", {
-      casterUnitId: unitId,
-      skillCode: abilityCode,
-      targetPosition: originalTargetPosition,
-      impactPoint: impactPoint,
-      targetId: result.qteTargetId,
-      requiresQTE: true,
-    });
-
-    startProjectileDodgeQTE(
-      casterSchema,
-      targetSchema,
-      state,
-      qteManager,
-      (dodgeResult) => {
-        console.log(`[BattleRoom] 🎯 Resultado do DODGE de projétil:`, {
-          dodged: dodgeResult.dodged,
-          newPosition: dodgeResult.newDefenderPosition,
-          projectileContinues: dodgeResult.projectileContinues,
-        });
-
-        // Determinar onde o projétil vai explodir
-        let finalImpactPoint: { x: number; y: number };
-
-        if (dodgeResult.dodged) {
-          // DODGE sucesso: projétil continua até o destino original
-          finalImpactPoint = originalTargetPosition ||
-            impactPoint || {
-              x: targetSchema.posX,
-              y: targetSchema.posY,
-            };
-
-          // Atualizar posição do alvo se esquivou
-          if (dodgeResult.newDefenderPosition) {
-            targetSchema.posX = dodgeResult.newDefenderPosition.x;
-            targetSchema.posY = dodgeResult.newDefenderPosition.y;
-          }
-        } else {
-          // DODGE falhou: projétil explode na posição do alvo
-          finalImpactPoint = impactPoint || {
-            x: targetSchema.posX,
-            y: targetSchema.posY,
-          };
-        }
-
-        // Re-executar a ability com skipQTE e forcedImpactPoint
-        const allUnits: BattleUnit[] = Array.from(state.units.values()).map(
-          (u) => schemaUnitToBattleUnit(u)
-        );
-        const casterUnit = schemaUnitToBattleUnit(casterSchema);
-
-        const obstacleArray = Array.from(state.obstacles).filter(
-          (o): o is NonNullable<typeof o> => o != null
-        );
-
-        const continuationContext = {
-          obstacles: obstacleArray.map((o) => ({
-            id: o.id,
-            posX: o.posX,
-            posY: o.posY,
-            hp: o.hp,
-            destroyed: o.destroyed || false,
-            type: (o.type || "default") as any,
-            size: o.size || "SMALL",
-          })),
-          targetPosition: finalImpactPoint,
-          battleId: roomId,
-          gridWidth: state.gridWidth,
-          gridHeight: state.gridHeight,
-          skipQTE: true, // Pular QTE na continuação
-          forcedImpactPoint: finalImpactPoint,
-        };
-
-        const continuationResult = executeSkill(
-          casterUnit,
-          pendingAbilityCode,
-          null, // Sem target específico - vai usar targetPosition
-          allUnits,
-          true,
-          continuationContext
-        );
-
-        if (continuationResult.success) {
-          // Sincronizar resultado
-          syncUnitFromResult(casterSchema, casterUnit, continuationResult);
-
-          // Aplicar dano em unidades afetadas
-          if (continuationResult.affectedUnits) {
-            for (const affected of continuationResult.affectedUnits) {
-              const affectedSchema = state.units.get(affected.unitId);
-              if (affectedSchema) {
-                affectedSchema.currentHp = affected.hpAfter;
-                affectedSchema.physicalProtection = affected.physicalProtection;
-                affectedSchema.magicalProtection = affected.magicalProtection;
-                if (affected.hpAfter <= 0 && affectedSchema.isAlive) {
-                  affectedSchema.isAlive = false;
-                  const affectedUnit = allUnits.find(
-                    (u) => u.id === affected.unitId
-                  );
-                  if (affectedUnit) {
-                    processUnitDeath(affectedUnit, allUnits);
-                  }
-                }
-              }
-            }
-          }
-
-          // Broadcast resultado
-          broadcast("battle:skill_used", {
-            casterUnitId: unitId,
-            skillCode: pendingAbilityCode,
-            targetPosition: finalImpactPoint,
-            result: continuationResult,
-            dodgeResult: {
-              dodged: dodgeResult.dodged,
-              targetId: targetSchema.id,
-              newPosition: dodgeResult.newDefenderPosition,
-            },
-            casterUpdated: {
-              actionsLeft: casterSchema.actionsLeft,
-              movesLeft: casterSchema.movesLeft,
-              currentHp: casterSchema.currentHp,
-              currentMana: casterSchema.currentMana,
-              attacksLeftThisTurn: casterSchema.attacksLeftThisTurn,
-              unitCooldowns: Object.fromEntries(
-                casterSchema.unitCooldowns.entries()
-              ),
-            },
-          });
-
-          // Emitir evento detalhado do projétil resolvido
-          const targetUnit = allUnits.find((u) => u.id === targetSchema.id);
-          emitAbilityExecutedEvent(
-            roomId,
-            ability,
-            casterUnit,
-            targetUnit || null,
-            continuationResult,
-            allUnits
-          ).catch(console.error);
-        } else {
-          console.error(
-            `[BattleRoom] Erro ao continuar projétil:`,
-            continuationResult.error
-          );
-        }
-      }
-    );
-    return;
-  }
-
-  // === TRATAMENTO DE QTE NORMAL (para ATTACK) ===
-  if (result.requiresQTE && result.qteAttackerId && result.qteTargetId) {
-    // Inicia QTE - o callback vai executar o ataque real após o QTE
-    startQTEFn(client, result.qteAttackerId, result.qteTargetId);
-    return;
-  }
-
   // === TRATAMENTO DE ATTACK MISS (ataque no ar) ===
-  if (
-    abilityCode === "ATTACK" &&
-    result.damageDealt === 0 &&
-    !result.targetHpAfter
-  ) {
+  if (result.missed) {
     unit.actionsLeft = casterUnit.actionsLeft;
     unit.attacksLeftThisTurn = casterUnit.attacksLeftThisTurn ?? 0;
     unit.hasStartedAction = true;
 
-    const targetPos = params?.targetPosition as { x: number; y: number };
     broadcast("battle:attack_missed", {
       attackerId: unitId,
-      targetPosition: targetPos,
+      targetPosition,
       message: "O ataque não atingiu nenhum alvo!",
       actionsLeft: unit.actionsLeft,
       attacksLeftThisTurn: unit.attacksLeftThisTurn,
@@ -449,9 +223,9 @@ function handleUseAbility(
       severity: "INFO",
       battleId: roomId,
       sourceUserId: unit.ownerId,
-      message: `${unit.name} atacou a posição (${targetPos?.x}, ${targetPos?.y}) mas não acertou nenhum alvo!`,
+      message: `${unit.name} atacou a posição (${targetPosition?.x}, ${targetPosition?.y}) mas não acertou nenhum alvo!`,
       code: "ATTACK_MISSED",
-      data: { targetPosition: targetPos },
+      data: { targetPosition },
       actorId: unitId,
       actorName: unit.name,
     }).catch(console.error);
@@ -556,9 +330,9 @@ function handleUseAbility(
   broadcast("battle:skill_used", {
     casterUnitId: unitId,
     skillCode: abilityCode,
-    targetPosition: params?.targetPosition,
+    targetPosition,
     // Enviar impactPoint do resultado (pode ser diferente do targetPosition se interceptado)
-    impactPoint: result.metadata?.impactPoint ?? params?.targetPosition,
+    impactPoint: result.metadata?.impactPoint ?? targetPosition,
     affectedCells: result.metadata?.affectedCells,
     isAreaAbility: !!(
       result.metadata?.affectedCells?.length &&

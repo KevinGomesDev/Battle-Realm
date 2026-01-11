@@ -87,7 +87,6 @@ app.get("/status", async (_req, res) => {
 // Monitor (apenas dev)
 if (process.env.NODE_ENV !== "production") {
   app.use("/monitor", monitor());
-  console.log("[Server] Monitor disponível em /monitor");
 }
 
 // ============================================
@@ -98,7 +97,6 @@ async function bootstrap() {
   try {
     // Verificar conexão com banco de dados
     await prisma.$connect();
-    console.log("[Database] ✅ Conectado ao banco de dados");
 
     // Iniciar servidor
     const PORT = parseInt(process.env.PORT || "3000", 10);
@@ -108,12 +106,7 @@ async function bootstrap() {
     // Iniciar worker de persistência
     startPersistenceWorker();
 
-    console.log(`[Server] ✅ Servidor rodando na porta ${PORT}`);
-    console.log(`[Colyseus] Rooms disponíveis: global, battle, match`);
-    console.log(`[Server] Endpoint de status: http://localhost:${PORT}/status`);
-
     if (process.env.NODE_ENV !== "production") {
-      console.log(`[Server] Monitor: http://localhost:${PORT}/monitor`);
     }
   } catch (error) {
     console.error("[Server] ❌ Falha ao iniciar servidor:", error);
@@ -123,7 +116,6 @@ async function bootstrap() {
 
 // Graceful shutdown
 process.on("SIGTERM", async () => {
-  console.log("[Server] Recebido SIGTERM, encerrando...");
   stopPersistenceWorker();
   await forcePeristAll(); // Persistir tudo antes de desligar
   await gameServer.gracefullyShutdown();
@@ -132,7 +124,6 @@ process.on("SIGTERM", async () => {
 });
 
 process.on("SIGINT", async () => {
-  console.log("[Server] Recebido SIGINT, encerrando...");
   stopPersistenceWorker();
   await forcePeristAll(); // Persistir tudo antes de desligar
   await gameServer.gracefullyShutdown();

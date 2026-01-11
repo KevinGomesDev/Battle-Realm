@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMatch } from "../features/match";
 import { useBattle } from "../features/battle";
-import { CombatTraining } from "../features/qte";
 import { EventHistory } from "../features/events";
 import { ArenaSection } from "../features/arena";
 import {
@@ -75,7 +74,6 @@ const DashboardPage: React.FC = () => {
   const { kingdoms, loadKingdoms } = useKingdom();
 
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
-  const [isCombatTrainingOpen, setIsCombatTrainingOpen] = useState(false);
 
   // Hooks para ações dos headers
   const kingdomActions = useKingdomSectionActions();
@@ -90,10 +88,6 @@ const DashboardPage: React.FC = () => {
     // A condição anterior causava loop: redirecionava com battleId+!isLoading,
     // mas BattleView esperava isInBattle=true
     if (battleState.battleId && battleState.isInBattle) {
-      console.log("[Dashboard] Batalha ativa detectada, redirecionando...", {
-        battleId: battleState.battleId,
-        isInBattle: battleState.isInBattle,
-      });
       navigate("/battle", { replace: true });
     }
   }, [battleState.battleId, battleState.isInBattle, navigate]);
@@ -128,14 +122,6 @@ const DashboardPage: React.FC = () => {
               accentColor="bronze"
               headerAction={
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    size="xs"
-                    onClick={() => setIsCombatTrainingOpen(true)}
-                    icon="⚔️"
-                  >
-                    Treino
-                  </Button>
                   <FundarReinoBtn
                     onClick={kingdomActions.openModal}
                     disabled={isKingdomLimitReached}
@@ -214,12 +200,6 @@ const DashboardPage: React.FC = () => {
           }}
         />
       )}
-
-      {/* === TREINAMENTO DE COMBATE === */}
-      <CombatTraining
-        isOpen={isCombatTrainingOpen}
-        onClose={() => setIsCombatTrainingOpen(false)}
-      />
     </div>
   );
 };

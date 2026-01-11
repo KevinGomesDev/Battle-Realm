@@ -47,10 +47,6 @@ export interface SpellExecutionContext {
   gridWidth?: number;
   /** Altura do grid de batalha */
   gridHeight?: number;
-  /** Flag para pular QTE (usado após QTE falhar) */
-  skipQTE?: boolean;
-  /** Ponto de impacto forçado (quando definido pelo QTE) */
-  forcedImpactPoint?: { x: number; y: number };
 }
 
 export type SpellExecutorFn = (
@@ -92,7 +88,6 @@ export interface AttackActionResult {
   success: boolean;
   error?: string;
   missed?: boolean;
-  dodged?: boolean;
   targetType?: "unit" | "corpse" | "obstacle";
   rawDamage?: number;
   bonusDamage?: number;
@@ -109,49 +104,6 @@ export interface AttackActionResult {
   damageTransferredToEidolon?: boolean;
   eidolonDefeated?: boolean;
   killedSummonIds?: string[];
-  // QTE modifiers applied (for logging/events)
-  attackModifier?: number;
-  defenseModifier?: number;
-  // Esquiva com movimento (para QTE)
-  newDefenderPosition?: { x: number; y: number };
-  // Buff aplicado por esquiva perfeita
-  perfectDodgeBuff?: string;
-}
-
-/**
- * Contexto preparado para iniciar QTE de ataque
- * Gerado pelo executor, usado pelo QTEManager
- */
-export interface AttackContext {
-  /** Dano base calculado (combat + bonusDamage) */
-  baseDamage: number;
-  /** Bônus de dano de condições */
-  bonusDamage: number;
-  /** Se o ataque é mágico (MAGIC_WEAPON) */
-  isMagicAttack: boolean;
-  /** Tipo de dano efetivo */
-  damageType: "FISICO" | "MAGICO";
-  /** Se o atacante pode realizar o ataque */
-  canAttack: boolean;
-  /** Motivo se não pode atacar */
-  blockReason?: string;
-}
-
-/**
- * Resultado do QTE passado para o executor
- * Unifica os dados necessários do QTECombatResult
- */
-export interface QTEResultForExecutor {
-  /** Se a esquiva foi bem-sucedida */
-  dodged: boolean;
-  /** Modificador de dano do atacante (1.0 = normal) */
-  attackerDamageModifier: number;
-  /** Modificador de defesa do defensor (1.0 = normal) */
-  defenderDamageModifier: number;
-  /** Nova posição do defensor após esquiva */
-  newDefenderPosition?: { x: number; y: number };
-  /** Grade da esquiva (para buff de esquiva perfeita) */
-  defenderGrade?: "PERFECT" | "GREAT" | "GOOD" | "OK" | "MISS" | "FAIL" | "HIT";
 }
 
 // =============================================================================

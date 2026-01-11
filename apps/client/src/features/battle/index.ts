@@ -33,9 +33,6 @@ export {
   AttributeTooltip,
 } from "./components/shared";
 
-// Components - QTE (re-export from qte feature)
-export { QTEOverlay } from "../qte";
-
 // Utils
 export { BattleLog, lobbyLog } from "./utils";
 

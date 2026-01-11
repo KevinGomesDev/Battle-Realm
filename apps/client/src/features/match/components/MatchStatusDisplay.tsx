@@ -2,7 +2,7 @@ import React from "react";
 import { useMatch } from "../hooks/useMatch";
 
 /**
- * Componente que exibe o estado atual da partida (rodada, turno, vez)
+ * Component that displays the current match state (round, turn, player's turn)
  */
 export const MatchStatusDisplay: React.FC = () => {
   const { completeMatchState, isMyTurn, waitingForPlayers } = useMatch();
@@ -13,55 +13,55 @@ export const MatchStatusDisplay: React.FC = () => {
 
   const { status, currentTurn, players } = completeMatchState;
 
-  // Mostrar apenas durante o jogo
+  // Only show during active game
   if (status !== "ACTIVE") {
     return null;
   }
 
-  // Tradução dos turnos
+  // Turn names
   const turnNames: Record<number, string> = {
-    1: "Administração",
-    2: "Exércitos",
-    3: "Movimentação",
-    4: "Crise",
-    5: "Ação",
-    6: "Batalha",
+    1: "Administration",
+    2: "Armies",
+    3: "Movement",
+    4: "Crisis",
+    5: "Action",
+    6: "Battle",
   };
 
   return (
     <div className="bg-medieval-stone border-2 border-medieval-red-800 rounded-2xl p-4 space-y-3 shadow-2xl shadow-medieval-blood/20">
-      {/* Rodada e Turno */}
+      {/* Round and Turn */}
       <div className="text-center">
         <h3 className="text-2xl font-bold text-medieval-red-500 mb-1">
-          Turno {currentTurn}
+          Turn {currentTurn}
         </h3>
         <p className="text-lg text-gray-300">
-          {turnNames[currentTurn] || `Turno ${currentTurn}`}
+          {turnNames[currentTurn] || `Turn ${currentTurn}`}
         </p>
       </div>
 
-      {/* Indicador de Vez */}
+      {/* Turn Indicator */}
       <div className="border-t border-medieval-red-800/30 pt-3">
         {isMyTurn ? (
           <div className="flex items-center justify-center gap-2 text-green-400 font-semibold">
             <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-            <span>É sua vez!</span>
+            <span>It's your turn!</span>
           </div>
         ) : waitingForPlayers.length > 0 ? (
           <div className="text-center">
-            <p className="text-gray-400 text-sm mb-1">Aguardando:</p>
+            <p className="text-gray-400 text-sm mb-1">Waiting for:</p>
             <p className="text-medieval-red-400 font-semibold">
               {waitingForPlayers.map((p) => p.username).join(", ")}
             </p>
           </div>
         ) : (
           <div className="text-center text-gray-400 text-sm">
-            Processando turno...
+            Processing turn...
           </div>
         )}
       </div>
 
-      {/* Progresso dos Jogadores */}
+      {/* Player Progress */}
       <div className="border-t border-medieval-red-800/30 pt-3 space-y-2">
         {players.map((player) => (
           <div
@@ -77,9 +77,9 @@ export const MatchStatusDisplay: React.FC = () => {
             </div>
             <div>
               {player.hasFinishedTurn ? (
-                <span className="text-green-400 text-xs">✓ Pronto</span>
+                <span className="text-green-400 text-xs">✓ Ready</span>
               ) : (
-                <span className="text-yellow-400 text-xs">⏳ Jogando</span>
+                <span className="text-yellow-400 text-xs">⏳ Playing</span>
               )}
             </div>
           </div>

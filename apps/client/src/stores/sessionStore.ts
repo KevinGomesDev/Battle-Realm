@@ -70,7 +70,6 @@ export const useSessionStore = create<SessionState & SessionActions>(
       // Prevenir chamadas duplicadas enquanto ainda está checando
       const { isChecking, activeSession } = useSessionStore.getState();
       if (isChecking) {
-        console.log("[Session] Já está verificando sessão, ignorando...");
         return;
       }
 
@@ -79,7 +78,6 @@ export const useSessionStore = create<SessionState & SessionActions>(
       if (colyseusService.isInBattle()) {
         // Só atualiza se ainda não tem activeSession ou se não marcou como verificado
         if (!hasCheckedOnce || !activeSession) {
-          console.log("[Session] Já está em batalha, atualizando estado...");
           const room = colyseusService.getBattleRoom();
           if (room) {
             hasCheckedOnce = true;
@@ -99,7 +97,6 @@ export const useSessionStore = create<SessionState & SessionActions>(
       // Se já verificou uma vez e tem sessão ativa, não re-emitir
       // para evitar loops
       if (hasCheckedOnce && activeSession) {
-        console.log("[Session] Já verificou anteriormente, ignorando...");
         return;
       }
 
@@ -152,7 +149,7 @@ export const useSessionStore = create<SessionState & SessionActions>(
 
         set({ activeSession: result.session, isChecking: false });
       } catch (error) {
-        console.error("[Session] Erro ao verificar sessão:", error);
+        console.error("[Session] Error checking session:", error);
         set({ activeSession: null, isChecking: false });
       }
     },
@@ -168,8 +165,8 @@ export const useSessionStore = create<SessionState & SessionActions>(
           set({
             canJoin: false,
             canJoinReason: isInBattle
-              ? "Já está em uma batalha"
-              : "Já está em uma partida",
+              ? "Already in a battle"
+              : "Already in a match",
           });
           return false;
         }
@@ -177,8 +174,8 @@ export const useSessionStore = create<SessionState & SessionActions>(
         set({ canJoin: true, canJoinReason: null });
         return true;
       } catch (error) {
-        console.error("[Session] Erro ao verificar permissão:", error);
-        set({ canJoin: false, canJoinReason: "Erro ao verificar sessão" });
+        console.error("[Session] Error checking permission:", error);
+        set({ canJoin: false, canJoinReason: "Error checking session" });
         return false;
       }
     },

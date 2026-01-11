@@ -7,7 +7,6 @@ import type {
   BattleObstacleSchema,
 } from "../../schemas";
 import type { BattleUnit } from "@boundless/shared/types/battle.types";
-import type { QTEManager } from "../../../../../qte";
 
 // =========================================
 // Interfaces
@@ -68,15 +67,9 @@ export interface BattleHandlerContext {
   allDisconnectedSince: number | null;
   setAllDisconnectedSince: (value: number | null) => void;
 
-  // QTE
-  qteManager: QTEManager | null;
-  setQteManager: (manager: QTEManager | null) => void;
-
   // Callbacks para outros handlers
   startBattle: () => Promise<void>;
   advanceToNextUnit: () => void;
-  /** @deprecated Use forceCheckBattleEnd - a verificação agora é feita pelo timer a cada segundo */
-  checkBattleEnd: () => void;
   /** Força verificação imediata de fim de batalha */
   forceCheckBattleEnd: () => void;
   executeAITurn: (unit: BattleUnitSchema) => void;

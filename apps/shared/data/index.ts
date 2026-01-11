@@ -27,8 +27,3 @@ export * from "./turns.data";
 export * from "./crisis.data";
 export * from "./effect-metadata.data";
 export * from "./sounds.data";
-
-// @deprecated - Estes m�dulos s�o wrappers de compatibilidade
-// Skills e Spells agora est�o unificados em abilities.data.ts
-// export * from "./skills.data"; // Use abilities.data
-// export * from "./spells.data"; // Use abilities.data

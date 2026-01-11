@@ -110,17 +110,13 @@ interface BattleActions {
     targetUnitId?: string
   ) => void;
   endAction: (unitId: string) => void;
-  executeAction: (
-    actionName: string,
+  executeAbility: (
     unitId: string,
-    params?: Record<string, unknown>
+    abilityCode: string,
+    targetPosition?: { x: number; y: number },
+    targetUnitId?: string
   ) => void;
-  castSpell: (
-    unitId: string,
-    spellCode: string,
-    targetId?: string,
-    targetPosition?: { x: number; y: number }
-  ) => void;
+
   surrender: () => void;
   requestRematch: () => void;
   leaveBattle: () => Promise<void>;
@@ -279,15 +275,12 @@ export const useBattleStore = create<BattleState & BattleActions>(
     },
 
     attackUnit: (attackerId, targetPosition, targetUnitId?: string) => {
-      // FLUXO UNIFICADO: ATTACK passa pelo mesmo caminho das outras abilities
-      colyseusService.sendToBattle("battle:execute_action", {
-        actionName: "use_ability",
+      // ATTACK usa o mesmo fluxo de abilities
+      colyseusService.sendToBattle("battle:use_ability", {
         unitId: attackerId,
-        params: {
-          abilityCode: "ATTACK",
-          targetPosition,
-          targetUnitId,
-        },
+        abilityCode: "ATTACK",
+        targetPosition,
+        targetUnitId,
       });
     },
 
@@ -295,20 +288,16 @@ export const useBattleStore = create<BattleState & BattleActions>(
       colyseusService.sendToBattle("battle:end_action", { unitId });
     },
 
-    executeAction: (actionName, unitId, params) => {
-      colyseusService.sendToBattle("battle:execute_action", {
-        actionName,
+    /**
+     * Executa uma ability (skill ou spell) - PONTO ÚNICO DE ENVIO
+     * Envia diretamente para battle:use_ability
+     */
+    executeAbility: (unitId, abilityCode, targetPosition, targetUnitId) => {
+      colyseusService.sendToBattle("battle:use_ability", {
         unitId,
-        params,
-      });
-    },
-
-    castSpell: (unitId, spellCode, targetId, targetPosition) => {
-      colyseusService.sendToBattle("battle:cast_spell", {
-        unitId,
-        spellCode,
-        targetId,
+        abilityCode,
         targetPosition,
+        targetUnitId,
       });
     },
 

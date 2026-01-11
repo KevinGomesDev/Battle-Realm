@@ -20,22 +20,11 @@ export async function handleCheckSession(client: Client): Promise<void> {
 
   const userData = getUserData(client)!;
 
-  console.log(`[Session] Verificando sessão para userId: ${userData.userId}`);
-
   try {
     // 1. Verificar rooms de battle ativas (memória)
     const battleRooms = await matchMaker.query({ name: "battle" });
 
-    console.log(
-      `[Session] Encontradas ${battleRooms.length} battle rooms em memória`
-    );
-
     for (const room of battleRooms) {
-      console.log(`[Session] Room ${room.roomId}:`, {
-        players: room.metadata?.players,
-        status: room.metadata?.status,
-        hasPlayer: room.metadata?.players?.includes(userData.userId),
-      });
 
       if (room.metadata?.players?.includes(userData.userId)) {
         const isInBattle =
@@ -54,9 +43,6 @@ export async function handleCheckSession(client: Client): Promise<void> {
           status: room.metadata?.status,
           source: "memory",
         });
-        console.log(
-          `[Session] Sessão ativa: Battle ${room.roomId} (${room.metadata?.status}) [memória]`
-        );
         return;
       }
     }
@@ -77,9 +63,6 @@ export async function handleCheckSession(client: Client): Promise<void> {
           status: room.metadata?.status,
           source: "memory",
         });
-        console.log(
-          `[Session] Sessão ativa: Match ${room.roomId} (${room.metadata?.status}) [memória]`
-        );
         return;
       }
     }
@@ -101,7 +84,6 @@ export async function handleCheckSession(client: Client): Promise<void> {
         source: "database",
         needsRestore: true,
       });
-      console.log(`[Session] Batalha pausada: ${pausedBattle.id} [banco]`);
       return;
     }
 
@@ -120,7 +102,6 @@ export async function handleCheckSession(client: Client): Promise<void> {
           source: "database",
           needsRestore: true,
         });
-        console.log(`[Session] Match pausado: ${pausedMatchId} [banco]`);
         return;
       }
     }

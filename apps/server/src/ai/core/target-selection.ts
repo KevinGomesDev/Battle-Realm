@@ -40,7 +40,7 @@ export function getVisionRange(unit: BattleUnit): number {
 
 /**
  * Verifica se um alvo está dentro da visão da unidade (apenas distância)
- * @deprecated Use isInVisionWithLoS para considerar obstáculos
+ * Para considerar obstáculos, use isInVisionWithLoS
  */
 export function isInVision(unit: BattleUnit, target: BattleUnit): boolean {
   const distance = manhattanDistance(
@@ -97,8 +97,8 @@ export function isInVisionWithLoS(
 
 /**
  * Filtra unidades baseado no campo de visão da unidade observadora
- * Versão sem LoS (compatibilidade)
- * @deprecated Use filterVisibleUnitsWithLoS para considerar obstáculos
+ * Versão simplificada sem Line of Sight
+ * Para considerar obstáculos, use filterVisibleUnitsWithLoS
  */
 export function filterVisibleUnits(
   observerUnit: BattleUnit,

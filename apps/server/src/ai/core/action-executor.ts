@@ -384,8 +384,6 @@ export async function executeFullAITurn(
   const results: AIExecutionResult[] = [];
   const aiUnits = getAIUnits(battle);
 
-  console.log(`[AI] Executando turno completo - ${aiUnits.length} unidades`);
-
   // Emitir início do turno da IA
   emit("battle:ai-turn-start", {
     battleId: battle.battleId,
@@ -504,7 +502,6 @@ export async function executeFullAITurn(
           units: battle.units,
         });
       } else {
-        console.log(`[AI] Ação falhou: ${result.error}`);
       }
 
       await aiActionDelay(AI_ACTION_DELAY);
@@ -522,8 +519,6 @@ export async function executeFullAITurn(
     battleId: battle.battleId,
     actionsExecuted: results.length,
   });
-
-  console.log(`[AI] Turno completo - ${results.length} ações executadas`);
 
   return results;
 }

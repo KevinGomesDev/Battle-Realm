@@ -6,6 +6,7 @@ import {
   colyseusService,
   type MatchStateData,
 } from "../services/colyseus.service";
+import { useKingdomStore } from "./kingdomStore";
 
 // ============================================
 // Types
@@ -219,7 +220,7 @@ export const useMatchStore = create<MatchState & MatchActions>((set, get) => ({
       sessionStorage.setItem("currentMatchId", room.id);
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : "Erro ao criar partida";
+        err instanceof Error ? err.message : "Error creating match";
       set({ error: message, isLoading: false });
     }
   },
@@ -233,7 +234,7 @@ export const useMatchStore = create<MatchState & MatchActions>((set, get) => ({
       sessionStorage.setItem("currentMatchId", room.id);
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : "Erro ao entrar na partida";
+        err instanceof Error ? err.message : "Error joining match";
       set({ error: message, isLoading: false });
     }
   },
@@ -448,7 +449,6 @@ export const useMatchStore = create<MatchState & MatchActions>((set, get) => ({
       if (colyseusService.isInMatch()) {
         const currentRoom = colyseusService.getMatchRoom();
         if (currentRoom?.id === roomId) {
-          console.log("[Match] Já conectado à room:", roomId);
           return;
         }
       }
@@ -459,20 +459,15 @@ export const useMatchStore = create<MatchState & MatchActions>((set, get) => ({
         let kingdomId = data.kingdomId;
 
         if (!kingdomId) {
-          const userData = localStorage.getItem("auth_user");
-          const authUser = userData ? JSON.parse(userData) : null;
-          const selectedKingdom = localStorage.getItem("selected_kingdom");
-          kingdomId = selectedKingdom
-            ? JSON.parse(selectedKingdom)?.id
-            : authUser?.kingdoms?.[0]?.id;
+          // Obter kingdomId do store Zustand
+          const kingdomFromStore = useKingdomStore.getState().kingdom;
+          kingdomId = kingdomFromStore?.id;
         }
 
         if (!kingdomId) {
-          console.error(
-            "[Match] Não foi possível encontrar kingdomId para reconexão"
-          );
+          console.error("[Match] Could not find kingdomId for reconnection");
           set({
-            error: "Reino não encontrado para reconexão",
+            error: "Kingdom not found for reconnection",
             isLoading: false,
           });
           return;
@@ -482,8 +477,8 @@ export const useMatchStore = create<MatchState & MatchActions>((set, get) => ({
 
         set({ matchId: roomId, isHost: false, isLoading: false });
       } catch (err: any) {
-        console.error("[Match] Erro ao reconectar:", err);
-        set({ error: err.message || "Erro ao reconectar", isLoading: false });
+        console.error("[Match] Error reconnecting:", err);
+        set({ error: err.message || "Error reconnecting", isLoading: false });
       }
     };
 

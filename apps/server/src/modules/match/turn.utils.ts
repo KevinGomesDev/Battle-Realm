@@ -199,22 +199,22 @@ export async function spendResources(
   });
 
   if (!player) {
-    throw new Error("Jogador não encontrado");
+    throw new Error("Player not found");
   }
 
   const currentResources = JSON.parse(player.resources) as PlayerResources;
 
-  // Verifica se tem recursos suficientes
+  // Check if has sufficient resources
   for (const [key, value] of Object.entries(costs)) {
     const resourceKey = key as keyof PlayerResources;
     if (value && currentResources[resourceKey] < value) {
       throw new Error(
-        `Recursos insuficientes: ${getResourceName(key as ResourceKey)}`
+        `Insufficient resources: ${getResourceName(key as ResourceKey)}`
       );
     }
   }
 
-  // Deduz recursos
+  // Deduct resources
   const newResources: PlayerResources = {
     ore: currentResources.ore - (costs.ore || 0),
     supplies: currentResources.supplies - (costs.supplies || 0),
@@ -223,7 +223,7 @@ export async function spendResources(
     devotion: currentResources.devotion - (costs.devotion || 0),
   };
 
-  // Atualiza no banco
+  // Update in database
   await prisma.matchKingdom.update({
     where: { id: playerId },
     data: {
@@ -235,7 +235,7 @@ export async function spendResources(
 }
 
 /**
- * Adiciona recursos a um jogador (para Devoção e outras fontes especiais)
+ * Adds resources to a player (for Devotion and other special sources)
  */
 export async function addResources(
   playerId: string,
@@ -246,7 +246,7 @@ export async function addResources(
   });
 
   if (!player) {
-    throw new Error("Jogador não encontrado");
+    throw new Error("Player not found");
   }
 
   const currentResources = JSON.parse(player.resources) as PlayerResources;

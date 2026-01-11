@@ -10,8 +10,6 @@ import type { BattleComputed } from "../../../../../stores/battleStore";
 import type { TargetingPreview } from "@boundless/shared/utils/targeting.utils";
 import type { SpriteAnimation, SpriteDirection } from "../sprite.config";
 
-import type { ProjectileType } from "../components/ProjectileTrajectory";
-
 /** Bolha de fala ativa sobre uma unidade */
 export interface ActiveBubble {
   message: string;
@@ -38,9 +36,6 @@ export interface AbilityAreaPreview {
   casterPos?: Position;
 }
 
-/** @deprecated Use AbilityAreaPreview instead */
-export type SpellAreaPreview = AbilityAreaPreview;
-
 /** Preview de linha para abilities com alvo único (PATTERNS.SINGLE) */
 export interface SingleTargetLinePreview {
   /** Posição inicial (caster) */
@@ -50,9 +45,6 @@ export interface SingleTargetLinePreview {
   /** Cor da linha */
   color: string;
 }
-
-/** @deprecated Use SingleTargetLinePreview instead */
-export type TeleportLinePreview = SingleTargetLinePreview;
 
 /** Informação de tooltip para célula de movimento */
 export interface MovementTooltipInfo {
@@ -102,6 +94,8 @@ export interface BattleCanvasProps {
   targetingPreview?: TargetingPreview | null;
   /** Preview de linha para abilities com alvo único */
   singleTargetLinePreview?: SingleTargetLinePreview | null;
+  /** Código da ability sendo hovereada no HotBar (para mostrar zona de dash) */
+  hoveredAbilityCode?: string | null;
 }
 
 /** Métodos expostos via ref do BattleCanvas */
@@ -116,8 +110,6 @@ export interface BattleCanvasRef {
   isUnitVisible: (unitId: string) => boolean;
   /** Verificar se uma posição do grid está na visão do jogador */
   isPositionVisible: (x: number, y: number) => boolean;
-  /** Obter a posição na tela (pixels) de uma unidade - para QTE inline */
-  getUnitScreenPosition: (unitId: string) => { x: number; y: number } | null;
   /** Iniciar animação de sprite em uma unidade */
   playAnimation: (unitId: string, animation: SpriteAnimation) => void;
   /** Sacudir a câmera (feedback de dano) */
@@ -130,31 +122,6 @@ export interface BattleCanvasRef {
     toX: number,
     toY: number
   ) => void;
-  /** Disparar um projétil de uma posição para outra */
-  fireProjectile: (params: {
-    /** Tipo explícito do projétil (opcional se abilityCode for fornecido) */
-    type?: ProjectileType;
-    /** Código da ability para inferir o tipo de projétil */
-    abilityCode?: string;
-    /** Posição inicial X (grid) */
-    startX: number;
-    /** Posição inicial Y (grid) */
-    startY: number;
-    /** Posição final X (grid) */
-    endX: number;
-    /** Posição final Y (grid) */
-    endY: number;
-    /** ID do caster */
-    casterId?: string;
-    /** ID do alvo */
-    targetId?: string;
-    /** Se é projétil de área (mostra explosão) */
-    isAreaProjectile?: boolean;
-    /** Tamanho da explosão em células */
-    explosionSize?: number;
-    /** Callback quando projétil chegar ao destino */
-    onComplete?: () => void;
-  }) => void;
   /** Disparar efeito de Hit Stop (freeze + shake + partículas) */
   triggerHitStop: (
     cellX: number,

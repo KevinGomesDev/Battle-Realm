@@ -10,7 +10,6 @@ import {
 
 /**
  * Interface para obstáculos usados na validação de movimento
- * @deprecated Use ObstacleForBlocking de blocking.utils.ts
  */
 export interface ObstaclePosition {
   posX: number;

@@ -1,5 +1,5 @@
 // server/src/modules/abilities/executors/ability-executors.ts
-// Executores UNIFICADOS de abilities (skills + spells)
+// Executores UNIFICADOS de abilities
 // Funções de alto nível para execução de habilidades
 
 import type {
@@ -8,12 +8,8 @@ import type {
 } from "@boundless/shared/types/ability.types";
 import type { BattleUnit } from "@boundless/shared/types/battle.types";
 import type { AbilityExecutionContext } from "./types";
-import { findAbilityByCode as findSkillByCode } from "@boundless/shared/data/abilities.data";
-import {
-  getAbilityExecutor,
-  SKILL_EXECUTORS,
-  SPELL_EXECUTORS,
-} from "./registry";
+import { findAbilityByCode } from "@boundless/shared/data/abilities.data";
+import { getAbilityExecutor, ABILITY_EXECUTORS } from "./registry";
 
 // Re-export types
 export type {
@@ -25,16 +21,10 @@ export type {
 } from "./types";
 
 // Re-export registries
-export {
-  SKILL_EXECUTORS,
-  SPELL_EXECUTORS,
-  ALL_ABILITY_EXECUTORS,
-  getAbilityExecutor,
-} from "./registry";
+export { ABILITY_EXECUTORS, getAbilityExecutor } from "./registry";
 
 // Re-export individual executors
-export * from "./skills";
-export * from "./spells";
+export * from "./abilities";
 
 // Re-export helpers
 export * from "./helpers";
@@ -63,21 +53,21 @@ export function executeSkill(
   isBattle: boolean = false,
   context?: AbilityExecutionContext
 ): AbilityExecutionResult {
-  const skill = findSkillByCode(skillCode);
-  if (!skill) {
-    return { success: false, error: "Skill não encontrada" };
+  const ability = findAbilityByCode(skillCode);
+  if (!ability) {
+    return { success: false, error: "Ability não encontrada" };
   }
 
-  if (!skill.functionName) {
-    return { success: false, error: "Skill não possui executor definido" };
+  if (!ability.functionName) {
+    return { success: false, error: "Ability não possui executor definido" };
   }
 
-  // Usar ALL_ABILITY_EXECUTORS para incluir skills E spells (ex: TELEPORT)
-  const executor = getAbilityExecutor(skill.functionName);
+  // Usar ABILITY_EXECUTORS unificado
+  const executor = getAbilityExecutor(ability.functionName);
   if (!executor) {
     return {
       success: false,
-      error: `Executor '${skill.functionName}' não implementado`,
+      error: `Executor '${ability.functionName}' não implementado`,
     };
   }
 
@@ -88,37 +78,37 @@ export function executeSkill(
   ) {
     return {
       success: false,
-      error: `Skill em cooldown (${caster.unitCooldowns[skillCode]} rodadas)`,
+      error: `Ability em cooldown (${caster.unitCooldowns[skillCode]} rodadas)`,
     };
   }
 
   // Verificar se tem ações disponíveis (a menos que consumesAction === false)
-  if (skill.consumesAction !== false && caster.actionsLeft <= 0) {
+  if (ability.consumesAction !== false && caster.actionsLeft <= 0) {
     return {
       success: false,
       error: "Sem ações disponíveis",
     };
   }
 
-  // Executar a skill (com contexto)
-  const result = executor(caster, target, allUnits, skill, context as any);
+  // Executar a ability (com contexto)
+  const result = executor(caster, target, allUnits, ability, context as any);
 
   // Se sucesso, aplicar consumo de ação e cooldown
   if (result.success) {
     // Consumir ação (a menos que consumesAction === false)
-    if (skill.consumesAction !== false) {
+    if (ability.consumesAction !== false) {
       caster.actionsLeft = Math.max(0, caster.actionsLeft - 1);
     }
     result.casterActionsLeft = caster.actionsLeft;
 
     // Aplicar cooldown (dobrado em Batalhas PvP)
-    if (skill.cooldown && skill.cooldown > 0) {
+    if (ability.cooldown && ability.cooldown > 0) {
       if (!caster.unitCooldowns) {
         caster.unitCooldowns = {};
       }
       const cooldownValue = isBattle
-        ? skill.cooldown * BATTLE_COOLDOWN_MULTIPLIER
-        : skill.cooldown;
+        ? ability.cooldown * BATTLE_COOLDOWN_MULTIPLIER
+        : ability.cooldown;
       caster.unitCooldowns[skillCode] = cooldownValue;
     }
 
@@ -156,46 +146,11 @@ export function getCooldown(unit: BattleUnit, code: string): number {
 }
 
 // =============================================================================
-// SPELL EXECUTION
-// =============================================================================
-
-/**
- * Executa uma spell
- */
-export function executeSpell(
-  spell: AbilityDefinition,
-  caster: BattleUnit,
-  target: BattleUnit | { x: number; y: number } | null,
-  allUnits: BattleUnit[],
-  context?: AbilityExecutionContext
-): AbilityExecutionResult {
-  if (!spell.functionName) {
-    return {
-      success: false,
-      error: `Spell ${spell.code} não tem functionName definido`,
-    };
-  }
-
-  const executor = SPELL_EXECUTORS[spell.functionName];
-
-  if (!executor) {
-    return {
-      success: false,
-      error: `Executor não encontrado: ${spell.functionName}`,
-    };
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (executor as any)(caster, target, allUnits, spell, context);
-}
-
-// =============================================================================
 // UNIFIED ABILITY EXECUTION
 // =============================================================================
 
 /**
- * Executa uma ability (skill ou spell) de forma unificada
- * Detecta automaticamente o tipo baseado na definição
+ * Executa uma ability de forma unificada
  */
 export function executeAbility(
   ability: AbilityDefinition,
@@ -224,3 +179,8 @@ export function executeAbility(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return executor(caster, target as any, allUnits, ability, context as any);
 }
+
+/**
+ * Alias para compatibilidade
+ */
+export const executeSpell = executeAbility;

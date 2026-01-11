@@ -60,10 +60,6 @@ export const ArenaSection: React.FC<ArenaSectionProps> = () => {
   // Listener para batalha iniciando
   useEffect(() => {
     const handleBattleStarting = async (data: BattleStartingNotification) => {
-      console.log(
-        "[ArenaSection] Batalha iniciando, entrando na room:",
-        data.battleRoomId
-      );
 
       // Usar o selectedKingdomId que foi usado para aceitar/criar o desafio
       // ou um dos kingdomIds da notificação como fallback
@@ -80,7 +76,6 @@ export const ArenaSection: React.FC<ArenaSectionProps> = () => {
       try {
         // Entrar na sala de batalha ANTES de navegar
         await colyseusService.joinBattleLobby(data.battleRoomId, kingdomId);
-        console.log("[ArenaSection] Entrou na BattleRoom com sucesso");
 
         // Aguardar a mensagem battle:started ou timeout
         // O Schema do Colyseus pode não sincronizar imediatamente, então
@@ -110,16 +105,12 @@ export const ArenaSection: React.FC<ArenaSectionProps> = () => {
                   "battle:battle:started",
                   handleBattleStarted
                 );
-                console.log(
-                  "[ArenaSection] Timeout esperando battle:started, navegando mesmo assim"
-                );
                 resolve();
               }
             }, 5000);
           });
 
         await waitForBattleStart();
-        console.log("[ArenaSection] Battle started, navegando para /battle");
 
         // Navegar para a batalha
         navigate("/battle", { replace: true });

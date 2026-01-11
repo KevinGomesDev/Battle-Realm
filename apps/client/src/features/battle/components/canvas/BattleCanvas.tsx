@@ -60,10 +60,6 @@ import {
 
 // Components
 import { MovementTooltip, HoverTooltip } from "./components";
-import {
-  useProjectileAnimations,
-  ProjectileTrajectory,
-} from "./components/ProjectileTrajectory";
 
 // Systems
 import { HitStopSystem } from "./systems";
@@ -151,15 +147,6 @@ export const BattleCanvas = memo(
         hasActiveAnimations,
         updateAnimations,
       } = useUnitAnimations();
-
-      // === HOOK DE PROJÉTEIS ===
-      const {
-        getActiveProjectiles,
-        getTrailParticles,
-        fireProjectile,
-        updateProjectiles,
-        hasActiveProjectiles,
-      } = useProjectileAnimations();
 
       // === HELPER FUNCTIONS ===
       const getPlayerColors = useCallback(
@@ -563,19 +550,6 @@ export const BattleCanvas = memo(
           }
         });
 
-        // Projéteis em movimento
-        const activeProjectiles = getActiveProjectiles();
-        const trailParticles = getTrailParticles();
-        if (activeProjectiles.length > 0 || trailParticles.length > 0) {
-          ProjectileTrajectory.render({
-            ctx,
-            cellSize,
-            projectiles: activeProjectiles,
-            trailParticles,
-            animationTime: animationTimeRef.current,
-          });
-        }
-
         // Fog of War
         drawFogOfWar({
           ctx,
@@ -642,8 +616,6 @@ export const BattleCanvas = memo(
         getPlayerColors,
         updateGridCache,
         gridCacheRef,
-        getActiveProjectiles,
-        getTrailParticles,
       ]);
 
       // === ANIMATION LOOP ===
@@ -657,8 +629,6 @@ export const BattleCanvas = memo(
         hasActiveAnimations,
         needsRedrawRef,
         animationTimeRef,
-        updateProjectiles,
-        hasActiveProjectiles,
         updateHitStop: (deltaTime) => hitStopRef.current.update(deltaTime),
         hasActiveHitStop: () => hitStopRef.current.hasActiveEffects(),
         isHitStopFrozen: () => hitStopRef.current.isFrozen(),
@@ -713,29 +683,6 @@ export const BattleCanvas = memo(
         [isPositionVisible, cellSize]
       );
 
-      // Calcular posição na tela de uma unidade (para QTE inline)
-      const getUnitScreenPosition = useCallback(
-        (unitId: string): { x: number; y: number } | null => {
-          const unit = units.find((u) => u.id === unitId);
-          if (!unit) return null;
-
-          // Obter estado da câmera
-          const camera = cameraRef.current?.getCamera();
-          if (!camera) return null;
-
-          // Calcular posição no canvas (centro da célula)
-          const canvasX = (unit.posX + 0.5) * cellSize;
-          const canvasY = (unit.posY + 0.5) * cellSize;
-
-          // Aplicar transformação da câmera (zoom e offset)
-          const screenX = canvasX * camera.zoom + camera.offsetX;
-          const screenY = canvasY * camera.zoom + camera.offsetY;
-
-          return { x: screenX, y: screenY };
-        },
-        [units, cellSize]
-      );
-
       useImperativeHandle(
         ref,
         () => ({
@@ -744,7 +691,6 @@ export const BattleCanvas = memo(
           centerOnPositionIfVisible,
           isUnitVisible,
           isPositionVisible,
-          getUnitScreenPosition,
           playAnimation: (unitId: string, animation: SpriteAnimation) => {
             startSpriteAnimation(unitId, animation);
             needsRedrawRef.current = true;
@@ -760,10 +706,6 @@ export const BattleCanvas = memo(
             toY: number
           ) => {
             startMoveAnimation(unitId, fromX, fromY, toX, toY);
-          },
-          fireProjectile: (params) => {
-            fireProjectile(params);
-            needsRedrawRef.current = true;
           },
           triggerHitStop: (
             cellX: number,
@@ -782,10 +724,8 @@ export const BattleCanvas = memo(
           centerOnPositionIfVisible,
           isUnitVisible,
           isPositionVisible,
-          getUnitScreenPosition,
           startSpriteAnimation,
           startMoveAnimation,
-          fireProjectile,
         ]
       );
 

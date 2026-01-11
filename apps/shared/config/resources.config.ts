@@ -133,10 +133,10 @@ export function getResourceName(key: ResourceKey): string {
 }
 
 // =============================================================================
-// COMPATIBILIDADE LEGADA
+// MAPEAMENTOS POR KEY (para uso no frontend)
 // =============================================================================
 
-/** @deprecated Use RESOURCES[id] */
+/** Mapeamento de recursos por key string */
 export const RESOURCE_NAMES: Record<ResourceKey, ResourceDefinition> =
   Object.fromEntries(
     ALL_RESOURCE_IDS.map((id) => [RESOURCES[id].key, RESOURCES[id]])

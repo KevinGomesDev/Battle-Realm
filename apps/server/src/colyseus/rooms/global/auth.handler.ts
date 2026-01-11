@@ -16,7 +16,6 @@ export async function handleValidateToken(
   ctx: HandlerContext
 ): Promise<void> {
   try {
-    console.log("[Auth] Validando token para sessionId:", client.sessionId);
 
     const decoded = verifyToken(token);
     if (!decoded || typeof decoded !== "object" || !decoded.userId) {
@@ -38,8 +37,6 @@ export async function handleValidateToken(
       username: user.username,
       authenticated: true,
     };
-
-    console.log("[Auth] Validação bem sucedida! userData:", client.userData);
 
     ctx.authenticatedClients.set(
       client.sessionId,
@@ -92,12 +89,6 @@ export async function handleLogin(
       username: user.username,
       authenticated: true,
     };
-
-    console.log(
-      "[Auth] Login bem sucedido - userData setado:",
-      client.userData
-    );
-    console.log("[Auth] Login - sessionId:", client.sessionId);
 
     ctx.authenticatedClients.set(
       client.sessionId,

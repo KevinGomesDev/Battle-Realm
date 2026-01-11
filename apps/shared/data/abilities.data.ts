@@ -1,13 +1,13 @@
 // shared/data/abilities.data.ts
-// FONTE DE VERDADE - Definições de TODAS as habilidades do jogo (Skills + Spells)
-// Unificado: use a propriedade `category` para diferenciar SKILL de SPELL
+// FONTE DE VERDADE - Definições de TODAS as habilidades do jogo
+// Todas as habilidades usam Mana como recurso
 
 import {
   type AbilityDefinition,
   type HeroClassDefinition,
   ATTRIBUTE,
-  DEFAULT_RANGE_DISTANCE,
 } from "../types/ability.types";
+import { isSelfAbility } from "../utils/ability-validation";
 import { PATTERNS } from "./targeting-patterns.data";
 
 // =============================================================================
@@ -18,12 +18,9 @@ export const COMMON_ACTION_ATTACK: AbilityDefinition = {
   code: "ATTACK",
   name: "Atacar",
   description: "Ataca um inimigo adjacente",
-  category: "SKILL",
   activationType: "ACTIVE",
   effectType: "OFFENSIVE",
   commonAction: true,
-  range: "MELEE",
-  targetType: "UNIT",
   targetingPattern: { ...PATTERNS.SINGLE, maxRange: 1 },
   functionName: "executeAttackSkill",
   consumesAction: true,
@@ -34,12 +31,9 @@ export const COMMON_ACTION_DASH: AbilityDefinition = {
   code: "DASH",
   name: "Disparada",
   description: "Gasta uma ação para dobrar o movimento neste turno",
-  category: "SKILL",
   activationType: "ACTIVE",
   effectType: "UTILITY",
   commonAction: true,
-  range: "SELF",
-  targetType: "SELF",
   targetingPattern: PATTERNS.SELF,
   functionName: "executeDash",
   consumesAction: true,
@@ -61,7 +55,6 @@ export const WILD_FURY: AbilityDefinition = {
   name: "Fúria Selvagem",
   description:
     "Todo dano recebido reduzido em 1. Ataques têm mínimo 2 de acertos. Duplicado sem Proteção.",
-  category: "SKILL",
   activationType: "PASSIVE",
   conditionApplied: "WILD_FURY",
 };
@@ -70,7 +63,6 @@ export const RECKLESS_ATTACK: AbilityDefinition = {
   code: "RECKLESS_ATTACK",
   name: "Ataque Descuidado",
   description: "Sem Proteção: Pode atacar 2x quando usa Ação de Ataque.",
-  category: "SKILL",
   activationType: "PASSIVE",
   conditionApplied: "RECKLESS_ATTACK",
 };
@@ -80,12 +72,9 @@ export const TOTAL_DESTRUCTION: AbilityDefinition = {
   name: "Destruição Total",
   description:
     "Escolha dano de 1 até seu Combate em alvo adjacente. Você recebe o mesmo dano.",
-  category: "SKILL",
   activationType: "ACTIVE",
   effectType: "OFFENSIVE",
-  costTier: "LOW",
-  range: "MELEE",
-  targetType: "UNIT",
+  manaCost: 1,
   targetingPattern: { ...PATTERNS.SINGLE, maxRange: 1 },
   functionName: "executeTotalDestruction",
   consumesAction: true,
@@ -102,12 +91,9 @@ export const INTIMIDATING_ROAR: AbilityDefinition = {
   name: "Rugido Intimidador",
   description:
     "Solta um rugido aterrorizante. O alvo deve resistir (WILL vs COMBAT) ou ficará Amedrontado por 2 turnos, sofrendo -2 em todos os atributos.",
-  category: "SKILL",
   activationType: "ACTIVE",
   effectType: "DEBUFF",
-  costTier: "MEDIUM",
-  range: "MELEE",
-  targetType: "UNIT",
+  manaCost: 2,
   targetingPattern: { ...PATTERNS.SINGLE, maxRange: 2 },
   functionName: "executeIntimidatingRoar",
   consumesAction: true,
@@ -140,7 +126,6 @@ export const EXTRA_ATTACK: AbilityDefinition = {
   name: "Ataque Extra",
   description:
     "Quando usa a Ação de Ataque, você pode realizar um ataque a mais.",
-  category: "SKILL",
   activationType: "PASSIVE",
   conditionApplied: "EXTRA_ATTACK",
 };
@@ -150,11 +135,9 @@ export const SECOND_WIND: AbilityDefinition = {
   name: "Retomar Fôlego",
   description:
     "Recupera HP igual à sua Vitalidade. Pode ser usado uma vez por batalha.",
-  category: "SKILL",
   activationType: "ACTIVE",
   effectType: "HEALING",
-  costTier: "LOW",
-  range: "SELF",
+  manaCost: 1,
   targetingPattern: PATTERNS.SELF,
   functionName: "executeSecondWind",
   consumesAction: true,
@@ -165,11 +148,9 @@ export const ACTION_SURGE: AbilityDefinition = {
   code: "ACTION_SURGE",
   name: "Surto de Ação",
   description: "Você recebe uma ação extra em seu turno.",
-  category: "SKILL",
   activationType: "ACTIVE",
   effectType: "BUFF",
-  costTier: "MEDIUM",
-  range: "SELF",
+  manaCost: 2,
   targetingPattern: PATTERNS.SELF,
   functionName: "executeActionSurge",
   consumesAction: false, // NÃO consome ação!
@@ -191,7 +172,6 @@ export const SNEAK_ATTACK: AbilityDefinition = {
   name: "Ataque Furtivo",
   description:
     "Causa +3 de dano ao atacar um inimigo que não te viu ou que está flanqueado.",
-  category: "SKILL",
   activationType: "PASSIVE",
   conditionApplied: "SNEAK_ATTACK",
 };
@@ -200,7 +180,6 @@ export const CUNNING_ACTION: AbilityDefinition = {
   code: "CUNNING_ACTION",
   name: "Ação Ardilosa",
   description: "Pode usar Dash, Disengage ou Hide como ação bônus.",
-  category: "SKILL",
   activationType: "PASSIVE",
   conditionApplied: "CUNNING_ACTION",
 };
@@ -210,7 +189,6 @@ export const ASSASSINATE: AbilityDefinition = {
   name: "Assassinar",
   description:
     "Primeiro ataque em combate contra alvo que não agiu causa dano dobrado.",
-  category: "SKILL",
   activationType: "PASSIVE",
   conditionApplied: "ASSASSINATE",
 };
@@ -230,12 +208,9 @@ export const HUNTERS_MARK: AbilityDefinition = {
   name: "Marca do Caçador",
   description:
     "Marca um inimigo. Todos os seus ataques contra ele causam +2 de dano.",
-  category: "SKILL",
   activationType: "ACTIVE",
   effectType: "DEBUFF",
-  costTier: "LOW",
-  range: "RANGED",
-  targetType: "UNIT",
+  manaCost: 1,
   targetingPattern: { ...PATTERNS.SINGLE, maxRange: 6 },
   functionName: "executeHuntersMark",
   consumesAction: true,
@@ -247,7 +222,6 @@ export const NATURAL_EXPLORER: AbilityDefinition = {
   name: "Explorador Natural",
   description:
     "+2 de movimento em terrenos naturais. Não sofre penalidades de terreno difícil.",
-  category: "SKILL",
   activationType: "PASSIVE",
   conditionApplied: "NATURAL_EXPLORER",
 };
@@ -256,12 +230,9 @@ export const VOLLEY: AbilityDefinition = {
   code: "VOLLEY",
   name: "Rajada",
   description: "Ataca todos os inimigos em uma área com metade do dano normal.",
-  category: "SKILL",
   activationType: "ACTIVE",
   effectType: "OFFENSIVE",
-  costTier: "MEDIUM",
-  range: "AREA",
-  targetType: "UNIT",
+  manaCost: 2,
   targetingPattern: { ...PATTERNS.DIAMOND_2, maxRange: 5 },
   functionName: "executeVolley",
   consumesAction: true,
@@ -284,12 +255,9 @@ export const HEAL: AbilityDefinition = {
   code: "HEAL",
   name: "Curar",
   description: "Cura um aliado adjacente em Foco de HP.",
-  category: "SKILL",
   activationType: "ACTIVE",
   effectType: "HEALING",
-  costTier: "LOW",
-  range: "MELEE",
-  targetType: "UNIT",
+  manaCost: 1,
   targetingPattern: { ...PATTERNS.SINGLE, maxRange: 1 },
   functionName: "executeHeal",
   consumesAction: true,
@@ -300,12 +268,9 @@ export const CELESTIAL_EXPULSION: AbilityDefinition = {
   code: "CELESTIAL_EXPULSION",
   name: "Expulsão Celestial",
   description: "Remove condições negativas do alvo.",
-  category: "SKILL",
   activationType: "ACTIVE",
   effectType: "HEALING",
-  costTier: "MEDIUM",
-  range: "MELEE",
-  targetType: "UNIT",
+  manaCost: 2,
   targetingPattern: { ...PATTERNS.SINGLE, maxRange: 1 },
   functionName: "executeCelestialExpulsion",
   consumesAction: true,
@@ -316,12 +281,9 @@ export const BLESS: AbilityDefinition = {
   code: "BLESS",
   name: "Abençoar",
   description: "Aliados em área ganham +1 em todos os testes por 3 turnos.",
-  category: "SKILL",
   activationType: "ACTIVE",
   effectType: "BUFF",
-  costTier: "MEDIUM",
-  range: "AREA",
-  targetType: "UNIT",
+  manaCost: 2,
   targetingPattern: { ...PATTERNS.DIAMOND_2, maxRange: 3 },
   functionName: "executeBless",
   consumesAction: true,
@@ -345,7 +307,6 @@ export const GRIMOIRE: AbilityDefinition = {
   name: "Grimório",
   description:
     "Você possui um Livro de Magias que ocupa todos seus Slots de Equipamentos. Sempre que uma Unidade conjurar uma magia visível, você a aprende permanentemente.",
-  category: "SKILL",
   activationType: "PASSIVE",
   conditionApplied: "GRIMOIRE",
 };
@@ -355,12 +316,9 @@ export const MAGIC_WEAPON: AbilityDefinition = {
   name: "Arma Mágica",
   description:
     "Imbuí a arma de uma Unidade adjacente com Magia. Até o fim do Combate, os Ataques dessa Unidade causam dano Mágico ao invés de Físico.",
-  category: "SKILL",
   activationType: "ACTIVE",
   effectType: "BUFF",
-  costTier: "MEDIUM",
-  range: "MELEE",
-  targetType: "UNIT",
+  manaCost: 2,
   targetingPattern: { ...PATTERNS.SINGLE, maxRange: 1 },
   functionName: "executeMagicWeapon",
   consumesAction: true,
@@ -371,12 +329,9 @@ export const ARCANE_SHIELD: AbilityDefinition = {
   name: "Escudo Arcano",
   description:
     "Até o começo do seu próximo turno, sempre que receberia dano no HP, sua Mana é reduzida no lugar.",
-  category: "SKILL",
   activationType: "ACTIVE",
   effectType: "BUFF",
-  costTier: "MEDIUM",
-  range: "SELF",
-  targetType: "SELF",
+  manaCost: 2,
   targetingPattern: PATTERNS.SELF,
   functionName: "executeArcaneShield",
   consumesAction: false,
@@ -397,7 +352,6 @@ export const EIDOLON_CHARGE: AbilityDefinition = {
   name: "Carga Eidolon",
   description:
     "No começo de toda Batalha, INVOCA seu Eidolon adjacente a você. Sempre que o Eidolon mata uma Unidade, ele ganha +1 em todos os atributos (permanente na Partida). Se o Eidolon morrer, perde todos os acúmulos.",
-  category: "SKILL",
   activationType: "PASSIVE",
   conditionApplied: "EIDOLON_CHARGE",
   metadata: {
@@ -411,7 +365,6 @@ export const EIDOLON_PROTECTION: AbilityDefinition = {
   name: "Proteção de Eidolon",
   description:
     "Caso você esteja adjacente ao seu Eidolon e receber dano, você converte em Dano Verdadeiro e o transfere para seu Eidolon.",
-  category: "SKILL",
   activationType: "PASSIVE",
   conditionApplied: "EIDOLON_PROTECTION",
   metadata: {
@@ -426,12 +379,9 @@ export const EIDOLON_RESISTANCE: AbilityDefinition = {
   name: "Resistência Eidolon",
   description:
     "Caso seu Eidolon tenha 1 ou mais de Proteção, você recupera [FOCO] de Proteção dele.",
-  category: "SKILL",
   activationType: "ACTIVE",
   effectType: "HEALING",
-  costTier: "HIGH",
-  range: "MELEE",
-  targetType: "UNIT",
+  manaCost: 3,
   targetingPattern: { ...PATTERNS.SINGLE, maxRange: 1 },
   functionName: "executeEidolonResistance",
   consumesAction: true,
@@ -459,7 +409,6 @@ export const TROOP_ABILITIES: AbilityDefinition[] = [
     name: "Escudo Protetor",
     description:
       "Quando um aliado adjacente recebe dano, 2 desse dano é automaticamente transferido para você.",
-    category: "SKILL",
     activationType: "PASSIVE",
     availableForTroops: true,
     conditionApplied: "ESCUDO_PROTETOR",
@@ -469,7 +418,6 @@ export const TROOP_ABILITIES: AbilityDefinition[] = [
     name: "Investida",
     description:
       "Ao se mover em linha reta por pelo menos 2 casas antes de atacar, causa +2 de dano.",
-    category: "SKILL",
     activationType: "PASSIVE",
     availableForTroops: true,
     conditionApplied: "INVESTIDA",
@@ -479,7 +427,6 @@ export const TROOP_ABILITIES: AbilityDefinition[] = [
     name: "Emboscada",
     description:
       "Caso ataque uma unidade que ainda não agiu neste turno, causa +3 de dano.",
-    category: "SKILL",
     activationType: "PASSIVE",
     availableForTroops: true,
     conditionApplied: "EMBOSCADA",
@@ -489,7 +436,6 @@ export const TROOP_ABILITIES: AbilityDefinition[] = [
     name: "Furtividade",
     description:
       "Não pode ser alvo de ataques à distância enquanto estiver adjacente a outra unidade aliada.",
-    category: "SKILL",
     activationType: "PASSIVE",
     availableForTroops: true,
     conditionApplied: "FURTIVIDADE",
@@ -499,7 +445,6 @@ export const TROOP_ABILITIES: AbilityDefinition[] = [
     name: "Tiro Rápido",
     description:
       "Pode realizar dois ataques à distância por turno, mas cada ataque causa -1 de dano.",
-    category: "SKILL",
     activationType: "PASSIVE",
     availableForTroops: true,
     conditionApplied: "TIRO_RAPIDO",
@@ -515,9 +460,7 @@ export const TELEPORT: AbilityDefinition = {
   name: "Teleporte",
   description:
     "Move-se instantaneamente para uma posição dentro do alcance (baseado em Focus), ignorando obstáculos e unidades.",
-  category: "SPELL",
-  range: "RANGED",
-  targetType: "POSITION",
+  activationType: "ACTIVE",
   effectType: "UTILITY",
   targetingPattern: { ...PATTERNS.SINGLE, maxRange: ATTRIBUTE.FOCUS },
   functionName: "executeTeleport",
@@ -532,9 +475,7 @@ export const FIRE: AbilityDefinition = {
   name: "Fogo",
   description:
     "Lança uma bola de fogo que viaja até o alvo e explode, causando dano mágico a todas as unidades na área (3x3). Se algo interceptar no caminho, explode nesse ponto. O impacto empurra as unidades atingidas.",
-  category: "SPELL",
-  range: "RANGED",
-  targetType: "POSITION",
+  activationType: "ACTIVE",
   effectType: "OFFENSIVE",
   targetingPattern: { ...PATTERNS.FIREBALL, maxRange: 5, travelDistance: 5 },
   functionName: "executeFire",
@@ -558,9 +499,7 @@ export const EMPOWER: AbilityDefinition = {
   name: "Potencializar",
   description:
     "Potencializa uma unidade adjacente, aumentando todos os seus atributos em 50% do seu Focus até o começo do próximo turno.",
-  category: "SPELL",
-  range: "MELEE",
-  targetType: "UNIT",
+  activationType: "ACTIVE",
   effectType: "BUFF",
   targetingPattern: { ...PATTERNS.SINGLE, maxRange: 1 },
   functionName: "executeEmpower",
@@ -584,8 +523,6 @@ export const HERO_CLASSES: HeroClassDefinition[] = [
     name: "Guerreiro",
     description:
       "Soldado disciplinado e experiente. Mestre em ataques múltiplos e em recuperação tática.",
-    archetype: "PHYSICAL",
-    resourceUsed: "FOOD",
     abilities: WARRIOR_ABILITIES,
   },
   {
@@ -593,8 +530,6 @@ export const HERO_CLASSES: HeroClassDefinition[] = [
     name: "Clérigo",
     description:
       "Escolhido divino com poderes sagrados. Protege aliados e expele maldições.",
-    archetype: "SPIRITUAL",
-    resourceUsed: "DEVOTION",
     abilities: CLERIC_ABILITIES,
   },
   {
@@ -602,8 +537,6 @@ export const HERO_CLASSES: HeroClassDefinition[] = [
     name: "Mago",
     description:
       "Estudioso das artes arcanas que manipula a realidade através de feitiços poderosos.",
-    archetype: "ARCANE",
-    resourceUsed: "ARCANA",
     abilities: WIZARD_ABILITIES,
   },
   {
@@ -611,8 +544,6 @@ export const HERO_CLASSES: HeroClassDefinition[] = [
     name: "Invocador",
     description:
       "Mestre espiritual que canaliza seu poder através de um Eidolon - uma manifestação espiritual que cresce ao consumir as almas de seus inimigos.",
-    archetype: "SPIRITUAL",
-    resourceUsed: "DEVOTION",
     abilities: SUMMONER_ABILITIES,
   },
 ];
@@ -754,9 +685,7 @@ export function getPassiveAbilities(): AbilityDefinition[] {
  * Lista todas as habilidades ativas
  */
 export function getActiveAbilities(): AbilityDefinition[] {
-  return ALL_ABILITIES.filter(
-    (a) => a.activationType === "ACTIVE" || a.category === "SPELL"
-  );
+  return ALL_ABILITIES.filter((a) => a.activationType === "ACTIVE");
 }
 
 /**
@@ -773,16 +702,12 @@ export function getAllClassesSummary(): Array<{
   code: string;
   name: string;
   description: string;
-  archetype: string;
-  resourceUsed: string;
   abilityCount: number;
 }> {
   return HERO_CLASSES.map((c) => ({
     code: c.code,
     name: c.name,
     description: c.description,
-    archetype: c.archetype,
-    resourceUsed: c.resourceUsed,
     abilityCount: c.abilities.length,
   }));
 }
@@ -887,10 +812,7 @@ export interface AbilityInfo {
   description: string;
   color: string;
   requiresTarget: boolean;
-  category: "SKILL" | "SPELL";
   activationType?: "PASSIVE" | "ACTIVE";
-  targetType?: string;
-  range?: string;
   cooldown?: number;
   consumesAction?: boolean;
   manaCost?: number;
@@ -912,11 +834,8 @@ export function getAbilityInfo(abilityCode: string): AbilityInfo | null {
   const ability = findAbilityByCode(abilityCode);
   if (!ability) return null;
 
-  // Determina se requer target baseado no range/targetType
-  const requiresTarget =
-    ability.range === "MELEE" ||
-    ability.range === "RANGED" ||
-    ability.range === "AREA";
+  // Requer target se não for SELF
+  const requiresTarget = !isSelfAbility(ability);
 
   return {
     icon: ABILITY_ICONS[abilityCode] || "✨",
@@ -924,10 +843,7 @@ export function getAbilityInfo(abilityCode: string): AbilityInfo | null {
     description: ability.description,
     color: ABILITY_COLORS[abilityCode] || "purple",
     requiresTarget,
-    category: ability.category,
     activationType: ability.activationType,
-    targetType: ability.targetType,
-    range: ability.range,
     cooldown: ability.cooldown,
     consumesAction: ability.consumesAction !== false,
     manaCost: ability.manaCost,
@@ -966,12 +882,7 @@ export function getAbilityInfoWithState(
     reason = "Passiva";
   }
   // Verificar se possui a habilidade
-  else if (ability.category === "SPELL") {
-    if (!unit.spells?.includes(ability.code)) {
-      canUse = false;
-      reason = "Não possui";
-    }
-  } else if (!unit.features.includes(ability.code)) {
+  else if (!unit.features.includes(ability.code)) {
     canUse = false;
     reason = "Não possui";
   }
@@ -985,8 +896,8 @@ export function getAbilityInfoWithState(
     canUse = false;
     reason = "Sem ações";
   }
-  // Verificar mana para spells
-  else if ((ability.category as string) === "SPELL" && ability.manaCost) {
+  // Verificar mana
+  else if (ability.manaCost) {
     const currentMana = unit.currentMana ?? 0;
     if (currentMana < ability.manaCost) {
       canUse = false;
@@ -1006,45 +917,3 @@ export function getAbilityInfoWithState(
     cooldownRemaining,
   };
 }
-
-// =============================================================================
-// ALIASES PARA COMPATIBILIDADE (DEPRECADOS)
-// =============================================================================
-
-/** @deprecated Use findAbilityByCode */
-export const findSkillByCode = findAbilityByCode;
-/** @deprecated Use getAbilityByCode */
-export const getSkillByCode = getAbilityByCode;
-/** @deprecated Use getAbilitiesForClass */
-export const getSkillsForClass = getAbilitiesForClass;
-/** @deprecated Use getAbilityInfo */
-export const getSkillInfo = getAbilityInfo;
-/** @deprecated Use getAbilityInfoWithState */
-export const getSkillInfoWithState = getAbilityInfoWithState;
-/** @deprecated Use ALL_ABILITIES */
-export const ALL_SKILLS: AbilityDefinition[] = ALL_ABILITIES.filter(
-  (a) => a.category === "SKILL"
-);
-/** @deprecated Use TROOP_ABILITIES */
-export const TROOP_SKILLS = TROOP_ABILITIES;
-/** @deprecated Use TROOP_ABILITY_MAP */
-export const TROOP_SKILLS_MAP = TROOP_ABILITY_MAP;
-/** @deprecated Use ABILITY_ICONS */
-export const SKILL_ICONS = ABILITY_ICONS;
-/** @deprecated Use ABILITY_COLORS */
-export const SKILL_COLORS = ABILITY_COLORS;
-/** @deprecated Use ABILITY_ICONS */
-export const SPELL_ICONS = ABILITY_ICONS;
-/** @deprecated Use ABILITY_COLORS */
-export const SPELL_COLORS = ABILITY_COLORS;
-
-// Re-exports para compatibilidade com imports antigos
-export {
-  WARRIOR_ABILITIES as WARRIOR_SKILLS,
-  CLERIC_ABILITIES as CLERIC_SKILLS,
-  WIZARD_ABILITIES as WIZARD_SKILLS,
-  SUMMONER_ABILITIES as SUMMONER_SKILLS,
-  BARBARIAN_ABILITIES as BARBARIAN_SKILLS,
-  RANGER_ABILITIES as RANGER_SKILLS,
-  ROGUE_ABILITIES as ROGUE_SKILLS,
-};

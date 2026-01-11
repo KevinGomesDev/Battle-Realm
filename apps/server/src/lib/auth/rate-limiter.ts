@@ -96,11 +96,6 @@ class RateLimiter {
     // Atingiu limite? Bloquear
     if (entry.attempts >= this.MAX_ATTEMPTS) {
       entry.blockedUntil = now + this.BLOCK_DURATION_MS;
-      console.log(
-        `[RATE-LIMIT] Bloqueado: ${identifier} por ${
-          this.BLOCK_DURATION_MS / 1000
-        }s`
-      );
     }
 
     this.attempts.set(identifier, entry);
@@ -132,7 +127,6 @@ class RateLimiter {
     }
 
     if (cleaned > 0) {
-      console.log(`[RATE-LIMIT] Cleanup: ${cleaned} entradas removidas`);
     }
   }
 }

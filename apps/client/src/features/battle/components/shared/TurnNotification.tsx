@@ -50,7 +50,6 @@ export function TurnNotification({
 
     // Se mudou de turno
     if (turnKeyRef.current !== turnKey) {
-      console.log("[TurnNotification] 🔄 Novo turno detectado:", turnKey);
       turnKeyRef.current = turnKey;
 
       // Resetar estados
@@ -73,7 +72,6 @@ export function TurnNotification({
   useEffect(() => {
     if (showTurnStart) {
       hideTimerRef.current = setTimeout(() => {
-        console.log("[TurnNotification] ⏱️ Auto-hide do modal turn-start");
         setShowTurnStart(false);
       }, 3000);
 
@@ -90,7 +88,6 @@ export function TurnNotification({
   const triggerEndAction = useCallback(() => {
     if (autoEndTriggeredRef.current) return;
     autoEndTriggeredRef.current = true;
-    console.log("[TurnNotification] ✅ Chamando onEndAction");
     onEndAction();
   }, [onEndAction]);
 

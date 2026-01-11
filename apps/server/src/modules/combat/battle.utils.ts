@@ -1,5 +1,5 @@
 import type { AbilityDefinition as SkillDefinition } from "@boundless/shared/types/ability.types";
-import { COST_VALUES } from "@boundless/shared/types/ability.types";
+import { getAbilityCost } from "@boundless/shared/types/ability.types";
 import { calculateActiveEffects } from "../conditions/conditions";
 import type { ActiveEffectsMap } from "@boundless/shared/types/conditions.types";
 
@@ -14,15 +14,9 @@ export {
 
 export function calculateSkillCost(
   skill: SkillDefinition,
-  timesUsedInBattle: number
+  _timesUsedInBattle: number = 0
 ): number {
-  if (skill.activationType === "PASSIVE" || !skill.costTier) {
-    return 0;
-  }
-
-  const baseCost = COST_VALUES[skill.costTier];
-
-  return baseCost * Math.pow(2, timesUsedInBattle);
+  return getAbilityCost(skill);
 }
 
 // Ordena BattleUnits por iniciativa (decrescente)

@@ -39,7 +39,6 @@ class AudioService {
       .forEach((sound) => this.load(sound));
 
     this.initialized = true;
-    console.log("[AudioService] Initialized");
   }
 
   /**

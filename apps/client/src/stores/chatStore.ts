@@ -132,7 +132,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         set({ messages: response.messages || [] });
       }
     } catch (error) {
-      console.error("Erro ao carregar histórico:", error);
+      console.error("Error loading history:", error);
     }
   },
 
@@ -154,7 +154,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
       }>("chat:send", payload, "chat:send:response");
 
       if (!response.success) {
-        throw new Error(response.error || "Erro ao enviar mensagem");
+        throw new Error(response.error || "Error sending message");
       }
 
       set({ isLoading: false });

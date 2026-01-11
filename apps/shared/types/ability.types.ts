@@ -5,20 +5,13 @@
 import type { BattleUnit } from "./battle.types";
 
 // =============================================================================
-// CATEGORIA DE HABILIDADE (DIFERENCIADOR SKILL vs SPELL)
+// TIPO DE ATIVAÇÃO
 // =============================================================================
 
 /**
- * Categoria principal da habilidade
- * SKILL = Habilidades de classe/passivas (usam features da unidade)
- * SPELL = Magias aprendidas (usam array spells da unidade, custam mana)
- */
-export type AbilityCategory = "SKILL" | "SPELL";
-
-/**
- * Subcategoria para skills
+ * Tipo de ativação da habilidade
  * PASSIVE = Sempre ativa, não precisa usar
- * ACTIVE = Precisa ser ativada, pode consumir ação
+ * ACTIVE = Precisa ser ativada, pode consumir ação e mana
  */
 export type AbilityActivationType = "PASSIVE" | "ACTIVE";
 
@@ -124,21 +117,13 @@ export function resolveDynamicValue(
 /**
  * Tipos de alcance para habilidades
  * SELF = apenas o próprio usuário (distância 0)
- * MELEE = adjacente (distância 1)
- * RANGED = à distância (distância customizável)
- * AREA = afeta área (requer targetingPattern.coordinates)
- */
-export type AbilityRange = "SELF" | "MELEE" | "RANGED" | "AREA";
-
 /**
- * Tipos de alvo para habilidades
+ * Tipos de alvo para habilidades (usado para inferência em `inferTargetType`)
  * SELF = apenas si mesmo
  * UNIT = qualquer unidade (incluindo si mesmo)
- * ALL = todas as unidades
- * POSITION = posição no grid
- * GROUND = terreno/chão
+ * POSITION = posição no grid (área)
  */
-export type AbilityTargetType = "SELF" | "UNIT" | "ALL" | "POSITION" | "GROUND";
+export type AbilityTargetType = "SELF" | "UNIT" | "POSITION";
 
 /**
  * Tipo de efeito da habilidade (usado pela IA para decisões)
@@ -155,33 +140,6 @@ export type AbilityEffectType =
   | "DEBUFF"
   | "UTILITY"
   | "DEFENSIVE";
-
-/**
- * Valores padrão de distância para cada tipo de alcance
- */
-export const DEFAULT_RANGE_DISTANCE: Record<AbilityRange, number> = {
-  SELF: 0,
-  MELEE: 1,
-  RANGED: 5,
-  AREA: 5,
-};
-
-/**
- * Mapeia tipos de alcance legados para o novo sistema
- */
-export function mapLegacyRange(range: string | AbilityRange): AbilityRange {
-  switch (range) {
-    case "ADJACENT":
-      return "MELEE";
-    case "SELF":
-    case "MELEE":
-    case "RANGED":
-    case "AREA":
-      return range as AbilityRange;
-    default:
-      return "MELEE";
-  }
-}
 
 // =============================================================================
 // TARGETING DIRECTION
@@ -362,24 +320,7 @@ export function isCoordinatePattern(
 }
 
 // =============================================================================
-// CUSTO E RECURSOS
-// =============================================================================
-
-export type AbilityCostTier = "LOW" | "MEDIUM" | "HIGH";
-export type Archetype = "PHYSICAL" | "SPIRITUAL" | "ARCANE";
-export type AbilityResourceType = "FOOD" | "DEVOTION" | "ARCANA" | "MANA";
-
-/**
- * Valores numéricos para cada tier de custo (recurso gasto)
- */
-export const COST_VALUES: Record<AbilityCostTier, number> = {
-  LOW: 1,
-  MEDIUM: 2,
-  HIGH: 3,
-};
-
-// =============================================================================
-// IMPACTO / KNOCKBACK
+// DEFINIÇÃO UNIFICADA DE HABILIDADE
 // =============================================================================
 
 /**
@@ -427,8 +368,8 @@ export interface ImpactConfig {
 // =============================================================================
 
 /**
- * Definição UNIFICADA de uma habilidade (Skill ou Spell)
- * A propriedade `category` diferencia entre SKILL e SPELL
+ * Definição UNIFICADA de uma habilidade
+ * Todas as habilidades usam mana como recurso
  */
 export interface AbilityDefinition {
   // === IDENTIFICAÇÃO ===
@@ -436,10 +377,8 @@ export interface AbilityDefinition {
   name: string;
   description: string;
 
-  // === CATEGORIA (DIFERENCIADOR PRINCIPAL) ===
-  /** SKILL = Habilidade de classe | SPELL = Magia aprendida */
-  category: AbilityCategory;
-  /** PASSIVE = Sempre ativa | ACTIVE = Precisa usar (apenas para SKILL) */
+  // === TIPO DE ATIVAÇÃO ===
+  /** PASSIVE = Sempre ativa | ACTIVE = Precisa usar */
   activationType?: AbilityActivationType;
 
   // === TIPO DE EFEITO (para IA) ===
@@ -452,24 +391,16 @@ export interface AbilityDefinition {
   availableForTroops?: boolean;
 
   // === CUSTO ===
-  /** Tier de custo para skills de classe */
-  costTier?: AbilityCostTier;
-  /** Custo de mana para spells */
+  /** Custo de mana. Default: 0 */
   manaCost?: number;
-
-  // === ALCANCE ===
-  /** Tipo semântico de alcance (para UI e legibilidade) */
-  range?: AbilityRange;
 
   // === TARGETING PATTERN ===
   /**
    * Padrão de coordenadas para área de efeito
    * Define exatamente quais células são afetadas
+   * Contém: origin, coordinates, maxRange, isProjectile, piercing, maxTargets
    */
   targetingPattern?: CoordinatePattern;
-
-  // === ALVO ===
-  targetType?: AbilityTargetType;
 
   // === EXECUÇÃO ===
   /** Nome da função que executa a habilidade */
@@ -478,19 +409,6 @@ export interface AbilityDefinition {
   consumesAction?: boolean;
   /** Rodadas de espera após uso. Default: 0 */
   cooldown?: number;
-
-  // === PROJÉTIL ===
-  /**
-   * Se a ability é um projétil interceptável
-   * Projéteis percorrem células uma a uma, podem ser esquivados
-   * Se o alvo esquivar (QTE), o projétil continua para próxima célula
-   * Default: true para OFFENSIVE, false para outros
-   */
-  isProjectile?: boolean;
-  /** Se o projétil atravessa unidades (não para no primeiro alvo). Default: false */
-  piercing?: boolean;
-  /** Número máximo de alvos afetados em sequência (do mais próximo ao mais distante) */
-  maxTargets?: number;
 
   // === IMPACTO (KNOCKBACK) ===
   /**
@@ -558,23 +476,6 @@ export function isContestedAbility(ability: AbilityDefinition): boolean {
   );
 }
 
-/**
- * Verifica se uma ability requer QTE (qualquer tipo)
- * Inclui: ataques, projéteis interceptáveis e abilities contestadas
- */
-export function abilityRequiresQTE(ability: AbilityDefinition): boolean {
-  // Ataques básicos sempre requerem QTE
-  if (ability.code === "ATTACK") return true;
-
-  // Projéteis que podem ser interceptados
-  if (ability.isProjectile === true) return true;
-
-  // Abilities contestadas (ex: debuffs resistíveis)
-  if (isContestedAbility(ability)) return true;
-
-  return false;
-}
-
 // =============================================================================
 // RESULTADO DE EXECUÇÃO (UNIFICADO)
 // =============================================================================
@@ -586,6 +487,10 @@ export interface AbilityExecutionResult {
   success: boolean;
   error?: string;
   abilityCode?: string;
+
+  // === ATAQUE ===
+  /** Se o ataque errou (nenhum alvo atingido) */
+  missed?: boolean;
 
   // === DANO/CURA ===
   damageDealt?: number;
@@ -634,18 +539,14 @@ export interface AbilityExecutionResult {
   eidolonDefeated?: boolean;
   killedSummonIds?: string[];
 
-  // === QTE (para ATTACK e PROJECTILES) ===
-  requiresQTE?: boolean;
-  qteAttackerId?: string;
-  qteTargetId?: string;
-  /** Tipo de QTE necessário */
-  qteType?: "ATTACK" | "DODGE";
-  /** Posição do impacto (para projéteis de área) */
-  qteImpactPoint?: { x: number; y: number };
-  /** Se é um projétil de área que vai explodir após QTE */
-  isAreaProjectile?: boolean;
-  /** Ability code para continuar execução após QTE */
-  pendingAbilityCode?: string;
+  // === NOVO SISTEMA DE PROJÉTEIS ===
+
+  /** Se a ability precisa lançar um projétil (usa ProjectileManager) */
+  requiresProjectile?: boolean;
+  /** Origem do projétil */
+  projectileOrigin?: { x: number; y: number };
+  /** Destino do projétil */
+  projectileDestination?: { x: number; y: number };
 
   // === METADATA (informações extras para viagem + explosão) ===
   metadata?: {
@@ -653,6 +554,10 @@ export interface AbilityExecutionResult {
     intercepted?: boolean;
     affectedCells?: Array<{ x: number; y: number }>;
     travelPath?: Array<{ x: number; y: number }>;
+    /** ID do caster (para tracking) */
+    casterId?: string;
+    /** Informações extras */
+    [key: string]: unknown;
   };
 
   // === UNIDADES AFETADAS (para explosões de área) ===
@@ -723,8 +628,6 @@ export interface HeroClassDefinition {
   code: string;
   name: string;
   description: string;
-  archetype: Archetype;
-  resourceUsed: AbilityResourceType;
   abilities: AbilityDefinition[];
 }
 
@@ -735,28 +638,12 @@ export interface HeroClassSummary {
   code: string;
   name: string;
   description: string;
-  archetype: Archetype;
-  resourceUsed: AbilityResourceType;
   abilityCount: number;
 }
 
 // =============================================================================
 // HELPERS
 // =============================================================================
-
-/**
- * Verifica se uma habilidade é uma Skill
- */
-export function isSkill(ability: AbilityDefinition): boolean {
-  return ability.category === "SKILL";
-}
-
-/**
- * Verifica se uma habilidade é uma Spell
- */
-export function isSpell(ability: AbilityDefinition): boolean {
-  return ability.category === "SPELL";
-}
 
 /**
  * Verifica se uma habilidade é passiva
@@ -769,168 +656,55 @@ export function isPassive(ability: AbilityDefinition): boolean {
  * Verifica se uma habilidade é ativa (pode ser usada)
  */
 export function isActive(ability: AbilityDefinition): boolean {
-  // Spells são sempre ativas
-  if (ability.category === "SPELL") return true;
-  // Skills dependem do activationType
-  return ability.activationType === "ACTIVE";
+  return (
+    ability.activationType === "ACTIVE" || ability.activationType === undefined
+  );
 }
 
 /**
- * Calcula o custo numérico de uma habilidade
- * @param isBattle - Se true, skills não têm custo em Battle
+ * Obtém o custo de mana de uma habilidade
  */
-export function getAbilityCost(
-  ability: AbilityDefinition,
-  isBattle: boolean = false
-): number {
-  // Spells usam manaCost
-  if (ability.category === "SPELL") {
-    return ability.manaCost ?? 0;
-  }
-
-  // Skills em Battle não têm custo
-  if (isBattle) return 0;
-
-  // Skills passivas não têm custo
-  if (ability.activationType === "PASSIVE" || !ability.costTier) return 0;
-
-  return COST_VALUES[ability.costTier];
+export function getAbilityCost(ability: AbilityDefinition): number {
+  // Passivas não têm custo
+  if (ability.activationType === "PASSIVE") return 0;
+  return ability.manaCost ?? 0;
 }
 
 /**
  * Obtém o alcance efetivo de uma habilidade
+ * Fonte de verdade: targetingPattern.maxRange
  */
 export function getAbilityEffectiveRange(ability: AbilityDefinition): number {
-  // 1. Fonte de verdade: targetingPattern.maxRange
   if (
     ability.targetingPattern?.maxRange !== undefined &&
     typeof ability.targetingPattern.maxRange === "number"
   ) {
     return ability.targetingPattern.maxRange;
   }
-
-  // 2. Fallback final: valor padrão baseado no tipo de range
-  if (!ability.range) return 0;
-  return DEFAULT_RANGE_DISTANCE[ability.range];
-}
-
-/**
- * Mapeia Archetype para AbilityResourceType
- */
-export function getArchetypeResource(
-  archetype: Archetype
-): AbilityResourceType {
-  const map: Record<Archetype, AbilityResourceType> = {
-    PHYSICAL: "FOOD",
-    SPIRITUAL: "DEVOTION",
-    ARCANE: "ARCANA",
-  };
-  return map[archetype];
+  // Pattern SELF ou sem maxRange = alcance 0
+  if (ability.targetingPattern?.origin === "CASTER") {
+    return 0;
+  }
+  return 0;
 }
 
 // =============================================================================
-// LABELS (TRADUÇÃO PARA PT-BR)
-// =============================================================================
-
-/**
- * Traduz categoria para português
- */
-export function getCategoryLabel(category: AbilityCategory): string {
-  const labels: Record<AbilityCategory, string> = {
-    SKILL: "Habilidade",
-    SPELL: "Magia",
-  };
-  return labels[category];
-}
-
-/**
- * Traduz tipo de ativação para português
- */
-export function getActivationTypeLabel(type: AbilityActivationType): string {
-  const labels: Record<AbilityActivationType, string> = {
-    PASSIVE: "Passiva",
-    ACTIVE: "Ativa",
-  };
-  return labels[type];
-}
-
-/**
- * Traduz alcance para português
- */
-export function getRangeLabel(range: AbilityRange): string {
-  const labels: Record<AbilityRange, string> = {
-    SELF: "Pessoal",
-    MELEE: "Corpo-a-corpo",
-    RANGED: "À Distância",
-    AREA: "Área",
-  };
-  return labels[range];
-}
-
-/**
- * Traduz tipo de alvo para português
- */
-export function getTargetTypeLabel(targetType: AbilityTargetType): string {
-  const labels: Record<AbilityTargetType, string> = {
-    SELF: "Você",
-    UNIT: "Unidade",
-    ALL: "Todos",
-    POSITION: "Posição",
-    GROUND: "Terreno",
-  };
-  return labels[targetType];
-}
-
-/**
- * Traduz archetype para português
- */
-export function getArchetypeLabel(archetype: Archetype): string {
-  const labels: Record<Archetype, string> = {
-    PHYSICAL: "Físico",
-    SPIRITUAL: "Espiritual",
-    ARCANE: "Arcano",
-  };
-  return labels[archetype];
-}
-
-/**
- * Traduz recurso para português
- */
-export function getResourceLabel(resource: AbilityResourceType): string {
-  const labels: Record<AbilityResourceType, string> = {
-    FOOD: "Suprimentos",
-    DEVOTION: "Devoção",
-    ARCANA: "Arcano",
-    MANA: "Mana",
-  };
-  return labels[resource];
-}
-
-// =============================================================================
-// SISTEMA DE PROJÉTIL
+// PROJECTILE SYSTEM
 // =============================================================================
 
 /**
  * Determina se uma ability é um projétil interceptável
- * Regras:
- * 1. Se isProjectile está definido explicitamente, usa esse valor
- * 2. Se targetingPattern.isProjectile está definido, usa esse valor
- * 3. OFFENSIVE é projétil por padrão (exceto SELF target)
- * 4. BUFF, DEBUFF, HEALING, UTILITY NÃO são projéteis
+ * Fonte de verdade: targetingPattern.isProjectile
+ * Default: OFFENSIVE é projétil, outros não
  */
 export function isAbilityProjectile(ability: AbilityDefinition): boolean {
-  // Verificar definição explícita na ability
-  if (ability.isProjectile !== undefined) {
-    return ability.isProjectile;
-  }
-
   // Verificar definição no pattern
   if (ability.targetingPattern?.isProjectile !== undefined) {
     return ability.targetingPattern.isProjectile;
   }
 
-  // SELF não é projétil
-  if (ability.targetType === "SELF" || ability.range === "SELF") {
+  // SELF/CASTER origin não é projétil
+  if (ability.targetingPattern?.origin === "CASTER") {
     return false;
   }
 
@@ -945,6 +719,7 @@ export function isAbilityProjectile(ability: AbilityDefinition): boolean {
 
 /**
  * Obtém configuração de projétil de uma ability
+ * Fonte de verdade: targetingPattern
  */
 export function getAbilityProjectileConfig(ability: AbilityDefinition): {
   isProjectile: boolean;
@@ -953,59 +728,12 @@ export function getAbilityProjectileConfig(ability: AbilityDefinition): {
   projectileOrder: "DISTANCE" | "SEQUENTIAL" | "REVERSE";
 } {
   const isProjectile = isAbilityProjectile(ability);
-
-  // Prioridade: pattern > ability > defaults
   const pattern = ability.targetingPattern;
 
   return {
     isProjectile,
-    piercing: pattern?.piercing ?? ability.piercing ?? false,
-    maxTargets:
-      pattern?.maxTargets ??
-      ability.maxTargets ??
-      (pattern?.piercing || ability.piercing ? Infinity : 1),
+    piercing: pattern?.piercing ?? false,
+    maxTargets: pattern?.maxTargets ?? (pattern?.piercing ? Infinity : 1),
     projectileOrder: pattern?.projectileOrder ?? "DISTANCE",
   };
 }
-
-// =============================================================================
-// ALIASES PARA COMPATIBILIDADE (DEPRECADOS)
-// =============================================================================
-
-/** @deprecated Use AbilityDefinition */
-export type SkillDefinition = AbilityDefinition;
-/** @deprecated Use AbilityDefinition */
-export type SpellDefinition = AbilityDefinition;
-/** @deprecated Use AbilityExecutionResult */
-export type SkillExecutionResult = AbilityExecutionResult;
-/** @deprecated Use AbilityExecutionResult */
-export type SpellExecutionResult = AbilityExecutionResult;
-/** @deprecated Use AbilityActivationType */
-export type SkillCategory = AbilityActivationType;
-/** @deprecated Use AbilityCostTier */
-export type SkillCostTier = AbilityCostTier;
-/** @deprecated Use AbilityRange */
-export type SkillRange = AbilityRange | "ADJACENT";
-/** @deprecated Use AbilityRange */
-export type SpellRange = AbilityRange | "ADJACENT";
-/** @deprecated Use AbilityTargetType */
-export type SkillTargetType = AbilityTargetType;
-/** @deprecated Use AbilityTargetType */
-export type SpellTargetType = AbilityTargetType;
-/** @deprecated Use AbilityResourceType */
-export type SkillResourceType = AbilityResourceType;
-/** @deprecated Use getAbilityCost */
-export const getSkillCost = getAbilityCost;
-/** @deprecated Use getAbilityEffectiveRange */
-export const getSkillEffectiveRange = getAbilityEffectiveRange;
-
-/**
- * @deprecated Use DEFAULT_RANGE_DISTANCE
- */
-export const DEFAULT_RANGE_VALUES: Record<string, number> = {
-  SELF: 0,
-  MELEE: 1,
-  ADJACENT: 1,
-  RANGED: 5,
-  AREA: 5,
-};

@@ -218,10 +218,6 @@ export async function handleCreateKingdom(
       });
     });
 
-    console.log(
-      `[Kingdom] Reino "${template.name}" criado para ${userData.userId}`
-    );
-
     client.send("kingdom:created", {
       kingdom,
       message: `Reino ${template.name} criado com sucesso!`,

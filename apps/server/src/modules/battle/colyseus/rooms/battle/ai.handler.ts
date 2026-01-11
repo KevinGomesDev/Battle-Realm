@@ -1,9 +1,16 @@
 // ai.handler.ts - Lógica de turno da IA
 import type { Room } from "@colyseus/core";
 import type { BattleSessionState, BattleUnitSchema } from "../../schemas";
-import { isValidPosition, canAttack } from "./utils";
-import type { QTEResultForExecutor } from "../../../../abilities/executors/types";
+import {
+  isValidPosition,
+  canAttack,
+  schemaUnitToBattleUnit,
+  syncUnitFromResult,
+} from "./utils";
 import { createAndEmitEvent } from "../../../../match/services/event.service";
+import { executeSkill } from "../../../../abilities/executors";
+import { processUnitDeath } from "../../../../combat/death-logic";
+import type { BattleUnit } from "@boundless/shared/types/battle.types";
 
 /**
  * Executa o turno de uma unidade controlada por IA
@@ -13,21 +20,10 @@ export function executeAITurn(
   unit: BattleUnitSchema,
   broadcast: Room<BattleSessionState>["broadcast"],
   isValidPositionFn: (x: number, y: number) => boolean,
-  executeAttackFn: (
-    attacker: BattleUnitSchema,
-    target: BattleUnitSchema,
-    qteResult: QTEResultForExecutor
-  ) => void,
   advanceToNextUnitFn: () => void,
   roomId?: string
 ): void {
-  console.log(
-    `[BattleRoom] 🤖 executeAITurn iniciado para: ${unit.name} (${unit.id})`
-  );
-
   setTimeout(() => {
-    console.log(`[BattleRoom] 🤖 IA processando turno de: ${unit.name}`);
-
     // Encontrar inimigo mais próximo
     let closestEnemy: BattleUnitSchema | undefined = undefined;
     let closestDist = Infinity;
@@ -44,17 +40,11 @@ export function executeAITurn(
     });
 
     if (!closestEnemy) {
-      console.log(
-        `[BattleRoom] 🤖 IA: Nenhum inimigo encontrado, passando turno`
-      );
       advanceToNextUnitFn();
       return;
     }
 
     const enemy = closestEnemy as BattleUnitSchema;
-    console.log(
-      `[BattleRoom] 🤖 IA: Inimigo mais próximo: ${enemy.name} a ${closestDist} células`
-    );
 
     // Mover em direção ao inimigo
     const dx = Math.sign(enemy.posX - unit.posX);
@@ -70,10 +60,6 @@ export function executeAITurn(
         unit.posX = newX;
         unit.posY = newY;
         unit.movesLeft--;
-
-        console.log(
-          `[BattleRoom] 🤖 IA: ${unit.name} moveu de (${fromX},${fromY}) para (${newX},${newY})`
-        );
 
         broadcast("battle:unit_moved", {
           unitId: unit.id,
@@ -111,9 +97,6 @@ export function executeAITurn(
           );
         }
       } else {
-        console.log(
-          `[BattleRoom] 🤖 IA: Posição (${newX},${newY}) inválida, não moveu`
-        );
       }
     }
 
@@ -121,19 +104,51 @@ export function executeAITurn(
     const newDist =
       Math.abs(enemy.posX - unit.posX) + Math.abs(enemy.posY - unit.posY);
     if (newDist <= 1 && canAttack(unit)) {
-      console.log(`[BattleRoom] 🤖 IA: ${unit.name} atacando ${enemy.name}`);
-      executeAttackFn(unit, enemy, {
-        dodged: false,
-        attackerDamageModifier: 1.0,
-        defenderDamageModifier: 1.0,
-      });
-    } else {
-      console.log(
-        `[BattleRoom] 🤖 IA: Distância ${newDist}, ataques restantes: ${unit.attacksLeftThisTurn}, ações: ${unit.actionsLeft}, não atacou`
+      // Executar ataque usando executeSkill diretamente (sem QTE)
+      const allUnits: BattleUnit[] = Array.from(state.units.values()).map((u) =>
+        schemaUnitToBattleUnit(u)
       );
-    }
+      const casterUnit = schemaUnitToBattleUnit(unit);
+      const targetUnit = schemaUnitToBattleUnit(enemy);
 
-    console.log(`[BattleRoom] 🤖 IA: ${unit.name} finalizando turno`);
+      const result = executeSkill(
+        casterUnit,
+        "ATTACK",
+        targetUnit,
+        allUnits,
+        true,
+        { targetPosition: { x: enemy.posX, y: enemy.posY } }
+      );
+
+      if (result.success) {
+        // Sincronizar resultado
+        syncUnitFromResult(unit, casterUnit, result);
+
+        // Sincronizar alvo
+        if (result.targetHpAfter !== undefined) {
+          enemy.currentHp = result.targetHpAfter;
+          if (result.targetHpAfter <= 0 && enemy.isAlive) {
+            enemy.isAlive = false;
+            processUnitDeath(targetUnit, allUnits);
+          }
+        }
+
+        // Broadcast ataque
+        broadcast("battle:skill_used", {
+          casterUnitId: unit.id,
+          skillCode: "ATTACK",
+          targetPosition: { x: enemy.posX, y: enemy.posY },
+          result,
+          casterUpdated: {
+            actionsLeft: unit.actionsLeft,
+            movesLeft: unit.movesLeft,
+            currentHp: unit.currentHp,
+            currentMana: unit.currentMana,
+            attacksLeftThisTurn: unit.attacksLeftThisTurn,
+          },
+        });
+      }
+    }
     advanceToNextUnitFn();
   }, 1000);
 }

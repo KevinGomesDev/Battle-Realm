@@ -27,6 +27,7 @@ export {
 export {
   type AbilityValidationResult,
   type AbilityValidationErrorCode,
+  type InferredTargetType,
   unitHasAbility,
   getAbilityMaxRange,
   validateAbilityUse,
@@ -36,17 +37,8 @@ export {
   isValidAbilityTarget,
   getValidAbilityTargets,
   isValidAbilityPosition,
-  // Aliases para compatibilidade
-  validateSkillUse,
-  validateSpellUse,
-  canUseSkill,
-  canUseSpell,
-  isValidSkillTarget,
-  isValidSpellTarget,
-  getValidSkillTargets,
-  getValidSpellTargets,
-  getSkillMaxRange,
-  getSpellMaxRange,
+  inferTargetType,
+  isSelfAbility,
 } from "./ability-validation";
 
 // Targeting - export seletivo (novo sistema baseado em CoordinatePattern)
@@ -69,15 +61,6 @@ export {
   calculateSelectableCells,
   calculateAffectedCells,
   calculateTargetingPreview,
-  // Sistema de projétil
-  type ProjectileUnit,
-  type ProjectileTrajectory,
-  type ProjectileProcessResult,
-  orderCoordinatesForProjectile,
-  calculateProjectileTrajectory,
-  findNextProjectileTarget,
-  continueProjectileAfterDodge,
-  processProjectileForPattern,
   // Sistema de viagem + explosão
   type TravelObstacle,
   type TravelResult,
@@ -85,6 +68,4 @@ export {
   calculateProjectileTravel,
   processAreaAbility,
   getTargetsInArea,
-  // QTE
-  handleQTE,
 } from "./targeting.utils";

@@ -1,6 +1,6 @@
 // Ações padrão importadas do shared (fonte de verdade)
 import {
-  findSkillByCode,
+  findAbilityByCode,
   getCommonActionCodes,
 } from "@boundless/shared/data/abilities.data";
 

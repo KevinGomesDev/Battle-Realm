@@ -45,7 +45,6 @@ export function unitsToBlockers(
 
 /**
  * Configuração para checagem de LoS
- * @deprecated Use BlockingOptions de blocking.utils.ts
  */
 export interface LoSConfig {
   /** Obstáculos que bloqueiam visão */

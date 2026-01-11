@@ -31,6 +31,10 @@ interface UseMovableCellsParams {
   isMyTurn: boolean;
   gridWidth: number;
   gridHeight: number;
+  /** Código da ability sendo hovereada no HotBar */
+  hoveredAbilityCode?: string | null;
+  /** Célula sob o mouse */
+  hoveredCell?: { x: number; y: number } | null;
 }
 
 interface UseMovableCellsResult {
@@ -63,6 +67,8 @@ export function useMovableCells({
   isMyTurn,
   gridWidth,
   gridHeight,
+  hoveredAbilityCode,
+  hoveredCell,
 }: UseMovableCellsParams): UseMovableCellsResult {
   // Verificar se pode usar dash
   const canDash = useMemo((): boolean => {
@@ -168,7 +174,8 @@ export function useMovableCells({
   }, [movableCellsMap]);
 
   // Células alcançáveis com disparada (além do movimento normal)
-  const dashableCellsMap = useMemo((): Map<string, MovementCellInfo> => {
+  // Calculamos todas as células potenciais primeiro
+  const allDashableCellsMap = useMemo((): Map<string, MovementCellInfo> => {
     if (!canDash || !selectedUnit) return new Map();
 
     const dashable = new Map<string, MovementCellInfo>();
@@ -237,6 +244,41 @@ export function useMovableCells({
     obstacles,
     gridWidth,
     gridHeight,
+  ]);
+
+  // Células de dash visíveis - só mostra quando:
+  // 1. Jogador está com HOVER em cima da Skill Dash (hoveredAbilityCode === "DASH")
+  // 2. Jogador tem movimento (movesLeft > 0) e ação livre, e dá hover em uma célula que
+  //    só pode ser alcançada com disparada (célula está em allDashableCellsMap mas não em movableCellsMap)
+  const dashableCellsMap = useMemo((): Map<string, MovementCellInfo> => {
+    // Caso 1: Hover na skill DASH - mostra toda a zona de dash
+    if (hoveredAbilityCode === "DASH") {
+      return allDashableCellsMap;
+    }
+
+    // Caso 2: Hover em célula que só pode ser alcançada com dash
+    if (hoveredCell && selectedUnit) {
+      const cellKey = `${hoveredCell.x},${hoveredCell.y}`;
+      const isHoveringDashOnlyCell =
+        allDashableCellsMap.has(cellKey) && !movableCellsMap.has(cellKey);
+
+      // Precisa ter movimento (movesLeft > 0) e ação livre (actionsLeft > 0)
+      const hasMovement = selectedUnit.movesLeft > 0;
+      const hasFreeAction = selectedUnit.actionsLeft > 0;
+
+      if (isHoveringDashOnlyCell && hasMovement && hasFreeAction) {
+        return allDashableCellsMap;
+      }
+    }
+
+    // Fora dessas condições, não mostra a zona de dash
+    return new Map();
+  }, [
+    hoveredAbilityCode,
+    hoveredCell,
+    selectedUnit,
+    allDashableCellsMap,
+    movableCellsMap,
   ]);
 
   // Set simples para células de dash

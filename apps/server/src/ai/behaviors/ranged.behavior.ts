@@ -86,8 +86,8 @@ export function makeRangedDecision(
           ? typeof s.targetingPattern.maxRange === "number"
             ? s.targetingPattern.maxRange
             : resolveDynamicValue(s.targetingPattern.maxRange, unit)
-          : 0;
-      return s.range === "RANGED" || maxRange > 1;
+          : 1;
+      return maxRange > 1;
     });
 
     if (rangedSkills.length > 0) {

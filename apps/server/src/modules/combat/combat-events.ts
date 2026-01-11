@@ -920,7 +920,7 @@ export async function emitAbilityExecutedEvent(
     data: {
       skillCode: ability.code,
       skillName: ability.name,
-      abilityCategory: ability.category,
+      abilityEffectType: ability.effectType,
       damageDealt: result.damageDealt,
       rawDamage: result.rawDamage,
       damageReduction: result.damageReduction,

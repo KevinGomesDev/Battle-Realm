@@ -10,11 +10,6 @@ type LogFn = (prefix: string, message: string, ...args: unknown[]) => void;
 function createLogger(category: string, color: string): LogFn {
   return (prefix: string, message: string, ...args: unknown[]) => {
     if (!isDev) return;
-    console.log(
-      `%c[${category}] ${prefix} ${message}`,
-      `color: ${color}; font-weight: bold`,
-      ...args
-    );
   };
 }
 

@@ -2,6 +2,7 @@
 // Store Zustand para gerenciamento de reinos
 
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { kingdomApi } from "../features/kingdom/api";
 import type {
   KingdomWithRelations,
@@ -38,98 +39,107 @@ const initialState: KingdomState = {
   error: null,
 };
 
-export const useKingdomStore = create<KingdomState & KingdomActions>((set) => ({
-  ...initialState,
+export const useKingdomStore = create<KingdomState & KingdomActions>()(
+  persist(
+    (set) => ({
+      ...initialState,
 
-  setKingdom: (kingdom) => set({ kingdom }),
+      setKingdom: (kingdom) => set({ kingdom }),
 
-  setKingdoms: (kingdoms) => set({ kingdoms }),
+      setKingdoms: (kingdoms) => set({ kingdoms }),
 
-  setLoading: (isLoading) => set({ isLoading }),
+      setLoading: (isLoading) => set({ isLoading }),
 
-  setError: (error) => set({ error }),
+      setError: (error) => set({ error }),
 
-  reset: () => set(initialState),
+      reset: () => set(initialState),
 
-  clearError: () => set({ error: null }),
+      clearError: () => set({ error: null }),
 
-  selectKingdom: (kingdom) => set({ kingdom }),
+      selectKingdom: (kingdom) => set({ kingdom }),
 
-  createKingdom: async (data) => {
-    set({ isLoading: true, error: null });
+      createKingdom: async (data) => {
+        set({ isLoading: true, error: null });
 
-    try {
-      const response = await kingdomApi.create(data);
+        try {
+          const response = await kingdomApi.create(data);
 
-      if (!response.success || !response.data) {
-        throw new Error(response.error || "Erro ao criar reino");
-      }
+          if (!response.success || !response.data) {
+            throw new Error(response.error || "Error creating kingdom");
+          }
 
-      set({ kingdom: response.data.kingdom });
+          set({ kingdom: response.data.kingdom });
 
-      // Atualiza lista de reinos
-      const listResponse = await kingdomApi.list();
-      if (listResponse.success && listResponse.data) {
-        set({ kingdoms: listResponse.data });
-      }
+          // Update kingdoms list
+          const listResponse = await kingdomApi.list();
+          if (listResponse.success && listResponse.data) {
+            set({ kingdoms: listResponse.data });
+          }
 
-      return response.data.kingdom;
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Erro ao criar reino";
-      set({ error: message });
-      throw error;
-    } finally {
-      set({ isLoading: false });
+          return response.data.kingdom;
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Error creating kingdom";
+          set({ error: message });
+          throw error;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      loadKingdoms: async () => {
+        set({ isLoading: true, error: null });
+
+        try {
+          const response = await kingdomApi.list();
+
+          if (!response.success) {
+            throw new Error(response.error || "Error loading kingdoms");
+          }
+
+          const kingdoms = response.data || [];
+          set({ kingdoms });
+          return kingdoms;
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Error loading kingdoms";
+          set({ error: message });
+          throw error;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      deleteKingdom: async (kingdomId: string) => {
+        set({ isLoading: true, error: null });
+
+        try {
+          const response = await kingdomApi.delete(kingdomId);
+
+          if (!response.success) {
+            throw new Error(response.error || "Error deleting kingdom");
+          }
+
+          // Remove the kingdom from local list
+          set((state) => ({
+            kingdoms: state.kingdoms.filter((k) => k.id !== kingdomId),
+            // If the deleted kingdom was selected, clear the selection
+            kingdom: state.kingdom?.id === kingdomId ? null : state.kingdom,
+          }));
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Error deleting kingdom";
+          set({ error: message });
+          throw error;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+    }),
+    {
+      name: "kingdom-storage",
+      // Apenas persistir o kingdom selecionado, não o resto do estado
+      partialize: (state) => ({ kingdom: state.kingdom }),
     }
-  },
-
-  loadKingdoms: async () => {
-    set({ isLoading: true, error: null });
-
-    try {
-      const response = await kingdomApi.list();
-
-      if (!response.success) {
-        throw new Error(response.error || "Erro ao carregar reinos");
-      }
-
-      const kingdoms = response.data || [];
-      set({ kingdoms });
-      return kingdoms;
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Erro ao carregar reinos";
-      set({ error: message });
-      throw error;
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-
-  deleteKingdom: async (kingdomId: string) => {
-    set({ isLoading: true, error: null });
-
-    try {
-      const response = await kingdomApi.delete(kingdomId);
-
-      if (!response.success) {
-        throw new Error(response.error || "Erro ao deletar reino");
-      }
-
-      // Remove o reino da lista local
-      set((state) => ({
-        kingdoms: state.kingdoms.filter((k) => k.id !== kingdomId),
-        // Se o reino deletado era o selecionado, limpa a seleção
-        kingdom: state.kingdom?.id === kingdomId ? null : state.kingdom,
-      }));
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Erro ao deletar reino";
-      set({ error: message });
-      throw error;
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-}));
+  )
+);

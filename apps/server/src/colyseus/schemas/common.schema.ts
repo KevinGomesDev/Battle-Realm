@@ -85,7 +85,7 @@ export class BattleObstacleSchema extends Schema {
   @type("string") type: string = "ROCK";
   /** Tamanho do obstáculo (SMALL=1x1, MEDIUM=2x2, LARGE=3x3, HUGE=4x4) */
   @type("string") size: string = "SMALL";
-  /** @deprecated Use 'type' - mantido apenas para compatibilidade */
+  /** Emoji para exibição (fallback se não houver sprite) */
   @type("string") emoji: string = "";
   @type("number") hp: number = 3;
   @type("number") maxHp: number = 3;
